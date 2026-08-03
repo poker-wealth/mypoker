@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FairPlay — live engine test</title>
+<style>
+  :root {
+    --bg:#0e1117; --panel:#161b26; --line:#242c3d; --text:#e6edf3; --dim:#8b98a9;
+    --green:#3fb950; --red:#f85149; --gold:#d29922; --blue:#58a6ff;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); line-height:1.55; }
+  header { padding:28px 20px 18px; border-bottom:1px solid var(--line); }
+  h1 { margin:0 0 6px; font-size:1.35rem; }
+  header p { margin:0; color:var(--dim); font-size:.9rem; }
+  main { max-width:980px; margin:0 auto; padding:22px 20px 60px; }
+  .games { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:22px; }
+  button {
+    background:var(--panel); color:var(--text); border:1px solid var(--line);
+    padding:9px 14px; border-radius:8px; cursor:pointer; font-size:.88rem;
+  }
+  button:hover { border-color:var(--blue); color:var(--blue); }
+  button.busy { opacity:.5; cursor:wait; }
+  button.fair { border-color:var(--gold); color:var(--gold); }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:14px; }
+  .headline { font-weight:600; margin-bottom:12px; }
+  .row { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid var(--line); font-size:.92rem; }
+  .row:last-child { border-bottom:0; }
+  .win { color:var(--green); }
+  .lose { color:var(--red); }
+  .dim { color:var(--dim); }
+  .verdict { margin-top:12px; padding:10px 12px; border-radius:8px; font-weight:600; font-size:.9rem; }
+  .ok { background:rgba(63,185,80,.12); color:var(--green); border:1px solid rgba(63,185,80,.3); }
+  .bad { background:rgba(248,81,73,.12); color:var(--red); border:1px solid rgba(248,81,73,.3); }
+  .cards { font-family:ui-monospace, monospace; letter-spacing:.06em; margin:6px 0; }
+  pre { background:#0b0f16; border:1px solid var(--line); border-radius:8px; padding:12px;
+        overflow-x:auto; font-size:.78rem; color:var(--dim); margin:10px 0 0; }
+  .steps li { margin:3px 0; font-size:.88rem; }
+  .hash { font-family:ui-monospace, monospace; font-size:.76rem; word-break:break-all; color:var(--dim); }
+  .kv { display:grid; grid-template-columns:170px 1fr; gap:4px 12px; font-size:.84rem; margin-top:8px; }
+  .kv div:nth-child(odd) { color:var(--dim); }
+</style>
+</head>
+<body>
+<header>
+  <h1>FairPlay — live engine test</h1>
+  <p>Every button runs the <strong>real game engine</strong>. Nothing on this page is mocked or hard-coded.</p>
+</header>
+
+<main>
+  <div class="games" id="games"></div>
+  <div id="out"></div>
+</main>
+
+<script>
+const GAMES = [
+  ['texas', "Texas Hold'em"], ['short-deck', 'Short Deck'], ['omaha', 'Omaha'],
+  ['baccarat', 'Baccarat'], ['san-zhang', 'San Zhang'], ['niu-niu', 'Niu Niu'],
+  ['red-packet', 'Red Packet'], ['cowboy-beauty', 'Cowboy & Beauty'],
+  ['lottery', 'Lottery'], ['slots', 'Slots (vendor)'], ['jackpot', 'Jackpot'],
+];
+
+const bar = document.getElementById('games');
+const out = document.getElementById('out');
+
+for (const [id, label] of GAMES) {
+  const b = document.createElement('button');
+  b.textContent = label;
+  b.onclick = () => run(id, label, b);
+  bar.appendChild(b);
+}
+const fb = document.createElement('button');
+fb.textContent = '🔐 Verify fairness';
+fb.className = 'fair';
+fb.onclick = () => fairness(fb);
+bar.appendChild(fb);
+
+const esc = (s) => String(s).replace(/[<>&]/g, (c) => ({ '<':'&lt;', '>':'&gt;', '&':'&amp;' }[c]));
+
+function moneyBlock(m) {
+  if (!m) return '<div class="dim">Round void — no money moved (a tie, or nobody won).</div>';
+  let h = '';
+  for (const w of m.winners) h += `<div class="row"><span>${esc(w.who)}</span><span class="win">+${w.amount}</span></div>`;
+  for (const l of m.losers)  h += `<div class="row"><span>${esc(l.who)}</span><span class="lose">−${l.amount}</span></div>`;
+  h += `<div class="row dim"><span>rake to us</span><span>${m.rake}</span></div>`;
+  if (m.jackpot) h += `<div class="row dim"><span>to jackpot</span><span>${m.jackpot}</span></div>`;
+  h += m.balances
+    ? `<div class="verdict ok">✅ Balances exactly: ${m.paidIn} paid in = ${m.paidOut} won + ${m.rake} rake + ${m.jackpot} jackpot</div>`
+    : `<div class="verdict bad">❌ DOES NOT BALANCE — ${m.paidIn} in vs ${m.paidOut + m.rake + m.jackpot} out</div>`;
+  return h;
+}
+
+async function run(id, label, btn) {
+  btn.classList.add('busy');
+  try {
+    const r = await fetch('/api/play/' + id);
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+
+    let body = `<div class="headline">${esc(label)}</div>`;
+    body += `<div class="dim">${esc(d.headline ?? '')}</div>`;
+
+    if (d.board) body += `<div class="cards">Board: ${d.board.join('  ')}</div>`;
+    if (d.showdown) {
+      for (const s of d.showdown) {
+        body += `<div class="row"><span class="cards">${esc(s.id)} — ${s.hole.join(' ')}</span>
+                 <span class="dim">best: ${s.best.join(' ')}</span></div>`;
+      }
+      body += d.balances
+        ? `<div class="verdict ok">✅ Every chip paid out: pot ${d.pot} = ${d.paidOut} to winners</div>`
+        : `<div class="verdict bad">❌ pot ${d.pot} but paid ${d.paidOut}</div>`;
+    }
+    if (d.playerCards) body += `<div class="cards">Player: ${d.playerCards.join(' ')} &nbsp;&nbsp; Banker: ${d.bankerCards.join(' ')}</div>`;
+    if (d.reels) body += `<div class="cards">Reels: ${d.reels.join('  ')} → payout ${d.payout}</div>`;
+
+    if (d.commitBeforeBets) {
+      body += `<div class="kv">
+        <div>Committed before bets</div><div class="hash">${esc(d.commitBeforeBets)}</div>
+        <div>Seed revealed after</div><div class="hash">${esc(d.revealedSeed)}</div>
+        <div>Mines were at</div><div>${d.mines.join(', ')}</div></div>`;
+    }
+    if (d.frozenOdds) {
+      body += `<div class="kv">
+        <div>Odds when betting closed</div><div>Cowboy ${d.frozenOdds.COWBOY}× / Beauty ${d.frozenOdds.BEAUTY}×</div>
+        <div>Deciding block</div><div>#${d.decidingBlock} — not yet mined when bets closed</div>
+        <div>Cards drawn</div><div class="cards">${d.cards.cowboy} vs ${d.cards.beauty}</div></div>`;
+    }
+    if (d.pools) {
+      body += `<div class="kv">
+        <div>Pools</div><div>mini $${d.pools.mini} · minor $${d.pools.minor} · major $${d.pools.major} · grand $${d.pools.grand}</div></div>`;
+      if (d.hit) {
+        body += `<div class="row"><span>🎰 ${d.hit.tier} jackpot</span><span class="win">${esc(d.hit.winner)} won $${d.hit.amount.toFixed(2)}</span></div>`;
+        body += d.colluderWon
+          ? `<div class="verdict bad">❌ The colluder won — anti-farming is broken</div>`
+          : `<div class="verdict ok">✅ The colluder had 100× the weight and still won NOTHING</div>`;
+      }
+    }
+    if (d.money !== undefined) body += moneyBlock(d.money);
+
+    out.innerHTML = `<div class="card">${body}</div>` + out.innerHTML;
+  } catch (e) {
+    out.innerHTML = `<div class="card"><div class="verdict bad">❌ ${esc(e.message)}</div></div>` + out.innerHTML;
+  } finally {
+    btn.classList.remove('busy');
+  }
+}
+
+async function fairness(btn) {
+  btn.classList.add('busy');
+  try {
+    const d = await (await fetch('/api/fairness')).json();
+    const steps = d.steps.map((s) =>
+      `<li>${s.pass ? '✅' : '❌'} ${esc(s.name ?? s.step ?? '')} <span class="dim">${esc(s.detail ?? '')}</span></li>`).join('');
+    const body = `
+      <div class="headline">🔐 Provably fair — the 6-step proof any player can run</div>
+      <div class="kv">
+        <div>1. Server commits (before deal)</div><div class="hash">${esc(d.serverCommit)}</div>
+        <div>2. Players add their seeds</div><div class="hash">${d.clientSeeds.map(esc).join('<br>')}</div>
+        <div>3. Future block (unmined)</div><div>#${d.futureBlock} → <span class="hash">${esc(d.futureBlockHash)}</span></div>
+        <div>4. Final seed</div><div class="hash">${esc(d.finalSeed)}</div>
+        <div>5. Seed revealed after</div><div class="hash">${esc(d.serverSeed)}</div>
+        <div>→ re-hashed gives back</div><div class="hash">${esc(d.recomputedCommit)}</div>
+        <div>6. Merkle root on chain</div><div class="hash">${esc(d.merkleRoot)}<br>tx ${esc(d.chainTx)}</div>
+        <div>Deck (first 10)</div><div class="cards">${d.deck.join(' ')}</div>
+      </div>
+      <ul class="steps">${steps}</ul>
+      ${d.allPass
+        ? `<div class="verdict ok">✅ All 6 steps verified — the deck was fixed before the deal and never touched.</div>`
+        : `<div class="verdict bad">❌ Verification FAILED</div>`}
+      <pre>The commit (step 1) is published BEFORE the cards exist.
+The revealed seed (step 5) hashes back to that exact commit — so the deck could not have been swapped.
+The future block (step 3) had not been mined yet, so not even we could predict the shuffle.</pre>`;
+    out.innerHTML = `<div class="card">${body}</div>` + out.innerHTML;
+  } finally {
+    btn.classList.remove('busy');
+  }
+}
+</script>
+</body>
+</html>

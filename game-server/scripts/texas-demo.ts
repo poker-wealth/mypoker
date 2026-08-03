@@ -1,137 +1,183 @@
-#!/usr/bin/env tsx
-// FairPlay — Texas Hold'em demo
-//
-//   npm run texas:demo
-//
-// Plays a full 3-handed hand with unequal stacks so an all-in produces a
-// SIDE POT, then shows the showdown and the exact settlement plan that would
-// post to the Financial Core (net deltas, rake, jackpot). No FC or network
-// needed — uses the provably-fair seed (offline → KMS fallback) and the pure
-// engine + settlement adapter.
+/**
+ * Runnable Texas Hold'em demo — plays one full provably-fair hand end-to-end and prints it.
+ *
+ *   npm run texas-demo
+ *
+ * Shows: the provably-fair inputs (server/client/future-block seeds → final seed), the deal, every
+ * action street by street, the showdown, the money settlement (rake + 0.5% jackpot), the exact
+ * request sent to the Financial Core, and a 6-step verification of the deal.
+ */
+import {
+  generateServerCommitment,
+  generateClientSeed,
+  mergeClientSeeds,
+  computeFinalSeed,
+  computeRoundHash,
+  shuffledDeck,
+  FakeChainClient,
+  MerkleAggregator,
+  InMemoryMerkleStore,
+  verifyRound,
+  type SeatedClientSeed,
+} from '../src/fairness';
+import {
+  TexasHand,
+  computeSettlement,
+  toTableSettlementRequest,
+  CATEGORY_NAME,
+  type Action,
+} from '../src/games/texas';
 
-process.env.NODE_ENV ??= 'development';
-process.env.LOG_LEVEL ??= 'error';
-
-import type { Card } from '../src/cards/card.js';
-import { buildSettlePotsRequest } from '../src/fc-client/settlement-adapter.js';
-import { TexasHoldem } from '../src/games/texas/texas-holdem.js';
-import { localCsprng } from '../src/provably-fair/kms.js';
-import { beginRound } from '../src/provably-fair/round-randomness.js';
-import type { DrandClientOptions } from '../src/provably-fair/drand.js';
-
-const c = {
-  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
-  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
-  cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
-  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
-  dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
-  bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
-};
-const drand: DrandClientOptions = { urls: ['https://drand.invalid'], timeoutMs: 50, fetchFn: async () => { throw new Error('offline'); } };
-const usd = (cents: bigint): string => `$${(Number(cents) / 100).toFixed(2)}`;
-function pc(card: Card): string {
-  const sym = { c: '♣', d: '♦', h: '♥', s: '♠' }[card.suit]!;
-  const f = `${card.rank}${sym}`;
-  return card.suit === 'h' || card.suit === 'd' ? c.red(f) : f;
-}
-function section(t: string): void {
-  console.log(`\n${c.bold(c.cyan(`▶ ${t}`))}`);
-}
+const line = (s = ''): void => console.log(s);
+const hr = (): void => line('─'.repeat(64));
 
 async function main(): Promise<void> {
-  console.log(c.bold("\nFairPlay — Texas Hold'em Demo (3-handed, side pot)"));
-  console.log(c.dim('======================================================'));
-
-  const game = new TexasHoldem({
-    tableId: 'demo-table',
-    tableType: 'PLATFORM',
-    minPlayers: 2,
-    maxPlayers: 6,
-    smallBlind: 50n,
-    bigBlind: 100n,
-  });
-
-  // Unequal stacks → guarantees a side pot when all go all-in.
-  const players: Array<[string, bigint]> = [
-    ['Alice', 2_000n], // $20 short stack
-    ['Bob', 10_000n], // $100
-    ['Carol', 10_000n], // $100
+  const roundId = 'demo-round-1';
+  const players = [
+    { id: 'alice', stack: 1000 },
+    { id: 'bob', stack: 1000 },
+    { id: 'carol', stack: 1000 },
   ];
-  players.forEach(([name, stack], i) => {
-    game.join(name, i);
-    game.buyIn(name, stack);
+
+  // ── 1. Provably-fair round inputs ──────────────────────────────────────────────
+  const { serverSeed, serverCommit } = generateServerCommitment();
+  const seats: SeatedClientSeed[] = players.map((_, i) => ({
+    seatOrder: i,
+    clientSeed: generateClientSeed(),
+  }));
+  const allClientSeeds = mergeClientSeeds(seats);
+  const chain = new FakeChainClient();
+  const targetBlock = (await chain.getLatestBlockNumber()) + 1;
+  const futureBlockHash = await chain.getBlockHash(targetBlock);
+  const finalSeed = computeFinalSeed(serverSeed, allClientSeeds, futureBlockHash, roundId);
+
+  hr();
+  line('FairPlay — Texas Hold\'em hand (provably fair)');
+  hr();
+  line(`server commit : ${serverCommit.slice(0, 24)}…`);
+  line(`client seeds  : ${seats.length} players contributed`);
+  line(`future block  : #${targetBlock} ${futureBlockHash.slice(0, 16)}…`);
+  line(`final seed    : ${finalSeed.slice(0, 24)}…  (no one could predict this before the deal)`);
+
+  // ── 2. Deal ─────────────────────────────────────────────────────────────────────
+  const hand = new TexasHand(players, { seed: finalSeed, smallBlind: 5, bigBlind: 10 });
+  line('');
+  line('Hole cards:');
+  for (const p of players) line(`  ${p.id.padEnd(6)} ${hand.holeCardsFor(p.id)!.join(' ')}`);
+  line(`Blinds posted — pot ${hand.pot}`);
+
+  // ── 3. Play (scripted: one preflop raise, then checks to showdown) ───────────────
+  line('');
+  line('PREFLOP');
+  let raised = false;
+  let lastStreet = hand.street;
+  while (!hand.isComplete) {
+    const actor = hand.toAct!;
+    const la = hand.legalActions();
+    let action: Action;
+    if (hand.street === 'PREFLOP' && !raised && la.minRaiseTo !== null) {
+      action = { type: 'raise', amount: la.minRaiseTo };
+      raised = true;
+    } else if (la.canCheck) {
+      action = { type: 'check' };
+    } else {
+      action = { type: 'call' };
+    }
+    const label =
+      action.type === 'raise' ? `raise to ${action.amount}` : action.type;
+    hand.act(actor, action);
+    line(`  ${actor.padEnd(6)} ${label}`);
+    if (hand.street !== lastStreet && !hand.isComplete) {
+      lastStreet = hand.street;
+      line(`${hand.street}  [ ${hand.community().join(' ')} ]`);
+    }
+  }
+
+  // ── 4. Showdown + result ─────────────────────────────────────────────────────────
+  const res = hand.getResult()!;
+  line('');
+  line(`Board: ${res.community.join(' ') || '(none — won before showdown)'}`);
+  if (res.showdown.length) {
+    line('Showdown:');
+    for (const s of res.showdown) {
+      line(`  ${s.id.padEnd(6)} ${s.hole.join(' ')}  →  ${CATEGORY_NAME[s.rank.category]}`);
+    }
+  }
+  line('');
+  line('Gross pot payouts:');
+  for (const [id, amt] of res.payouts) line(`  ${id.padEnd(6)} +${amt}`);
+
+  // ── 5. Money settlement (rake + jackpot) ──────────────────────────────────────────
+  const settlement = computeSettlement({
+    payouts: res.payouts,
+    contributions: hand.contributions(),
+    rake: { bps: 500, cap: 10000, noFlopNoDrop: true },
+    flopSeen: res.community.length >= 3,
   });
-
-  section('Step 1 — Commit + deal (provably fair)');
-  const seed = await beginRound('texas-demo-1', { drand, cloud: localCsprng });
-  game.startHand({ roundId: 'texas-demo-1', finalSeed: seed.finalSeed });
-  console.log(`  server commit: ${c.yellow(seed.serverCommit)}  ${c.dim('(published before the deal)')}`);
-  console.log(`  randomness:    ${c.yellow(seed.randomSource)}  ${c.dim('(offline demo → KMS fallback)')}`);
-  console.log('');
-  for (const [name] of players) {
-    const view = game.getPrivateView(name) as { holeCards: string[] };
-    const cards = view.holeCards.map((id) => pc({ rank: id[0] as never, suit: id[1] as never, rankValue: 0 }));
-    const stack = (game.getPublicState() as { players: Array<{ playerId: string; stack: string }> }).players.find((p) => p.playerId === name)!;
-    console.log(`  ${name.padEnd(6)} ${cards.join(' ')}   ${c.dim('stack ' + usd(BigInt(stack.stack)))}`);
-  }
-
-  section('Step 2 — Everyone goes all-in (preflop)');
-  let guard = 0;
-  while (game.state !== 'SETTLED' && guard++ < 60) {
-    const pub = game.getPublicState() as {
-      actor: string | null;
-      currentBet: string;
-      players: Array<{ playerId: string; stack: string; streetCommitted: string }>;
-    };
-    const actor = pub.actor;
-    if (!actor) break;
-    const me = pub.players.find((p) => p.playerId === actor)!;
-    const target = BigInt(me.stack) + BigInt(me.streetCommitted);
-    const toCall = BigInt(pub.currentBet) - BigInt(me.streetCommitted);
-    let r = game.applyAction(actor, { type: 'raise', payload: { amount: target.toString() } });
-    if (!r.ok) r = game.applyAction(actor, { type: toCall === 0n ? 'check' : 'call' });
-    if (r.ok) console.log(`  ${c.dim(actor + ' all-in/calls')}`);
-  }
-
-  const result = game.getHandResult()!;
-  section('Step 3 — Board + showdown');
-  console.log(`  Board: ${result.board.map((id) => pc({ rank: id[0] as never, suit: id[1] as never, rankValue: 0 })).join(' ')}`);
-  console.log('');
-  console.log(`  ${c.bold('Pot awards (main + side pots):')}`);
-  for (const award of result.potAwards) {
-    console.log(`    ${usd(award.amount)} → ${c.green(award.winners.join(', '))}`);
-  }
-  console.log(`\n  ${c.bold('Per-player net:')}`);
-  for (const p of result.players) {
-    const net = p.net >= 0n ? c.green('+' + usd(p.net)) : c.red('-' + usd(-p.net));
-    console.log(`    ${p.playerId.padEnd(6)} ${net}${p.bestHand ? c.dim('  ' + p.bestHand.replace(/_/g, ' ').toLowerCase()) : ''}`);
-  }
-
-  section('Step 4 — Settlement plan (what posts to the Financial Core)');
-  const rakeCents = (() => {
-    const r = (result.potTotal * 5n) / 100n;
-    return r > 300n ? 300n : r;
-  })();
-  const req = buildSettlePotsRequest(result, { tableType: 'PLATFORM', rakeCents });
-  console.log(`  POST /api/v1/internal/settle-pots`);
-  console.log(`  ${c.dim('rake:')} ${usd(BigInt(req.rake_amount))}  ${c.dim('(5% capped at $3)')}`);
-  console.log(`  ${c.dim('net deltas (sum to 0 — engine conserves chips):')}`);
-  for (const d of req.net_deltas) {
-    console.log(`    ${d.owner_id.padEnd(6)} ${d.net}`);
-  }
-  const sum = req.net_deltas.reduce((s, d) => s + BigInt(d.net), 0n);
-  console.log(`    ${c.dim('sum = ' + sum.toString())}`);
-
-  console.log(c.dim('\n======================================================'));
-  console.log(
-    c.bold('Takeaway: ') +
-      'one short stack → a side pot only the bigger stacks can win. The engine\n' +
-      'conserves every chip; the Financial Core applies rake + the 0.5% jackpot at\n' +
-      'settlement. Verify the deal anytime at /verify.html with the round id.',
+  hr();
+  line('Settlement');
+  line(`  rake to house : ${settlement.rake}`);
+  line(
+    `  jackpot (0.5%): ${settlement.jackpotTotal}  ` +
+      `(mini ${settlement.jackpot.mini} / minor ${settlement.jackpot.minor} / ` +
+      `major ${settlement.jackpot.major} / grand ${settlement.jackpot.grand})`,
   );
+  for (const w of settlement.winners) line(`  ${w.playerId.padEnd(6)} net +${w.amount}`);
+  for (const l of settlement.losers) line(`  ${l.playerId.padEnd(6)} net -${l.amount}`);
+
+  const fcRequest = toTableSettlementRequest(settlement, {
+    roundId,
+    tableType: 'PLATFORM',
+    accountOf: (p) => `acc-${p}`,
+    jackpotAccounts: { mini: 'jm', minor: 'jn', major: 'jj', grand: 'jg' },
+  });
+  line('');
+  line('→ Financial Core request (POST /internal/table-settlements):');
+  line(`  losers : ${fcRequest.losers.map((l) => `${l.playerAccountId}=${l.amount}`).join(', ')}`);
+  line(`  winners: ${fcRequest.winners.map((w) => `${w.playerAccountId}=${w.amount}`).join(', ')}`);
+  line(`  rake=${fcRequest.rake}  jackpot.grand=${fcRequest.jackpot.grand}`);
+
+  // ── 6. Provably-fair verification (the 6 steps anyone can run) ─────────────────────
+  const cards = shuffledDeck(finalSeed);
+  const timestamp = 1_700_000_000_000;
+  const roundHash = computeRoundHash({
+    roundId,
+    serverCommit,
+    allClientSeeds,
+    futureBlockHash,
+    finalSeed,
+    cards,
+    timestamp,
+  });
+  const store = new InMemoryMerkleStore();
+  const agg = new MerkleAggregator(chain, store, 100);
+  await agg.addRound(roundId, roundHash);
+  await agg.flush();
+  const rec = store.get(roundId)!;
+  const v = verifyRound({
+    roundId,
+    serverSeed,
+    serverCommit,
+    allClientSeeds,
+    futureBlockHash,
+    finalSeed,
+    cards,
+    timestamp,
+    roundHash,
+    merkleProof: rec.merkleProof,
+    merkleRoot: rec.merkleRoot,
+    seatedClientSeeds: seats,
+  });
+  hr();
+  line(
+    v.allPass
+      ? '✅ Provably fair: all 6 verification steps passed (deck is verifiable & untampered).'
+      : '❌ Verification FAILED',
+  );
+  hr();
 }
 
 main().catch((err) => {
-  console.error(c.red(`\nfatal: ${err instanceof Error ? err.stack : String(err)}`));
+  console.error(err);
   process.exit(1);
 });

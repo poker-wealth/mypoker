@@ -1,6 +1,3 @@
-node_modules/
-dist/
-coverage/
-data/
-mongo-rs/
-*.md
+dist
+node_modules
+coverage

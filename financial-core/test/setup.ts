@@ -1,10 +1,12 @@
-// Set required env vars for the test runner BEFORE any module that imports
-// src/config/env.ts is loaded. The actual MONGO_URI is overwritten per-test
-// using mongodb-memory-server's MongoMemoryReplSet.
+// Global Jest setup. Keep this light — it runs before every test file.
+// Integration tests that need MongoDB spin up their own MongoMemoryReplSet via test/db-helper.ts
+// (added in M1), so we do not boot a database here.
+
+import { setAlertHandler } from '../src/lib/alert';
+
 process.env.NODE_ENV = 'test';
-process.env.MONGO_URI ??= 'mongodb://127.0.0.1:27017/placeholder?replicaSet=rs0';
-process.env.MONGO_DB_NAME ??= 'fairplay-fc-test';
-process.env.REDIS_URL ??= 'redis://127.0.0.1:6379';
-process.env.JWT_SECRET ??= 'test-secret-test-secret-test-secret';
-process.env.INTERNAL_API_TOKEN ??= 'test-internal-token-test-internal-token';
-process.env.LOG_LEVEL ??= 'warn';
+process.env.LOG_LEVEL = process.env.LOG_LEVEL ?? 'silent';
+
+// Default ops alerts to a no-op in tests (silences harmless 50ms-timing warnings from the
+// in-memory server). Tests that assert an alert fired install their own spy via setAlertHandler.
+beforeEach(() => setAlertHandler(() => {}));

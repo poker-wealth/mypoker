@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0e1117" />
+<title>FairPlay</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+<div id="app">
+  <!-- Top bar: brand + wallet -->
+  <div class="topbar">
+    <div class="brand">FairPlay</div>
+    <button class="wallet-pill" id="walletPill">💰 <span id="walletBalance">$0</span></button>
+  </div>
+
+  <!-- Hero: the jackpot is the reason people open the app -->
+  <section class="hero">
+    <div class="hero-label">🏆 GRAND JACKPOT</div>
+    <div class="hero-amount" id="grand">—</div>
+    <div class="ticker" id="ticker">Loading winners…</div>
+  </section>
+
+  <!-- The proof is the front door, not a settings page -->
+  <a class="fair-banner" id="fairBanner" href="#">
+    <div>
+      <div class="fair-title">✅ Provably Fair</div>
+      <div class="fair-sub" id="fairSub">Every hand. On-chain. Tap to verify.</div>
+    </div>
+    <div class="chev">›</div>
+  </a>
+
+  <button class="play-cta" id="playCta">▶ Play a hand of Texas now</button>
+
+  <main id="rail"><div class="loading">Loading lobby…</div></main>
+</div>
+
+<!-- Table screen (full-screen overlay) -->
+<div class="table-screen" id="tableScreen">
+  <header class="table-head">
+    <button class="back" id="tableBack">‹</button>
+    <span>Texas Hold'em · $1/$2</span>
+    <span class="pot-pill" id="potPill">Pot $0</span>
+  </header>
+
+  <div class="felt">
+    <div class="opponents" id="opponents"></div>
+    <div class="board" id="board"></div>
+    <div class="you-seat">
+      <div class="hole" id="hole"></div>
+      <div class="you-meta"><span id="youStack">$0</span> · You</div>
+    </div>
+  </div>
+
+  <div class="actions" id="actions"></div>
+
+  <!-- Post-hand result sheet -->
+  <div class="result-sheet" id="resultSheet">
+    <div class="result-card">
+      <div class="result-title" id="resultTitle">Hand complete</div>
+      <div id="resultShowdown"></div>
+      <button class="verify-btn" id="verifyBtn">🔐 Verify this hand</button>
+      <div class="verify-out" id="verifyOut"></div>
+      <button class="again-btn" id="againBtn">Deal again</button>
+    </div>
+  </div>
+</div>
+
+<!-- Table list drawer -->
+<div class="drawer-scrim" id="scrim"></div>
+<section class="drawer" id="drawer">
+  <header class="drawer-head">
+    <button class="back" id="drawerBack">‹</button>
+    <span id="drawerTitle">Tables</span>
+  </header>
+  <div id="tableList"></div>
+</section>
+
+<!-- Dou Di Zhu (Landlord) -->
+<div class="table-screen" id="ddzScreen">
+  <header class="table-head">
+    <button class="back" id="ddzBack">‹</button>
+    <span>Dou Di Zhu</span>
+    <span class="pot-pill" id="ddzRole">—</span>
+  </header>
+  <div class="felt ddz-felt">
+    <div class="ddz-opps" id="ddzOpps"></div>
+    <div class="ddz-table" id="ddzTable"><div class="bet-hint">Bid for the landlord role to start.</div></div>
+    <div class="ddz-hand" id="ddzHand"></div>
+  </div>
+  <div class="bet-controls">
+    <div id="ddzBidWrap">
+      <div class="field-label">Bid for landlord (higher bid = bigger stakes)</div>
+      <div class="bet-options" id="ddzBids">
+        <button data-bid="0">Pass</button>
+        <button data-bid="1">1</button>
+        <button data-bid="2">2</button>
+        <button data-bid="3" class="sel">3</button>
+      </div>
+    </div>
+    <div class="actions" id="ddzActions" hidden>
+      <button class="act-check" id="ddzPass">Pass</button>
+      <button class="act-raise" id="ddzPlay" disabled>Play</button>
+    </div>
+    <div class="wd-err" id="ddzErr"></div>
+  </div>
+</div>
+
+<!-- Red Packet Minesweeper -->
+<div class="table-screen" id="rpScreen">
+  <header class="table-head">
+    <button class="back" id="rpBack">‹</button>
+    <span>Red Packet Minesweeper</span>
+  </header>
+  <div class="felt bet-felt">
+    <div class="rp-commit" id="rpCommit">
+      <div class="field-label">🔒 Grid locked before you bet</div>
+      <div class="hash" id="rpCommitHash">…</div>
+    </div>
+    <div class="rp-grid" id="rpGrid"></div>
+    <div class="bet-outcome" id="rpOutcome"></div>
+  </div>
+  <div class="bet-controls">
+    <div class="field-label" id="rpHint">Pick a cell, then reveal. 5 of 25 are mines — a safe cell pays 1.25×.</div>
+    <div class="stake-row" id="rpStakes"></div>
+    <button class="wbtn" id="rpGo" disabled>Pick a cell first</button>
+    <div class="wd-err" id="rpErr"></div>
+  </div>
+</div>
+
+<!-- Fast-game screen (Cowboy & Beauty / Lottery / Slots) -->
+<div class="table-screen" id="fastScreen">
+  <header class="table-head">
+    <button class="back" id="fastBack">‹</button>
+    <span id="fastTitle">Cowboy & Beauty</span>
+  </header>
+  <div class="felt bet-felt">
+    <div id="fastStage"><div class="bet-hint">Place your bet, then play.</div></div>
+    <div class="bet-outcome" id="fastOutcome"></div>
+  </div>
+  <div class="bet-controls">
+    <div id="fastPickWrap">
+      <div class="field-label" id="fastPickLabel">Your pick</div>
+      <div class="bet-options" id="fastPicks"></div>
+    </div>
+    <div class="stake-row" id="fastStakes"></div>
+    <button class="wbtn" id="fastGo">Play · <span id="fastAmt">$10</span></button>
+    <div class="wd-err" id="fastErr"></div>
+  </div>
+</div>
+
+<!-- Betting-game screen (Baccarat / Niu Niu / San Zhang) -->
+<div class="table-screen" id="betScreen">
+  <header class="table-head">
+    <button class="back" id="betBack">‹</button>
+    <span id="betTitle">Baccarat</span>
+    <span class="pot-pill" id="betBankerPill">Banker: a player</span>
+  </header>
+
+  <div class="felt bet-felt">
+    <div class="bet-reveal" id="betReveal">
+      <div class="bet-hint">Place your bet, then deal.</div>
+    </div>
+    <div class="bet-outcome" id="betOutcome"></div>
+  </div>
+
+  <div class="bet-controls" id="betControls">
+    <div class="field-label">Your bet</div>
+    <div class="bet-options" id="betOptions"></div>
+    <div class="stake-row" id="betStakes"></div>
+    <button class="wbtn" id="dealBtn">Deal · <span id="dealAmt">$10</span></button>
+    <div class="wd-err" id="betErr"></div>
+  </div>
+</div>
+
+<!-- Wallet screen (full-screen overlay) -->
+<div class="table-screen" id="walletScreen">
+  <header class="table-head">
+    <button class="back" id="walletBack">‹</button>
+    <span>Wallet</span>
+  </header>
+  <div class="wallet-body">
+    <div class="bal-card">
+      <div class="bal-total-label">Total balance</div>
+      <div class="bal-total" id="balTotal">$0</div>
+      <div class="bal-buckets">
+        <div class="bucket"><div class="b-amt" id="balAvail">$0</div><div class="b-lbl">Available</div></div>
+        <div class="bucket"><div class="b-amt" id="balLocked">$0</div><div class="b-lbl">At tables</div></div>
+        <div class="bucket"><div class="b-amt" id="balClearing">$0</div><div class="b-lbl">Withdrawing</div></div>
+      </div>
+    </div>
+
+    <div class="wallet-tabs">
+      <button class="wtab active" data-tab="deposit">Deposit</button>
+      <button class="wtab" data-tab="withdraw">Withdraw</button>
+    </div>
+
+    <section class="wpane" id="paneDeposit">
+      <div class="field-label">Your USDT (TRC-20) deposit address</div>
+      <div class="addr" id="depositAddr">…</div>
+      <div class="hint">Send USDT to this address. Funds appear after 20 network confirmations.</div>
+      <div class="quick" id="depositQuick"></div>
+    </section>
+
+    <section class="wpane" id="paneWithdraw" hidden>
+      <div class="field-label">Amount to withdraw</div>
+      <input class="amt-input" id="wdAmount" type="number" inputmode="decimal" placeholder="0.00" />
+      <div class="hint" id="wdHint">Available to withdraw: $0. Funds at a table can't be withdrawn until you leave.</div>
+      <button class="wbtn" id="wdSubmit">Withdraw</button>
+      <div class="wd-err" id="wdErr"></div>
+    </section>
+
+    <div class="field-label" style="margin-top:20px">Recent activity</div>
+    <div id="txHistory"></div>
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,53 +1,22 @@
-import { PLATFORM_OWNER } from '../../src/domain/account-types';
-import {
-  getPlayerWalletScope,
-  getRakeDestination,
-} from '../../src/settlement/settlement-domain';
+import { getRakeDestination, TableType } from '../../src/settlement/settlement-domain';
+import { AccountType } from '../../src/domain/account-types';
 
-describe('settlement/SettlementDomain', () => {
-  describe('getRakeDestination', () => {
-    it('PLATFORM table → TREASURY/PLATFORM', () => {
-      expect(getRakeDestination('PLATFORM')).toEqual({
-        account_type: 'TREASURY',
-        owner_id: PLATFORM_OWNER,
-      });
-    });
-
-    it('LEAGUE table → LEAGUE_INVENTORY/{leagueId}', () => {
-      expect(getRakeDestination('LEAGUE', 'league-42')).toEqual({
-        account_type: 'LEAGUE_INVENTORY',
-        owner_id: 'league-42',
-      });
-    });
-
-    it('LEAGUE without leagueId throws', () => {
-      // @ts-expect-error — runtime check despite typed signature
-      expect(() => getRakeDestination('LEAGUE')).toThrow(/requires a leagueId/);
-    });
-
-    it('unknown table type throws', () => {
-      expect(() => getRakeDestination('NOPE' as 'PLATFORM')).toThrow(/unknown table type/);
-    });
-
-    it('platform and league destinations never collide (zero double-rake)', () => {
-      const a = getRakeDestination('PLATFORM');
-      const b = getRakeDestination('LEAGUE', 'l1');
-      expect(a.account_type).not.toBe(b.account_type);
+describe('Settlement Domain — rake routing', () => {
+  it('routes platform-table rake to the platform TREASURY', () => {
+    expect(getRakeDestination(TableType.PLATFORM)).toEqual({
+      accountType: AccountType.TREASURY,
+      ownerId: 'PLATFORM',
     });
   });
 
-  describe('getPlayerWalletScope', () => {
-    it('PLATFORM table → PLATFORM scope (lobby wallet)', () => {
-      expect(getPlayerWalletScope('PLATFORM')).toBe(PLATFORM_OWNER);
+  it('routes league-table rake to that league\'s LEAGUE_INVENTORY', () => {
+    expect(getRakeDestination(TableType.LEAGUE, 'league-9')).toEqual({
+      accountType: AccountType.LEAGUE_INVENTORY,
+      ownerId: 'league-9',
     });
+  });
 
-    it('LEAGUE table → leagueId scope (per-league wallet)', () => {
-      expect(getPlayerWalletScope('LEAGUE', 'league-7')).toBe('league-7');
-    });
-
-    it('LEAGUE without leagueId throws', () => {
-      // @ts-expect-error — runtime check despite typed signature
-      expect(() => getPlayerWalletScope('LEAGUE')).toThrow(/requires a leagueId/);
-    });
+  it('requires a leagueId for league tables', () => {
+    expect(() => getRakeDestination(TableType.LEAGUE)).toThrow(/leagueId is required/);
   });
 });

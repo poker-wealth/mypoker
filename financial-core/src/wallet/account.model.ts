@@ -1,101 +1,70 @@
-import mongoose, { Schema, type Model } from 'mongoose';
-import { v7 as uuidv7 } from 'uuid';
-import {
-  ACCOUNT_TYPES,
-  type AccountType,
-  PLATFORM_OWNER,
-  validateOwnerForType,
-} from '../domain/account-types.js';
+import { randomUUID } from 'node:crypto';
+import { Decimal128 } from 'bson';
+import mongoose, { Schema, type HydratedDocument, type Model } from 'mongoose';
+import { AccountType, ACCOUNT_TYPES, PLATFORM_SCOPE } from '../domain/account-types';
 
 /**
- * `accounts` collection — one document per (account_type, owner_id, wallet_scope).
+ * accounts collection — one document per fund pool.
  *
- * Iron rule from spec §3.2:
- *   `UPDATE accounts SET balance = balance - 100 WHERE id = ...` is PROHIBITED.
- *   All balance changes happen inside transfer() with optimistic-lock + ledger write
- *   in a single ≤50ms MongoDB transaction.
+ * Three-balance model (M1 Remediation §P0-04), each an exact Decimal128:
+ *   - availableBalance: spendable funds.
+ *   - lockedBalance:    funds committed to a live table buy-in (frozen, not spendable, not withdrawable).
+ *   - clearingBalance:  funds in-flight on a withdrawal (deducted from available, awaiting on-chain settle).
+ *
+ * NO code may write these fields directly except via `transfer()` / the withdrawal state machine,
+ * both of which use the optimistic `version` lock. Direct UPDATE is forbidden (spec §3.2).
  */
-export interface AccountDoc {
-  _id: string; // UUID v7 string
-  account_type: AccountType;
-  owner_id: string;
-  wallet_scope: string;
-  balance: bigint; // cents, never negative
-  version: number; // optimistic-lock counter, incremented by transfer()
-  created_at: Date;
-  updated_at: Date;
+
+const ZERO = (): Decimal128 => Decimal128.fromString('0');
+
+export interface AccountAttrs {
+  accountType: AccountType;
+  /** playerId / leagueId / tableId / 'PLATFORM'. */
+  ownerId: string;
+  /** 'PLATFORM' or `league:<leagueId>`. Separates a player's platform vs league wallet. */
+  scope?: string;
 }
 
-const AccountSchema = new Schema<AccountDoc>(
+export interface AccountDoc {
+  _id: string;
+  accountType: AccountType;
+  ownerId: string;
+  scope: string;
+  availableBalance: Decimal128;
+  lockedBalance: Decimal128;
+  clearingBalance: Decimal128;
+  /** Optimistic-lock counter. Incremented on every balance mutation by transfer(). */
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export type AccountHydrated = HydratedDocument<AccountDoc>;
+
+const accountSchema = new Schema<AccountDoc>(
   {
-    _id: { type: String, default: () => uuidv7() },
-
-    account_type: {
-      type: String,
-      enum: { values: [...ACCOUNT_TYPES], message: 'invalid account_type: {VALUE}' },
-      required: true,
-      immutable: true,
-    },
-
-    owner_id: { type: String, required: true, immutable: true, trim: true },
-
-    wallet_scope: {
-      type: String,
-      required: true,
-      default: PLATFORM_OWNER,
-      immutable: true,
-      trim: true,
-    },
-
-    balance: {
-      type: BigInt,
-      required: true,
-      default: () => 0n,
-      validate: {
-        validator: (v: bigint) => typeof v === 'bigint' && v >= 0n,
-        message: 'balance must be a non-negative BigInt (cents)',
-      },
-    },
-
-    version: {
-      type: Number,
-      required: true,
-      default: 0,
-      min: 0,
-      validate: {
-        validator: (v: number) => Number.isInteger(v),
-        message: 'version must be an integer',
-      },
-    },
+    _id: { type: String, default: (): string => randomUUID() },
+    accountType: { type: String, enum: ACCOUNT_TYPES, required: true, index: true },
+    ownerId: { type: String, required: true },
+    scope: { type: String, required: true, default: PLATFORM_SCOPE },
+    availableBalance: { type: Schema.Types.Decimal128, required: true, default: ZERO },
+    lockedBalance: { type: Schema.Types.Decimal128, required: true, default: ZERO },
+    clearingBalance: { type: Schema.Types.Decimal128, required: true, default: ZERO },
+    version: { type: Number, required: true, default: 0 },
   },
   {
-    collection: 'accounts',
-    timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
-    versionKey: false, // we manage `version` manually for optimistic-lock semantics
+    timestamps: true,
+    // We manage `version` ourselves for the spec's optimistic-lock pattern; disable Mongoose's __v.
+    versionKey: false,
+    // Money is exact: never let Mongoose coerce Decimal128 to JS number on the way out.
     minimize: false,
-    optimisticConcurrency: false,
   },
 );
 
-// Cross-field validation: owner_id shape must match account_type rules.
-// If account_type itself is invalid, defer to the field-level enum validator.
-AccountSchema.pre('validate', function (next) {
-  if (!ACCOUNT_TYPES.includes(this.account_type)) return next();
-  const result = validateOwnerForType(this.account_type, this.owner_id);
-  if (!result.ok) return next(new Error(`account validation failed: ${result.reason}`));
-  next();
-});
+// One account per (type, owner, scope). e.g. a player's platform wallet is unique; each table's
+// JACKPOT_MINI is unique; the single PLATFORM treasury is unique.
+accountSchema.index({ accountType: 1, ownerId: 1, scope: 1 }, { unique: true });
 
-// Unique natural key — one account per (type, owner, scope). Compound is the
-// hot lookup path used by transfer() and by the rake-routing Settlement Domain.
-AccountSchema.index(
-  { account_type: 1, owner_id: 1, wallet_scope: 1 },
-  { unique: true, name: 'uniq_account_natural_key' },
-);
-
-// Reverse lookup: every account a given owner holds (e.g., all wallets for player X).
-AccountSchema.index({ owner_id: 1, account_type: 1 }, { name: 'by_owner' });
-
-export const Account: Model<AccountDoc> =
+export const AccountModel: Model<AccountDoc> =
   (mongoose.models.Account as Model<AccountDoc>) ??
-  mongoose.model<AccountDoc>('Account', AccountSchema);
+  mongoose.model<AccountDoc>('Account', accountSchema);

@@ -1,158 +1,162 @@
-import { loadEnv } from '../config/env.js';
-import { logger } from '../lib/logger.js';
-import { transfer } from '../wallet/transfer.js';
-import type { TransferResult } from '../wallet/transfer-types.js';
+import { Money } from '../domain/money';
+import {
+  AccountType,
+  LedgerType,
+  LedgerDirection,
+  LedgerStatus,
+} from '../domain/account-types';
+import { AccountModel } from '../wallet/account.model';
+import { LedgerModel } from '../wallet/ledger.model';
+import { runTransaction } from '../wallet/transfer';
+import { getOrCreateExternalAccount } from '../wallet/system-accounts';
+import { isFlowAllowed } from '../clearing/clearing-rules';
+import { AccountNotFoundError, IllegalFundFlowError } from '../wallet/errors';
+import { alertOps } from '../lib/alert';
+import { SecurityLogModel } from '../security/security-log.model';
+import { isOfficialContract, isConfirmed } from './trc20';
 
 /**
- * TRC20 deposit credit logic (spec §3.7).
- *
- * Iron rules:
- *   1. Only the official USDT contract address is accepted.
- *      Non-official → log + TG notify player + ZERO credit.
- *   2. Mempool deposits → ZERO credit. Caller passes `confirmations`; must be
- *      >= TRON_DEPOSIT_CONFIRMATIONS (default 20).
- *   3. Each tx_hash is unique — idempotency key is `deposit:${txHash}`.
- *      Replay returns the original ledger entry.
- *   4. Amounts are BigInt (USDT has 6 decimals on-chain; convert to cents
- *      before calling this function — 1 USDT = 100 cents in our accounting).
- *
- * The actual Tron node polling / websocket subscription lives in
- * `tron-listener.ts` (M1 W2+ integration). This function is the credit
- * primitive that the listener invokes once it has a confirmed deposit.
+ * Deposit crediting (FairPlay §3.7). A confirmed on-chain USDT deposit is recorded as the
+ * double-entry movement EXTERNAL → PLAYER. The on-chain txHash is the idempotency key, so the same
+ * deposit can never be credited twice (DB-level unique guard).
  */
 
-export interface DepositInput {
-  /** Player whose deposit address received the funds. */
-  playerId: string;
-  /** Cents to credit (1 USDT = 100 cents). */
-  amount: bigint;
-  /** Transaction hash from the Tron network. Used as idempotency key. */
+export interface CreditDepositInput {
+  playerAccountId: string;
+  amount: Money;
+  /** On-chain transaction hash — the idempotency key. */
   txHash: string;
-  /** Tron contract that emitted the transfer. Validated against the whitelist. */
+  metadata?: Record<string, unknown>;
+}
+
+function isDuplicateKeyError(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { code?: number }).code === 11000;
+}
+
+/** Credit a confirmed deposit. Idempotent on txHash. Returns false if already credited. */
+export async function creditDeposit(input: CreditDepositInput): Promise<{ credited: boolean }> {
+  if (!input.amount.isPositive()) throw new RangeError('deposit amount must be > 0');
+
+  const player = await AccountModel.findById(input.playerAccountId);
+  if (!player) throw new AccountNotFoundError(input.playerAccountId);
+  if (player.accountType !== AccountType.PLAYER) {
+    throw new Error('deposits may only credit PLAYER accounts');
+  }
+
+  const external = await getOrCreateExternalAccount();
+  // Defense in depth: EXTERNAL → PLAYER must be whitelisted.
+  if (!isFlowAllowed(external.accountType, player.accountType)) {
+    throw new IllegalFundFlowError(external.accountType, player.accountType);
+  }
+
+  const key = `deposit:${input.txHash}`;
+  if (await LedgerModel.exists({ idempotencyKey: key })) {
+    return { credited: false };
+  }
+
+  const amountD = input.amount.toDecimal128();
+  const negAmountD = input.amount.negate().toDecimal128();
+
+  try {
+    await runTransaction(async (session) => {
+      const dup = await LedgerModel.exists({ idempotencyKey: key }).session(session);
+      if (dup) return;
+
+      // EXTERNAL is the boundary account — it may go negative, so NO overdraft guard here.
+      await AccountModel.updateOne(
+        { _id: external._id },
+        { $inc: { availableBalance: negAmountD, version: 1 } },
+        { session },
+      );
+      await AccountModel.updateOne(
+        { _id: input.playerAccountId },
+        { $inc: { availableBalance: amountD, version: 1 } },
+        { session },
+      );
+      await LedgerModel.create(
+        [
+          {
+            idempotencyKey: key,
+            businessId: input.txHash,
+            accountId: external._id,
+            counterpartyAccountId: input.playerAccountId,
+            direction: LedgerDirection.DEBIT,
+            amount: amountD,
+            type: LedgerType.DEPOSIT,
+            status: LedgerStatus.SETTLED,
+            metadata: input.metadata,
+          },
+          {
+            idempotencyKey: key,
+            businessId: input.txHash,
+            accountId: input.playerAccountId,
+            counterpartyAccountId: external._id,
+            direction: LedgerDirection.CREDIT,
+            amount: amountD,
+            type: LedgerType.DEPOSIT,
+            status: LedgerStatus.SETTLED,
+            metadata: input.metadata,
+          },
+        ],
+        { session, ordered: true },
+      );
+    });
+  } catch (err) {
+    if (isDuplicateKeyError(err)) return { credited: false };
+    throw err;
+  }
+
+  return { credited: true };
+}
+
+export interface OnChainDepositEvent {
+  playerAccountId: string;
+  amount: Money;
+  txHash: string;
   contractAddress: string;
-  /** Confirmation depth at the time of credit. Must be >= TRON_DEPOSIT_CONFIRMATIONS. */
   confirmations: number;
-  /** Optional wallet scope (defaults to PLATFORM — the lobby wallet). */
-  walletScope?: string;
-  /** Block number where the tx was included. Captured in metadata. */
-  blockNumber?: number;
-  /** Sending Tron address — captured for compliance/audit only. */
-  fromTronAddress?: string;
 }
 
-export class UnauthorizedContractError extends Error {
-  constructor(public readonly contractAddress: string) {
-    super(
-      `UnauthorizedContractError: deposit from contract ${contractAddress} is not the official USDT contract`,
-    );
-    this.name = 'UnauthorizedContractError';
-  }
-}
+export type DepositOutcome =
+  | { credited: true }
+  | { credited: false; reason: 'wrong_contract' | 'unconfirmed' | 'already_credited' };
 
-export class InsufficientConfirmationsError extends Error {
-  constructor(
-    public readonly confirmations: number,
-    public readonly required: number,
-    public readonly txHash: string,
-  ) {
-    super(
-      `InsufficientConfirmationsError: tx ${txHash} has ${confirmations} confirmations, need ≥ ${required}`,
-    );
-    this.name = 'InsufficientConfirmationsError';
-  }
-}
-
-function depositKey(txHash: string): string {
-  return `deposit:${txHash}`;
-}
-
-export interface CreditDepositResult extends TransferResult {
-  /** Convenience: the tx hash this credit corresponded to. */
-  txHash: string;
-}
-
-export async function creditDeposit(input: DepositInput): Promise<CreditDepositResult> {
-  if (!input.playerId) throw new Error('creditDeposit: playerId required');
-  if (!input.txHash) throw new Error('creditDeposit: txHash required');
-  if (typeof input.amount !== 'bigint' || input.amount <= 0n) {
-    throw new Error('creditDeposit: amount must be a positive BigInt (cents)');
-  }
-  if (!input.contractAddress) throw new Error('creditDeposit: contractAddress required');
-  if (!Number.isInteger(input.confirmations) || input.confirmations < 0) {
-    throw new Error('creditDeposit: confirmations must be a non-negative integer');
-  }
-
-  const env = loadEnv();
-
-  // Rule 1: official contract whitelist.
-  if (input.contractAddress !== env.TRON_USDT_CONTRACT) {
-    logger.error(
+/**
+ * Gate a raw on-chain deposit event through the TRC-20 rules, then credit it.
+ *   - Non-official contract → never credited (logged + ops alert + player notified upstream).
+ *   - Fewer than 20 confirmations (incl. mempool) → never credited; caller re-checks later.
+ */
+export async function processConfirmedDeposit(
+  event: OnChainDepositEvent,
+): Promise<DepositOutcome> {
+  if (!isOfficialContract(event.contractAddress)) {
+    await SecurityLogModel.create([
       {
-        event: 'UNAUTHORIZED_CONTRACT_DEPOSIT',
-        playerId: input.playerId,
-        contractAddress: input.contractAddress,
-        expected: env.TRON_USDT_CONTRACT,
-        txHash: input.txHash,
-        amount: input.amount.toString(),
+        event: 'NON_OFFICIAL_CONTRACT_DEPOSIT',
+        detail: {
+          contractAddress: event.contractAddress,
+          txHash: event.txHash,
+          playerAccountId: event.playerAccountId,
+        },
       },
-      'TRC20 deposit from non-official contract — NOT credited',
-    );
-    throw new UnauthorizedContractError(input.contractAddress);
+    ]);
+    await alertOps('Deposit from non-official contract ignored', {
+      contractAddress: event.contractAddress,
+      txHash: event.txHash,
+    });
+    return { credited: false, reason: 'wrong_contract' };
   }
 
-  // Rule 2: confirmation threshold (Mempool → 0 confirmations, never credited).
-  if (input.confirmations < env.TRON_DEPOSIT_CONFIRMATIONS) {
-    logger.info(
-      {
-        event: 'DEPOSIT_PENDING_CONFIRMATIONS',
-        playerId: input.playerId,
-        txHash: input.txHash,
-        confirmations: input.confirmations,
-        required: env.TRON_DEPOSIT_CONFIRMATIONS,
-      },
-      'TRC20 deposit not yet credited — awaiting confirmations',
-    );
-    throw new InsufficientConfirmationsError(
-      input.confirmations,
-      env.TRON_DEPOSIT_CONFIRMATIONS,
-      input.txHash,
-    );
+  if (!isConfirmed(event.confirmations)) {
+    // Mempool / not enough confirmations — do NOT credit. Caller polls again later.
+    return { credited: false, reason: 'unconfirmed' };
   }
 
-  // Rule 3+4: credit via transfer() with txHash as idempotency key.
-  const result = await transfer({
-    to: {
-      type: 'PLAYER',
-      ownerId: input.playerId,
-      walletScope: input.walletScope ?? 'PLATFORM',
-    },
-    amount: input.amount,
-    ledgerType: 'DEPOSIT',
-    idempotencyKey: depositKey(input.txHash),
-    status: 'SETTLED',
-    metadata: {
-      tx_hash: input.txHash,
-      contract_address: input.contractAddress,
-      confirmations: input.confirmations,
-      block_number: input.blockNumber ?? null,
-      from_tron_address: input.fromTronAddress ?? null,
-    },
+  const result = await creditDeposit({
+    playerAccountId: event.playerAccountId,
+    amount: event.amount,
+    txHash: event.txHash,
+    metadata: { contractAddress: event.contractAddress },
   });
-
-  logger.info(
-    {
-      event: 'DEPOSIT_CREDITED',
-      playerId: input.playerId,
-      txHash: input.txHash,
-      amount: input.amount.toString(),
-      ledgerEntryId: result.ledgerEntry._id,
-      replayed: result.replayed,
-    },
-    result.replayed ? 'TRC20 deposit credit replayed (idempotent)' : 'TRC20 deposit credited',
-  );
-
-  return { ...result, txHash: input.txHash };
+  return result.credited ? { credited: true } : { credited: false, reason: 'already_credited' };
 }
-
-/** Internal helper exported for tests. */
-export const __DEPOSIT_INTERNAL = Object.freeze({ depositKey });

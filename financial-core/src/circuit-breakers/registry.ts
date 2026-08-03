@@ -1,49 +1,79 @@
-import { logger } from '../lib/logger.js';
-import { registerCB6 } from './cb6-illegal-fund-flow.js';
-
 /**
- * Circuit Breakers (spec §3.8). Status as of M1:
- *
- *   CB1: Insurance pool level → disable insurance sales when balance < threshold.
- *        Status: STUB. Needs INSURANCE pool to actually exist (M2 Underwriting).
- *
- *   CB2: Daily payout rate → suspend insurance 24h when payouts > 15% of pool.
- *        Status: STUB. Needs CB1 infra.
- *
- *   CB3: Jackpot anomaly → freeze table's Jackpot on 3+ Mini triggers / 1h.
- *        Status: STUB. Needs jackpot trigger tracking (M5).
- *
- *   CB4: Abnormal account withdrawal → freeze account withdrawals 1h.
- *        Status: STUB. Needs per-account rate tracking (M10 Operations).
- *
- *   CB5: Platform withdrawal rate → enable throttle (5-min delay).
- *        Status: STUB. Needs aggregate withdrawal rate tracking (M10 Operations).
- *
- *   CB6: Non-whitelist fund flow → reject + log + TG alert.
- *        Status: ACTIVE. ClearingRules + securityEvents + cb6-illegal-fund-flow.ts.
- *        Acceptance test: alert fires within 5 seconds.
- *
- *   CB7: On-chain address mapping validation → abort tx + human review.
- *        Status: STUB. Needs on-chain integration (M2 TRC20 listener + M2 Solana).
- *
- * Call registerAllCircuitBreakers() once at app boot.
+ * The seven circuit breakers (FairPlay §3.8). This registry is the catalogue; the decision logic
+ * for ALL SEVEN is implemented and tested in `breakers.ts` (evaluateCB1..CB7). Enforcement status:
+ *   - CB6 — LIVE inline in transfer() (every fund movement) + standalone checker.
+ *   - CB4, CB5 — LIVE, evaluated against the real withdrawals collection.
+ *   - CB7 — logic complete; fires once the on-chain tx feed is wired.
+ *   - CB1, CB2, CB3 — logic complete; fire once insurance/jackpot data feeds land.
+ * Each trip writes a security_log entry and an ops alert.
  */
 
-export function registerAllCircuitBreakers(): void {
-  registerCB6();
-  // CB1-CB5, CB7 will register their handlers as they're implemented.
-  logger.info('circuit breakers registered (active: CB6; stubbed: CB1-CB5, CB7)');
+export interface CircuitBreaker {
+  id: string;
+  name: string;
+  trigger: string;
+  action: string;
+  status: 'live' | 'planned';
+  /** Where the breaker becomes active (milestone / week), for the planned ones. */
+  activatesAt?: string;
 }
 
-/** Public surface so callers can introspect status — useful for /health endpoints. */
-export const CIRCUIT_BREAKER_STATUS = Object.freeze({
-  CB1: 'STUB',
-  CB2: 'STUB',
-  CB3: 'STUB',
-  CB4: 'STUB',
-  CB5: 'STUB',
-  CB6: 'ACTIVE',
-  CB7: 'STUB',
-} as const);
+export const CIRCUIT_BREAKERS: readonly CircuitBreaker[] = [
+  {
+    id: 'CB1',
+    name: 'Insurance pool level',
+    trigger: 'INSURANCE balance < threshold (Platform $10k / League $1k)',
+    action: 'Disable insurance sales (existing policies still pay out)',
+    status: 'planned',
+    activatesAt: 'Insurance milestone',
+  },
+  {
+    id: 'CB2',
+    name: 'Daily payout rate',
+    trigger: "Today's INSURANCE→PLAYER total > 15% of INSURANCE balance",
+    action: 'Suspend insurance for 24h',
+    status: 'planned',
+    activatesAt: 'Insurance milestone',
+  },
+  {
+    id: 'CB3',
+    name: 'Jackpot anomaly',
+    trigger: 'Same table: Mini triggers ≥ 3 times within 1 hour',
+    action: "Freeze that table's jackpot",
+    status: 'planned',
+    activatesAt: 'Jackpot milestone',
+  },
+  {
+    id: 'CB4',
+    name: 'Abnormal account withdrawal',
+    trigger: 'Single account withdrawals in 1 hour > limit',
+    action: "Freeze that account's withdrawals for 1 hour",
+    status: 'live',
+  },
+  {
+    id: 'CB5',
+    name: 'Platform withdrawal rate',
+    trigger: 'Platform total withdrawals in 1 hour > threshold',
+    action: 'Enable withdrawal throttle (5-minute delay)',
+    status: 'live',
+  },
+  {
+    id: 'CB6',
+    name: 'Non-whitelist fund flow',
+    trigger: 'Any fund movement along a non-whitelisted clearing path',
+    action: 'Reject immediately + security_log + ops alert',
+    status: 'live', // enforced in transfer() via ClearingRules
+  },
+  {
+    id: 'CB7',
+    name: 'On-chain address mapping',
+    trigger: 'On-chain tx from/to address does not match the account_type mapping',
+    action: 'Abort transfer + human review',
+    status: 'planned',
+    activatesAt: 'On-chain integration milestone',
+  },
+];
 
-export type CircuitBreakerId = keyof typeof CIRCUIT_BREAKER_STATUS;
+export function getCircuitBreaker(id: string): CircuitBreaker | undefined {
+  return CIRCUIT_BREAKERS.find((cb) => cb.id === id);
+}

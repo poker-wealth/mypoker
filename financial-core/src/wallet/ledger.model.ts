@@ -1,144 +1,90 @@
-import mongoose, { Schema, type Model } from 'mongoose';
-import { v7 as uuidv7 } from 'uuid';
-import {
-  LEDGER_STATUSES,
-  LEDGER_TYPES,
-  isInflowType,
-  isOutflowType,
-  type LedgerStatus,
-  type LedgerType,
-} from '../domain/ledger-types.js';
+import { randomUUID } from 'node:crypto';
+import { Decimal128 } from 'bson';
+import mongoose, { Schema, type HydratedDocument, type Model } from 'mongoose';
+import { LedgerType, LEDGER_TYPES, LedgerDirection, LedgerStatus } from '../domain/account-types';
 
 /**
- * `ledger` collection — append-only single source of truth for every fund movement.
+ * ledger collection — the single source of truth for ALL fund movement (spec §3.2).
  *
- * Iron rules from spec §3.2:
- *   - Every balance change has a ledger entry.
- *   - amount > 0 (direction expressed by from/to, never by sign).
- *   - idempotency_key is UNIQUE — duplicate writes return the original entry.
- *   - VIP effective volume, agent commission, audits all read from ledger.
+ * Double-entry (M1 Remediation §P0-01): every transfer produces TWO entries sharing one
+ * `idempotencyKey` — a DEBIT on the source account and a CREDIT on the destination — with equal
+ * `amount`. The system invariant Σ(DEBIT) = Σ(CREDIT) must hold at all times.
  *
- * Boundary entries (DEPOSIT / WITHDRAW / WITHDRAW_REFUND) cross the platform
- * edge. For these one of from_account/to_account is null; the on-chain side is
- * recorded in metadata.tx_hash.
+ * `idempotencyKey` is the dedup guard: a unique (idempotencyKey, direction) index makes a repeated
+ * transfer physically impossible to double-insert. Replays are detected by querying the key.
  */
-export interface LedgerDoc {
-  _id: string; // UUID v7
-  from_account: string | null; // accounts._id, null for inflows
-  to_account: string | null; // accounts._id, null for outflows
-  amount: bigint; // cents, always > 0
+
+export interface LedgerEntryAttrs {
+  /** Shared across the DEBIT/CREDIT pair of a single transfer. Dedup guard. */
+  idempotencyKey: string;
+  /** Domain event this movement belongs to (roundId / withdrawalId / depositTxHash …). */
+  businessId?: string;
+  accountId: string;
+  /** The opposite account in this transfer (for traceability / reconciliation reads). */
+  counterpartyAccountId: string;
+  direction: LedgerDirection;
+  amount: Decimal128;
   type: LedgerType;
-  idempotency_key: string;
-  status: LedgerStatus;
-  metadata: Record<string, unknown>; // round_id, tx_hash, table_id, etc.
-  created_at: Date;
-  updated_at: Date;
+  status?: LedgerStatus;
+  metadata?: Record<string, unknown>;
 }
 
-const LedgerSchema = new Schema<LedgerDoc>(
+export interface LedgerEntryDoc {
+  _id: string;
+  idempotencyKey: string;
+  businessId?: string;
+  accountId: string;
+  counterpartyAccountId: string;
+  direction: LedgerDirection;
+  amount: Decimal128;
+  type: LedgerType;
+  status: LedgerStatus;
+  metadata?: Record<string, unknown>;
+  createdAt: Date;
+}
+
+export type LedgerEntryHydrated = HydratedDocument<LedgerEntryDoc>;
+
+const ledgerSchema = new Schema<LedgerEntryDoc>(
   {
-    _id: { type: String, default: () => uuidv7() },
-
-    from_account: { type: String, default: null, immutable: true },
-    to_account: { type: String, default: null, immutable: true },
-
+    _id: { type: String, default: (): string => randomUUID() },
+    idempotencyKey: { type: String, required: true },
+    businessId: { type: String, required: false },
+    accountId: { type: String, required: true, index: true },
+    counterpartyAccountId: { type: String, required: true },
+    direction: { type: String, enum: Object.values(LedgerDirection), required: true },
     amount: {
-      type: BigInt,
+      type: Schema.Types.Decimal128,
       required: true,
-      immutable: true,
       validate: {
-        validator: (v: bigint) => typeof v === 'bigint' && v > 0n,
-        message: 'amount must be a positive BigInt (cents); direction is encoded by from/to',
+        // amount MUST be > 0 (spec §3.2). Sign is carried by `direction`, never by the number.
+        validator: (v: Decimal128): boolean => parseFloat(v.toString()) > 0,
+        message: 'ledger amount must be > 0',
       },
     },
-
-    type: {
-      type: String,
-      enum: { values: [...LEDGER_TYPES], message: 'invalid ledger type: {VALUE}' },
-      required: true,
-      immutable: true,
-    },
-
-    idempotency_key: {
-      type: String,
-      required: true,
-      immutable: true,
-      trim: true,
-      minlength: 1,
-    },
-
+    type: { type: String, enum: LEDGER_TYPES, required: true, index: true },
     status: {
       type: String,
-      enum: { values: [...LEDGER_STATUSES], message: 'invalid ledger status: {VALUE}' },
+      enum: Object.values(LedgerStatus),
       required: true,
-      default: 'PENDING',
+      default: LedgerStatus.SETTLED,
     },
-
-    metadata: {
-      type: Schema.Types.Mixed,
-      required: true,
-      default: () => ({}),
-    },
+    metadata: { type: Schema.Types.Mixed, required: false },
   },
   {
-    collection: 'ledger',
-    timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' },
+    // Ledger entries are immutable facts — created, never updated. No updatedAt.
+    timestamps: { createdAt: true, updatedAt: false },
     versionKey: false,
     minimize: false,
   },
 );
 
-// Direction validation: inflow types (DEPOSIT / WITHDRAW_REFUND) only have a
-// destination; outflow types (WITHDRAW) only have a source; everything else
-// requires both endpoints.
-LedgerSchema.pre('validate', function (next) {
-  if (!LEDGER_TYPES.includes(this.type)) return next();
+// Dedup guard: a transfer's DEBIT and CREDIT each appear exactly once.
+ledgerSchema.index({ idempotencyKey: 1, direction: 1 }, { unique: true });
+// Reconciliation / history reads.
+ledgerSchema.index({ businessId: 1 });
+ledgerSchema.index({ createdAt: 1 });
 
-  if (isInflowType(this.type)) {
-    if (this.from_account !== null) {
-      return next(new Error(`${this.type} must have from_account=null (boundary inflow)`));
-    }
-    if (!this.to_account) {
-      return next(new Error(`${this.type} requires to_account`));
-    }
-  } else if (isOutflowType(this.type)) {
-    if (this.to_account !== null) {
-      return next(new Error(`${this.type} must have to_account=null (boundary outflow)`));
-    }
-    if (!this.from_account) {
-      return next(new Error(`${this.type} requires from_account`));
-    }
-  } else {
-    if (!this.from_account || !this.to_account) {
-      return next(new Error(`${this.type} requires both from_account and to_account`));
-    }
-    if (this.from_account === this.to_account) {
-      return next(new Error('from_account and to_account must differ'));
-    }
-  }
-
-  next();
-});
-
-// idempotency_key is the de-dup primary signal. Unique index enforces the
-// "duplicate request returns already-processed" guarantee.
-LedgerSchema.index(
-  { idempotency_key: 1 },
-  { unique: true, name: 'uniq_idempotency_key' },
-);
-
-// Hot read paths used by reconciliation, agent commission distribution,
-// and VIP effective-volume aggregation.
-LedgerSchema.index({ from_account: 1, created_at: -1 }, { name: 'by_from_account' });
-LedgerSchema.index({ to_account: 1, created_at: -1 }, { name: 'by_to_account' });
-LedgerSchema.index({ type: 1, created_at: -1 }, { name: 'by_type' });
-
-// All ledger entries for a given settlement round (round_id is in metadata).
-LedgerSchema.index(
-  { 'metadata.round_id': 1 },
-  { name: 'by_round_id', sparse: true },
-);
-
-export const Ledger: Model<LedgerDoc> =
-  (mongoose.models.Ledger as Model<LedgerDoc>) ??
-  mongoose.model<LedgerDoc>('Ledger', LedgerSchema);
+export const LedgerModel: Model<LedgerEntryDoc> =
+  (mongoose.models.Ledger as Model<LedgerEntryDoc>) ??
+  mongoose.model<LedgerEntryDoc>('Ledger', ledgerSchema);

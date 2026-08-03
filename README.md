@@ -1,28 +1,43 @@
-# poker
+# FairPlay
 
-FairPlay multi-game fair gaming platform — umbrella repo.
+A real-time **financial clearing platform with game shells** — Web2.0 speed, Web3 verifiability.
+The Financial Core is the product; the 9 games are plugins. Centralized accounts, USDT/TRC-20
+money rails, Solana as a notary (never in the game critical path).
 
-## Layout
+## Repository layout
 
+| Path | What it is | First active milestone |
+|------|------------|------------------------|
+| [`financial-core/`](financial-core/) | The true core. Wallets, double-entry ledger, `transfer()` + ClearingRules, settlement, withdrawals, circuit breakers. **Owns every cent.** | **M1** |
+| [`game-server/`](game-server/) | Games, Unified State Machine, WebSocket transport, provably-fair, smoothness. Calls FC API for all money. | **M2 / M3** |
+| [`PROJECT_PLAN.md`](PROJECT_PLAN.md) | The day-by-day build plan: 16 milestones, gates, iron rules. | — |
+| `*.docx` | Source specs (v5.9 base + M1 Remediation + v5.9.1 Merkle + v6.0 UltraFair). | — |
+
+## Build target
+
+Reconciles four specs — build the **latest** of each concern, never the base's older version:
+
+**v5.9 base** (whole product) **+ M1 Remediation** (3-balance wallet, double-entry ledger)
+**+ v5.9.1 Merkle** (batch on-chain commit) **+ v6.0 UltraFair** (client-seed + future-block randomness).
+
+## Iron rules (never violated)
+
+1. No direct balance writes — money moves only through `transfer()` → ClearingRules → double-entry ledger (≤50ms txn).
+2. No blockchain in the game critical path — deal at T+0ms, notarize async.
+3. Reputation / collusion / anti-bot never block withdrawals.
+4. RiskFactor never exposed to UI.
+5. Dual-system (Platform / League) isolation is absolute.
+6. All amounts integer / Decimal128 — no floats.
+
+See [`PROJECT_PLAN.md`](PROJECT_PLAN.md) for the full list and the per-milestone gates.
+
+## Getting started
+
+```bash
+cd financial-core
+npm install
+npm test
 ```
-poker/                          <- this repo (poker-wealth/poker)
-  FairPlay_v5.9_FINAL_EN.docx
-  FairPlay_12Week_Milestone_EN.docx
-  README.md
-  CODEOWNERS                    <- 2-reviewer rule scoped via paths
-  .github/workflows/            <- CI per package, path-filtered
-  financial-core/               <- /api/v1/, ledger, settlement, jackpot, insurance
-  game-server/                  (later — W3+)
-  client/                       (later — Expo Bare Workflow, W2+)
-  contracts/                    (later — Solana + Anchor, W2+)
-  infra/                        (later — Cloudflare, MongoDB, Redis configs)
-```
 
-## Spec source of truth
-
-- [FairPlay_v5.9_FINAL_EN.docx](FairPlay_v5.9_FINAL_EN.docx) — full technical engineering spec (28 weeks / 14 milestones).
-- [FairPlay_12Week_Milestone_EN.docx](FairPlay_12Week_Milestone_EN.docx) — accelerated 12-week milestone plan with daily tasks, deliverables, acceptance criteria, and the 51-item Master Acceptance gate.
-
-## Active milestone — M1 / Week 1: Financial Core foundation
-
-See [financial-core/README.md](financial-core/README.md). Current status: scaffolding complete, schema and `transfer()` next.
+MongoDB must run as a **replica set** (transactions). Tests use `mongodb-memory-server` (no install);
+for a persistent stack, `docker compose up -d` from the repo root.

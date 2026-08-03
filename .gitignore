@@ -1,46 +1,19 @@
-# Node
+# Dependencies / build output (per-package .gitignore files also apply)
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-.pnpm-store/
-
-# TypeScript
 dist/
-build/
-*.tsbuildinfo
+coverage/
 
-# Env / secrets
+# Env / secrets — NEVER commit
 .env
 .env.local
-.env.*.local
-*.pem
-*.key
+**/.env
+!**/.env.example
 
-# Test / coverage
-coverage/
-.nyc_output/
+# Extracted spec text (regenerate with extract_docx.py; source .docx are tracked)
+docs_extracted/
 
-# IDE
-.idea/
-.vscode/*
-!.vscode/settings.json
-!.vscode/extensions.json
+# Editor / OS
 .DS_Store
-Thumbs.db
-
-# OS / temp
 *.log
-*.tmp
-*~
-
-# Office lockfiles (Word leaves these next to .docx while open)
-~$*
-
-# MongoDB local data (if running rs locally)
-data/
-mongo-rs/
-
-# AI assistant session metadata (Claude Code)
-.claude/
+.idea/
+.vscode/

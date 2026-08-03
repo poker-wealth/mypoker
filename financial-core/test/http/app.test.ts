@@ -1,532 +1,212 @@
-import { MongoMemoryReplSet } from 'mongodb-memory-server';
-import request from 'supertest';
-import { connectDB, disconnectDB } from '../../src/db/connection';
-import { PLATFORM_OWNER } from '../../src/domain/account-types';
-import { buildApp } from '../../src/http/app';
-import { signToken } from '../../src/security/jwt';
-import { Account } from '../../src/wallet/account.model';
-import { Ledger } from '../../src/wallet/ledger.model';
-import { Withdrawal } from '../../src/withdrawal/withdrawal.model';
+import type { Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { Decimal128 } from 'bson';
+import { createApp } from '../../src/http/app';
+import { signToken } from '../../src/http/jwt';
+import { AccountModel } from '../../src/wallet/account.model';
+import { LedgerModel } from '../../src/wallet/ledger.model';
+import { SecurityLogModel } from '../../src/security/security-log.model';
+import { SettlementModel } from '../../src/settlement/settlement.model';
+import { WithdrawalModel } from '../../src/withdrawal/withdrawal.model';
+import { OFFICIAL_USDT_TRC20_CONTRACT } from '../../src/deposit/trc20';
+import { startTestDb, stopTestDb, clearCollections, ensureIndexes } from '../db-helper';
 
-const INTERNAL_TOKEN = process.env.INTERNAL_API_TOKEN!;
+const INTERNAL_SECRET = 'test-internal-secret';
+const JWT_SECRET = 'test-jwt-secret';
 
-describe('http/app — end-to-end via supertest', () => {
-  let rs: MongoMemoryReplSet;
-  const app = buildApp();
+let server: Server;
+let base: string;
 
+function url(path: string): string {
+  return `${base}${path}`;
+}
+
+async function post(path: string, body: unknown, headers: Record<string, string> = {}): Promise<Response> {
+  return fetch(url(path), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', ...headers },
+    body: JSON.stringify(body),
+  });
+}
+
+const internal = { 'x-internal-secret': INTERNAL_SECRET };
+const playerToken = (playerId: string): Record<string, string> => ({
+  authorization: `Bearer ${signToken({ playerId, role: 'player' }, JWT_SECRET)}`,
+});
+
+describe('Financial Core HTTP API (/api/v1)', () => {
   beforeAll(async () => {
-    rs = await MongoMemoryReplSet.create({
-      replSet: { count: 1, storageEngine: 'wiredTiger' },
+    process.env.INTERNAL_API_SECRET = INTERNAL_SECRET;
+    process.env.JWT_SECRET = JWT_SECRET;
+    await startTestDb();
+    await ensureIndexes(
+      AccountModel,
+      LedgerModel,
+      SecurityLogModel,
+      SettlementModel,
+      WithdrawalModel,
+    );
+    const app = createApp();
+    await new Promise<void>((resolve) => {
+      server = app.listen(0, resolve);
     });
-    await connectDB(rs.getUri());
-    await Account.syncIndexes();
-    await Ledger.syncIndexes();
-    await Withdrawal.syncIndexes();
+    const { port } = server.address() as AddressInfo;
+    base = `http://127.0.0.1:${port}/api/v1`;
   });
 
   afterAll(async () => {
-    await disconnectDB();
-    await rs.stop();
+    await new Promise<void>((resolve, reject) =>
+      server.close((err) => (err ? reject(err) : resolve())),
+    );
+    await stopTestDb();
   });
 
-  beforeEach(async () => {
-    await Account.deleteMany({});
-    await Ledger.deleteMany({});
-    await Withdrawal.deleteMany({});
+  afterEach(clearCollections);
+
+  it('health is open', async () => {
+    const res = await fetch(url('/health'));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ status: 'ok' });
   });
 
-  // ───────────────────────────────────────────────────────────────────
-  // Health
-  // ───────────────────────────────────────────────────────────────────
-  describe('GET /api/v1/health', () => {
-    it('returns 200 with status ok and mongo connected', async () => {
-      const r = await request(app).get('/api/v1/health');
-      expect(r.status).toBe(200);
-      expect(r.body).toEqual({ status: 'ok', mongo: 'connected' });
-    });
+  it('serves the OpenAPI spec (the API docs release link)', async () => {
+    const res = await fetch(url('/openapi.json'));
+    expect(res.status).toBe(200);
+    const spec = (await res.json()) as { openapi: string; paths: Record<string, unknown> };
+    expect(spec.openapi).toBe('3.0.3');
+    expect(Object.keys(spec.paths)).toContain('/internal/settlements');
   });
 
-  // ───────────────────────────────────────────────────────────────────
-  // 404 fallback + error model shape
-  // ───────────────────────────────────────────────────────────────────
-  describe('error model', () => {
-    it('unknown route returns 404 problem-details', async () => {
-      const r = await request(app).get('/api/v1/does-not-exist');
-      expect(r.status).toBe(404);
-      expect(r.body).toMatchObject({
-        type: expect.stringContaining('not-found'),
-        title: 'NotFound',
-        status: 404,
-        code: 'NOT_FOUND',
-      });
-    });
+  it('rejects internal endpoints without the shared secret (401)', async () => {
+    const res = await post('/internal/buy-ins', { playerAccountId: 'x', amount: '1' });
+    expect(res.status).toBe(401);
   });
 
-  // ───────────────────────────────────────────────────────────────────
-  // Player /me/* — auth required
-  // ───────────────────────────────────────────────────────────────────
-  describe('/api/v1/me — player routes', () => {
-    it('balance: 401 without token', async () => {
-      const r = await request(app).get('/api/v1/me/balance');
-      expect(r.status).toBe(401);
-    });
+  it('rejects player endpoints without a valid token (401)', async () => {
+    expect((await fetch(url('/me/balance'))).status).toBe(401);
+    const bad = await fetch(url('/me/balance'), { headers: { authorization: 'Bearer not.a.jwt' } });
+    expect(bad.status).toBe(401);
+  });
 
-    it('balance: returns wallets across scopes for the JWT subject', async () => {
-      await Account.create({
-        account_type: 'PLAYER',
-        owner_id: 'player-A',
-        balance: 12_345_600n,
-      });
-      await Account.create({
-        account_type: 'PLAYER',
-        owner_id: 'player-A',
-        wallet_scope: 'league-7',
-        balance: 5_000n,
-      });
-      const token = signToken({ sub: 'player-A', roles: ['player'] });
-      const r = await request(app)
-        .get('/api/v1/me/balance')
-        .set('Authorization', `Bearer ${token}`);
-      expect(r.status).toBe(200);
-      expect(r.body.userId).toBe('player-A');
-      expect(r.body.wallets).toHaveLength(2);
-      // BigInt → string per docs/api-v1.md §2.
-      const platform = r.body.wallets.find(
-        (w: { walletScope: string }) => w.walletScope === 'PLATFORM',
-      );
-      expect(platform.balance).toBe('12345600');
-      expect(platform.currency).toBe('USDT-cents');
-    });
-
-    it('transactions: returns ledger entries for the player', async () => {
-      const player = await Account.create({
-        account_type: 'PLAYER',
-        owner_id: 'player-A',
-        balance: 10_000n,
-      });
-      const treasury = await Account.create({
-        account_type: 'TREASURY',
-        owner_id: PLATFORM_OWNER,
-      });
-      await Ledger.create({
-        from_account: player._id,
-        to_account: treasury._id,
-        amount: 500n,
-        type: 'RAKE',
-        idempotency_key: 'r1:rake',
-        status: 'SETTLED',
-        metadata: { round_id: 'r1' },
-      });
-      const token = signToken({ sub: 'player-A', roles: ['player'] });
-      const r = await request(app)
-        .get('/api/v1/me/transactions')
-        .set('Authorization', `Bearer ${token}`);
-      expect(r.status).toBe(200);
-      expect(r.body.items).toHaveLength(1);
-      expect(r.body.items[0]).toMatchObject({
-        type: 'RAKE',
+  it('end-to-end: deposit (internal) → balance (player) → withdraw (player)', async () => {
+    // Deposit 500 for player p-api via the internal endpoint.
+    const dep = await post(
+      '/internal/deposits',
+      {
+        playerId: 'p-api',
         amount: '500',
-        direction: 'out',
-        status: 'SETTLED',
-      });
-    });
+        txHash: 'tx-api-1',
+        contractAddress: OFFICIAL_USDT_TRC20_CONTRACT,
+        confirmations: 20,
+      },
+      internal,
+    );
+    expect(dep.status).toBe(200);
+    expect(await dep.json()).toEqual({ credited: true });
 
-    it('withdrawals: create → get → cancel happy path', async () => {
-      await Account.create({
-        account_type: 'PLAYER',
-        owner_id: 'player-A',
-        balance: 10_000n,
-      });
-      const token = signToken({ sub: 'player-A', roles: ['player'] });
+    // Player reads their own balance (scope from JWT).
+    const balRes = await fetch(url('/me/balance'), { headers: playerToken('p-api') });
+    expect(balRes.status).toBe(200);
+    expect(await balRes.json()).toMatchObject({ playerId: 'p-api', available: '500.000000' });
 
-      // Create
-      const created = await request(app)
-        .post('/api/v1/me/withdrawals')
-        .set('Authorization', `Bearer ${token}`)
-        .send({ amount: '5000', destination_address: 'TR-test-address' });
-      expect(created.status).toBe(201);
-      expect(created.body.state).toBe('REQUESTED');
-      expect(created.body.amount).toBe('5000');
-      const wId = created.body.id;
-
-      // Get
-      const got = await request(app)
-        .get(`/api/v1/me/withdrawals/${wId}`)
-        .set('Authorization', `Bearer ${token}`);
-      expect(got.status).toBe(200);
-      expect(got.body.id).toBe(wId);
-
-      // Cancel
-      const cancelled = await request(app)
-        .post(`/api/v1/me/withdrawals/${wId}/cancel`)
-        .set('Authorization', `Bearer ${token}`)
-        .send({ note: 'changed mind' });
-      expect(cancelled.status).toBe(200);
-      expect(cancelled.body.state).toBe('ROLLED_BACK');
-      expect(cancelled.body.failure_reason).toBe('changed mind');
-    });
-
-    it('withdrawals: cannot view another player\'s withdrawal (returns 404)', async () => {
-      await Account.create({
-        account_type: 'PLAYER',
-        owner_id: 'alice',
-        balance: 10_000n,
-      });
-      const aliceToken = signToken({ sub: 'alice', roles: ['player'] });
-      const bobToken = signToken({ sub: 'bob', roles: ['player'] });
-
-      const created = await request(app)
-        .post('/api/v1/me/withdrawals')
-        .set('Authorization', `Bearer ${aliceToken}`)
-        .send({ amount: '1000', destination_address: 'TR-x' });
-      const wId = created.body.id;
-
-      const r = await request(app)
-        .get(`/api/v1/me/withdrawals/${wId}`)
-        .set('Authorization', `Bearer ${bobToken}`);
-      expect(r.status).toBe(404);
-    });
-
-    it('balance strips body-supplied leagueId (data-scope iron rule)', async () => {
-      await Account.create({
-        account_type: 'PLAYER',
-        owner_id: 'player-A',
-        balance: 100n,
-      });
-      const token = signToken({ sub: 'player-A', leagueId: 'real-league' });
-      // Even if attacker tries to inject leagueId via body, it's stripped
-      // BEFORE the handler sees it — handler reads from req.scope (JWT).
-      const r = await request(app)
-        .post('/api/v1/me/withdrawals')
-        .set('Authorization', `Bearer ${token}`)
-        .send({
-          amount: '50',
-          destination_address: 'TR-x',
-          leagueId: 'attacker-league', // stripped
-        });
-      expect(r.status).toBe(201);
-    });
+    // Player requests a withdrawal.
+    const wRes = await post('/me/withdrawals', { amount: '200', address: 'TXaddr' }, playerToken('p-api'));
+    expect(wRes.status).toBe(201);
+    expect(await wRes.json()).toMatchObject({ state: 'REQUESTED' });
   });
 
-  // ───────────────────────────────────────────────────────────────────
-  // Internal /api/v1/internal/* — service auth
-  // ───────────────────────────────────────────────────────────────────
-  describe('/api/v1/internal — server-to-server', () => {
-    it('settle-round: 401 without X-Internal-Token', async () => {
-      const r = await request(app).post('/api/v1/internal/settle-round').send({});
-      expect(r.status).toBe(401);
-      expect(r.body.code).toBe('INVALID_INTERNAL_TOKEN');
-    });
-
-    it('settle-round: 401 with wrong token', async () => {
-      const r = await request(app)
-        .post('/api/v1/internal/settle-round')
-        .set('X-Internal-Token', 'wrong-token-wrong-token-wrong')
-        .send({});
-      expect(r.status).toBe(401);
-    });
-
-    it('settle-round: full happy path produces a receipt', async () => {
-      await Account.create({
-        account_type: 'PLAYER',
-        owner_id: 'a',
-        balance: 10_000n,
-      });
-      await Account.create({
-        account_type: 'PLAYER',
-        owner_id: 'w',
-        balance: 0n,
-      });
-
-      const r = await request(app)
-        .post('/api/v1/internal/settle-round')
-        .set('X-Internal-Token', INTERNAL_TOKEN)
-        .send({
-          round_id: 'http-round-1',
-          table_id: 'http-table-1',
-          table_type: 'PLATFORM',
-          winner_owner_id: 'w',
-          winner_profit: '10000',
-          rake_amount: '500',
-          losers: [{ owner_id: 'a', contribution: '10000' }],
-        });
-      expect(r.status).toBe(200);
-      expect(r.body).toMatchObject({
-        round_id: 'http-round-1',
-        sequence: ['WIN_PAYOUT', 'JACKPOT_INJECT', 'JACKPOT_INJECT', 'JACKPOT_INJECT', 'JACKPOT_INJECT', 'RAKE'],
-        replayed: false,
-      });
-      expect(r.body.amounts.rake).toBe('500');
-      expect(r.body.amounts.jackpot.total).toBe('50');
-      expect(r.body.hash).toMatch(/^[0-9a-f]{64}$/);
-    });
-
-    it('settle-round: replay returns x-idempotent-replay header', async () => {
-      await Account.create({ account_type: 'PLAYER', owner_id: 'a', balance: 10_000n });
-      await Account.create({ account_type: 'PLAYER', owner_id: 'w', balance: 0n });
-
-      const send = () =>
-        request(app)
-          .post('/api/v1/internal/settle-round')
-          .set('X-Internal-Token', INTERNAL_TOKEN)
-          .send({
-            round_id: 'http-replay-1',
-            table_id: 't',
-            table_type: 'PLATFORM',
-            winner_owner_id: 'w',
-            winner_profit: '10000',
-            rake_amount: '500',
-            losers: [{ owner_id: 'a', contribution: '10000' }],
-          });
-      const first = await send();
-      const second = await send();
-      expect(first.body.replayed).toBe(false);
-      expect(first.headers['x-idempotent-replay']).toBeUndefined();
-      expect(second.body.replayed).toBe(true);
-      expect(second.headers['x-idempotent-replay']).toBe('true');
-    });
-
-    it('settle-round: validation rejects bad payload with 400 + issue list', async () => {
-      const r = await request(app)
-        .post('/api/v1/internal/settle-round')
-        .set('X-Internal-Token', INTERNAL_TOKEN)
-        .send({
-          round_id: '',
-          table_id: 't',
-          table_type: 'PLATFORM',
-          winner_owner_id: 'w',
-          winner_profit: '0',
-          rake_amount: '0',
-          losers: [],
-        });
-      expect(r.status).toBe(400);
-      expect(r.body.code).toBe('VALIDATION_FAILED');
-      expect(Array.isArray(r.body.extra.issues)).toBe(true);
-    });
-
-    it('transfer: 422 for non-whitelist flow (CB6 emits)', async () => {
-      await Account.create({ account_type: 'PLAYER', owner_id: 'p', balance: 100n });
-      await Account.create({ account_type: 'REINSURANCE', owner_id: 'PLATFORM' });
-      const r = await request(app)
-        .post('/api/v1/internal/transfer')
-        .set('X-Internal-Token', INTERNAL_TOKEN)
-        .set('Idempotency-Key', 'http-illegal-1')
-        .send({
-          from: { type: 'PLAYER', owner_id: 'p' },
-          to: { type: 'REINSURANCE', owner_id: 'PLATFORM' },
-          amount: '50',
-          ledger_type: 'BET',
-        });
-      expect(r.status).toBe(422);
-      expect(r.body.code).toBe('ILLEGAL_FUND_FLOW');
-      expect(r.body.extra.from_type).toBe('PLAYER');
-      expect(r.body.extra.to_type).toBe('REINSURANCE');
-    });
-
-    it('transfer: 400 when Idempotency-Key header is missing', async () => {
-      const r = await request(app)
-        .post('/api/v1/internal/transfer')
-        .set('X-Internal-Token', INTERNAL_TOKEN)
-        .send({
-          from: { type: 'PLAYER', owner_id: 'p' },
-          to: { type: 'TREASURY', owner_id: 'PLATFORM' },
-          amount: '1',
-          ledger_type: 'RAKE',
-        });
-      expect(r.status).toBe(400);
-      expect(r.body.code).toBe('MISSING_IDEMPOTENCY_KEY');
-    });
-
-    it('deposit/credit: rejects non-official contract with 422', async () => {
-      const r = await request(app)
-        .post('/api/v1/internal/deposit/credit')
-        .set('X-Internal-Token', INTERNAL_TOKEN)
-        .send({
-          player_id: 'p1',
-          amount: '1000',
-          tx_hash: 'tx-bad-contract',
-          contract_address: 'TFakeContract',
-          confirmations: 30,
-        });
-      expect(r.status).toBe(422);
-      expect(r.body.code).toBe('UNAUTHORIZED_CONTRACT');
-    });
-
-    it('deposit/credit: rejects insufficient confirmations with 409', async () => {
-      const r = await request(app)
-        .post('/api/v1/internal/deposit/credit')
-        .set('X-Internal-Token', INTERNAL_TOKEN)
-        .send({
-          player_id: 'p1',
-          amount: '1000',
-          tx_hash: 'tx-pending',
-          contract_address: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
-          confirmations: 5,
-        });
-      expect(r.status).toBe(409);
-      expect(r.body.code).toBe('INSUFFICIENT_CONFIRMATIONS');
-    });
-
-    it('deposit/credit: happy path credits player', async () => {
-      const r = await request(app)
-        .post('/api/v1/internal/deposit/credit')
-        .set('X-Internal-Token', INTERNAL_TOKEN)
-        .send({
-          player_id: 'p1',
-          amount: '5000',
-          tx_hash: 'tx-deposit-1',
-          contract_address: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
-          confirmations: 30,
-          block_number: 12345678,
-        });
-      expect(r.status).toBe(200);
-      expect(r.body.replayed).toBe(false);
-      expect(r.body.to_account.balance).toBe('5000');
-    });
+  it('a player can only ever see their own scope (leagueId/ids come from the token, not the body)', async () => {
+    await post(
+      '/internal/deposits',
+      {
+        playerId: 'alice',
+        amount: '100',
+        txHash: 'tx-alice',
+        contractAddress: OFFICIAL_USDT_TRC20_CONTRACT,
+        confirmations: 20,
+      },
+      internal,
+    );
+    // Bob's token only ever resolves to Bob's (empty) account, regardless of any body.
+    const res = await fetch(url('/me/balance'), { headers: playerToken('bob') });
+    expect(await res.json()).toMatchObject({ playerId: 'bob', available: '0.000000' });
   });
 
-  // ───────────────────────────────────────────────────────────────────
-  // Ops /api/v1/ops/* — withdrawal lifecycle
-  // ───────────────────────────────────────────────────────────────────
-  describe('/api/v1/ops — withdrawal lifecycle', () => {
-    it('blocks player tokens with 403', async () => {
-      const playerToken = signToken({ sub: 'random-player', roles: ['player'] });
-      const r = await request(app)
-        .get('/api/v1/ops/withdrawals')
-        .set('Authorization', `Bearer ${playerToken}`);
-      expect(r.status).toBe(403);
-    });
+  it('validates request bodies (400) and overdraft (409)', async () => {
+    const bad = await post('/internal/buy-ins', { playerAccountId: 'x' }, internal); // missing amount
+    expect(bad.status).toBe(400);
 
-    it('full lifecycle: create → approve → broadcast → confirm via ops endpoints', async () => {
-      await Account.create({
-        account_type: 'PLAYER',
-        owner_id: 'p1',
-        balance: 100_000n,
-      });
-      const playerToken = signToken({ sub: 'p1', roles: ['player'] });
-      const opsToken = signToken({ sub: 'jane', roles: ['ops'] });
-
-      // Player creates request.
-      const created = await request(app)
-        .post('/api/v1/me/withdrawals')
-        .set('Authorization', `Bearer ${playerToken}`)
-        .send({ amount: '50000', destination_address: 'TR-y' });
-      const wId = created.body.id;
-
-      // Ops approves → balance deducted.
-      const approved = await request(app)
-        .post(`/api/v1/ops/withdrawals/${wId}/approve`)
-        .set('Authorization', `Bearer ${opsToken}`);
-      expect(approved.status).toBe(200);
-      expect(approved.body.state).toBe('APPROVED');
-      expect(approved.body.reviewed_by).toBe('jane');
-      const player = await Account.findOne({ owner_id: 'p1' });
-      expect(player?.balance).toBe(50_000n);
-
-      // Ops broadcasts.
-      const broadcasting = await request(app)
-        .post(`/api/v1/ops/withdrawals/${wId}/broadcast`)
-        .set('Authorization', `Bearer ${opsToken}`)
-        .send({ tx_hash: '0xtxhash-abc' });
-      expect(broadcasting.status).toBe(200);
-      expect(broadcasting.body.state).toBe('BROADCASTING');
-      expect(broadcasting.body.tx_hash).toBe('0xtxhash-abc');
-
-      // Ops confirms.
-      const confirmed = await request(app)
-        .post(`/api/v1/ops/withdrawals/${wId}/confirm`)
-        .set('Authorization', `Bearer ${opsToken}`);
-      expect(confirmed.status).toBe(200);
-      expect(confirmed.body.state).toBe('CONFIRMED');
-    });
-
-    it('fail path: BROADCASTING → FAILED → ROLLED_BACK refunds balance', async () => {
-      await Account.create({
-        account_type: 'PLAYER',
-        owner_id: 'p1',
-        balance: 100_000n,
-      });
-      const playerToken = signToken({ sub: 'p1', roles: ['player'] });
-      const opsToken = signToken({ sub: 'jane', roles: ['ops'] });
-
-      const created = await request(app)
-        .post('/api/v1/me/withdrawals')
-        .set('Authorization', `Bearer ${playerToken}`)
-        .send({ amount: '40000', destination_address: 'TR-z' });
-      const wId = created.body.id;
-
-      await request(app)
-        .post(`/api/v1/ops/withdrawals/${wId}/approve`)
-        .set('Authorization', `Bearer ${opsToken}`);
-      await request(app)
-        .post(`/api/v1/ops/withdrawals/${wId}/broadcast`)
-        .set('Authorization', `Bearer ${opsToken}`)
-        .send({ tx_hash: '0xfail' });
-
-      const failed = await request(app)
-        .post(`/api/v1/ops/withdrawals/${wId}/fail`)
-        .set('Authorization', `Bearer ${opsToken}`)
-        .send({ reason: 'on-chain rejection' });
-      expect(failed.status).toBe(200);
-      expect(failed.body.state).toBe('ROLLED_BACK');
-      expect(failed.body.failure_reason).toBe('on-chain rejection');
-
-      const player = await Account.findOne({ owner_id: 'p1' });
-      expect(player?.balance).toBe(100_000n); // refunded
-    });
-
-    it('approving a non-REQUESTED withdrawal returns 409', async () => {
-      await Account.create({ account_type: 'PLAYER', owner_id: 'p1', balance: 1_000n });
-      const playerToken = signToken({ sub: 'p1', roles: ['player'] });
-      const opsToken = signToken({ sub: 'jane', roles: ['ops'] });
-
-      const created = await request(app)
-        .post('/api/v1/me/withdrawals')
-        .set('Authorization', `Bearer ${playerToken}`)
-        .send({ amount: '500', destination_address: 'TR-x' });
-      const wId = created.body.id;
-
-      // Approve once → APPROVED.
-      await request(app)
-        .post(`/api/v1/ops/withdrawals/${wId}/approve`)
-        .set('Authorization', `Bearer ${opsToken}`);
-
-      // Approve again → 409 ILLEGAL_WITHDRAWAL_TRANSITION.
-      const r = await request(app)
-        .post(`/api/v1/ops/withdrawals/${wId}/approve`)
-        .set('Authorization', `Bearer ${opsToken}`);
-      expect(r.status).toBe(409);
-      expect(r.body.code).toBe('ILLEGAL_WITHDRAWAL_TRANSITION');
-    });
+    // Overdraft withdrawal → 409.
+    const res = await post('/me/withdrawals', { amount: '999', address: 'TXaddr' }, playerToken('broke'));
+    expect(res.status).toBe(409);
   });
 
-  // ───────────────────────────────────────────────────────────────────
-  // Admin /api/v1/admin/*
-  // ───────────────────────────────────────────────────────────────────
-  describe('/api/v1/admin', () => {
-    it('blocks ops tokens (admin-only) with 403', async () => {
-      const opsToken = signToken({ sub: 'jane', roles: ['ops'] });
-      const r = await request(app)
-        .get('/api/v1/admin/circuit-breakers')
-        .set('Authorization', `Bearer ${opsToken}`);
-      expect(r.status).toBe(403);
+  it('runs the internal settlement endpoint', async () => {
+    // Fund a winner account directly, create treasury + jackpot pools, then settle.
+    const winner = await AccountModel.create({
+      accountType: 'PLAYER',
+      ownerId: 'w',
+      availableBalance: Decimal128.fromString('1000'),
     });
+    await AccountModel.create({ accountType: 'TREASURY', ownerId: 'PLATFORM' });
+    const pools = {
+      mini: (await AccountModel.create({ accountType: 'JACKPOT_MINI', ownerId: 't' }))._id,
+      minor: (await AccountModel.create({ accountType: 'JACKPOT_MINOR', ownerId: 't' }))._id,
+      major: (await AccountModel.create({ accountType: 'JACKPOT_MAJOR', ownerId: 't' }))._id,
+      grand: (await AccountModel.create({ accountType: 'JACKPOT_GRAND', ownerId: 't' }))._id,
+    };
+    const res = await post(
+      '/internal/settlements',
+      {
+        roundId: 'r-api-1',
+        tableType: 'PLATFORM',
+        winnerAccountId: winner._id,
+        winnerProfit: '1000',
+        rake: '50',
+        jackpotAccounts: pools,
+      },
+      internal,
+    );
+    expect(res.status).toBe(200);
+    const receipt = (await res.json()) as { sequence: string[]; hash: string };
+    expect(receipt.sequence).toEqual(['jackpot_inject', 'rake', 'payout']);
+    expect(receipt.hash).toMatch(/^[0-9a-f]{64}$/);
+  });
 
-    it('admin gets the circuit-breaker status map', async () => {
-      const adminToken = signToken({ sub: 'admin-1', roles: ['admin'] });
-      const r = await request(app)
-        .get('/api/v1/admin/circuit-breakers')
-        .set('Authorization', `Bearer ${adminToken}`);
-      expect(r.status).toBe(200);
-      expect(r.body).toEqual({
-        CB1: 'STUB',
-        CB2: 'STUB',
-        CB3: 'STUB',
-        CB4: 'STUB',
-        CB5: 'STUB',
-        CB6: 'ACTIVE',
-        CB7: 'STUB',
-      });
-    });
+  it('settles a full table hand via /internal/table-settlements', async () => {
+    const mk = async (owner: string, lockedAmt: string): Promise<string> =>
+      (
+        await AccountModel.create({
+          accountType: 'PLAYER',
+          ownerId: owner,
+          lockedBalance: Decimal128.fromString(lockedAmt),
+        })
+      )._id;
+    const p0 = await mk('tp0', '1000');
+    const p1 = await mk('tp1', '1000');
+    await AccountModel.create({ accountType: 'TREASURY', ownerId: 'PLATFORM' });
+    const pool = async (t: string): Promise<string> =>
+      (await AccountModel.create({ accountType: t, ownerId: 'tt' }))._id;
+
+    const res = await post(
+      '/internal/table-settlements',
+      {
+        roundId: 'rt-1',
+        tableType: 'PLATFORM',
+        losers: [{ playerAccountId: p1, amount: '1000' }],
+        winners: [{ playerAccountId: p0, amount: '950' }],
+        rake: '50',
+        jackpot: { mini: '0', minor: '0', major: '0', grand: '0' },
+        jackpotAccounts: {
+          mini: await pool('JACKPOT_MINI'),
+          minor: await pool('JACKPOT_MINOR'),
+          major: await pool('JACKPOT_MAJOR'),
+          grand: await pool('JACKPOT_GRAND'),
+        },
+      },
+      internal,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ roundId: 'rt-1', applied: true });
   });
 });

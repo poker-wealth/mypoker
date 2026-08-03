@@ -1,117 +1,61 @@
-# @fairplay/financial-core
+# FairPlay — Financial Core
 
-The single source of truth for all fund movements on the FairPlay platform.
-All games and services interact with money exclusively through `/api/v1/`.
-Direct DB writes to balance fields are prohibited.
+The **true core** of FairPlay. All games are plugins; this service owns every cent.
 
-**API contract:** [docs/api-v1.md](docs/api-v1.md) — frontend / game-server build Mocks against this.
+> **Iron rule:** no module may write a balance directly. All fund movement goes through
+> `transfer()` → `ClearingRules` whitelist → double-entry ledger, inside one MongoDB
+> transaction (≤50ms). Direct `UPDATE balance` is forbidden everywhere.
 
-**M1 close-out documents:**
-- [docs/m1-acceptance.md](docs/m1-acceptance.md) — single-page status of every M1 acceptance item.
-- [docs/m1-schema-review.md](docs/m1-schema-review.md) — schema-review packet (your sign-off goes here).
-- [docs/m1-deferred-items.md](docs/m1-deferred-items.md) — what we knowingly punted to later milestones.
-- [docs/m1-runbook.md](docs/m1-runbook.md) — step-by-step for the user-side tasks.
+Build target reconciles four specs: **v5.9 base + M1 Remediation (3-balance wallet, double-entry
+ledger) + v5.9.1 Merkle (on-chain) + v6.0 UltraFair (randomness)**. See `../PROJECT_PLAN.md`.
 
-> Iron rule from spec: **NO module may bypass `transfer()`. NO `UPDATE accounts SET balance = ...`. ALL flows go through the hardcoded `ClearingRules` whitelist.**
+## Status
 
-## What lives here
+**M0 — scaffold.** Toolchain, strict TypeScript, and the `Money` primitive are in place.
+The accounts/ledger schema, `transfer()`, ClearingRules, Settlement Engine, withdrawal state
+machine, and the seven circuit breakers land in **M1**.
 
-- 9 account types: `PLAYER`, `TREASURY`, `INSURANCE`, `REINSURANCE`, `LEAGUE_INVENTORY`, `JACKPOT_MINI`, `JACKPOT_MINOR`, `JACKPOT_MAJOR`, `JACKPOT_GRAND`.
-- `accounts` collection (balance + optimistic-lock version) and `ledger` collection (single source of truth, append-only).
-- `ClearingRules` whitelist (hardcoded — not admin-configurable).
-- `transfer()` — the only mutator. Whitelist + idempotency key + atomic MongoDB transaction (≤50ms local).
-- Settlement Engine (Phase 1 strong consistency, Phase 2 async workers).
-- Settlement Domain — rake routing hub (Platform → Treasury / League → League Inventory).
-- Withdrawal state machine (5 states).
-- 7 circuit breakers (CB1–CB7).
-- HD wallet derivation (BIP-44) per account type.
-- TRC20-USDT deposit listener (20-block confirm, official contract whitelist, no Mempool credit).
+## Money
 
-## Stack
+Amounts are **never** JS floats. `Money` is a `bigint` of micro-units (6 dp, matching USDT-TRC20),
+persisted as `Decimal128`. See `src/domain/money.ts`.
 
-- Node.js 20 LTS, TypeScript 5 (strict).
-- MongoDB 7.0 Replica Set (single-node RS for local dev — Replica Set is required for transactions).
-- Redis (Sentinel in prod, single instance for local dev).
-- Express + pino + zod + Mongoose 8.
-
-## Quick start
+## Develop
 
 ```bash
-cp .env.example .env                   # fill in secrets (JWT_SECRET, etc.)
 npm install
+npm run typecheck   # strict tsc, no emit
+npm test            # jest (ts-jest)
+npm run lint
+npm run build       # -> dist/
 ```
 
-### Run tests
+MongoDB must be a **replica set** (transactions require it). Tests use `mongodb-memory-server`
+(single-node replica set, no install). For a persistent local stack use the root `docker-compose.yml`.
 
-Tests use `mongodb-memory-server`'s in-process Replica Set — no Docker or local Mongo required. The first run downloads a Mongo binary (~120 MB) and caches it.
+## Try it without a database (zero install)
 
 ```bash
-npm test                               # runs the full suite (217 tests across 17 suites)
-npm run test:coverage
+npm run smoke        # drives the whole money lifecycle end-to-end, prints ✅/❌
+npm run dev:memory   # live server on an in-memory DB; prints copy-paste API commands
+npm run bench        # settlement latency (p50/p95/p99/max)
 ```
 
-### Run the smoke test (end-to-end demo)
+These boot an in-memory replica set and use built-in dev secrets — no `.env` needed. Great for
+verifying behaviour; data is discarded on exit.
+
+## Run as a real service (persistent DB)
+
+The production entrypoint (`src/index.ts`) loads `.env`, connects to a **real** MongoDB, starts the
+server, and shuts down cleanly.
 
 ```bash
-npm run smoke                          # boots in-process Mongo + HTTP server, walks the full M1 journey
+cp .env.example .env          # then edit .env:
+#   MONGO_URI = a replica-set connection string (MongoDB Atlas free tier, or a local RS)
+#   INTERNAL_API_SECRET, JWT_SECRET = real secrets (≥8 chars)
+npm run dev                   # boots against your configured DB; data persists across restarts
 ```
 
-Output: 34 PASS/FAIL steps covering deposit, settlement, CB6 illegal-flow detection, full withdrawal lifecycle (approve → broadcast → confirm), and the failure → rollback path. Takes ~5 seconds.
-
-### Open the demo UI
-
-Two paths — pick one.
-
-**Path A — zero install (recommended for the client demo):**
-
-```bash
-npm install                            # one time
-npm run dev:memory                     # boots the server with an in-process Mongo
-```
-
-Open <http://localhost:3000> in a browser. Data is in-memory only — resets on restart. No Docker, no native Mongo install needed.
-
-**Path B — Docker (production-parity, persistent data):**
-
-```bash
-cd ../                                 # poker/
-docker compose up -d                   # starts Mongo + Redis (one-time setup)
-cd financial-core
-npm run mongo:rs:start                 # initiates the rs0 Replica Set
-npm run dev                            # http://localhost:3000
-```
-
-Either path: sign in as `alice` / `demo` (player), `ops` / `demo` (ops), or `admin` / `demo`. The 8 buttons exercise every M1 capability live.
-
-### Run the dev server (needs MongoDB + Redis)
-
-The dev server connects to a real Replica Set. Two paths to bring one up locally:
-
-**Path A — Docker (recommended):** install [Docker Desktop](https://www.docker.com/products/docker-desktop/), then from the `poker/` umbrella:
-
-```bash
-cd ../                                 # poker/
-docker compose up -d mongodb redis     # or just `npm run mongo:rs:start` from financial-core/
-cd financial-core
-npm run mongo:rs:start                 # idempotent: starts containers + initiates rs0
-npm run dev                            # tsx watch on src/index.ts
-npm run mongo:rs:stop                  # tears down containers (data persists in named volumes)
-```
-
-**Path B — Native MongoDB 7.0:** install MongoDB Community 7.0, then start it with `--replSet rs0` and run `rs.initiate()` manually in `mongosh`. Update `MONGO_URI` in `.env`.
-
-## CI gates
-
-Every PR runs `lint + typecheck + test`. Merge to `main` requires:
-
-1. CI green.
-2. ≥2 CODEOWNERS approvals (spec mandate).
-3. No direct push to `main` — branch protection enforced.
-
-## Hard rules (PR rejection criteria)
-
-- Direct `Account.updateOne({ ... balance ... })` outside `transfer()` → reject.
-- Cross-pool flow not in `ClearingRules` whitelist → reject.
-- MongoDB transaction touching multiple shards or running >50ms (local time) → reject.
-- Floating-point money math → reject. All amounts are `BigInt` cents.
-- Mempool deposit credited before 20-block confirmation → reject.
+`.env` is git-ignored — secrets never get committed. The service refuses to boot if `MONGO_URI` or
+the secrets are missing (fail-fast, not wide-open). The boot path is covered by
+`test/server-boot.test.ts`.

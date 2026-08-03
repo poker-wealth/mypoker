@@ -1,486 +1,206 @@
-#!/usr/bin/env tsx
-// FairPlay M1 — smoke test
-// Boots MongoMemoryReplSet + the FC app in-process, then walks the full
-// player + ops journey via real HTTP. Prints per-step PASS/FAIL.
-//
-// Run: npm run smoke
-//
-// This is the "human eyeball" verification — separate from the jest tests.
-// If this passes, every M1 deliverable is exercised end-to-end on a real
-// HTTP server with real Mongo (in-process Replica Set).
-
-// MUST be the first import — sets env defaults before any FC module loads.
-import './_smoke-env.js';
-
+/**
+ * End-to-end smoke run — drives the whole Financial Core money lifecycle against a LIVE HTTP server
+ * (booted on an in-memory replica set, zero install) and narrates each step with ✅ / ❌.
+ *
+ *   npm run smoke
+ *
+ * Watch: deposit → balance → buy-in → release → settle (jackpot+rake) → withdraw lifecycle →
+ * illegal-flow rejection (CB6) → ledger stays balanced (Σdebit = Σcredit).
+ */
 import type { Server } from 'node:http';
-import { setTimeout as sleep } from 'node:timers/promises';
+import type { AddressInfo } from 'node:net';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
+import { connectDb, disconnectDb } from '../src/db/connection';
+import { createApp } from '../src/http/app';
+import { signToken } from '../src/http/jwt';
+import { getOrCreatePlayerAccount } from '../src/wallet/system-accounts';
+import { AccountModel } from '../src/wallet/account.model';
+import { LedgerModel } from '../src/wallet/ledger.model';
+import { transfer } from '../src/wallet/transfer';
+import { IllegalFundFlowError } from '../src/wallet/errors';
+import { Money } from '../src/domain/money';
+import { AccountType, LedgerType, LedgerDirection } from '../src/domain/account-types';
+import { OFFICIAL_USDT_TRC20_CONTRACT } from '../src/deposit/trc20';
 
-import { registerAllCircuitBreakers } from '../src/circuit-breakers/registry.js';
-import { connectDB, disconnectDB } from '../src/db/connection.js';
-import { buildApp } from '../src/http/app.js';
-import { Account } from '../src/wallet/account.model.js';
-import { Ledger } from '../src/wallet/ledger.model.js';
-import { Withdrawal } from '../src/withdrawal/withdrawal.model.js';
-
-const colors = {
-  green: (s: string) => `\x1b[32m${s}\x1b[0m`,
-  red: (s: string) => `\x1b[31m${s}\x1b[0m`,
-  yellow: (s: string) => `\x1b[33m${s}\x1b[0m`,
-  cyan: (s: string) => `\x1b[36m${s}\x1b[0m`,
-  dim: (s: string) => `\x1b[2m${s}\x1b[0m`,
-  bold: (s: string) => `\x1b[1m${s}\x1b[0m`,
-};
+const INTERNAL = 'dev-internal-secret';
+const JWT = 'dev-jwt-secret';
 
 let pass = 0;
 let fail = 0;
-let baseUrl = '';
-let server: Server | null = null;
-let rs: MongoMemoryReplSet | null = null;
-
-function step(name: string): void {
-  process.stdout.write(`  ${colors.dim('• ')}${name}${colors.dim(' ... ')}`);
-}
-function ok(detail = ''): void {
-  pass++;
-  console.log(colors.green('PASS') + (detail ? colors.dim(`  ${detail}`) : ''));
-}
-function ko(reason: string): void {
-  fail++;
-  console.log(colors.red('FAIL') + colors.dim(`  ${reason}`));
-}
-function section(title: string): void {
-  console.log(`\n${colors.bold(colors.cyan(`▶ ${title}`))}`);
-}
-
-interface ApiOpts {
-  method?: string;
-  headers?: Record<string, string>;
-  body?: unknown;
-}
-interface ApiResult {
-  status: number;
-  body: any;
-}
-
-async function api(path: string, opts: ApiOpts = {}): Promise<ApiResult> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...(opts.headers ?? {}),
-  };
-  const res = await fetch(baseUrl + path, {
-    method: opts.method ?? 'GET',
-    headers,
-    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-  });
-  const text = await res.text();
-  let body: any = null;
-  try {
-    body = text ? JSON.parse(text) : null;
-  } catch {
-    body = text;
-  }
-  return { status: res.status, body };
-}
-
-async function bootstrap(): Promise<void> {
-  section('Bootstrap');
-
-  step('starting in-process MongoDB Replica Set');
-  rs = await MongoMemoryReplSet.create({
-    replSet: { count: 1, storageEngine: 'wiredTiger' },
-  });
-  ok();
-
-  step('connecting Mongoose');
-  await connectDB(rs.getUri());
-  await Account.syncIndexes();
-  await Ledger.syncIndexes();
-  await Withdrawal.syncIndexes();
-  ok();
-
-  step('registering circuit breakers');
-  registerAllCircuitBreakers();
-  ok();
-
-  step('starting HTTP server on a random port');
-  const app = buildApp();
-  await new Promise<void>((resolve) => {
-    server = app.listen(0, '127.0.0.1', () => {
-      const addr = server!.address();
-      const port = typeof addr === 'object' && addr ? addr.port : 0;
-      baseUrl = `http://127.0.0.1:${port}/api/v1`;
-      resolve();
-    });
-  });
-  ok(baseUrl);
-}
-
-async function teardown(): Promise<void> {
-  if (server) await new Promise<void>((r) => server!.close(() => r()));
-  if (rs) {
-    await disconnectDB();
-    await rs.stop();
-  }
-}
-
-async function scenario(): Promise<void> {
-  // ─── Health ──────────────────────────────────────────────────
-  section('Health');
-  step('GET /health');
-  const h = await api('/health');
-  if (h.status === 200 && h.body.status === 'ok' && h.body.mongo === 'connected') ok();
-  else ko(`expected 200/ok/connected, got ${h.status} ${JSON.stringify(h.body)}`);
-
-  // ─── Demo login ──────────────────────────────────────────────
-  section('Demo login');
-  let aliceToken = '';
-  let opsToken = '';
-  let internalToken = '';
-
-  step('POST /demo/login (alice)');
-  let r = await api('/demo/login', {
-    method: 'POST',
-    body: { username: 'alice', password: 'demo' },
-  });
-  if (r.status === 200 && r.body.token && r.body.internal_token) {
-    aliceToken = r.body.token;
-    internalToken = r.body.internal_token;
-    ok(`user=${r.body.user.username}`);
-  } else ko(`expected 200 with token, got ${r.status}`);
-
-  step('POST /demo/login (ops)');
-  r = await api('/demo/login', { method: 'POST', body: { username: 'ops', password: 'demo' } });
-  if (r.status === 200 && r.body.token) {
-    opsToken = r.body.token;
-    ok(`user=${r.body.user.username}`);
-  } else ko(`expected 200, got ${r.status}`);
-
-  if (!aliceToken || !opsToken || !internalToken) {
-    console.log(colors.red('\nfatal: login failed; aborting'));
-    return;
-  }
-
-  const aliceAuth = { Authorization: `Bearer ${aliceToken}` };
-  const opsAuth = { Authorization: `Bearer ${opsToken}` };
-  const internalAuth = { 'X-Internal-Token': internalToken };
-
-  // ─── Player journey ──────────────────────────────────────────
-  section('Player journey — alice');
-
-  step('balance starts empty');
-  r = await api('/me/balance', { headers: aliceAuth });
-  if (r.status === 200 && r.body.wallets.length === 0) ok();
-  else ko(`expected wallets=[], got ${JSON.stringify(r.body)}`);
-
-  step('deposit $100 via /internal/deposit/credit');
-  r = await api('/internal/deposit/credit', {
-    method: 'POST',
-    headers: internalAuth,
-    body: {
-      player_id: 'demo-player-alice',
-      amount: '10000',
-      tx_hash: 'smoke-deposit-1',
-      contract_address: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
-      confirmations: 25,
-    },
-  });
-  if (r.status === 200 && r.body.replayed === false) ok(`balance=${r.body.to_account.balance}`);
-  else ko(`expected 200 replayed=false, got ${r.status}`);
-
-  step('balance reflects deposit');
-  r = await api('/me/balance', { headers: aliceAuth });
-  if (r.status === 200 && r.body.wallets[0]?.balance === '10000') ok('$100.00');
-  else ko(`expected balance=10000, got ${JSON.stringify(r.body)}`);
-
-  step('Mempool deposit (0 confirmations) is REJECTED');
-  r = await api('/internal/deposit/credit', {
-    method: 'POST',
-    headers: internalAuth,
-    body: {
-      player_id: 'demo-player-alice',
-      amount: '999',
-      tx_hash: 'smoke-mempool-1',
-      contract_address: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
-      confirmations: 0,
-    },
-  });
-  if (r.status === 409 && r.body.code === 'INSUFFICIENT_CONFIRMATIONS') ok('CB blocked');
-  else ko(`expected 409, got ${r.status} ${r.body?.code}`);
-
-  step('non-official contract deposit is REJECTED');
-  r = await api('/internal/deposit/credit', {
-    method: 'POST',
-    headers: internalAuth,
-    body: {
-      player_id: 'demo-player-alice',
-      amount: '999',
-      tx_hash: 'smoke-bad-contract-1',
-      contract_address: 'TFakeContract',
-      confirmations: 30,
-    },
-  });
-  if (r.status === 422 && r.body.code === 'UNAUTHORIZED_CONTRACT') ok('CB blocked');
-  else ko(`expected 422, got ${r.status} ${r.body?.code}`);
-
-  step('duplicate txHash deposit returns idempotent replay');
-  r = await api('/internal/deposit/credit', {
-    method: 'POST',
-    headers: internalAuth,
-    body: {
-      player_id: 'demo-player-alice',
-      amount: '10000',
-      tx_hash: 'smoke-deposit-1',
-      contract_address: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
-      confirmations: 30,
-    },
-  });
-  if (r.status === 200 && r.body.replayed === true) ok('balance unchanged');
-  else ko(`expected replayed=true, got ${r.status} replayed=${r.body?.replayed}`);
-
-  step('balance still $100 (no double-credit)');
-  r = await api('/me/balance', { headers: aliceAuth });
-  if (r.body.wallets[0]?.balance === '10000') ok();
-  else ko(`got ${r.body.wallets[0]?.balance}`);
-
-  // ─── Settle a hand ────────────────────────────────────────────
-  section('Settlement — alice wins against bob');
-
-  step('fund bob via deposit');
-  r = await api('/internal/deposit/credit', {
-    method: 'POST',
-    headers: internalAuth,
-    body: {
-      player_id: 'demo-player-bob',
-      amount: '5000',
-      tx_hash: 'smoke-bob-fund',
-      contract_address: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
-      confirmations: 25,
-    },
-  });
-  if (r.status === 200) ok();
-  else ko(`failed: ${r.status}`);
-
-  step('settle PLATFORM round (alice wins $50, $2.50 rake)');
-  r = await api('/internal/settle-round', {
-    method: 'POST',
-    headers: internalAuth,
-    body: {
-      round_id: 'smoke-round-1',
-      table_id: 'smoke-table-1',
-      table_type: 'PLATFORM',
-      winner_owner_id: 'demo-player-alice',
-      winner_profit: '5000',
-      rake_amount: '250',
-      losers: [{ owner_id: 'demo-player-bob', contribution: '5000' }],
-    },
-  });
-  if (
-    r.status === 200 &&
-    r.body.replayed === false &&
-    r.body.amounts.rake === '250' &&
-    r.body.amounts.jackpot.total === '25'
-  ) {
-    ok('jackpot total=$0.25 (4 pools split 20/30/25/25)');
+function check(label: string, cond: boolean, detail = ''): void {
+  if (cond) {
+    pass++;
+    console.log(`   \x1b[32m✅ ${label}\x1b[0m`);
   } else {
-    ko(`unexpected: ${JSON.stringify(r.body.amounts)}`);
+    fail++;
+    console.log(`   \x1b[31m❌ ${label}\x1b[0m ${detail}`);
   }
-
-  step('replay the same round → idempotent');
-  r = await api('/internal/settle-round', {
-    method: 'POST',
-    headers: internalAuth,
-    body: {
-      round_id: 'smoke-round-1',
-      table_id: 'smoke-table-1',
-      table_type: 'PLATFORM',
-      winner_owner_id: 'demo-player-alice',
-      winner_profit: '5000',
-      rake_amount: '250',
-      losers: [{ owner_id: 'demo-player-bob', contribution: '5000' }],
-    },
-  });
-  if (r.status === 200 && r.body.replayed === true) ok();
-  else ko(`expected replayed=true, got ${r.body?.replayed}`);
-
-  step('alice = $100 + $50 - $0.25 jackpot - $2.50 rake = $147.25');
-  r = await api('/me/balance', { headers: aliceAuth });
-  if (r.body.wallets[0]?.balance === '14725') ok();
-  else ko(`got ${r.body.wallets[0]?.balance}`);
-
-  // ─── CB6 ─────────────────────────────────────────────────────
-  section('CB6 — illegal fund flow detection');
-
-  step('PLAYER → REINSURANCE returns 422 ILLEGAL_FUND_FLOW');
-  const t0 = Date.now();
-  r = await api('/internal/transfer', {
-    method: 'POST',
-    headers: { ...internalAuth, 'Idempotency-Key': 'smoke-illegal-1' },
-    body: {
-      from: { type: 'PLAYER', owner_id: 'demo-player-alice' },
-      to: { type: 'REINSURANCE', owner_id: 'PLATFORM' },
-      amount: '100',
-      ledger_type: 'BET',
-    },
-  });
-  const elapsed = Date.now() - t0;
-  if (r.status === 422 && r.body.code === 'ILLEGAL_FUND_FLOW' && elapsed < 5000) {
-    ok(`rejected in ${elapsed}ms (CB6 alert dispatched)`);
-  } else {
-    ko(`expected 422 ILLEGAL_FUND_FLOW <5s, got ${r.status} in ${elapsed}ms`);
-  }
-
-  step('alice balance unchanged');
-  r = await api('/me/balance', { headers: aliceAuth });
-  if (r.body.wallets[0]?.balance === '14725') ok();
-  else ko(`balance changed: ${r.body.wallets[0]?.balance}`);
-
-  // ─── Withdrawal flow ──────────────────────────────────────────
-  section('Withdrawal flow — full lifecycle');
-
-  step('alice creates $25 withdrawal');
-  r = await api('/me/withdrawals', {
-    method: 'POST',
-    headers: aliceAuth,
-    body: { amount: '2500', destination_address: 'TR-smoke-test' },
-  });
-  let withdrawalId = '';
-  if (r.status === 201 && r.body.state === 'REQUESTED') {
-    withdrawalId = r.body.id;
-    ok(`id=${withdrawalId.slice(0, 8)}…`);
-  } else ko(`expected 201 REQUESTED, got ${r.status}`);
-
-  step('balance unchanged after request');
-  r = await api('/me/balance', { headers: aliceAuth });
-  if (r.body.wallets[0]?.balance === '14725') ok();
-  else ko('balance changed prematurely');
-
-  step('ops approves → APPROVED, balance deducted');
-  r = await api(`/ops/withdrawals/${withdrawalId}/approve`, {
-    method: 'POST',
-    headers: opsAuth,
-  });
-  if (r.status === 200 && r.body.state === 'APPROVED' && r.body.reviewed_by === 'demo-ops-jane') ok();
-  else ko(`expected APPROVED, got ${r.body?.state}`);
-
-  step('balance now = $147.25 - $25 = $122.25');
-  r = await api('/me/balance', { headers: aliceAuth });
-  if (r.body.wallets[0]?.balance === '12225') ok();
-  else ko(`got ${r.body.wallets[0]?.balance}`);
-
-  step('ops broadcasts → BROADCASTING with tx_hash');
-  r = await api(`/ops/withdrawals/${withdrawalId}/broadcast`, {
-    method: 'POST',
-    headers: opsAuth,
-    body: { tx_hash: 'smoke-onchain-1' },
-  });
-  if (r.status === 200 && r.body.state === 'BROADCASTING' && r.body.tx_hash === 'smoke-onchain-1')
-    ok();
-  else ko(`expected BROADCASTING, got ${r.body?.state}`);
-
-  step('ops confirms → CONFIRMED, ledger PENDING → SETTLED');
-  r = await api(`/ops/withdrawals/${withdrawalId}/confirm`, {
-    method: 'POST',
-    headers: opsAuth,
-  });
-  if (r.status === 200 && r.body.state === 'CONFIRMED') ok();
-  else ko(`expected CONFIRMED, got ${r.body?.state}`);
-
-  step('double-confirm → 409 ILLEGAL_WITHDRAWAL_TRANSITION');
-  r = await api(`/ops/withdrawals/${withdrawalId}/confirm`, {
-    method: 'POST',
-    headers: opsAuth,
-  });
-  if (r.status === 409 && r.body.code === 'ILLEGAL_WITHDRAWAL_TRANSITION') ok();
-  else ko(`expected 409, got ${r.status}`);
-
-  // ─── Failed withdrawal flow ───────────────────────────────────
-  section('Withdrawal failure path → auto-refund');
-
-  step('alice creates another $20 withdrawal');
-  r = await api('/me/withdrawals', {
-    method: 'POST',
-    headers: aliceAuth,
-    body: { amount: '2000', destination_address: 'TR-smoke-test-2' },
-  });
-  const failId: string = r.body.id;
-  if (r.status === 201) ok();
-  else ko(`failed: ${r.status}`);
-
-  step('approve + broadcast');
-  await api(`/ops/withdrawals/${failId}/approve`, { method: 'POST', headers: opsAuth });
-  r = await api(`/ops/withdrawals/${failId}/broadcast`, {
-    method: 'POST',
-    headers: opsAuth,
-    body: { tx_hash: 'smoke-onchain-2' },
-  });
-  if (r.body.state === 'BROADCASTING') ok();
-  else ko('not in BROADCASTING');
-
-  step('balance = $122.25 - $20 = $102.25');
-  r = await api('/me/balance', { headers: aliceAuth });
-  if (r.body.wallets[0]?.balance === '10225') ok();
-  else ko(`got ${r.body.wallets[0]?.balance}`);
-
-  step('ops marks failed → ROLLED_BACK + refund');
-  r = await api(`/ops/withdrawals/${failId}/fail`, {
-    method: 'POST',
-    headers: opsAuth,
-    body: { reason: 'smoke: simulated on-chain rejection' },
-  });
-  if (r.status === 200 && r.body.state === 'ROLLED_BACK' && r.body.refund_ledger_entry_id)
-    ok(`refund_ledger_entry_id=${r.body.refund_ledger_entry_id.slice(0, 8)}…`);
-  else ko(`expected ROLLED_BACK + refund, got ${r.body?.state}`);
-
-  step('balance refunded back to $122.25');
-  r = await api('/me/balance', { headers: aliceAuth });
-  if (r.body.wallets[0]?.balance === '12225') ok();
-  else ko(`got ${r.body.wallets[0]?.balance}`);
-
-  // ─── Admin ───────────────────────────────────────────────────
-  section('Admin');
-
-  step('ops cannot read /admin (403)');
-  r = await api('/admin/circuit-breakers', { headers: opsAuth });
-  if (r.status === 403) ok();
-  else ko(`expected 403, got ${r.status}`);
-
-  step('admin token can read CB status');
-  const adminLogin = await api('/demo/login', {
-    method: 'POST',
-    body: { username: 'admin', password: 'demo' },
-  });
-  r = await api('/admin/circuit-breakers', {
-    headers: { Authorization: `Bearer ${adminLogin.body.token}` },
-  });
-  if (r.status === 200 && r.body.CB6 === 'ACTIVE') ok('CB6=ACTIVE; CB1-5,7=STUB');
-  else ko(`expected CB6=ACTIVE, got ${JSON.stringify(r.body)}`);
 }
 
 async function main(): Promise<void> {
-  console.log(colors.bold('\nFairPlay M1 Smoke Test'));
-  console.log(colors.dim('===================================================='));
+  process.env.INTERNAL_API_SECRET = INTERNAL;
+  process.env.JWT_SECRET = JWT;
 
-  const totalT0 = Date.now();
-  try {
-    await bootstrap();
-    await scenario();
-  } catch (err) {
-    console.log(colors.red(`\nfatal: ${err instanceof Error ? err.stack : String(err)}`));
-    fail++;
-  } finally {
-    await sleep(100);
-    await teardown();
+  const rs = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: 'wiredTiger' } });
+  await connectDb({ uri: rs.getUri('fc_smoke') });
+  await AccountModel.init();
+  await LedgerModel.init();
+  await AccountModel.create({ accountType: AccountType.TREASURY, ownerId: 'PLATFORM' });
+
+  const app = createApp();
+  const server: Server = await new Promise((resolve) => {
+    const s = app.listen(0, () => resolve(s));
+  });
+  const { port } = server.address() as AddressInfo;
+  const base = `http://127.0.0.1:${port}/api/v1`;
+  const token = signToken({ playerId: 'p-demo', role: 'player' }, JWT, 3600);
+
+  type Json = Record<string, unknown>;
+  async function api(
+    method: string,
+    path: string,
+    opts: { body?: unknown; player?: boolean; internal?: boolean } = {},
+  ): Promise<{ status: number; json: Json }> {
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    if (opts.player) headers.authorization = `Bearer ${token}`;
+    if (opts.internal) headers['x-internal-secret'] = INTERNAL;
+    const res = await fetch(`${base}${path}`, {
+      method,
+      headers,
+      ...(opts.body ? { body: JSON.stringify(opts.body) } : {}),
+    });
+    const json = (await res.json().catch(() => ({}))) as Json;
+    return { status: res.status, json };
   }
+  const bal = async (): Promise<{ available: number; locked: number; clearing: number }> => {
+    const { json } = await api('GET', '/me/balance', { player: true });
+    return {
+      available: parseFloat(json.available as string),
+      locked: parseFloat(json.locked as string),
+      clearing: parseFloat(json.clearing as string),
+    };
+  };
 
-  const elapsed = ((Date.now() - totalT0) / 1000).toFixed(1);
-  console.log(colors.dim('\n===================================================='));
-  console.log(
-    `${colors.bold('Smoke result: ')}${colors.green(`${pass} passed`)}` +
-      (fail ? colors.red(`, ${fail} failed`) : '') +
-      colors.dim(`  (${elapsed}s)`),
+  console.log(`\n\x1b[1mFairPlay Financial Core — live smoke run\x1b[0m  (${base})\n`);
+
+  console.log('1) Health');
+  const health = await api('GET', '/health');
+  check('GET /health → 200 ok', health.status === 200 && health.json.status === 'ok');
+
+  console.log('2) Deposit 500 USDT (official contract, 20 confirmations)');
+  const dep = await api('POST', '/internal/deposits', {
+    internal: true,
+    body: {
+      playerId: 'p-demo',
+      amount: '500',
+      txHash: 'tx-smoke-1',
+      contractAddress: OFFICIAL_USDT_TRC20_CONTRACT,
+      confirmations: 20,
+    },
+  });
+  check('deposit credited', dep.json.credited === true);
+  check('balance available = 500', (await bal()).available === 500);
+
+  console.log('3) Reject an unconfirmed (mempool) deposit');
+  const memp = await api('POST', '/internal/deposits', {
+    internal: true,
+    body: {
+      playerId: 'p-demo',
+      amount: '999',
+      txHash: 'tx-mempool',
+      contractAddress: OFFICIAL_USDT_TRC20_CONTRACT,
+      confirmations: 3,
+    },
+  });
+  check('mempool deposit NOT credited', memp.json.credited === false && memp.json.reason === 'unconfirmed');
+  check('balance unchanged = 500', (await bal()).available === 500);
+
+  console.log('4) Buy in 300 at a table (available → locked)');
+  const player = await getOrCreatePlayerAccount('p-demo');
+  await api('POST', '/internal/buy-ins', { internal: true, body: { playerAccountId: player._id, amount: '300' } });
+  const b4 = await bal();
+  check('available 200 / locked 300', b4.available === 200 && b4.locked === 300, JSON.stringify(b4));
+
+  console.log('5) Locked funds are NOT withdrawable');
+  const overW = await api('POST', '/me/withdrawals', { player: true, body: { amount: '250', address: 'TXaddr' } });
+  check('withdraw 250 (> available 200) → 409', overW.status === 409);
+
+  console.log('6) Leave table with 100 (locked → available)');
+  await api('POST', '/internal/releases', { internal: true, body: { playerAccountId: player._id, amount: '100' } });
+  const b6 = await bal();
+  check('available 300 / locked 200', b6.available === 300 && b6.locked === 200, JSON.stringify(b6));
+
+  console.log('7) Settle a hand — jackpot (0.5%) + rake, winner = p-demo');
+  const pool = async (t: AccountType): Promise<string> =>
+    (await AccountModel.create({ accountType: t, ownerId: 'demo-table' }))._id;
+  const settle = await api('POST', '/internal/settlements', {
+    internal: true,
+    body: {
+      roundId: 'r-smoke-1',
+      tableType: 'PLATFORM',
+      winnerAccountId: player._id,
+      winnerProfit: '1000',
+      rake: '50',
+      jackpotAccounts: {
+        mini: await pool(AccountType.JACKPOT_MINI),
+        minor: await pool(AccountType.JACKPOT_MINOR),
+        major: await pool(AccountType.JACKPOT_MAJOR),
+        grand: await pool(AccountType.JACKPOT_GRAND),
+      },
+    },
+  });
+  check('settlement receipt returned', Array.isArray(settle.json.sequence));
+  const b7 = await bal();
+  check('winner paid 55 (jackpot 5 + rake 50): available 245', b7.available === 245, JSON.stringify(b7));
+
+  console.log('8) Withdraw 100 — full lifecycle REQUESTED → APPROVED → BROADCASTING → CONFIRMED');
+  const wreq = await api('POST', '/me/withdrawals', { player: true, body: { amount: '100', address: 'TXaddr' } });
+  const wid = wreq.json.withdrawalId as string;
+  check('withdrawal REQUESTED', wreq.status === 201 && wreq.json.state === 'REQUESTED');
+  const apv = await api('POST', `/internal/withdrawals/${wid}/approve`, { internal: true });
+  check('APPROVED (funds held in clearing)', apv.json.state === 'APPROVED');
+  const ba = await bal();
+  check('available 145 / clearing 100', ba.available === 145 && ba.clearing === 100, JSON.stringify(ba));
+  await api('POST', `/internal/withdrawals/${wid}/broadcast`, { internal: true, body: { txHash: 'tx-out-1' } });
+  const cf = await api('POST', `/internal/withdrawals/${wid}/confirm`, { internal: true });
+  check('CONFIRMED (funds left platform)', cf.json.state === 'CONFIRMED');
+  check('clearing 0', (await bal()).clearing === 0);
+
+  console.log('9) Circuit breaker CB6 — illegal fund flow is rejected');
+  const reins = await AccountModel.create({ accountType: AccountType.REINSURANCE, ownerId: 'PLATFORM' });
+  let cb6 = false;
+  try {
+    await transfer({
+      fromAccountId: player._id,
+      toAccountId: reins._id,
+      amount: Money.fromDecimalString('1'),
+      type: LedgerType.BET,
+      idempotencyKey: 'smoke-illegal',
+    });
+  } catch (e) {
+    cb6 = e instanceof IllegalFundFlowError;
+  }
+  check('PLAYER → REINSURANCE blocked by CB6', cb6);
+
+  console.log('10) Ledger integrity — double-entry stays balanced');
+  const agg = await LedgerModel.aggregate<{ _id: LedgerDirection; total: { toString(): string } }>([
+    { $group: { _id: '$direction', total: { $sum: '$amount' } } },
+  ]);
+  const totals = Object.fromEntries(agg.map((x) => [x._id, x.total.toString()]));
+  check(
+    `Σ(DEBIT) = Σ(CREDIT)  (${totals[LedgerDirection.DEBIT]} = ${totals[LedgerDirection.CREDIT]})`,
+    totals[LedgerDirection.DEBIT] === totals[LedgerDirection.CREDIT],
   );
-  process.exit(fail === 0 ? 0 : 1);
+
+  console.log(`\n\x1b[1mRESULT: ${pass} passed, ${fail} failed\x1b[0m\n`);
+
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+  await disconnectDb();
+  await rs.stop();
+  process.exit(fail > 0 ? 1 : 0);
 }
 
-void main();
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

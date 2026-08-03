@@ -1,217 +1,113 @@
-import { MongoMemoryReplSet } from 'mongodb-memory-server';
-import { loadEnv } from '../../src/config/env';
-import { connectDB, disconnectDB } from '../../src/db/connection';
-import {
-  InsufficientConfirmationsError,
-  UnauthorizedContractError,
-  creditDeposit,
-} from '../../src/deposit/deposit-credit';
-import { Account } from '../../src/wallet/account.model';
-import { Ledger } from '../../src/wallet/ledger.model';
+import { Decimal128 } from 'bson';
+import { AccountModel } from '../../src/wallet/account.model';
+import { LedgerModel } from '../../src/wallet/ledger.model';
+import { SecurityLogModel } from '../../src/security/security-log.model';
+import { creditDeposit, processConfirmedDeposit } from '../../src/deposit/deposit-credit';
+import { OFFICIAL_USDT_TRC20_CONTRACT } from '../../src/deposit/trc20';
+import { Money } from '../../src/domain/money';
+import { AccountType, LedgerType, LedgerDirection } from '../../src/domain/account-types';
+import { startTestDb, stopTestDb, clearCollections, ensureIndexes } from '../db-helper';
 
-const env = loadEnv();
-const OFFICIAL_USDT = env.TRON_USDT_CONTRACT;
-const REQUIRED_CONFIRMATIONS = env.TRON_DEPOSIT_CONFIRMATIONS;
+async function makePlayer(): Promise<string> {
+  const a = await AccountModel.create({ accountType: AccountType.PLAYER, ownerId: 'p1' });
+  return a._id;
+}
 
-describe('deposit/creditDeposit (TRC20, spec §3.7)', () => {
-  let rs: MongoMemoryReplSet;
+async function avail(id: string): Promise<number> {
+  const a = await AccountModel.findById(id);
+  return parseFloat(a!.availableBalance.toString());
+}
 
+describe('deposit crediting (EXTERNAL → PLAYER)', () => {
   beforeAll(async () => {
-    rs = await MongoMemoryReplSet.create({
-      replSet: { count: 1, storageEngine: 'wiredTiger' },
+    await startTestDb();
+    await ensureIndexes(AccountModel, LedgerModel, SecurityLogModel);
+  });
+  afterAll(stopTestDb);
+  afterEach(clearCollections);
+
+  it('credits a confirmed deposit and books a double-entry DEPOSIT pair', async () => {
+    const player = await makePlayer();
+    const res = await creditDeposit({
+      playerAccountId: player,
+      amount: Money.fromDecimalString('100'),
+      txHash: 'tx-aaa',
     });
-    await connectDB(rs.getUri());
-    await Account.syncIndexes();
-    await Ledger.syncIndexes();
+
+    expect(res.credited).toBe(true);
+    expect(await avail(player)).toBe(100);
+    // EXTERNAL goes negative by the deposited amount (it owes the player into the system).
+    const external = await AccountModel.findOne({ accountType: AccountType.EXTERNAL });
+    expect(parseFloat(external!.availableBalance.toString())).toBe(-100);
+
+    const entries = await LedgerModel.find({ idempotencyKey: 'deposit:tx-aaa' });
+    expect(entries).toHaveLength(2);
+    expect(entries.every((e) => e.type === LedgerType.DEPOSIT)).toBe(true);
+    expect(entries.find((e) => e.direction === LedgerDirection.CREDIT)!.accountId).toBe(player);
   });
 
-  afterAll(async () => {
-    await disconnectDB();
-    await rs.stop();
+  it('is idempotent on txHash — the same deposit is never credited twice', async () => {
+    const player = await makePlayer();
+    const input = { playerAccountId: player, amount: Money.fromDecimalString('100'), txHash: 'tx-dup' };
+
+    const first = await creditDeposit(input);
+    const second = await creditDeposit(input);
+
+    expect(first.credited).toBe(true);
+    expect(second.credited).toBe(false);
+    expect(await avail(player)).toBe(100); // credited once
+    expect(await LedgerModel.countDocuments({ idempotencyKey: 'deposit:tx-dup' })).toBe(2);
   });
 
-  beforeEach(async () => {
-    await Account.deleteMany({});
-    await Ledger.deleteMany({});
+  it('keeps Σ(DEBIT) = Σ(CREDIT) — deposit conserves at the boundary', async () => {
+    const player = await makePlayer();
+    await creditDeposit({ playerAccountId: player, amount: Money.fromDecimalString('250'), txHash: 'tx-bal' });
+    const agg = await LedgerModel.aggregate<{ _id: LedgerDirection; total: Decimal128 }>([
+      { $group: { _id: '$direction', total: { $sum: '$amount' } } },
+    ]);
+    const totals = Object.fromEntries(agg.map((r) => [r._id, r.total.toString()]));
+    expect(totals[LedgerDirection.DEBIT]).toBe(totals[LedgerDirection.CREDIT]);
   });
 
-  // ───────────────────────────────────────────────────────────────────
-  // Acceptance: Mempool no-credit + 20-block confirm credits + txHash dup rejected
-  // ───────────────────────────────────────────────────────────────────
-
-  it('Mempool detection (0 confirmations) does NOT credit', async () => {
-    await expect(
-      creditDeposit({
-        playerId: 'p1',
-        amount: 1_000_000n,
-        txHash: 'tx-mempool-1',
-        contractAddress: OFFICIAL_USDT,
-        confirmations: 0,
-      }),
-    ).rejects.toBeInstanceOf(InsufficientConfirmationsError);
-
-    expect(await Account.countDocuments()).toBe(0); // no player account upserted
-    expect(await Ledger.countDocuments()).toBe(0); // no ledger entry
-  });
-
-  it('confirmations between 1 and required-1 do NOT credit', async () => {
-    for (const conf of [1, 5, 10, REQUIRED_CONFIRMATIONS - 1]) {
-      await expect(
-        creditDeposit({
-          playerId: 'p1',
-          amount: 1_000_000n,
-          txHash: `tx-pending-${conf}`,
-          contractAddress: OFFICIAL_USDT,
-          confirmations: conf,
-        }),
-      ).rejects.toBeInstanceOf(InsufficientConfirmationsError);
-    }
-    expect(await Ledger.countDocuments()).toBe(0);
-  });
-
-  it('exactly REQUIRED_CONFIRMATIONS credits the player', async () => {
-    const result = await creditDeposit({
-      playerId: 'p1',
-      amount: 1_000_000n, // $10,000 in cents
-      txHash: 'tx-confirmed-1',
-      contractAddress: OFFICIAL_USDT,
-      confirmations: REQUIRED_CONFIRMATIONS,
-      blockNumber: 12_345_678,
-      fromTronAddress: 'TXSender123',
+  describe('processConfirmedDeposit gates', () => {
+    it('never credits a deposit from a non-official contract (logs it instead)', async () => {
+      const player = await makePlayer();
+      const outcome = await processConfirmedDeposit({
+        playerAccountId: player,
+        amount: Money.fromDecimalString('100'),
+        txHash: 'tx-bad',
+        contractAddress: 'TXfakeContract000000000000000000000',
+        confirmations: 50,
+      });
+      expect(outcome).toEqual({ credited: false, reason: 'wrong_contract' });
+      expect(await avail(player)).toBe(0);
+      expect(await SecurityLogModel.countDocuments({ event: 'NON_OFFICIAL_CONTRACT_DEPOSIT' })).toBe(1);
     });
 
-    expect(result.replayed).toBe(false);
-    expect(result.toAccount?.balance).toBe(1_000_000n);
-    expect(result.ledgerEntry.type).toBe('DEPOSIT');
-    expect(result.ledgerEntry.status).toBe('SETTLED');
-    expect(result.ledgerEntry.from_account).toBeNull();
-    expect(result.ledgerEntry.metadata).toMatchObject({
-      tx_hash: 'tx-confirmed-1',
-      contract_address: OFFICIAL_USDT,
-      confirmations: REQUIRED_CONFIRMATIONS,
-      block_number: 12_345_678,
-      from_tron_address: 'TXSender123',
-    });
-  });
-
-  it('greater than REQUIRED_CONFIRMATIONS still credits exactly once', async () => {
-    const result = await creditDeposit({
-      playerId: 'p1',
-      amount: 500n,
-      txHash: 'tx-deep-confirm',
-      contractAddress: OFFICIAL_USDT,
-      confirmations: REQUIRED_CONFIRMATIONS + 100,
-    });
-    expect(result.replayed).toBe(false);
-    const player = await Account.findOne({ owner_id: 'p1' });
-    expect(player?.balance).toBe(500n);
-  });
-
-  it('txHash duplicate rejected via idempotency — second call returns replayed=true', async () => {
-    const first = await creditDeposit({
-      playerId: 'p1',
-      amount: 100_000n,
-      txHash: 'tx-dup',
-      contractAddress: OFFICIAL_USDT,
-      confirmations: REQUIRED_CONFIRMATIONS,
-    });
-    const second = await creditDeposit({
-      playerId: 'p1',
-      amount: 100_000n,
-      txHash: 'tx-dup',
-      contractAddress: OFFICIAL_USDT,
-      confirmations: REQUIRED_CONFIRMATIONS + 5,
+    it('never credits an unconfirmed (mempool) deposit', async () => {
+      const player = await makePlayer();
+      const outcome = await processConfirmedDeposit({
+        playerAccountId: player,
+        amount: Money.fromDecimalString('100'),
+        txHash: 'tx-pending',
+        contractAddress: OFFICIAL_USDT_TRC20_CONTRACT,
+        confirmations: 5, // < 20
+      });
+      expect(outcome).toEqual({ credited: false, reason: 'unconfirmed' });
+      expect(await avail(player)).toBe(0);
     });
 
-    expect(first.replayed).toBe(false);
-    expect(second.replayed).toBe(true);
-    expect(second.ledgerEntry._id).toBe(first.ledgerEntry._id);
-
-    // Balance moved exactly once.
-    const player = await Account.findOne({ owner_id: 'p1' });
-    expect(player?.balance).toBe(100_000n);
-    expect(await Ledger.countDocuments()).toBe(1);
-  });
-
-  // ───────────────────────────────────────────────────────────────────
-  // Contract whitelist
-  // ───────────────────────────────────────────────────────────────────
-
-  it('Non-official contract attempts are rejected (logged + NOT credited)', async () => {
-    await expect(
-      creditDeposit({
-        playerId: 'p1',
-        amount: 100_000n,
-        txHash: 'tx-fake-contract',
-        contractAddress: 'TFakeContract000000000000000000000',
-        confirmations: REQUIRED_CONFIRMATIONS,
-      }),
-    ).rejects.toBeInstanceOf(UnauthorizedContractError);
-
-    expect(await Account.countDocuments()).toBe(0);
-    expect(await Ledger.countDocuments()).toBe(0);
-  });
-
-  it('confirmation check happens BEFORE balance write (contract check first)', async () => {
-    // Non-official contract + insufficient confirmations: contract error wins.
-    await expect(
-      creditDeposit({
-        playerId: 'p1',
-        amount: 100_000n,
-        txHash: 'tx-fake-and-pending',
-        contractAddress: 'TFakeContract',
-        confirmations: 5,
-      }),
-    ).rejects.toBeInstanceOf(UnauthorizedContractError);
-  });
-
-  // ───────────────────────────────────────────────────────────────────
-  // Input validation
-  // ───────────────────────────────────────────────────────────────────
-
-  describe('input validation', () => {
-    const ok = {
-      playerId: 'p1',
-      amount: 100n,
-      txHash: 'tx-x',
-      contractAddress: OFFICIAL_USDT,
-      confirmations: REQUIRED_CONFIRMATIONS,
-    };
-
-    it('rejects empty playerId', async () => {
-      await expect(creditDeposit({ ...ok, playerId: '' })).rejects.toThrow(/playerId/);
+    it('credits once 20-block confirmed on the official contract', async () => {
+      const player = await makePlayer();
+      const outcome = await processConfirmedDeposit({
+        playerAccountId: player,
+        amount: Money.fromDecimalString('100'),
+        txHash: 'tx-good',
+        contractAddress: OFFICIAL_USDT_TRC20_CONTRACT,
+        confirmations: 20,
+      });
+      expect(outcome).toEqual({ credited: true });
+      expect(await avail(player)).toBe(100);
     });
-    it('rejects empty txHash', async () => {
-      await expect(creditDeposit({ ...ok, txHash: '' })).rejects.toThrow(/txHash/);
-    });
-    it('rejects zero / negative amount', async () => {
-      await expect(creditDeposit({ ...ok, amount: 0n })).rejects.toThrow(/positive BigInt/);
-      await expect(creditDeposit({ ...ok, amount: -1n })).rejects.toThrow(/positive BigInt/);
-    });
-    it('rejects negative / non-integer confirmations', async () => {
-      await expect(creditDeposit({ ...ok, confirmations: -1 })).rejects.toThrow(/non-negative integer/);
-      await expect(creditDeposit({ ...ok, confirmations: 1.5 })).rejects.toThrow(/non-negative integer/);
-    });
-    it('rejects empty contractAddress', async () => {
-      await expect(creditDeposit({ ...ok, contractAddress: '' })).rejects.toThrow(/contractAddress/);
-    });
-  });
-
-  // ───────────────────────────────────────────────────────────────────
-  // BigInt preservation
-  // ───────────────────────────────────────────────────────────────────
-
-  it('preserves BigInt precision for very large deposit amounts', async () => {
-    const huge = 100_000_000_000_000n; // $1B in cents
-    await creditDeposit({
-      playerId: 'whale-1',
-      amount: huge,
-      txHash: 'tx-whale',
-      contractAddress: OFFICIAL_USDT,
-      confirmations: REQUIRED_CONFIRMATIONS,
-    });
-    const player = await Account.findOne({ owner_id: 'whale-1' });
-    expect(typeof player?.balance).toBe('bigint');
-    expect(player?.balance).toBe(huge);
   });
 });

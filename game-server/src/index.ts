@@ -1,23 +1,11 @@
-import { loadEnv } from './config/env.js';
-import { logger } from './lib/logger.js';
-import { buildServer } from './server.js';
+// FairPlay Game Server — entry point.
+// The Unified State Machine framework lives in ./core. The WebSocket transport and the first game
+// (Texas Hold'em) are wired in subsequent W2/W3 days.
 
-async function main(): Promise<void> {
-  const env = loadEnv();
-  const { http } = buildServer(env);
-  http.listen(env.PORT, () => {
-    logger.info({ port: env.PORT, env: env.NODE_ENV }, 'game-server listening (HTTP + WebSocket)');
-  });
+export * from './core';
+export * from './transport';
+export * from './fairness';
 
-  const shutdown = (signal: string): void => {
-    logger.info({ signal }, 'shutdown signal received');
-    http.close(() => process.exit(0));
-  };
-  process.on('SIGINT', () => shutdown('SIGINT'));
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
+if (require.main === module) {
+  console.log('FairPlay Game Server — State Machine + secure WebSocket transport ready.');
 }
-
-main().catch((err) => {
-  logger.fatal({ err }, 'fatal boot error');
-  process.exit(1);
-});

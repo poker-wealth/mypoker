@@ -1,316 +1,208 @@
-import { logger } from '../lib/logger.js';
-import { Ledger } from '../wallet/ledger.model.js';
-import { transfer } from '../wallet/transfer.js';
+import { randomUUID } from 'node:crypto';
+import { Money } from '../domain/money';
 import {
-  Withdrawal,
-  type WithdrawalDoc,
-  type WithdrawalState,
-} from './withdrawal.model.js';
+  AccountType,
+  LedgerType,
+  LedgerDirection,
+  LedgerStatus,
+} from '../domain/account-types';
+import { WithdrawalState, canTransition, isHeldInClearing } from '../domain/withdrawal-types';
+import { AccountModel } from '../wallet/account.model';
+import { LedgerModel } from '../wallet/ledger.model';
+import { runTransaction } from '../wallet/transfer';
+import { getOrCreateExternalAccount } from '../wallet/system-accounts';
+import {
+  AccountNotFoundError,
+  InsufficientBalanceError,
+  InvalidWithdrawalTransitionError,
+  WithdrawalNotFoundError,
+} from '../wallet/errors';
+import { WithdrawalModel, type WithdrawalDoc } from './withdrawal.model';
 
 /**
- * Withdrawal state machine — spec §3.6.
- *
- * Allowed transitions:
- *   REQUESTED   → APPROVED | ROLLED_BACK   (cancellation by player or risk control)
- *   APPROVED    → BROADCASTING
- *   BROADCASTING → CONFIRMED | FAILED
- *   FAILED      → ROLLED_BACK              (auto, with WITHDRAW_REFUND ledger entry)
- *   CONFIRMED, ROLLED_BACK                 (terminal)
- *
- * Side effects:
- *   - approve(): transfer(PLAYER → null, WITHDRAW, status='PENDING'). Balance
- *     atomically deducted. Writes WITHDRAW ledger entry.
- *   - markConfirmed(): updates the WITHDRAW ledger entry status PENDING → SETTLED.
- *   - markFailed(): updates the WITHDRAW ledger entry status PENDING → FAILED.
- *   - rollback() (auto on FAILED): transfer(null → PLAYER, WITHDRAW_REFUND).
- *     Balance atomically refunded. Writes WITHDRAW_REFUND ledger entry.
+ * Withdrawal state machine (FairPlay §3.6). Each step moves funds across the player's
+ * three-balance wallet atomically and advances state. The clearing hold is what prevents a second
+ * withdrawal of the same funds. Final ledger entry (PLAYER → TREASURY) is written at CONFIRMED —
+ * the only point where money actually leaves the platform.
  */
 
-const ALLOWED_NEXT: Readonly<Record<WithdrawalState, ReadonlySet<WithdrawalState>>> = Object.freeze({
-  REQUESTED: new Set<WithdrawalState>(['APPROVED', 'ROLLED_BACK']),
-  APPROVED: new Set<WithdrawalState>(['BROADCASTING']),
-  BROADCASTING: new Set<WithdrawalState>(['CONFIRMED', 'FAILED']),
-  CONFIRMED: new Set<WithdrawalState>(),
-  FAILED: new Set<WithdrawalState>(['ROLLED_BACK']),
-  ROLLED_BACK: new Set<WithdrawalState>(),
-});
-
-export class WithdrawalNotFoundError extends Error {
-  constructor(public readonly withdrawalId: string) {
-    super(`WithdrawalNotFound: ${withdrawalId}`);
-    this.name = 'WithdrawalNotFoundError';
-  }
-}
-
-export class IllegalWithdrawalTransitionError extends Error {
-  constructor(
-    public readonly from: WithdrawalState,
-    public readonly to: WithdrawalState,
-    public readonly withdrawalId: string,
-  ) {
-    super(`IllegalWithdrawalTransition: ${from} -> ${to} on withdrawal ${withdrawalId}`);
-    this.name = 'IllegalWithdrawalTransitionError';
-  }
-}
-
-export interface CreateWithdrawalInput {
-  playerId: string;
-  amount: bigint; // cents
-  destinationAddress: string;
-  /** Optional wallet scope (defaults to PLATFORM). League withdrawals not supported. */
-  walletScope?: string;
-}
-
-export async function createWithdrawal(input: CreateWithdrawalInput): Promise<WithdrawalDoc> {
-  if (!input.playerId) throw new Error('createWithdrawal: playerId required');
-  if (typeof input.amount !== 'bigint' || input.amount <= 0n) {
-    throw new Error('createWithdrawal: amount must be a positive BigInt (cents)');
-  }
-  if (!input.destinationAddress) throw new Error('createWithdrawal: destinationAddress required');
-
-  const created = await Withdrawal.create({
-    player_id: input.playerId,
-    amount: input.amount,
-    destination_address: input.destinationAddress,
-    state: 'REQUESTED',
-    state_history: [{ state: 'REQUESTED', at: new Date(), actor: 'system' }],
-  });
-  logger.info(
-    { withdrawalId: created._id, playerId: input.playerId, amount: input.amount.toString() },
-    'withdrawal REQUESTED',
-  );
-  return created.toObject();
-}
-
-function ensureTransition(
-  withdrawal: WithdrawalDoc,
-  next: WithdrawalState,
-): void {
-  const allowed = ALLOWED_NEXT[withdrawal.state];
-  if (!allowed.has(next)) {
-    throw new IllegalWithdrawalTransitionError(withdrawal.state, next, withdrawal._id);
-  }
+export interface RequestWithdrawalInput {
+  playerAccountId: string;
+  amount: Money;
+  address: string;
 }
 
 async function loadOrThrow(withdrawalId: string): Promise<WithdrawalDoc> {
-  const w = await Withdrawal.findById(withdrawalId);
+  const w = await WithdrawalModel.findById(withdrawalId);
   if (!w) throw new WithdrawalNotFoundError(withdrawalId);
-  return w.toObject();
+  return w;
 }
 
-export interface ApproveInput {
-  withdrawalId: string;
-  /** Ops user id; required for amounts > $10K (≥1_000_000 cents). */
-  reviewer?: string;
-  /** Optional wallet scope (defaults to PLATFORM). */
-  walletScope?: string;
+function assertTransition(from: WithdrawalState, to: WithdrawalState): void {
+  if (!canTransition(from, to)) throw new InvalidWithdrawalTransitionError(from, to);
 }
 
-const HUMAN_REVIEW_THRESHOLD = 1_000_000n; // $10,000 in cents
+/** REQUESTED: record the request. Balance is NOT moved yet (risk review pending). */
+export async function requestWithdrawal(input: RequestWithdrawalInput): Promise<string> {
+  if (!input.amount.isPositive()) throw new RangeError('withdrawal amount must be > 0');
 
-/**
- * REQUESTED → APPROVED. Atomically deducts balance via WITHDRAW ledger entry
- * (status=PENDING). The on-chain broadcast and confirmation happen later via
- * markBroadcasting() and markConfirmed().
- */
-export async function approveWithdrawal(input: ApproveInput): Promise<WithdrawalDoc> {
-  const w = await loadOrThrow(input.withdrawalId);
-  ensureTransition(w, 'APPROVED');
-
-  if (w.amount > HUMAN_REVIEW_THRESHOLD && !input.reviewer) {
-    throw new Error(
-      `approveWithdrawal: amounts > ${HUMAN_REVIEW_THRESHOLD} cents require reviewer`,
-    );
+  const player = await AccountModel.findById(input.playerAccountId);
+  if (!player) throw new AccountNotFoundError(input.playerAccountId);
+  if (player.accountType !== AccountType.PLAYER) {
+    throw new Error('withdrawals may only be requested from PLAYER accounts');
+  }
+  // Early sanity check on spendable funds (re-guarded atomically at APPROVED).
+  if (Money.fromDecimal128(player.availableBalance).lessThan(input.amount)) {
+    throw new InsufficientBalanceError(input.playerAccountId);
   }
 
-  // Deduct balance via WITHDRAW (status=PENDING; flips to SETTLED on CONFIRMED).
-  const transferResult = await transfer({
-    from: { type: 'PLAYER', ownerId: w.player_id, walletScope: input.walletScope ?? 'PLATFORM' },
-    amount: w.amount,
-    ledgerType: 'WITHDRAW',
-    idempotencyKey: `withdraw:${w._id}`,
-    status: 'PENDING',
-    metadata: {
-      withdrawal_id: w._id,
-      destination_address: w.destination_address,
-      reviewer: input.reviewer ?? null,
-    },
-  });
-
-  const updated = await Withdrawal.findOneAndUpdate(
-    { _id: w._id, state: 'REQUESTED' },
+  const [doc] = await WithdrawalModel.create([
     {
-      $set: {
-        state: 'APPROVED',
-        ledger_entry_id: transferResult.ledgerEntry._id,
-        reviewed_by: input.reviewer ?? null,
-      },
-      $push: {
-        state_history: {
-          state: 'APPROVED',
-          at: new Date(),
-          actor: input.reviewer ?? 'auto',
-        },
-      },
+      _id: randomUUID(),
+      playerAccountId: input.playerAccountId,
+      amount: input.amount.toDecimal128(),
+      address: input.address,
+      state: WithdrawalState.REQUESTED,
     },
-    { new: true },
-  );
-  if (!updated) {
-    // CAS race — somebody else moved this withdrawal. Reload and decide.
-    throw new IllegalWithdrawalTransitionError(w.state, 'APPROVED', w._id);
-  }
-  logger.info(
-    { withdrawalId: w._id, ledgerEntryId: transferResult.ledgerEntry._id },
-    'withdrawal APPROVED + balance deducted',
-  );
-  return updated.toObject();
+  ]);
+  return doc!._id;
 }
 
-export interface MarkBroadcastingInput {
-  withdrawalId: string;
-  txHash: string;
-}
-
-export async function markBroadcasting(input: MarkBroadcastingInput): Promise<WithdrawalDoc> {
-  if (!input.txHash) throw new Error('markBroadcasting: txHash required');
-  const w = await loadOrThrow(input.withdrawalId);
-  ensureTransition(w, 'BROADCASTING');
-
-  const updated = await Withdrawal.findOneAndUpdate(
-    { _id: w._id, state: 'APPROVED' },
-    {
-      $set: { state: 'BROADCASTING', tx_hash: input.txHash },
-      $push: {
-        state_history: { state: 'BROADCASTING', at: new Date(), actor: 'system', note: input.txHash },
-      },
-    },
-    { new: true },
-  );
-  if (!updated) throw new IllegalWithdrawalTransitionError(w.state, 'BROADCASTING', w._id);
-  logger.info({ withdrawalId: w._id, txHash: input.txHash }, 'withdrawal BROADCASTING');
-  return updated.toObject();
-}
-
-export interface MarkConfirmedInput {
-  withdrawalId: string;
-}
-
-export async function markConfirmed(input: MarkConfirmedInput): Promise<WithdrawalDoc> {
-  const w = await loadOrThrow(input.withdrawalId);
-  ensureTransition(w, 'CONFIRMED');
-
-  // Flip the WITHDRAW ledger entry from PENDING → SETTLED.
-  if (w.ledger_entry_id) {
-    await Ledger.updateOne(
-      { _id: w.ledger_entry_id, status: 'PENDING' },
-      { $set: { status: 'SETTLED' } },
-    );
-  }
-
-  const updated = await Withdrawal.findOneAndUpdate(
-    { _id: w._id, state: 'BROADCASTING' },
-    {
-      $set: { state: 'CONFIRMED' },
-      $push: { state_history: { state: 'CONFIRMED', at: new Date(), actor: 'system' } },
-    },
-    { new: true },
-  );
-  if (!updated) throw new IllegalWithdrawalTransitionError(w.state, 'CONFIRMED', w._id);
-  logger.info({ withdrawalId: w._id }, 'withdrawal CONFIRMED');
-  return updated.toObject();
-}
-
-export interface MarkFailedInput {
-  withdrawalId: string;
-  reason: string;
-  /** Optional wallet scope used for the refund (defaults to PLATFORM). */
-  walletScope?: string;
-}
-
-/**
- * BROADCASTING → FAILED → ROLLED_BACK. Two transitions in one call:
- * 1. Mark FAILED (and flip ledger entry status PENDING → FAILED).
- * 2. Auto-refund via transfer(null → PLAYER, WITHDRAW_REFUND), then mark ROLLED_BACK.
- *
- * Returns the final ROLLED_BACK doc.
- */
-export async function markFailedAndRollback(input: MarkFailedInput): Promise<WithdrawalDoc> {
-  if (!input.reason) throw new Error('markFailedAndRollback: reason required');
-  const w = await loadOrThrow(input.withdrawalId);
-  ensureTransition(w, 'FAILED');
-
-  // 1. Mark FAILED + update ledger entry.
-  if (w.ledger_entry_id) {
-    await Ledger.updateOne(
-      { _id: w.ledger_entry_id, status: 'PENDING' },
-      { $set: { status: 'FAILED' } },
-    );
-  }
-  const failedDoc = await Withdrawal.findOneAndUpdate(
-    { _id: w._id, state: 'BROADCASTING' },
-    {
-      $set: { state: 'FAILED', failure_reason: input.reason },
-      $push: { state_history: { state: 'FAILED', at: new Date(), actor: 'system', note: input.reason } },
-    },
-    { new: true },
-  );
-  if (!failedDoc) throw new IllegalWithdrawalTransitionError(w.state, 'FAILED', w._id);
-
-  // 2. Refund and mark ROLLED_BACK.
-  const refund = await transfer({
-    to: { type: 'PLAYER', ownerId: w.player_id, walletScope: input.walletScope ?? 'PLATFORM' },
-    amount: w.amount,
-    ledgerType: 'WITHDRAW_REFUND',
-    idempotencyKey: `withdraw-refund:${w._id}`,
-    status: 'SETTLED',
-    metadata: {
-      withdrawal_id: w._id,
-      original_ledger_entry_id: w.ledger_entry_id,
-      reason: input.reason,
-    },
-  });
-
-  const rolledBack = await Withdrawal.findOneAndUpdate(
-    { _id: w._id, state: 'FAILED' },
-    {
-      $set: { state: 'ROLLED_BACK', refund_ledger_entry_id: refund.ledgerEntry._id },
-      $push: {
-        state_history: { state: 'ROLLED_BACK', at: new Date(), actor: 'system', note: 'auto-refund' },
-      },
-    },
-    { new: true },
-  );
-  if (!rolledBack) throw new IllegalWithdrawalTransitionError('FAILED', 'ROLLED_BACK', w._id);
-
-  logger.warn(
-    { withdrawalId: w._id, reason: input.reason, refundLedgerEntryId: refund.ledgerEntry._id },
-    'withdrawal FAILED → ROLLED_BACK + balance refunded',
-  );
-  return rolledBack.toObject();
-}
-
-/** Cancel a REQUESTED withdrawal (player or risk-control rejection). No balance change. */
-export async function cancelWithdrawal(
-  withdrawalId: string,
-  actor: string,
-  note?: string,
-): Promise<WithdrawalDoc> {
+/** APPROVED: atomically move amount available → clearing (held, not spendable, not re-withdrawable). */
+export async function approveWithdrawal(withdrawalId: string): Promise<void> {
   const w = await loadOrThrow(withdrawalId);
-  ensureTransition(w, 'ROLLED_BACK');
+  assertTransition(w.state, WithdrawalState.APPROVED);
+  const amountD = w.amount;
+  const negAmountD = Money.fromDecimal128(w.amount).negate().toDecimal128();
 
-  const updated = await Withdrawal.findOneAndUpdate(
-    { _id: w._id, state: 'REQUESTED' },
-    {
-      $set: { state: 'ROLLED_BACK', failure_reason: note ?? 'cancelled' },
-      $push: {
-        state_history: { state: 'ROLLED_BACK', at: new Date(), actor, note: note ?? 'cancelled' },
-      },
-    },
-    { new: true },
-  );
-  if (!updated) throw new IllegalWithdrawalTransitionError(w.state, 'ROLLED_BACK', w._id);
-  logger.info({ withdrawalId: w._id, actor }, 'withdrawal cancelled (REQUESTED → ROLLED_BACK)');
-  return updated.toObject();
+  await runTransaction(async (session) => {
+    // Hold funds: available -= amount, clearing += amount (guard prevents overdraft / double-hold).
+    const held = await AccountModel.updateOne(
+      { _id: w.playerAccountId, availableBalance: { $gte: amountD } },
+      { $inc: { availableBalance: negAmountD, clearingBalance: amountD, version: 1 } },
+      { session },
+    );
+    if (held.matchedCount === 0) throw new InsufficientBalanceError(w.playerAccountId);
+
+    const moved = await WithdrawalModel.updateOne(
+      { _id: withdrawalId, state: WithdrawalState.REQUESTED },
+      { $set: { state: WithdrawalState.APPROVED } },
+      { session },
+    );
+    if (moved.matchedCount === 0) {
+      throw new InvalidWithdrawalTransitionError(w.state, WithdrawalState.APPROVED);
+    }
+  });
 }
 
-export { ALLOWED_NEXT, HUMAN_REVIEW_THRESHOLD };
+/** BROADCASTING: record the on-chain tx hash. Funds remain held in clearing. */
+export async function broadcastWithdrawal(withdrawalId: string, txHash: string): Promise<void> {
+  const w = await loadOrThrow(withdrawalId);
+  assertTransition(w.state, WithdrawalState.BROADCASTING);
+  const moved = await WithdrawalModel.updateOne(
+    { _id: withdrawalId, state: WithdrawalState.APPROVED },
+    { $set: { state: WithdrawalState.BROADCASTING, txHash } },
+  );
+  if (moved.matchedCount === 0) {
+    throw new InvalidWithdrawalTransitionError(w.state, WithdrawalState.BROADCASTING);
+  }
+}
+
+/** CONFIRMED: funds leave the platform. Remove from clearing, settle to EXTERNAL, write WITHDRAW. */
+export async function confirmWithdrawal(withdrawalId: string): Promise<void> {
+  const w = await loadOrThrow(withdrawalId);
+  assertTransition(w.state, WithdrawalState.CONFIRMED);
+  const amountD = w.amount;
+  const negAmountD = Money.fromDecimal128(w.amount).negate().toDecimal128();
+
+  // Off-ramp: funds settle to the EXTERNAL boundary account (symmetric with deposits). TREASURY is
+  // reserved for rake/income, not the deposit/withdrawal float.
+  const external = await getOrCreateExternalAccount();
+
+  await runTransaction(async (session) => {
+    // Remove the held funds from the player's clearing balance.
+    const cleared = await AccountModel.updateOne(
+      { _id: w.playerAccountId, clearingBalance: { $gte: amountD } },
+      { $inc: { clearingBalance: negAmountD, version: 1 } },
+      { session },
+    );
+    if (cleared.matchedCount === 0) throw new InsufficientBalanceError(w.playerAccountId);
+
+    // EXTERNAL receives the outflow (its balance rises by total withdrawn).
+    await AccountModel.updateOne(
+      { _id: external._id },
+      { $inc: { availableBalance: amountD, version: 1 } },
+      { session },
+    );
+
+    // Double-entry WITHDRAW: DEBIT player, CREDIT external.
+    await LedgerModel.create(
+      [
+        {
+          idempotencyKey: `withdraw:${withdrawalId}`,
+          businessId: withdrawalId,
+          accountId: w.playerAccountId,
+          counterpartyAccountId: external._id,
+          direction: LedgerDirection.DEBIT,
+          amount: amountD,
+          type: LedgerType.WITHDRAW,
+          status: LedgerStatus.SETTLED,
+          metadata: { address: w.address, txHash: w.txHash },
+        },
+        {
+          idempotencyKey: `withdraw:${withdrawalId}`,
+          businessId: withdrawalId,
+          accountId: external._id,
+          counterpartyAccountId: w.playerAccountId,
+          direction: LedgerDirection.CREDIT,
+          amount: amountD,
+          type: LedgerType.WITHDRAW,
+          status: LedgerStatus.SETTLED,
+          metadata: { address: w.address, txHash: w.txHash },
+        },
+      ],
+      { session, ordered: true },
+    );
+
+    const moved = await WithdrawalModel.updateOne(
+      { _id: withdrawalId, state: WithdrawalState.BROADCASTING },
+      { $set: { state: WithdrawalState.CONFIRMED } },
+      { session },
+    );
+    if (moved.matchedCount === 0) {
+      throw new InvalidWithdrawalTransitionError(w.state, WithdrawalState.CONFIRMED);
+    }
+  });
+}
+
+/**
+ * ROLLED_BACK: terminal failure. If the amount was held in clearing (APPROVED/BROADCASTING),
+ * release it back to available. From REQUESTED there is nothing to release.
+ */
+export async function rollbackWithdrawal(withdrawalId: string, reason: string): Promise<void> {
+  const w = await loadOrThrow(withdrawalId);
+  assertTransition(w.state, WithdrawalState.ROLLED_BACK);
+  const amountD = w.amount;
+  const negAmountD = Money.fromDecimal128(w.amount).negate().toDecimal128();
+  const releaseHold = isHeldInClearing(w.state);
+
+  await runTransaction(async (session) => {
+    if (releaseHold) {
+      const released = await AccountModel.updateOne(
+        { _id: w.playerAccountId, clearingBalance: { $gte: amountD } },
+        { $inc: { clearingBalance: negAmountD, availableBalance: amountD, version: 1 } },
+        { session },
+      );
+      if (released.matchedCount === 0) throw new InsufficientBalanceError(w.playerAccountId);
+    }
+
+    const moved = await WithdrawalModel.updateOne(
+      { _id: withdrawalId, state: w.state },
+      { $set: { state: WithdrawalState.ROLLED_BACK, failureReason: reason } },
+      { session },
+    );
+    if (moved.matchedCount === 0) {
+      throw new InvalidWithdrawalTransitionError(w.state, WithdrawalState.ROLLED_BACK);
+    }
+  });
+}

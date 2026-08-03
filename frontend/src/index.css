@@ -1,0 +1,112 @@
+@import 'tailwindcss';
+
+/*
+ * ── FairPlay design tokens ────────────────────────────────────────────────────
+ * Semantic CSS variables are the single source of truth for the whole look.
+ * Light/dark and the Telegram theme override THESE variables at runtime, and
+ * Tailwind utilities (bg-bg, text-brand, …) read them via the @theme map below.
+ *
+ * BRANDING: when the owner sends logo + colors, only the values in this block
+ * change — every screen restyles automatically.
+ */
+
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* MYPOKER — dark-forward, near-black with a violet tint. */
+  --bg: #0d0d1a;
+  --surface: #17172b;
+  --surface-2: #21213a;
+  --border: #2c2c48;
+
+  --text: #f2f2fa;
+  --text-dim: #9797b8;
+
+  --brand: #bb5cf6; /* violet — primary brand */
+  --brand-strong: #9a3fe4;
+  --brand-2: #6366f1; /* indigo — gradient partner */
+  --accent: #00d4ff; /* neon cyan */
+  --success: #3fd07a;
+  --danger: #f85677;
+  --info: #00d4ff;
+
+  --felt: #12233f; /* deep indigo table */
+
+  --brand-gradient: linear-gradient(120deg, #6366f1 0%, #bb5cf6 55%, #00d4ff 120%);
+
+  --radius: 0.875rem;
+  --shadow-card: 0 2px 10px rgb(0 0 0 / 0.4);
+  --shadow-pop: 0 14px 44px rgb(0 0 0 / 0.55);
+  --glow-brand: 0 0 28px rgb(187 92 246 / 0.35);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --bg: #f4f4fb;
+  --surface: #ffffff;
+  --surface-2: #ececf7;
+  --border: #dedeee;
+
+  --text: #14142a;
+  --text-dim: #616184;
+
+  --brand: #7c3aed;
+  --brand-strong: #6d28d9;
+  --brand-2: #4f46e5;
+  --accent: #0891b2;
+  --success: #1f9d54;
+  --danger: #dc2650;
+  --info: #0891b2;
+
+  --felt: #1b3a6b;
+
+  --brand-gradient: linear-gradient(120deg, #4f46e5 0%, #7c3aed 55%, #0891b2 120%);
+
+  --shadow-card: 0 2px 10px rgb(0 0 0 / 0.08);
+  --shadow-pop: 0 14px 44px rgb(0 0 0 / 0.18);
+  --glow-brand: 0 0 24px rgb(124 58 237 / 0.22);
+}
+
+/* Map semantic tokens into Tailwind's theme so utilities resolve at runtime. */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-dim: var(--text-dim);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-2: var(--brand-2);
+  --color-accent: var(--accent);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-felt: var(--felt);
+
+  --radius-app: var(--radius);
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  overscroll-behavior: none;
+  /* Respect the Telegram safe areas on notched devices. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}

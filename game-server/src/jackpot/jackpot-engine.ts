@@ -1,210 +1,261 @@
-/**
- * Per-table Jackpot trigger + winner-selection logic (spec §5).
- *
- * Division of responsibility:
- *   - Financial Core injects 0.5% of each winner's profit into the 4 pools
- *     (handled by settle-round — already built in M1).
- *   - THIS engine decides, each hand, whether a tier should pay out, and if
- *     so, computes the payout amount and selects the winning player.
- *
- * Trigger decisions are derived from the round's provably-fair seed (not
- * Math.random), so a trigger is verifiable after the fact and cannot be
- * manipulated by the operator.
- *
- * Tiers (spec §5 table):
- *   Mini  — every 25–35 rounds   — 5%  of pool — min $10
- *   Minor — every 80–120 rounds  — 15% of pool — min $50
- *   Major — once per day         — 40% of pool — min $200
- *   Grand — Saturday 18–23 UTC+8 — 70% of pool — min $1,000
- *
- * Below threshold → skip; the round counter keeps accumulating. No subsidy,
- * no deferred payout.
- */
-
-export const JACKPOT_TIERS = ['MINI', 'MINOR', 'MAJOR', 'GRAND'] as const;
-export type JackpotTier = (typeof JACKPOT_TIERS)[number];
-
-/** Minimum pool balance for a tier to be allowed to trigger (cents). */
-export const MIN_THRESHOLD_CENTS: Readonly<Record<JackpotTier, bigint>> = Object.freeze({
-  MINI: 1_000n, // $10
-  MINOR: 5_000n, // $50
-  MAJOR: 20_000n, // $200
-  GRAND: 100_000n, // $1,000
-});
-
-/** Payout as a percentage of the pool when a tier triggers. */
-export const PAYOUT_PCT: Readonly<Record<JackpotTier, bigint>> = Object.freeze({
-  MINI: 5n,
-  MINOR: 15n,
-  MAJOR: 40n,
-  GRAND: 70n,
-});
-
-/** Round-count trigger ranges for the frequency-based tiers [min, max] inclusive. */
-export const FREQUENCY_RANGE: Readonly<Record<'MINI' | 'MINOR', readonly [number, number]>> =
-  Object.freeze({
-    MINI: [25, 35],
-    MINOR: [80, 120],
-  });
-
-const UTC8_OFFSET_MS = 8 * 60 * 60 * 1000;
-
-export function payoutAmount(tier: JackpotTier, poolCents: bigint): bigint {
-  if (poolCents < 0n) throw new Error('payoutAmount: poolCents must be >= 0');
-  return (poolCents * PAYOUT_PCT[tier]) / 100n;
-}
-
-export function meetsThreshold(tier: JackpotTier, poolCents: bigint): boolean {
-  return poolCents >= MIN_THRESHOLD_CENTS[tier];
-}
+import {
+  dailyTriggerAt,
+  grandTriggerAt,
+  isInGrandWindow,
+  nextRoundInterval,
+  zoned,
+} from './schedule';
+import {
+  injectionFor,
+  splitInjection,
+  TIER_CONFIG,
+  TIERS,
+  type JackpotTier,
+} from './tiers';
+import { drawWinner, type JackpotCandidate } from './weights';
 
 /**
- * Pick the random round-count target for a Mini/Minor cycle, deterministically
- * from a [0,1) value (derived from the round seed). e.g. Mini → 25..35.
+ * JackpotEngine — one table's four pools, their triggers and their history (v5.9 §5).
+ *
+ * Money in:  0.5% of the WINNER'S PROFIT, split 20/30/25/25. Losers never fund a jackpot.
+ * Money out: a share of that table's own pool (Mini 5% / Minor 15% / Major 40% / Grand 70%),
+ *            to a weighted winner, and only once the pool clears its minimum.
+ *
+ * Three rules from the spec that are easy to get wrong, so they are enforced here explicitly:
+ *
+ *  • Below threshold → SKIP, and the counter keeps accumulating. We do not subsidise the pool from
+ *    platform money and we do not defer the payout: the tier simply stays due and fires the moment
+ *    the pool is genuinely funded.
+ *  • Grand needs all THREE conditions at once — pool ≥ $1,000 AND players at the table AND inside
+ *    the Saturday window. A table frozen during its window misses it and waits for next Saturday.
+ *  • CB3 — three jackpots inside one hour on the same table freezes that table's jackpot. That is a
+ *    farming signature, not luck.
  */
-export function pickRoundTarget(tier: 'MINI' | 'MINOR', rng01: number): number {
-  if (rng01 < 0 || rng01 >= 1) throw new Error('pickRoundTarget: rng01 must be in [0,1)');
-  const [lo, hi] = FREQUENCY_RANGE[tier];
-  return lo + Math.floor(rng01 * (hi - lo + 1));
+
+export interface RoundContext {
+  roundId: string;
+  /** The round's final seed (server + client seeds + future block) — makes every draw verifiable. */
+  seed: string;
+  now: number;
+  /** Everyone seated, with their anti-bot / collusion status. */
+  candidates: readonly JackpotCandidate[];
 }
 
-/** Is `now` inside the Grand window: Saturday 18:00–23:00 UTC+8? */
-export function isGrandWindow(now: Date): boolean {
-  const shifted = new Date(now.getTime() + UTC8_OFFSET_MS);
-  const day = shifted.getUTCDay(); // 6 = Saturday
-  const hour = shifted.getUTCHours();
-  return day === 6 && hour >= 18 && hour < 23;
-}
-
-export interface TriggerDecision {
-  triggered: boolean;
+export interface JackpotHit {
   tier: JackpotTier;
-  payoutCents: bigint;
-  /** Human-readable reason (esp. when NOT triggered). */
-  reason: string;
-}
-
-/** Evaluate a frequency-based tier (Mini/Minor). */
-export function evaluateFrequencyTrigger(input: {
-  tier: 'MINI' | 'MINOR';
-  roundsSinceLastTrigger: number;
-  roundTarget: number;
-  poolCents: bigint;
-}): TriggerDecision {
-  const { tier, roundsSinceLastTrigger, roundTarget, poolCents } = input;
-  if (roundsSinceLastTrigger < roundTarget) {
-    return { triggered: false, tier, payoutCents: 0n, reason: `round ${roundsSinceLastTrigger}/${roundTarget}` };
-  }
-  if (!meetsThreshold(tier, poolCents)) {
-    return {
-      triggered: false,
-      tier,
-      payoutCents: 0n,
-      reason: `pool ${poolCents} below threshold ${MIN_THRESHOLD_CENTS[tier]} — skip, counter continues`,
-    };
-  }
-  return { triggered: true, tier, payoutCents: payoutAmount(tier, poolCents), reason: 'frequency reached' };
-}
-
-/** Evaluate the Major tier (once per day, random — gated by date + threshold). */
-export function evaluateMajorTrigger(input: {
-  poolCents: bigint;
-  now: Date;
-  lastTriggerDate: Date | null;
-  /** Deterministic [0,1) from the round seed; the daily trigger fires when this clears `dailyChance`. */
-  rng01: number;
-  /** Probability a given hand triggers Major (so it lands ~once across a day's hands). */
-  dailyChance: number;
-}): TriggerDecision {
-  const { poolCents, now, lastTriggerDate, rng01, dailyChance } = input;
-  if (lastTriggerDate && sameUtc8Day(lastTriggerDate, now)) {
-    return { triggered: false, tier: 'MAJOR', payoutCents: 0n, reason: 'already triggered today' };
-  }
-  if (!meetsThreshold('MAJOR', poolCents)) {
-    return { triggered: false, tier: 'MAJOR', payoutCents: 0n, reason: 'below threshold — skip' };
-  }
-  if (rng01 >= dailyChance) {
-    return { triggered: false, tier: 'MAJOR', payoutCents: 0n, reason: 'random gate not cleared this hand' };
-  }
-  return { triggered: true, tier: 'MAJOR', payoutCents: payoutAmount('MAJOR', poolCents), reason: 'daily random trigger' };
-}
-
-/** Evaluate the Grand tier (Saturday 18–23 UTC+8 window, random within). */
-export function evaluateGrandTrigger(input: {
-  poolCents: bigint;
-  now: Date;
-  triggeredThisWindow: boolean;
-  rng01: number;
-  windowChance: number;
-}): TriggerDecision {
-  const { poolCents, now, triggeredThisWindow, rng01, windowChance } = input;
-  if (!isGrandWindow(now)) {
-    return { triggered: false, tier: 'GRAND', payoutCents: 0n, reason: 'outside Saturday 18–23 UTC+8 window' };
-  }
-  if (triggeredThisWindow) {
-    return { triggered: false, tier: 'GRAND', payoutCents: 0n, reason: 'already triggered this window' };
-  }
-  if (!meetsThreshold('GRAND', poolCents)) {
-    return { triggered: false, tier: 'GRAND', payoutCents: 0n, reason: 'below threshold — skip' };
-  }
-  if (rng01 >= windowChance) {
-    return { triggered: false, tier: 'GRAND', payoutCents: 0n, reason: 'random gate not cleared this hand' };
-  }
-  return { triggered: true, tier: 'GRAND', payoutCents: payoutAmount('GRAND', poolCents), reason: 'window random trigger' };
-}
-
-function sameUtc8Day(a: Date, b: Date): boolean {
-  const sa = new Date(a.getTime() + UTC8_OFFSET_MS);
-  const sb = new Date(b.getTime() + UTC8_OFFSET_MS);
-  return (
-    sa.getUTCFullYear() === sb.getUTCFullYear() &&
-    sa.getUTCMonth() === sb.getUTCMonth() &&
-    sa.getUTCDate() === sb.getUTCDate()
-  );
-}
-
-// ── Winner weighting (spec §5 + §6 Day 28) ─────────────────────────
-
-export type BehaviorFactor = 1.0 | 0.5 | 0.0; // normal / flagged / confirmed collusion
-export type NonCollusionFactor = 1.0 | 0.3; // unassociated / IP-device-GPS associated
-
-export interface WeightInput {
-  baseWeight: number;
-  behaviorFactor: BehaviorFactor;
-  nonCollusionFactor: NonCollusionFactor;
-  /** VIP jackpot weight bonus: V4 → +0.10, V5 → +0.25, else 0. */
-  vipBonus?: number;
-}
-
-export function computeWeight(input: WeightInput): number {
-  const { baseWeight, behaviorFactor, nonCollusionFactor, vipBonus = 0 } = input;
-  if (baseWeight < 0) throw new Error('computeWeight: baseWeight must be >= 0');
-  return baseWeight * behaviorFactor * nonCollusionFactor * (1 + vipBonus);
-}
-
-export interface WeightedPlayer {
   playerId: string;
-  weight: number;
+  amount: number;
+  roundId: string;
+  at: number;
+  /** Pool balance after paying out. */
+  poolAfter: number;
+  animationMs: number;
+  seed: string;
 }
 
-/**
- * Weighted-random winner selection from a deterministic [0,1) value.
- * Confirmed-collusion players (weight 0) can never win. Returns null if no
- * player has positive weight.
- */
-export function selectJackpotWinner(players: WeightedPlayer[], rng01: number): string | null {
-  if (rng01 < 0 || rng01 >= 1) throw new Error('selectJackpotWinner: rng01 must be in [0,1)');
-  const total = players.reduce((s, p) => s + Math.max(0, p.weight), 0);
-  if (total <= 0) return null;
-  let cursor = rng01 * total;
-  for (const p of players) {
-    const w = Math.max(0, p.weight);
-    if (cursor < w) return p.playerId;
-    cursor -= w;
+export type SkipReason =
+  | 'BELOW_THRESHOLD'
+  | 'NO_PLAYERS'
+  | 'OUTSIDE_WINDOW'
+  | 'TABLE_FROZEN'
+  | 'NO_ELIGIBLE_WINNER';
+
+export interface JackpotSkip {
+  tier: JackpotTier;
+  reason: SkipReason;
+  at: number;
+  poolAtSkip: number;
+}
+
+/** CB3: three jackpot hits within this window on one table freezes it. */
+export const CB3_MAX_HITS = 3;
+export const CB3_WINDOW_MS = 3_600_000;
+
+export class JackpotEngine {
+  private readonly pools: Record<JackpotTier, number> = { MINI: 0, MINOR: 0, MAJOR: 0, GRAND: 0 };
+  /** Rounds played since each round-based tier last paid. */
+  private readonly roundsSince: Record<JackpotTier, number> = { MINI: 0, MINOR: 0, MAJOR: 0, GRAND: 0 };
+  /** The interval each round-based tier is currently counting towards (drawn from a seed). */
+  private readonly target: Record<JackpotTier, number | null> = {
+    MINI: null,
+    MINOR: null,
+    MAJOR: null,
+    GRAND: null,
+  };
+  /** Period keys already paid, so Major fires at most once a day and Grand once a Saturday. */
+  private readonly paidPeriod: Record<JackpotTier, string | null> = {
+    MINI: null,
+    MINOR: null,
+    MAJOR: null,
+    GRAND: null,
+  };
+  private epoch = 0;
+  private frozen = false;
+  private readonly hits: JackpotHit[] = [];
+  private readonly skips: JackpotSkip[] = [];
+
+  constructor(readonly tableId: string) {}
+
+  // ── Money in ────────────────────────────────────────────────────────────────
+  /** Inject 0.5% of the winner's profit, split across the four tiers. Returns what was injected. */
+  inject(winnerProfit: number): { total: number; split: Record<JackpotTier, number> } {
+    const total = injectionFor(winnerProfit);
+    const split = splitInjection(total);
+    for (const t of TIERS) this.pools[t] += split[t];
+    return { total, split };
   }
-  // Floating-point edge — return the last positive-weight player.
-  for (let i = players.length - 1; i >= 0; i--) {
-    if ((players[i]?.weight ?? 0) > 0) return players[i]!.playerId;
+
+  pool(tier: JackpotTier): number {
+    return this.pools[tier];
   }
-  return null;
+  totalPool(): number {
+    return TIERS.reduce((a, t) => a + this.pools[t], 0);
+  }
+
+  // ── CB3 ─────────────────────────────────────────────────────────────────────
+  isFrozen(): boolean {
+    return this.frozen;
+  }
+  /** Ops action after review — CB3 freezes automatically, but only a human unfreezes. */
+  unfreeze(): void {
+    this.frozen = false;
+  }
+  private checkCB3(now: number): void {
+    if (this.triggersLastHour(now) >= CB3_MAX_HITS) this.frozen = true;
+  }
+
+  /**
+   * The live feed for the Financial Core's CB3 (`evaluateCB3(tableId, triggersLastHour)`).
+   * Three jackpots in an hour on one table is a farming signature, not luck.
+   */
+  triggersLastHour(now: number): number {
+    return this.hits.filter((h) => now - h.at < CB3_WINDOW_MS).length;
+  }
+
+  // ── Money out ───────────────────────────────────────────────────────────────
+  /**
+   * Advance one settled round and pay out any tier that is due.
+   * Returns every hit (usually none) — the caller moves the money via the Financial Core.
+   */
+  onRoundSettled(ctx: RoundContext): JackpotHit[] {
+    this.roundsSince.MINI += 1;
+    this.roundsSince.MINOR += 1;
+
+    const hits: JackpotHit[] = [];
+    for (const tier of TIERS) {
+      const hit = this.evaluate(tier, ctx);
+      if (hit) {
+        hits.push(hit);
+        this.checkCB3(ctx.now); // three in an hour → this table's jackpot freezes
+      }
+    }
+    return hits;
+  }
+
+  private evaluate(tier: JackpotTier, ctx: RoundContext): JackpotHit | null {
+    const cfg = TIER_CONFIG[tier];
+
+    // A frozen table pays nothing at all (CB3). Grand additionally misses its whole window.
+    if (this.frozen) {
+      if (this.isDue(tier, ctx)) this.skip(tier, 'TABLE_FROZEN', ctx.now);
+      return null;
+    }
+    if (!this.isDue(tier, ctx)) return null;
+
+    // Grand's three-condition gate — all three, simultaneously.
+    if (tier === 'GRAND') {
+      if (!isInGrandWindow(ctx.now)) {
+        this.skip(tier, 'OUTSIDE_WINDOW', ctx.now);
+        return null;
+      }
+      if (ctx.candidates.length === 0) {
+        this.skip(tier, 'NO_PLAYERS', ctx.now);
+        return null;
+      }
+    }
+
+    // Below the minimum → skip. No subsidy, no deferral; the counter keeps accumulating and the
+    // tier stays due, so it fires as soon as the pool is genuinely funded.
+    if (this.pools[tier] < cfg.minThreshold) {
+      this.skip(tier, 'BELOW_THRESHOLD', ctx.now);
+      return null;
+    }
+
+    const winner = drawWinner(ctx.candidates, `${ctx.seed}:${tier}`);
+    if (!winner) {
+      // Everyone at the table is a confirmed colluder (weight 0) — pay nobody.
+      this.skip(tier, 'NO_ELIGIBLE_WINNER', ctx.now);
+      return null;
+    }
+
+    const amount = Math.floor((this.pools[tier] * cfg.payoutBps) / 10000);
+    this.pools[tier] -= amount;
+    this.reset(tier, ctx);
+
+    const hit: JackpotHit = {
+      tier,
+      playerId: winner.playerId,
+      amount,
+      roundId: ctx.roundId,
+      at: ctx.now,
+      poolAfter: this.pools[tier],
+      animationMs: cfg.animationMs,
+      seed: ctx.seed,
+    };
+    this.hits.push(hit);
+    return hit;
+  }
+
+  private isDue(tier: JackpotTier, ctx: RoundContext): boolean {
+    const cadence = TIER_CONFIG[tier].cadence;
+
+    if (cadence.kind === 'ROUNDS') {
+      if (this.target[tier] === null) {
+        this.target[tier] = nextRoundInterval(ctx.seed, tier, this.epoch);
+      }
+      return this.roundsSince[tier] >= this.target[tier]!;
+    }
+
+    if (cadence.kind === 'DAILY') {
+      const dayKey = zoned(ctx.now).dayKey;
+      if (this.paidPeriod.MAJOR === dayKey) return false; // once a day
+      return ctx.now >= dailyTriggerAt(ctx.seed, ctx.now);
+    }
+
+    // WINDOW (Grand): due once the seed-chosen moment inside this Saturday's window has passed.
+    const weekKey = zoned(ctx.now).dayKey;
+    if (this.paidPeriod.GRAND === weekKey) return false;
+    if (!isInGrandWindow(ctx.now)) return false;
+    return ctx.now >= grandTriggerAt(ctx.seed, ctx.now);
+  }
+
+  private reset(tier: JackpotTier, ctx: RoundContext): void {
+    const cadence = TIER_CONFIG[tier].cadence;
+    if (cadence.kind === 'ROUNDS') {
+      this.roundsSince[tier] = 0;
+      this.epoch += 1;
+      this.target[tier] = nextRoundInterval(ctx.seed, tier, this.epoch); // fresh unpredictable interval
+    } else {
+      this.paidPeriod[tier] = zoned(ctx.now).dayKey;
+    }
+  }
+
+  private skip(tier: JackpotTier, reason: SkipReason, at: number): void {
+    this.skips.push({ tier, reason, at, poolAtSkip: this.pools[tier] });
+  }
+
+  // ── History (spec: no time limit, fully queryable) ───────────────────────────
+  history(filter: { tier?: JackpotTier; from?: number; to?: number; playerId?: string } = {}): JackpotHit[] {
+    return this.hits.filter(
+      (h) =>
+        (!filter.tier || h.tier === filter.tier) &&
+        (filter.from === undefined || h.at >= filter.from) &&
+        (filter.to === undefined || h.at <= filter.to) &&
+        (!filter.playerId || h.playerId === filter.playerId),
+    );
+  }
+
+  skipHistory(): readonly JackpotSkip[] {
+    return this.skips;
+  }
 }

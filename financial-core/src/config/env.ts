@@ -1,47 +1,48 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import { z } from 'zod';
 
+/**
+ * Environment configuration — loaded once at startup, validated, fail-fast.
+ *
+ * Reads `.env` (via dotenv) then validates `process.env`. Missing/invalid required values throw a
+ * clear, actionable error instead of the service starting in a half-configured, unsafe state.
+ * Security-critical secrets (internal API secret, JWT secret) are REQUIRED — the service refuses to
+ * boot without them rather than run wide open.
+ */
+
 const EnvSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().int().positive().default(3000),
-  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+  NODE_ENV: z.string().default('development'),
+  // 0 = OS-assigned ephemeral port (valid for Node's listen); real deploys set a fixed port.
+  PORT: z.coerce.number().int().min(0).max(65535).default(4001),
+  LOG_LEVEL: z.string().default('info'),
 
-  MONGO_URI: z.string().min(1),
-  MONGO_DB_NAME: z.string().min(1),
+  // MongoDB MUST be a replica set (transactions). e.g. mongodb://host:27017/db?replicaSet=rs0
+  MONGO_URI: z.string().min(1, 'MONGO_URI is required (a replica-set connection string)'),
+  MONGO_TLS: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((v) => v === 'true'),
 
-  REDIS_URL: z.string().min(1),
-
-  JWT_SECRET: z.string().min(16),
-  JWT_ISSUER: z.string().default('fairplay'),
-  JWT_AUDIENCE: z.string().default('fairplay-fc'),
-
-  TG_BOT_TOKEN: z.string().optional(),
-  TG_OPS_CHAT_ID: z.string().optional(),
-
-  // Shared secret guarding /api/v1/internal/* (game-server → FC).
-  // M2 W3+ replaces this with a proper service JWT (separate aud).
-  INTERNAL_API_TOKEN: z.string().min(16).optional(),
-
-  TRON_FULLNODE_URL: z.string().url().default('https://api.trongrid.io'),
-  TRON_USDT_CONTRACT: z.string().default('TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t'),
-  TRON_DEPOSIT_CONFIRMATIONS: z.coerce.number().int().positive().default(20),
-
-  HD_MASTER_SEED_HEX: z.string().optional(),
+  // Service-to-service + player auth secrets. Required — no insecure defaults.
+  INTERNAL_API_SECRET: z.string().min(8, 'INTERNAL_API_SECRET must be set (≥8 chars)'),
+  JWT_SECRET: z.string().min(8, 'JWT_SECRET must be set (≥8 chars)'),
 });
 
-export type Env = z.infer<typeof EnvSchema>;
+export type AppConfig = z.infer<typeof EnvSchema>;
 
-let cached: Env | null = null;
+export function loadConfig(): AppConfig {
+  // Populates process.env from .env without overwriting already-set vars.
+  dotenv.config();
 
-export function loadEnv(): Env {
-  if (cached) return cached;
   const parsed = EnvSchema.safeParse(process.env);
   if (!parsed.success) {
     const issues = parsed.error.issues
-      .map((i) => `  - ${i.path.join('.')}: ${i.message}`)
+      .map((i) => `  - ${i.path.join('.') || '(root)'}: ${i.message}`)
       .join('\n');
-    throw new Error(`Invalid environment configuration:\n${issues}`);
+    throw new Error(
+      `Invalid environment configuration:\n${issues}\n\n` +
+        'Copy financial-core/.env.example to financial-core/.env and fill the required values.',
+    );
   }
-  cached = parsed.data;
-  return cached;
+  return parsed.data;
 }

@@ -1,341 +1,160 @@
-import { MongoMemoryReplSet } from 'mongodb-memory-server';
-import { connectDB, disconnectDB } from '../../src/db/connection';
-import { Account } from '../../src/wallet/account.model';
-import { InsufficientBalanceError } from '../../src/wallet/errors';
-import { Ledger } from '../../src/wallet/ledger.model';
+import { Decimal128 } from 'bson';
+import { AccountModel } from '../../src/wallet/account.model';
+import { LedgerModel } from '../../src/wallet/ledger.model';
+import { WithdrawalModel } from '../../src/withdrawal/withdrawal.model';
 import {
-  ALLOWED_NEXT,
-  HUMAN_REVIEW_THRESHOLD,
-  IllegalWithdrawalTransitionError,
-  WithdrawalNotFoundError,
+  requestWithdrawal,
   approveWithdrawal,
-  cancelWithdrawal,
-  createWithdrawal,
-  markBroadcasting,
-  markConfirmed,
-  markFailedAndRollback,
+  broadcastWithdrawal,
+  confirmWithdrawal,
+  rollbackWithdrawal,
 } from '../../src/withdrawal/withdrawal-state-machine';
-import { Withdrawal } from '../../src/withdrawal/withdrawal.model';
+import { WithdrawalState } from '../../src/domain/withdrawal-types';
+import {
+  InsufficientBalanceError,
+  InvalidWithdrawalTransitionError,
+} from '../../src/wallet/errors';
+import { Money } from '../../src/domain/money';
+import { AccountType, LedgerType } from '../../src/domain/account-types';
+import { startTestDb, stopTestDb, clearCollections, ensureIndexes } from '../db-helper';
 
-describe('withdrawal/state-machine — spec §3.6', () => {
-  let rs: MongoMemoryReplSet;
+async function makePlayer(available: string): Promise<string> {
+  const a = await AccountModel.create({
+    accountType: AccountType.PLAYER,
+    ownerId: 'p1',
+    availableBalance: Decimal128.fromString(available),
+  });
+  return a._id;
+}
 
+async function makeTreasury(): Promise<string> {
+  const a = await AccountModel.create({ accountType: AccountType.TREASURY, ownerId: 'PLATFORM' });
+  return a._id;
+}
+
+async function balances(id: string): Promise<{ available: number; clearing: number }> {
+  const a = await AccountModel.findById(id);
+  return {
+    available: parseFloat(a!.availableBalance.toString()),
+    clearing: parseFloat(a!.clearingBalance.toString()),
+  };
+}
+
+describe('withdrawal state machine', () => {
   beforeAll(async () => {
-    rs = await MongoMemoryReplSet.create({
-      replSet: { count: 1, storageEngine: 'wiredTiger' },
+    await startTestDb();
+    await ensureIndexes(AccountModel, LedgerModel, WithdrawalModel);
+  });
+  afterAll(stopTestDb);
+  afterEach(clearCollections);
+
+  it('runs the full happy path: REQUESTED → APPROVED → BROADCASTING → CONFIRMED', async () => {
+    const player = await makePlayer('1000');
+    const treasury = await makeTreasury();
+
+    const id = await requestWithdrawal({
+      playerAccountId: player,
+      amount: Money.fromDecimalString('300'),
+      address: 'TXaddrTest',
     });
-    await connectDB(rs.getUri());
-    await Account.syncIndexes();
-    await Ledger.syncIndexes();
-    await Withdrawal.syncIndexes();
+    // REQUESTED: nothing moved yet.
+    expect((await balances(player))).toEqual({ available: 1000, clearing: 0 });
+
+    await approveWithdrawal(id);
+    // APPROVED: held in clearing.
+    expect(await balances(player)).toEqual({ available: 700, clearing: 300 });
+
+    await broadcastWithdrawal(id, 'tx-hash-abc');
+    expect((await WithdrawalModel.findById(id))!.txHash).toBe('tx-hash-abc');
+    expect(await balances(player)).toEqual({ available: 700, clearing: 300 });
+
+    await confirmWithdrawal(id);
+    // CONFIRMED: clearing emptied, funds left the platform via the EXTERNAL boundary account.
+    expect(await balances(player)).toEqual({ available: 700, clearing: 0 });
+    const external = await AccountModel.findOne({ accountType: AccountType.EXTERNAL });
+    expect(parseFloat(external!.availableBalance.toString())).toBe(300);
+    expect((await WithdrawalModel.findById(id))!.state).toBe(WithdrawalState.CONFIRMED);
+    // Treasury (rake/income) is untouched by a withdrawal.
+    expect(parseFloat((await AccountModel.findById(treasury))!.availableBalance.toString())).toBe(0);
+
+    // Exactly one double-entry WITHDRAW pair.
+    expect(await LedgerModel.countDocuments({ type: LedgerType.WITHDRAW })).toBe(2);
   });
 
-  afterAll(async () => {
-    await disconnectDB();
-    await rs.stop();
+  it('held funds are not spendable — withdrawal locks the clearing amount', async () => {
+    const player = await makePlayer('500');
+    await makeTreasury();
+
+    const id = await requestWithdrawal({
+      playerAccountId: player,
+      amount: Money.fromDecimalString('500'),
+      address: 'TXaddr',
+    });
+    await approveWithdrawal(id);
+    expect(await balances(player)).toEqual({ available: 0, clearing: 500 });
+
+    // A second withdrawal for the same funds cannot be approved — available is now 0.
+    const id2 = await requestWithdrawal({
+      playerAccountId: player,
+      amount: Money.fromDecimalString('500'),
+      address: 'TXaddr2',
+    }).catch((e) => e);
+    // request itself fails the early available check (available already 0).
+    expect(id2).toBeInstanceOf(InsufficientBalanceError);
   });
 
-  beforeEach(async () => {
-    await Account.deleteMany({});
-    await Ledger.deleteMany({});
-    await Withdrawal.deleteMany({});
+  it('rolls back a held withdrawal and refunds clearing → available', async () => {
+    const player = await makePlayer('1000');
+    await makeTreasury();
+
+    const id = await requestWithdrawal({
+      playerAccountId: player,
+      amount: Money.fromDecimalString('400'),
+      address: 'TXaddr',
+    });
+    await approveWithdrawal(id);
+    expect(await balances(player)).toEqual({ available: 600, clearing: 400 });
+
+    await rollbackWithdrawal(id, 'broadcast failed');
+    // Hold released back to spendable.
+    expect(await balances(player)).toEqual({ available: 1000, clearing: 0 });
+    const w = await WithdrawalModel.findById(id);
+    expect(w!.state).toBe(WithdrawalState.ROLLED_BACK);
+    expect(w!.failureReason).toBe('broadcast failed');
+    // No money left the platform → no WITHDRAW ledger entry.
+    expect(await LedgerModel.countDocuments({ type: LedgerType.WITHDRAW })).toBe(0);
   });
 
-  // ───────────────────────────────────────────────────────────────────
-  // Transition table sanity
-  // ───────────────────────────────────────────────────────────────────
-  // Regression for the bug found 2026-05-13 in `npm run dev:memory`:
-  // sparse:true on uniq_tx_hash didn't filter null values, so creating
-  // two withdrawals (both with tx_hash=null) collided with E11000.
-  // Fix: partialFilterExpression on tx_hash type=string.
-  it('two REQUESTED withdrawals (both with null tx_hash) do NOT collide on uniq_tx_hash', async () => {
-    await Account.create({ account_type: 'PLAYER', owner_id: 'p1', balance: 100_000n });
-    const a = await createWithdrawal({
-      playerId: 'p1',
-      amount: 1_000n,
-      destinationAddress: 'TR-a',
+  it('rolls back a REQUESTED withdrawal with no balance to release', async () => {
+    const player = await makePlayer('1000');
+    const id = await requestWithdrawal({
+      playerAccountId: player,
+      amount: Money.fromDecimalString('400'),
+      address: 'TXaddr',
     });
-    const b = await createWithdrawal({
-      playerId: 'p1',
-      amount: 2_000n,
-      destinationAddress: 'TR-b',
-    });
-    expect(a._id).not.toBe(b._id);
-    expect(a.tx_hash).toBeNull();
-    expect(b.tx_hash).toBeNull();
-    expect(await Withdrawal.countDocuments({ player_id: 'p1' })).toBe(2);
+    await rollbackWithdrawal(id, 'risk rejected');
+    expect(await balances(player)).toEqual({ available: 1000, clearing: 0 });
+    expect((await WithdrawalModel.findById(id))!.state).toBe(WithdrawalState.ROLLED_BACK);
   });
 
-  it('uniq_tx_hash still rejects two non-null tx_hash values that collide', async () => {
-    await Account.create({ account_type: 'PLAYER', owner_id: 'p1', balance: 100_000n });
-    const a = await createWithdrawal({
-      playerId: 'p1',
-      amount: 1_000n,
-      destinationAddress: 'TR-a',
+  it('rejects an illegal transition (cannot confirm a REQUESTED withdrawal)', async () => {
+    const player = await makePlayer('1000');
+    const id = await requestWithdrawal({
+      playerAccountId: player,
+      amount: Money.fromDecimalString('100'),
+      address: 'TXaddr',
     });
-    const b = await createWithdrawal({
-      playerId: 'p1',
-      amount: 2_000n,
-      destinationAddress: 'TR-b',
-    });
-    await approveWithdrawal({ withdrawalId: a._id });
-    await markBroadcasting({ withdrawalId: a._id, txHash: 'collision-test' });
-    await approveWithdrawal({ withdrawalId: b._id });
+    await expect(confirmWithdrawal(id)).rejects.toThrow(InvalidWithdrawalTransitionError);
+  });
+
+  it('rejects requesting more than the available balance', async () => {
+    const player = await makePlayer('50');
     await expect(
-      markBroadcasting({ withdrawalId: b._id, txHash: 'collision-test' }),
-    ).rejects.toThrow(/duplicate key|E11000/);
-  });
-
-  it('matches the spec §3.6 transition table exactly', () => {
-    expect([...ALLOWED_NEXT.REQUESTED]).toEqual(['APPROVED', 'ROLLED_BACK']);
-    expect([...ALLOWED_NEXT.APPROVED]).toEqual(['BROADCASTING']);
-    expect([...ALLOWED_NEXT.BROADCASTING]).toEqual(['CONFIRMED', 'FAILED']);
-    expect([...ALLOWED_NEXT.CONFIRMED]).toEqual([]); // terminal
-    expect([...ALLOWED_NEXT.FAILED]).toEqual(['ROLLED_BACK']);
-    expect([...ALLOWED_NEXT.ROLLED_BACK]).toEqual([]); // terminal
-  });
-
-  // ───────────────────────────────────────────────────────────────────
-  // createWithdrawal
-  // ───────────────────────────────────────────────────────────────────
-  it('createWithdrawal puts the request in REQUESTED state with no balance change', async () => {
-    await Account.create({ account_type: 'PLAYER', owner_id: 'p1', balance: 100_000n });
-    const w = await createWithdrawal({
-      playerId: 'p1',
-      amount: 50_000n,
-      destinationAddress: 'TR-test-address',
-    });
-    expect(w.state).toBe('REQUESTED');
-    expect(w.ledger_entry_id).toBeNull();
-    expect(w.state_history).toHaveLength(1);
-    expect(w.state_history[0]!.state).toBe('REQUESTED');
-
-    const player = await Account.findOne({ owner_id: 'p1' });
-    expect(player?.balance).toBe(100_000n); // unchanged
-    expect(await Ledger.countDocuments()).toBe(0);
-  });
-
-  // ───────────────────────────────────────────────────────────────────
-  // approveWithdrawal
-  // ───────────────────────────────────────────────────────────────────
-  describe('approveWithdrawal', () => {
-    it('REQUESTED → APPROVED deducts balance and writes WITHDRAW ledger entry (status=PENDING)', async () => {
-      await Account.create({ account_type: 'PLAYER', owner_id: 'p1', balance: 100_000n });
-      const w = await createWithdrawal({
-        playerId: 'p1',
-        amount: 50_000n,
-        destinationAddress: 'TR-x',
-      });
-
-      const approved = await approveWithdrawal({ withdrawalId: w._id });
-      expect(approved.state).toBe('APPROVED');
-      expect(approved.ledger_entry_id).toBeTruthy();
-
-      const player = await Account.findOne({ owner_id: 'p1' });
-      expect(player?.balance).toBe(50_000n);
-
-      const ledger = await Ledger.findById(approved.ledger_entry_id);
-      expect(ledger?.type).toBe('WITHDRAW');
-      expect(ledger?.status).toBe('PENDING');
-      expect(ledger?.amount).toBe(50_000n);
-      expect(ledger?.to_account).toBeNull();
-    });
-
-    it('rejects approval with InsufficientBalance (no state change, no ledger entry)', async () => {
-      await Account.create({ account_type: 'PLAYER', owner_id: 'p1', balance: 100n });
-      const w = await createWithdrawal({
-        playerId: 'p1',
-        amount: 50_000n,
-        destinationAddress: 'TR-x',
-      });
-
-      await expect(approveWithdrawal({ withdrawalId: w._id })).rejects.toBeInstanceOf(
-        InsufficientBalanceError,
-      );
-
-      const reloaded = await Withdrawal.findById(w._id);
-      expect(reloaded?.state).toBe('REQUESTED'); // unchanged
-      expect(await Ledger.countDocuments()).toBe(0);
-    });
-
-    it('amounts > $10K require a reviewer', async () => {
-      await Account.create({
-        account_type: 'PLAYER',
-        owner_id: 'p1',
-        balance: 100_000_000n,
-      });
-      const w = await createWithdrawal({
-        playerId: 'p1',
-        amount: HUMAN_REVIEW_THRESHOLD + 1n,
-        destinationAddress: 'TR-x',
-      });
-      await expect(approveWithdrawal({ withdrawalId: w._id })).rejects.toThrow(
-        /reviewer/,
-      );
-
-      // With reviewer it succeeds.
-      const approved = await approveWithdrawal({
-        withdrawalId: w._id,
-        reviewer: 'ops-jane',
-      });
-      expect(approved.state).toBe('APPROVED');
-      expect(approved.reviewed_by).toBe('ops-jane');
-    });
-
-    it('cannot APPROVE a non-REQUESTED withdrawal', async () => {
-      await Account.create({ account_type: 'PLAYER', owner_id: 'p1', balance: 100_000n });
-      const w = await createWithdrawal({
-        playerId: 'p1',
-        amount: 50_000n,
-        destinationAddress: 'TR-x',
-      });
-      await approveWithdrawal({ withdrawalId: w._id });
-      await expect(approveWithdrawal({ withdrawalId: w._id })).rejects.toBeInstanceOf(
-        IllegalWithdrawalTransitionError,
-      );
-    });
-  });
-
-  // ───────────────────────────────────────────────────────────────────
-  // markBroadcasting
-  // ───────────────────────────────────────────────────────────────────
-  it('APPROVED → BROADCASTING records tx_hash and keeps ledger PENDING', async () => {
-    await Account.create({ account_type: 'PLAYER', owner_id: 'p1', balance: 100_000n });
-    const w = await createWithdrawal({
-      playerId: 'p1',
-      amount: 50_000n,
-      destinationAddress: 'TR-x',
-    });
-    const approved = await approveWithdrawal({ withdrawalId: w._id });
-    const broadcasting = await markBroadcasting({
-      withdrawalId: approved._id,
-      txHash: '0xtxhash-abc',
-    });
-    expect(broadcasting.state).toBe('BROADCASTING');
-    expect(broadcasting.tx_hash).toBe('0xtxhash-abc');
-
-    // Ledger entry still PENDING.
-    const ledger = await Ledger.findById(broadcasting.ledger_entry_id);
-    expect(ledger?.status).toBe('PENDING');
-  });
-
-  // ───────────────────────────────────────────────────────────────────
-  // markConfirmed (happy path terminal)
-  // ───────────────────────────────────────────────────────────────────
-  it('BROADCASTING → CONFIRMED flips ledger entry PENDING → SETTLED', async () => {
-    await Account.create({ account_type: 'PLAYER', owner_id: 'p1', balance: 100_000n });
-    const w = await createWithdrawal({
-      playerId: 'p1',
-      amount: 50_000n,
-      destinationAddress: 'TR-x',
-    });
-    await approveWithdrawal({ withdrawalId: w._id });
-    await markBroadcasting({ withdrawalId: w._id, txHash: '0xtx' });
-    const confirmed = await markConfirmed({ withdrawalId: w._id });
-    expect(confirmed.state).toBe('CONFIRMED');
-
-    const ledger = await Ledger.findById(confirmed.ledger_entry_id);
-    expect(ledger?.status).toBe('SETTLED');
-
-    // CONFIRMED is terminal: no further transitions.
-    await expect(
-      markConfirmed({ withdrawalId: w._id }),
-    ).rejects.toBeInstanceOf(IllegalWithdrawalTransitionError);
-  });
-
-  // ───────────────────────────────────────────────────────────────────
-  // markFailedAndRollback (failure terminal)
-  // ───────────────────────────────────────────────────────────────────
-  it('BROADCASTING → FAILED → ROLLED_BACK refunds balance via WITHDRAW_REFUND ledger entry', async () => {
-    await Account.create({ account_type: 'PLAYER', owner_id: 'p1', balance: 100_000n });
-    const w = await createWithdrawal({
-      playerId: 'p1',
-      amount: 50_000n,
-      destinationAddress: 'TR-x',
-    });
-    await approveWithdrawal({ withdrawalId: w._id });
-    await markBroadcasting({ withdrawalId: w._id, txHash: '0xtx' });
-
-    const before = await Account.findOne({ owner_id: 'p1' });
-    expect(before?.balance).toBe(50_000n); // deducted
-
-    const rolledBack = await markFailedAndRollback({
-      withdrawalId: w._id,
-      reason: 'on-chain broadcast rejected by node',
-    });
-    expect(rolledBack.state).toBe('ROLLED_BACK');
-    expect(rolledBack.failure_reason).toMatch(/broadcast rejected/);
-    expect(rolledBack.refund_ledger_entry_id).toBeTruthy();
-
-    const after = await Account.findOne({ owner_id: 'p1' });
-    expect(after?.balance).toBe(100_000n); // refunded
-
-    // Original WITHDRAW ledger entry → FAILED.
-    const orig = await Ledger.findById(rolledBack.ledger_entry_id);
-    expect(orig?.status).toBe('FAILED');
-
-    // Refund WITHDRAW_REFUND ledger entry → SETTLED.
-    const refund = await Ledger.findById(rolledBack.refund_ledger_entry_id);
-    expect(refund?.type).toBe('WITHDRAW_REFUND');
-    expect(refund?.status).toBe('SETTLED');
-    expect(refund?.amount).toBe(50_000n);
-    expect(refund?.from_account).toBeNull();
-
-    // ROLLED_BACK is terminal — state_history reflects the full path.
-    const states = rolledBack.state_history.map((h) => h.state);
-    expect(states).toEqual(['REQUESTED', 'APPROVED', 'BROADCASTING', 'FAILED', 'ROLLED_BACK']);
-  });
-
-  // ───────────────────────────────────────────────────────────────────
-  // cancelWithdrawal (REQUESTED → ROLLED_BACK direct)
-  // ───────────────────────────────────────────────────────────────────
-  it('cancelWithdrawal moves REQUESTED → ROLLED_BACK with no balance change', async () => {
-    await Account.create({ account_type: 'PLAYER', owner_id: 'p1', balance: 100_000n });
-    const w = await createWithdrawal({
-      playerId: 'p1',
-      amount: 50_000n,
-      destinationAddress: 'TR-x',
-    });
-    const cancelled = await cancelWithdrawal(w._id, 'risk-control', 'KYC mismatch');
-    expect(cancelled.state).toBe('ROLLED_BACK');
-    expect(cancelled.failure_reason).toBe('KYC mismatch');
-
-    const player = await Account.findOne({ owner_id: 'p1' });
-    expect(player?.balance).toBe(100_000n); // unchanged
-    expect(await Ledger.countDocuments()).toBe(0); // no ledger entries
-  });
-
-  // ───────────────────────────────────────────────────────────────────
-  // Negative paths
-  // ───────────────────────────────────────────────────────────────────
-  it('throws WithdrawalNotFoundError when target id does not exist', async () => {
-    await expect(approveWithdrawal({ withdrawalId: 'ghost-id' })).rejects.toBeInstanceOf(
-      WithdrawalNotFoundError,
-    );
-  });
-
-  it('rejects createWithdrawal with bad inputs', async () => {
-    await expect(
-      createWithdrawal({ playerId: '', amount: 1n, destinationAddress: 'TR-x' }),
-    ).rejects.toThrow(/playerId/);
-    await expect(
-      createWithdrawal({ playerId: 'p', amount: 0n, destinationAddress: 'TR-x' }),
-    ).rejects.toThrow(/positive BigInt/);
-    await expect(
-      createWithdrawal({ playerId: 'p', amount: 1n, destinationAddress: '' }),
-    ).rejects.toThrow(/destinationAddress/);
-  });
-
-  it('cannot APPROVE → CONFIRMED (skipping BROADCASTING)', async () => {
-    await Account.create({ account_type: 'PLAYER', owner_id: 'p1', balance: 100_000n });
-    const w = await createWithdrawal({
-      playerId: 'p1',
-      amount: 1_000n,
-      destinationAddress: 'TR-x',
-    });
-    await approveWithdrawal({ withdrawalId: w._id });
-    await expect(markConfirmed({ withdrawalId: w._id })).rejects.toBeInstanceOf(
-      IllegalWithdrawalTransitionError,
-    );
+      requestWithdrawal({
+        playerAccountId: player,
+        amount: Money.fromDecimalString('100'),
+        address: 'TXaddr',
+      }),
+    ).rejects.toThrow(InsufficientBalanceError);
   });
 });

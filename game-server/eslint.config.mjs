@@ -1,57 +1,44 @@
-// ESLint 9 flat config — mirrors financial-core/.
-import js from '@eslint/js';
+// @ts-check
+import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
-import prettier from 'eslint-config-prettier';
-import globals from 'globals';
 
 export default tseslint.config(
   {
-    ignores: ['dist/', 'node_modules/', 'coverage/', 'public/'],
+    ignores: ['dist/**', 'node_modules/**', 'coverage/**', 'jest.config.js'],
   },
-  js.configs.recommended,
+  eslint.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    files: ['**/*.ts'],
-    languageOptions: {
-      globals: { ...globals.node, ...globals.jest },
-      parserOptions: {
-        ecmaVersion: 'latest',
-        sourceType: 'module',
-        project: './tsconfig.json',
-      },
-    },
     rules: {
+      // ignoreRestSiblings allows the redaction idiom `const { secret, ...safe } = obj` — the safest
+      // way to strip private fields, since a newly-added secret can't leak by being forgotten.
       '@typescript-eslint/no-unused-vars': [
         'error',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', ignoreRestSiblings: true },
       ],
       '@typescript-eslint/no-explicit-any': 'error',
-      '@typescript-eslint/explicit-function-return-type': ['warn', { allowExpressions: true }],
-      'no-console': ['error', { allow: ['warn', 'error'] }],
-      'prefer-const': 'error',
-      'no-var': 'error',
-      eqeqeq: ['error', 'always'],
+      '@typescript-eslint/explicit-function-return-type': 'warn',
+      'no-console': 'off',
     },
   },
   {
-    files: ['test/**/*.ts', 'scripts/**/*.ts', '**/*.test.ts', '**/*.spec.ts'],
-    rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/explicit-function-return-type': 'off',
+    // Tests don't need explicit return types (inline mocks, etc.).
+    files: ['test/**/*.ts'],
+    rules: { '@typescript-eslint/explicit-function-return-type': 'off' },
+  },
+  {
+    // Browser frontend assets for the Mini App — plain JS with browser globals, not the TS build.
+    files: ['scripts/app/**/*.js'],
+    languageOptions: {
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        fetch: 'readonly',
+        setInterval: 'readonly',
+        alert: 'readonly',
+        encodeURIComponent: 'readonly',
+      },
     },
+    rules: { '@typescript-eslint/explicit-function-return-type': 'off' },
   },
-  {
-    files: ['scripts/**/*.ts'],
-    rules: { 'no-console': 'off' },
-  },
-  {
-    files: ['**/*.mjs', '**/*.js'],
-    languageOptions: { sourceType: 'module', globals: { ...globals.node } },
-    rules: { 'no-console': 'off', '@typescript-eslint/explicit-function-return-type': 'off' },
-  },
-  {
-    files: ['**/*.cjs', 'jest.config.js'],
-    languageOptions: { sourceType: 'commonjs', globals: { ...globals.node } },
-  },
-  prettier,
 );

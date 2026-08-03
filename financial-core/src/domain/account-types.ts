@@ -1,88 +1,93 @@
 /**
- * The 9 account types from the Financial Core spec.
- * Each is a physically isolated ledger; cross-type movements are gated
- * by ClearingRules. Adding a new type requires schema review + ClearingRules
- * whitelist update + on-chain HD derivation path mapping.
- */
-export const ACCOUNT_TYPES = [
-  'PLAYER',
-  'TREASURY',
-  'INSURANCE',
-  'REINSURANCE',
-  'LEAGUE_INVENTORY',
-  'JACKPOT_MINI',
-  'JACKPOT_MINOR',
-  'JACKPOT_MAJOR',
-  'JACKPOT_GRAND',
-] as const;
-
-export type AccountType = (typeof ACCOUNT_TYPES)[number];
-
-/** Sentinel owner_id used by PLATFORM-scoped accounts (TREASURY always; INSURANCE/REINSURANCE optionally). */
-export const PLATFORM_OWNER = 'PLATFORM' as const;
-
-/** The four per-table Jackpot tiers, in injection-priority order. */
-export const JACKPOT_TYPES = [
-  'JACKPOT_MINI',
-  'JACKPOT_MINOR',
-  'JACKPOT_MAJOR',
-  'JACKPOT_GRAND',
-] as const satisfies readonly AccountType[];
-
-export type JackpotType = (typeof JACKPOT_TYPES)[number];
-
-export function isJackpotType(type: AccountType): type is JackpotType {
-  return (JACKPOT_TYPES as readonly AccountType[]).includes(type);
-}
-
-/**
- * Validates that owner_id is shaped correctly for the given account_type.
- * Rules come straight from spec §3.1 (account_type / owner_id table).
- */
-export function validateOwnerForType(
-  type: AccountType,
-  ownerId: string,
-): { ok: true } | { ok: false; reason: string } {
-  if (!ownerId) return { ok: false, reason: 'owner_id required' };
-
-  switch (type) {
-    case 'PLAYER':
-      // owner_id = playerId. Format is enforced by the player service.
-      return { ok: true };
-
-    case 'TREASURY':
-      // Single global treasury — owner_id MUST be the PLATFORM sentinel.
-      return ownerId === PLATFORM_OWNER
-        ? { ok: true }
-        : { ok: false, reason: `TREASURY.owner_id must be '${PLATFORM_OWNER}'` };
-
-    case 'INSURANCE':
-    case 'REINSURANCE':
-      // Either platform-wide ('PLATFORM') or per-league (leagueId).
-      return { ok: true };
-
-    case 'LEAGUE_INVENTORY':
-      // owner_id = leagueId. The PLATFORM sentinel is invalid here.
-      return ownerId === PLATFORM_OWNER
-        ? { ok: false, reason: 'LEAGUE_INVENTORY.owner_id must be a leagueId, not PLATFORM' }
-        : { ok: true };
-
-    case 'JACKPOT_MINI':
-    case 'JACKPOT_MINOR':
-    case 'JACKPOT_MAJOR':
-    case 'JACKPOT_GRAND':
-      // Per-table independent pool: owner_id = tableId.
-      return { ok: true };
-  }
-}
-
-/**
- * Wallet scope distinguishes a PLAYER's Platform Wallet from per-League Wallets.
- * Spec §3.1: "Player balance (Platform Wallet and League Wallet as separate accounts)".
+ * Core financial enums — the vocabulary of the ledger.
  *
- * For non-PLAYER account types this is conventionally PLATFORM (or the leagueId
- * for league-scoped INSURANCE/REINSURANCE/JACKPOT). Concrete usage:
- *   - PLAYER + scope=PLATFORM  → player's lobby wallet (TRC20-USDT settled)
- *   - PLAYER + scope=leagueId  → player's wallet inside that league (credit system)
+ * These are the spec's hard-isolation primitives (FairPlay §3.1–3.3). Every account is one of
+ * nine pool types; every fund movement is one of sixteen ledger types. Nothing outside these
+ * sets is allowed to exist in the system.
  */
-export type WalletScope = string;
+
+/** The nine fund-pool types. Each is an independent account with its own on-chain address. */
+export enum AccountType {
+  /** Player balance. A player may hold separate Platform-wallet and League-wallet accounts (see `scope`). */
+  PLAYER = 'PLAYER',
+  /** Platform vault: rake income / deposit aggregation / withdrawal exit. */
+  TREASURY = 'TREASURY',
+  /** Insurance pool: premium source / payout exit. Single payout ≤5% of pool, daily ≤15%. */
+  INSURANCE = 'INSURANCE',
+  /** Reinsurance backstop. Only accepts Insurance application; no direct withdrawal. */
+  REINSURANCE = 'REINSURANCE',
+  /** Per-league inventory: top-up source / league rake aggregation. */
+  LEAGUE_INVENTORY = 'LEAGUE_INVENTORY',
+  /** Per-table Mini jackpot pool (receives 20% of the 0.5% winner-profit injection). Out-only. */
+  JACKPOT_MINI = 'JACKPOT_MINI',
+  /** Per-table Minor jackpot pool (30%). Out-only. */
+  JACKPOT_MINOR = 'JACKPOT_MINOR',
+  /** Per-table Major jackpot pool (25%). Out-only. */
+  JACKPOT_MAJOR = 'JACKPOT_MAJOR',
+  /** Per-table Grand jackpot pool (25%). Out-only. Admin withdrawal PROHIBITED. */
+  JACKPOT_GRAND = 'JACKPOT_GRAND',
+  /**
+   * System boundary account representing the outside world (the chain). NOT a fund pool — it is
+   * the double-entry counterparty for on/off-ramps: deposits flow EXTERNAL→PLAYER, withdrawals
+   * PLAYER→EXTERNAL. It is allowed to go negative; −balance = total funds players hold on-platform
+   * (the on-chain reserve the platform must custody). Spec §3.9 refers to this as `external`.
+   */
+  EXTERNAL = 'EXTERNAL',
+}
+
+export const ACCOUNT_TYPES: readonly AccountType[] = Object.values(AccountType);
+
+/** Owner id of the singleton EXTERNAL boundary account. */
+export const WORLD_OWNER = 'WORLD';
+
+export const JACKPOT_ACCOUNT_TYPES: readonly AccountType[] = [
+  AccountType.JACKPOT_MINI,
+  AccountType.JACKPOT_MINOR,
+  AccountType.JACKPOT_MAJOR,
+  AccountType.JACKPOT_GRAND,
+];
+
+/** The sixteen ledger movement types (FairPlay §3.2 + M1 Remediation agent types). */
+export enum LedgerType {
+  DEPOSIT = 'DEPOSIT',
+  WITHDRAW = 'WITHDRAW',
+  RAKE = 'RAKE',
+  BET = 'BET',
+  WIN_PAYOUT = 'WIN_PAYOUT',
+  INSURANCE_PREMIUM = 'INSURANCE_PREMIUM',
+  INSURANCE_PAYOUT = 'INSURANCE_PAYOUT',
+  REINSURANCE_INJECT = 'REINSURANCE_INJECT',
+  REINSURANCE_PAYOUT = 'REINSURANCE_PAYOUT',
+  JACKPOT_INJECT = 'JACKPOT_INJECT',
+  JACKPOT_PAYOUT = 'JACKPOT_PAYOUT',
+  LEAGUE_TOPUP = 'LEAGUE_TOPUP',
+  LEAGUE_CASHOUT = 'LEAGUE_CASHOUT',
+  WITHDRAW_REFUND = 'WITHDRAW_REFUND',
+  AGENT_COMMISSION = 'AGENT_COMMISSION',
+  AGENT_VIP_BONUS = 'AGENT_VIP_BONUS',
+}
+
+export const LEDGER_TYPES: readonly LedgerType[] = Object.values(LedgerType);
+
+/** Double-entry direction. Every fund movement produces a matched DEBIT + CREDIT pair. */
+export enum LedgerDirection {
+  /** Funds leaving an account (the source side of a transfer). */
+  DEBIT = 'DEBIT',
+  /** Funds entering an account (the destination side of a transfer). */
+  CREDIT = 'CREDIT',
+}
+
+/** Lifecycle of a ledger entry. */
+export enum LedgerStatus {
+  PENDING = 'PENDING',
+  SETTLED = 'SETTLED',
+  FAILED = 'FAILED',
+  ROLLED_BACK = 'ROLLED_BACK',
+}
+
+/**
+ * Wallet scope — distinguishes a player's Platform wallet from a League wallet (both are PLAYER
+ * accounts per the spec). Platform-only for the Aug-30 MVP; the field exists now so adding leagues
+ * later needs no migration. Format: 'PLATFORM' or `league:<leagueId>`.
+ */
+export const PLATFORM_SCOPE = 'PLATFORM';

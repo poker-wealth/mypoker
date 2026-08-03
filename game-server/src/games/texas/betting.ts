@@ -1,145 +1,283 @@
 /**
- * Texas Hold'em betting math — pots, side pots, and award resolution.
+ * Texas Hold'em betting engine.
  *
- * This is the fiddly heart of poker: when players go all-in for different
- * amounts, the pot splits into a main pot + side pots, each with its own set
- * of eligible winners. Pure functions, exhaustively tested.
- *
- * All chip amounts are BigInt cents.
+ * Drives a hand through its four betting rounds (preflop → flop → turn → river → showdown):
+ * posts blinds, enforces turn order and min-raise rules, validates every action, and tracks each
+ * player's contribution (which the side-pot builder uses at settlement). Works in integer chip
+ * units; real money is handled by the Financial Core at buy-in and settlement.
  */
 
-export interface PlayerChips {
-  playerId: string;
-  /** Total chips this player put into the pot this hand (across all streets). */
-  committed: bigint;
-  /** Folded players' chips stay in the pot but they can't win it. */
-  folded: boolean;
+export type Street = 'PREFLOP' | 'FLOP' | 'TURN' | 'RIVER' | 'SHOWDOWN';
+export type SeatStatus = 'active' | 'folded' | 'allin';
+export type ActionType = 'fold' | 'check' | 'call' | 'raise';
+
+export interface Action {
+  type: ActionType;
+  /** For 'raise': the TOTAL this player wants their street contribution to be (raise-to). */
+  amount?: number;
 }
 
-export interface Pot {
-  amount: bigint;
-  /** Players eligible to win this pot (contributed to it AND not folded). */
-  eligible: string[];
+export interface SeatPublic {
+  id: string;
+  stack: number;
+  status: SeatStatus;
+  streetContributed: number;
+  totalContributed: number;
 }
 
-/**
- * Split total contributions into a main pot + side pots by all-in layers.
- *
- * Algorithm (standard layered side-pots):
- *   While anyone still has un-allocated contribution:
- *     - take the smallest remaining contribution level `L`
- *     - every still-contributing player owes `L` into this layer
- *     - layer amount = L × (number of contributors at this layer)
- *     - eligible = contributors at this layer who have NOT folded
- *     - subtract L from each contributor's remaining
- *   Adjacent layers with identical eligible sets are merged.
- *
- * Folded players' chips ARE counted in pot amounts (their money is in the
- * pot) but they are never eligible to win.
- */
-export function computePots(players: PlayerChips[]): Pot[] {
-  const contributors = players
-    .filter((p) => p.committed > 0n)
-    .map((p) => ({ playerId: p.playerId, remaining: p.committed, folded: p.folded }));
+export interface LegalActions {
+  canFold: boolean;
+  canCheck: boolean;
+  /** Chips needed to call, or null if nothing to call. */
+  callAmount: number | null;
+  /** Smallest legal raise-to, or null if a raise isn't possible. */
+  minRaiseTo: number | null;
+  /** Largest raise-to (all-in). */
+  maxRaiseTo: number | null;
+}
 
-  if (contributors.length === 0) return [];
+export interface BettingConfig {
+  smallBlind: number;
+  bigBlind: number;
+  buttonIndex?: number;
+}
 
-  const pots: Pot[] = [];
+interface Seat {
+  id: string;
+  stack: number;
+  status: SeatStatus;
+  streetContributed: number;
+  totalContributed: number;
+  hasActed: boolean;
+}
 
-  while (contributors.some((c) => c.remaining > 0n)) {
-    const active = contributors.filter((c) => c.remaining > 0n);
-    const level = active.reduce((min, c) => (c.remaining < min ? c.remaining : min), active[0]!.remaining);
+export class IllegalActionError extends Error {}
 
-    let amount = 0n;
-    for (const c of active) {
-      c.remaining -= level;
-      amount += level;
+export class TexasBetting {
+  private readonly seats: Seat[];
+  private readonly n: number;
+  private readonly button: number;
+  private readonly smallBlind: number;
+  private readonly bigBlind: number;
+
+  private _street: Street = 'PREFLOP';
+  private currentBet = 0;
+  private minRaise: number;
+  private toActIndex = -1;
+
+  constructor(players: { id: string; stack: number }[], cfg: BettingConfig) {
+    if (players.length < 2) throw new Error('need at least 2 players');
+    this.n = players.length;
+    this.button = cfg.buttonIndex ?? 0;
+    this.smallBlind = cfg.smallBlind;
+    this.bigBlind = cfg.bigBlind;
+    this.minRaise = cfg.bigBlind;
+    this.seats = players.map((p) => ({
+      id: p.id,
+      stack: p.stack,
+      status: 'active',
+      streetContributed: 0,
+      totalContributed: 0,
+      hasActed: false,
+    }));
+
+    const sb = this.n === 2 ? this.button : (this.button + 1) % this.n;
+    const bb = this.n === 2 ? (this.button + 1) % this.n : (this.button + 2) % this.n;
+    this.postBlind(sb, this.smallBlind);
+    this.postBlind(bb, this.bigBlind);
+    this.currentBet = Math.max(this.seats[sb]!.streetContributed, this.seats[bb]!.streetContributed);
+
+    // First to act preflop: heads-up = button (SB); otherwise the seat after the big blind.
+    const firstPreflop = this.n === 2 ? this.button : (this.button + 3) % this.n;
+    this.toActIndex = this.nextActionableFrom(firstPreflop);
+  }
+
+  // ── Public state ────────────────────────────────────────────────────────────
+
+  get street(): Street {
+    return this._street;
+  }
+
+  get pot(): number {
+    return this.seats.reduce((sum, s) => sum + s.totalContributed, 0);
+  }
+
+  get toAct(): string | null {
+    return this.toActIndex >= 0 ? this.seats[this.toActIndex]!.id : null;
+  }
+
+  /** True when betting is finished (showdown reached, or only one player remains). */
+  get handComplete(): boolean {
+    return this._street === 'SHOWDOWN' || this.notFolded().length === 1;
+  }
+
+  seatsPublic(): SeatPublic[] {
+    return this.seats.map((s) => ({
+      id: s.id,
+      stack: s.stack,
+      status: s.status,
+      streetContributed: s.streetContributed,
+      totalContributed: s.totalContributed,
+    }));
+  }
+
+  /** Players who have not folded (still eligible to win the pot). */
+  notFolded(): string[] {
+    return this.seats.filter((s) => s.status !== 'folded').map((s) => s.id);
+  }
+
+  /** Total each player has put in this hand — input to side-pot construction. */
+  contributions(): Map<string, number> {
+    return new Map(this.seats.map((s) => [s.id, s.totalContributed]));
+  }
+
+  /** If everyone but one has folded, that player wins without showdown. */
+  winnerByFold(): string | null {
+    const live = this.seats.filter((s) => s.status !== 'folded');
+    return live.length === 1 ? live[0]!.id : null;
+  }
+
+  legalActions(): LegalActions {
+    const seat = this.seats[this.toActIndex];
+    if (!seat) return { canFold: false, canCheck: false, callAmount: null, minRaiseTo: null, maxRaiseTo: null };
+    const toCall = this.currentBet - seat.streetContributed;
+    const maxRaiseTo = seat.streetContributed + seat.stack;
+    const canRaise = maxRaiseTo > this.currentBet;
+    return {
+      canFold: true,
+      canCheck: toCall === 0,
+      callAmount: toCall > 0 ? Math.min(toCall, seat.stack) : null,
+      minRaiseTo: canRaise ? Math.min(this.currentBet + this.minRaise, maxRaiseTo) : null,
+      maxRaiseTo: canRaise ? maxRaiseTo : null,
+    };
+  }
+
+  // ── Actions ─────────────────────────────────────────────────────────────────
+
+  act(playerId: string, action: Action): void {
+    const seat = this.seats[this.toActIndex];
+    if (!seat || seat.id !== playerId) {
+      throw new IllegalActionError(`not ${playerId}'s turn`);
     }
-    const eligible = active.filter((c) => !c.folded).map((c) => c.playerId);
+    const toCall = this.currentBet - seat.streetContributed;
 
-    // Skip a layer with no eligible winners only if it's degenerate (all
-    // contributors at this layer folded). Their chips roll into the next
-    // layer's amount by being re-counted? No — they're already counted here.
-    // If eligible is empty, fold this amount into the previous pot if any,
-    // else keep it as an uneligible pot (resolved by caller's last-man rule).
-    if (eligible.length === 0) {
-      if (pots.length > 0) {
-        pots[pots.length - 1]!.amount += amount;
-      } else {
-        pots.push({ amount, eligible: [] });
+    switch (action.type) {
+      case 'fold':
+        seat.status = 'folded';
+        seat.hasActed = true;
+        break;
+      case 'check':
+        if (toCall !== 0) throw new IllegalActionError('cannot check facing a bet');
+        seat.hasActed = true;
+        break;
+      case 'call': {
+        if (toCall <= 0) throw new IllegalActionError('nothing to call');
+        this.commit(seat, Math.min(toCall, seat.stack));
+        seat.hasActed = true;
+        break;
       }
-      continue;
+      case 'raise': {
+        this.applyRaise(seat, action.amount ?? 0);
+        break;
+      }
+      default:
+        throw new IllegalActionError('unknown action');
     }
 
-    // Merge with the previous pot if the eligible set is identical.
-    const prev = pots[pots.length - 1];
-    if (prev && sameSet(prev.eligible, eligible)) {
-      prev.amount += amount;
+    this.advance();
+  }
+
+  private applyRaise(seat: Seat, raiseTo: number): void {
+    const maxRaiseTo = seat.streetContributed + seat.stack;
+    if (raiseTo <= this.currentBet) throw new IllegalActionError('raise must exceed current bet');
+    if (raiseTo > maxRaiseTo) throw new IllegalActionError('raise exceeds stack');
+
+    const isAllIn = raiseTo === maxRaiseTo;
+    const raiseSize = raiseTo - this.currentBet;
+    if (raiseSize < this.minRaise && !isAllIn) {
+      throw new IllegalActionError(`raise must be at least ${this.minRaise}`);
+    }
+
+    this.commit(seat, raiseTo - seat.streetContributed);
+    // A full-size raise reopens the action and sets the new min-raise increment.
+    if (raiseSize >= this.minRaise) this.minRaise = raiseSize;
+    this.currentBet = raiseTo;
+    // Everyone still active who hasn't matched must act again.
+    for (const s of this.seats) {
+      if (s !== seat && s.status === 'active') s.hasActed = false;
+    }
+    seat.hasActed = true;
+  }
+
+  private commit(seat: Seat, chips: number): void {
+    const amount = Math.min(chips, seat.stack);
+    seat.stack -= amount;
+    seat.streetContributed += amount;
+    seat.totalContributed += amount;
+    if (seat.stack === 0) seat.status = 'allin';
+  }
+
+  private postBlind(index: number, amount: number): void {
+    this.commit(this.seats[index]!, amount);
+  }
+
+  // ── Turn / street advancement ────────────────────────────────────────────────
+
+  private advance(): void {
+    if (this.notFolded().length === 1) {
+      this.toActIndex = -1; // hand won by fold
+      return;
+    }
+    const next = this.nextActionableFrom((this.toActIndex + 1) % this.n);
+    if (next >= 0) {
+      this.toActIndex = next;
     } else {
-      pots.push({ amount, eligible });
+      this.endStreet();
     }
   }
 
-  return pots;
-}
-
-function sameSet(a: string[], b: string[]): boolean {
-  if (a.length !== b.length) return false;
-  const sb = new Set(b);
-  return a.every((x) => sb.has(x));
-}
-
-export interface AwardResult {
-  /** playerId → chips won (cents). Players not present won nothing. */
-  payouts: Map<string, bigint>;
-  /** Per-pot breakdown for the settlement receipt. */
-  potAwards: Array<{ amount: bigint; winners: string[]; perWinner: bigint; oddChip: bigint }>;
-}
-
-/**
- * Award each pot to the highest-ranked eligible hand. Ties split evenly; the
- * odd chip (when a pot doesn't divide evenly) goes to the first winner in the
- * provided `seatOrder` — the standard "odd chip to the earliest seat" rule.
- *
- * `strengths` maps playerId → hand rank (higher wins). Players who reached
- * showdown must have an entry; folded/ineligible players need not.
- */
-export function awardPots(
-  pots: Pot[],
-  strengths: ReadonlyMap<string, number>,
-  seatOrder: readonly string[],
-): AwardResult {
-  const payouts = new Map<string, bigint>();
-  const potAwards: AwardResult['potAwards'] = [];
-
-  for (const pot of pots) {
-    if (pot.amount === 0n) continue;
-    const ranked = pot.eligible.filter((p) => strengths.has(p));
-    if (ranked.length === 0) {
-      // No eligible ranked player (degenerate). Skip — caller handles
-      // last-man-standing before showdown so this shouldn't occur.
-      continue;
+  /** First seat from `start` (inclusive, scanning clockwise) that still needs to act, or -1. */
+  private nextActionableFrom(start: number): number {
+    for (let i = 0; i < this.n; i++) {
+      const idx = (start + i) % this.n;
+      const s = this.seats[idx]!;
+      if (s.status === 'active' && (!s.hasActed || s.streetContributed < this.currentBet)) {
+        return idx;
+      }
     }
-    const maxRank = ranked.reduce((m, p) => Math.max(m, strengths.get(p)!), -1);
-    const winners = ranked.filter((p) => strengths.get(p) === maxRank);
-    // Order winners by seatOrder for deterministic odd-chip assignment.
-    winners.sort((a, b) => seatOrder.indexOf(a) - seatOrder.indexOf(b));
-
-    const perWinner = pot.amount / BigInt(winners.length);
-    const oddChip = pot.amount - perWinner * BigInt(winners.length);
-
-    winners.forEach((w, i) => {
-      const share = perWinner + (i === 0 ? oddChip : 0n);
-      payouts.set(w, (payouts.get(w) ?? 0n) + share);
-    });
-
-    potAwards.push({ amount: pot.amount, winners, perWinner, oddChip });
+    return -1;
   }
 
-  return { payouts, potAwards };
-}
+  private canStillAct(): number {
+    return this.seats.filter((s) => s.status === 'active').length;
+  }
 
-/** Sum of all pot amounts — used to assert chip conservation. */
-export function totalPot(pots: Pot[]): bigint {
-  return pots.reduce((sum, p) => sum + p.amount, 0n);
+  private endStreet(): void {
+    if (this._street === 'RIVER') {
+      this._street = 'SHOWDOWN';
+      this.toActIndex = -1;
+      return;
+    }
+    // If fewer than 2 players can still act, the remaining streets are dealt with no betting.
+    if (this.canStillAct() < 2) {
+      this._street = 'SHOWDOWN';
+      this.toActIndex = -1;
+      return;
+    }
+    this._street = this._street === 'PREFLOP' ? 'FLOP' : this._street === 'FLOP' ? 'TURN' : 'RIVER';
+    this.startNewStreet();
+  }
+
+  private startNewStreet(): void {
+    this.currentBet = 0;
+    this.minRaise = this.bigBlind;
+    for (const s of this.seats) {
+      s.streetContributed = 0;
+      s.hasActed = false;
+    }
+    // First to act postflop: heads-up = big blind (non-button); otherwise first seat after button.
+    const firstPostflop = (this.button + 1) % this.n;
+    this.toActIndex = this.nextActionableFrom(firstPostflop);
+    if (this.toActIndex < 0) this.endStreet();
+  }
 }

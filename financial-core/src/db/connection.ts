@@ -1,46 +1,47 @@
 import mongoose from 'mongoose';
-import { loadEnv } from '../config/env.js';
-import { logger } from '../lib/logger.js';
 
-let connecting: Promise<typeof mongoose> | null = null;
+/**
+ * MongoDB connection management.
+ *
+ * The Financial Core REQUIRES a replica set — multi-document transactions (used by `transfer()`
+ * and the settlement engine) only work against an RS. A single-node RS is fine for dev.
+ */
 
-export async function connectDB(uriOverride?: string): Promise<typeof mongoose> {
-  if (mongoose.connection.readyState === 1) return mongoose;
-  if (connecting) return connecting;
-
-  const env = loadEnv();
-  const uri = uriOverride ?? env.MONGO_URI;
-
-  connecting = mongoose
-    .connect(uri, {
-      dbName: env.MONGO_DB_NAME,
-      serverSelectionTimeoutMS: 5_000,
-      socketTimeoutMS: 45_000,
-      autoIndex: env.NODE_ENV !== 'production',
-      // BSON Int64 → native BigInt. Required for accounts.balance / ledger.amount
-      // to preserve BigInt typing through .lean() reads.
-      useBigInt64: true,
-    })
-    .then((m) => {
-      logger.info({ uri: redact(uri), db: env.MONGO_DB_NAME }, 'mongoose connected');
-      return m;
-    })
-    .catch((err) => {
-      connecting = null;
-      logger.error({ err, uri: redact(uri) }, 'mongoose connection failed');
-      throw err;
-    });
-
-  return connecting;
+export interface DbConfig {
+  uri: string;
+  /** Enable TLS in production. */
+  tls?: boolean;
 }
 
-export async function disconnectDB(): Promise<void> {
-  if (mongoose.connection.readyState === 0) return;
+let connected = false;
+
+export async function connectDb(config: DbConfig): Promise<typeof mongoose> {
+  if (connected) return mongoose;
+
+  // Fail fast and loud on money-layer DB errors rather than buffering silently.
+  mongoose.set('bufferCommands', false);
+  // Strict query: ignore unknown fields in filters (prevents silent typo-filters on balances).
+  mongoose.set('strictQuery', true);
+
+  await mongoose.connect(config.uri, {
+    tls: config.tls ?? false,
+    // Surface connection problems quickly instead of hanging the service.
+    serverSelectionTimeoutMS: 5000,
+    // The whole point of the RS: enable transactions with majority concerns by default.
+    retryWrites: true,
+    writeConcern: { w: 'majority' },
+  });
+
+  connected = true;
+  return mongoose;
+}
+
+export async function disconnectDb(): Promise<void> {
+  if (!connected) return;
   await mongoose.disconnect();
-  connecting = null;
-  logger.info('mongoose disconnected');
+  connected = false;
 }
 
-function redact(uri: string): string {
-  return uri.replace(/\/\/[^@]+@/, '//***@');
+export function isConnected(): boolean {
+  return connected;
 }

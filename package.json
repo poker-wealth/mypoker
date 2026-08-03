@@ -1,0 +1,22 @@
+{
+  "name": "fairplay",
+  "private": true,
+  "version": "0.1.0",
+  "description": "FairPlay \u2014 provably-fair multi-game platform (Financial Core + Game Server)",
+  "scripts": {
+    "install:all": "npm --prefix financial-core install && npm --prefix game-server install && npm --prefix frontend install",
+    "test": "npm run test:fc && npm run test:gs",
+    "test:fc": "npm --prefix financial-core test",
+    "test:gs": "npm --prefix game-server test",
+    "verify": "npm run typecheck && npm run lint && npm test",
+    "typecheck": "npm --prefix financial-core run typecheck && npm --prefix game-server run typecheck",
+    "lint": "npm --prefix financial-core run lint && npm --prefix game-server run lint",
+    "smoke": "npm --prefix financial-core run smoke",
+    "demo": "npm --prefix game-server run all-games-demo",
+    "demo:texas": "npm --prefix game-server run texas-demo",
+    "web": "npm --prefix game-server run web",
+    "app": "npm --prefix game-server run app",
+    "dev": "npm --prefix frontend run dev",
+    "ui:build": "npm --prefix frontend run build"
+  }
+}

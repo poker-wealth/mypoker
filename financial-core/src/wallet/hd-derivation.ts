@@ -1,134 +1,69 @@
-import type { JackpotType } from '../domain/account-types.js';
+import { AccountType } from '../domain/account-types';
 
 /**
- * HD wallet derivation paths — spec §3.4 (BIP-44).
+ * HD wallet derivation paths (BIP-44, FairPlay §3.4).
  *
- * Iron rule: master private key lives in HSM. Never online. Never in code.
- * This module produces derivation PATHS only. Actual address derivation
- * (path → secp256k1 key → Tron base58check address) lives in
- * `derive-tron-address.ts` and is called by the HSM-signing service.
+ * One master key (in an HSM, never online, never in code) derives an independent on-chain address
+ * for every pool. This module only computes the PATH strings — no keys, no signing. TRON coin type
+ * is 195'. Account-level is 0' (the platform master account).
  *
- * Coin type: 195' (Tron, BIP-44 SLIP-0044 registration).
- * Account: 0' (single platform account).
- *
- * Mapping (spec §3.4 table):
- *   TREASURY (Hot)              m/44'/195'/0'/0/0
- *   TREASURY (Warm)             m/44'/195'/0'/0/1
- *   TREASURY (Cold)             m/44'/195'/0'/0/2
- *   INSURANCE (PLATFORM)        m/44'/195'/0'/1/0
- *   INSURANCE (leagueId)        m/44'/195'/0'/1/{leagueIdx}
- *   REINSURANCE (PLATFORM)      m/44'/195'/0'/2/0
- *   REINSURANCE (leagueId)      m/44'/195'/0'/2/{leagueIdx}
- *   LEAGUE_INVENTORY            m/44'/195'/0'/3/{leagueIdx}
- *   JACKPOT_*                   m/44'/195'/0'/4/{tableIdx}/{tier}
- *                                  tier: 0=MINI, 1=MINOR, 2=MAJOR, 3=GRAND
- *   PLAYER deposit              m/44'/195'/0'/5/{playerIdx}
- *
- * Indices (leagueIdx, tableIdx, playerIdx) are stable monotonic counters
- * assigned at account-creation time and persisted alongside the
- * `accounts` document. The platform-level pools (INSURANCE/REINSURANCE
- * with owner_id=PLATFORM) use leagueIdx=0 by convention; leagueIdx=1+
- * are reserved for per-league pools.
- *
- * Hardened indices use the apostrophe suffix (BIP-32 hardened derivation:
- * index ≥ 2^31). Only the first three segments are hardened per BIP-44.
+ *   TREASURY hot/warm/cold  m/44'/195'/0'/0/{0|1|2}
+ *   INSURANCE               m/44'/195'/0'/1/0
+ *   REINSURANCE             m/44'/195'/0'/2/0
+ *   LEAGUE_INVENTORY        m/44'/195'/0'/3/{leagueIndex}
+ *   JACKPOT_*               m/44'/195'/0'/4/{tableIndex}/{tierIndex}
+ *   PLAYER deposit address  m/44'/195'/0'/5/{playerIndex}
  */
 
-// BIP-44 coin type for Tron — see SLIP-0044.
-const COIN_TRON = "195'";
-const PURPOSE_BIP44 = "44'";
-const ACCOUNT_PLATFORM = "0'";
+const TRON_COIN_TYPE = "195'";
+const BASE = `m/44'/${TRON_COIN_TYPE}/0'`;
 
-// Change-level branch ids (the 4th segment of m/44'/195'/0'/X).
-const BRANCH_TREASURY = 0;
-const BRANCH_INSURANCE = 1;
-const BRANCH_REINSURANCE = 2;
-const BRANCH_LEAGUE_INVENTORY = 3;
-const BRANCH_JACKPOT = 4;
-const BRANCH_PLAYER_DEPOSIT = 5;
-
-const ROOT = `m/${PURPOSE_BIP44}/${COIN_TRON}/${ACCOUNT_PLATFORM}`;
-
-const MAX_NON_HARDENED_INDEX = 2 ** 31 - 1;
-
-function assertNonNegativeIndex(label: string, idx: number): void {
-  if (!Number.isInteger(idx) || idx < 0) {
-    throw new Error(`hd-derivation: ${label} must be a non-negative integer`);
-  }
-  if (idx > MAX_NON_HARDENED_INDEX) {
-    throw new Error(`hd-derivation: ${label} exceeds BIP-32 non-hardened max (${MAX_NON_HARDENED_INDEX})`);
-  }
+export enum TreasuryTier {
+  HOT = 0,
+  WARM = 1,
+  COLD = 2,
 }
 
-export type TreasuryTier = 'hot' | 'warm' | 'cold';
-const TREASURY_TIER_INDEX: Readonly<Record<TreasuryTier, number>> = Object.freeze({
-  hot: 0,
-  warm: 1,
-  cold: 2,
-});
+const JACKPOT_TIER_INDEX: Readonly<Record<string, number>> = {
+  [AccountType.JACKPOT_MINI]: 0,
+  [AccountType.JACKPOT_MINOR]: 1,
+  [AccountType.JACKPOT_MAJOR]: 2,
+  [AccountType.JACKPOT_GRAND]: 3,
+};
 
 export function treasuryPath(tier: TreasuryTier): string {
-  const idx = TREASURY_TIER_INDEX[tier];
-  if (idx === undefined) throw new Error(`hd-derivation: unknown treasury tier ${tier}`);
-  return `${ROOT}/${BRANCH_TREASURY}/${idx}`;
+  return `${BASE}/0/${tier}`;
 }
 
-/** INSURANCE pool path. `leagueIdx` 0 = platform-wide pool; 1+ = per-league. */
-export function insurancePath(leagueIdx: number): string {
-  assertNonNegativeIndex('leagueIdx', leagueIdx);
-  return `${ROOT}/${BRANCH_INSURANCE}/${leagueIdx}`;
+export function insurancePath(): string {
+  return `${BASE}/1/0`;
 }
 
-/** REINSURANCE pool path. `leagueIdx` 0 = platform-wide pool; 1+ = per-league. */
-export function reinsurancePath(leagueIdx: number): string {
-  assertNonNegativeIndex('leagueIdx', leagueIdx);
-  return `${ROOT}/${BRANCH_REINSURANCE}/${leagueIdx}`;
+export function reinsurancePath(): string {
+  return `${BASE}/2/0`;
 }
 
-/** LEAGUE_INVENTORY path (per-league). `leagueIdx` 1+. */
-export function leagueInventoryPath(leagueIdx: number): string {
-  assertNonNegativeIndex('leagueIdx', leagueIdx);
-  if (leagueIdx === 0) {
-    throw new Error('hd-derivation: leagueIdx=0 reserved for platform pools, not LEAGUE_INVENTORY');
+export function leagueInventoryPath(leagueIndex: number): string {
+  assertIndex(leagueIndex, 'leagueIndex');
+  return `${BASE}/3/${leagueIndex}`;
+}
+
+export function jackpotPath(jackpotType: AccountType, tableIndex: number): string {
+  const tier = JACKPOT_TIER_INDEX[jackpotType];
+  if (tier === undefined) {
+    throw new Error(`jackpotPath: ${jackpotType} is not a jackpot account type`);
   }
-  return `${ROOT}/${BRANCH_LEAGUE_INVENTORY}/${leagueIdx}`;
+  assertIndex(tableIndex, 'tableIndex');
+  return `${BASE}/4/${tableIndex}/${tier}`;
 }
 
-/** Maps a JackpotType to its tier sub-index per spec §3.4. */
-const JACKPOT_TIER_INDEX: Readonly<Record<JackpotType, number>> = Object.freeze({
-  JACKPOT_MINI: 0,
-  JACKPOT_MINOR: 1,
-  JACKPOT_MAJOR: 2,
-  JACKPOT_GRAND: 3,
-});
-
-export function jackpotPath(tableIdx: number, type: JackpotType): string {
-  assertNonNegativeIndex('tableIdx', tableIdx);
-  const tier = JACKPOT_TIER_INDEX[type];
-  return `${ROOT}/${BRANCH_JACKPOT}/${tableIdx}/${tier}`;
+export function playerDepositPath(playerIndex: number): string {
+  assertIndex(playerIndex, 'playerIndex');
+  return `${BASE}/5/${playerIndex}`;
 }
 
-/** Per-player deposit address. `playerIdx` is the player's stable HD index. */
-export function playerDepositPath(playerIdx: number): string {
-  assertNonNegativeIndex('playerIdx', playerIdx);
-  return `${ROOT}/${BRANCH_PLAYER_DEPOSIT}/${playerIdx}`;
+function assertIndex(value: number, name: string): void {
+  if (!Number.isInteger(value) || value < 0) {
+    throw new RangeError(`${name} must be a non-negative integer`);
+  }
 }
-
-/** Internal constants exposed for tests and the address-derivation service. */
-export const HD_CONSTANTS = Object.freeze({
-  PURPOSE: PURPOSE_BIP44,
-  COIN: COIN_TRON,
-  ACCOUNT: ACCOUNT_PLATFORM,
-  ROOT,
-  BRANCH: {
-    TREASURY: BRANCH_TREASURY,
-    INSURANCE: BRANCH_INSURANCE,
-    REINSURANCE: BRANCH_REINSURANCE,
-    LEAGUE_INVENTORY: BRANCH_LEAGUE_INVENTORY,
-    JACKPOT: BRANCH_JACKPOT,
-    PLAYER_DEPOSIT: BRANCH_PLAYER_DEPOSIT,
-  },
-  TREASURY_TIER_INDEX,
-  JACKPOT_TIER_INDEX,
-  MAX_NON_HARDENED_INDEX,
-});
