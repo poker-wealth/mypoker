@@ -2,6 +2,10 @@
 node_modules/
 dist/
 coverage/
+*.tsbuildinfo
+
+# Netlify CLI state (site linkage, local function cache) — machine-specific
+.netlify/
 
 # Env / secrets — NEVER commit
 .env
