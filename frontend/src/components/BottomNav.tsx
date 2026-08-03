@@ -1,14 +1,20 @@
 import { NavLink } from 'react-router-dom';
-import { Home, Gamepad2, Wallet, User } from 'lucide-react';
+import { Users, Gamepad2, Home, BarChart3, User } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { haptic } from '@/lib/telegram';
 
+/**
+ * The five product tabs, in the owner-specified order. Wallet is deliberately not
+ * here — it hangs off My Account (the deposit/withdraw entry point), matching the
+ * reference design.
+ */
 const tabs: { to: string; label: string; icon: LucideIcon }[] = [
-  { to: '/', label: 'Lobby', icon: Home },
+  { to: '/alliance', label: 'Alliance', icon: Users },
   { to: '/games', label: 'Games', icon: Gamepad2 },
-  { to: '/wallet', label: 'Wallet', icon: Wallet },
-  { to: '/profile', label: 'Profile', icon: User },
+  { to: '/', label: 'Lobby', icon: Home },
+  { to: '/data', label: 'Data', icon: BarChart3 },
+  { to: '/profile', label: 'My Account', icon: User },
 ];
 
 export function BottomNav() {
@@ -23,12 +29,17 @@ export function BottomNav() {
           to={to}
           end={to === '/'}
           onClick={() => haptic('light')}
-          className="flex flex-1 flex-col items-center gap-0.5 py-2.5"
+          className="flex min-w-0 flex-1 flex-col items-center gap-0.5 px-0.5 py-2.5"
         >
           {({ isActive }) => (
             <>
-              <Icon size={22} className={cn(isActive ? 'text-brand' : 'text-dim')} />
-              <span className={cn('text-[0.66rem] font-semibold', isActive ? 'text-brand' : 'text-dim')}>
+              <Icon size={21} className={cn(isActive ? 'text-brand' : 'text-dim')} />
+              <span
+                className={cn(
+                  'whitespace-nowrap text-[0.62rem] font-semibold',
+                  isActive ? 'text-brand' : 'text-dim',
+                )}
+              >
                 {label}
               </span>
             </>
