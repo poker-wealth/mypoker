@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/cn';
 import { haptic } from '@/lib/telegram';
@@ -10,6 +11,9 @@ interface SegmentedProps<T extends string> {
 
 /** iOS-style segmented control with an animated selection pill. */
 export function Segmented<T extends string>({ options, value, onChange }: SegmentedProps<T>) {
+  // Per-instance layoutId: a shared constant would make the pill animate between
+  // two different controls if both were ever on screen at once.
+  const pillId = useId();
   return (
     <div className="flex gap-1 rounded-(--radius-app) border border-border bg-surface p-1">
       {options.map((o) => {
@@ -28,7 +32,7 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
           >
             {active && (
               <motion.span
-                layoutId="segmented-pill"
+                layoutId={pillId}
                 className="absolute inset-0 rounded-[calc(var(--radius-app)-0.25rem)]"
                 style={{ backgroundImage: 'var(--brand-gradient)' }}
                 transition={{ type: 'spring', damping: 30, stiffness: 380 }}

@@ -1,0 +1,31 @@
+# Netlify config for the MYPOKER Mini App.
+#
+# Lives at the repo root (not in frontend/) because the auth function imports the
+# shared verification code from game-server/ — the build context has to span both
+# packages, so a base of "frontend" would cut the function off from it.
+
+[build]
+  command = "npm --prefix frontend install && npm --prefix frontend run build"
+  publish = "frontend/dist"
+  functions = "netlify/functions"
+
+# Serverless auth. MUST come before the SPA fallback below — redirect rules are
+# evaluated top-down, and the catch-all would otherwise swallow /auth/* and serve
+# index.html instead of running the function.
+[[redirects]]
+  from = "/auth/*"
+  to = "/.netlify/functions/auth-:splat"
+  status = 200
+
+# SPA fallback — every other route serves index.html (React Router handles it).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Allow embedding inside the Telegram in-app browser.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
