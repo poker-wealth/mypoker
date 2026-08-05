@@ -23,6 +23,7 @@ export class ApiError extends Error {
 
 let authToken: string | null = null;
 let onUnauthorized: (() => void) | null = null;
+let onReachabilityChange: ((reachable: boolean) => void) | null = null;
 
 export function setAuthToken(token: string | null): void {
   authToken = token;
@@ -31,6 +32,16 @@ export function setAuthToken(token: string | null): void {
 /** Registered by the session store so a 401 anywhere drops the stale session. */
 export function setUnauthorizedHandler(handler: () => void): void {
   onUnauthorized = handler;
+}
+
+/**
+ * Registered by the connection store. Called with `false` when a request cannot
+ * reach the server at all, and `true` as soon as one gets through — which is a
+ * better signal than navigator.onLine, since that only reports whether the
+ * device has an interface, not whether anything is answering on it.
+ */
+export function setReachabilityHandler(handler: (reachable: boolean) => void): void {
+  onReachabilityChange = handler;
 }
 
 interface RequestOptions {
@@ -58,8 +69,13 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     });
   } catch (cause) {
     // fetch only rejects on network/CORS failure — the server was never reached.
+    onReachabilityChange?.(false);
     throw new ApiError(0, `Cannot reach the server at ${API_URL}`, cause);
   }
+
+  // We got a response, so the server is reachable — even a 500 proves that, and
+  // the banner should come down. Only transport failures mean "no connection".
+  onReachabilityChange?.(true);
 
   const payload: unknown = await res.json().catch(() => null);
 
