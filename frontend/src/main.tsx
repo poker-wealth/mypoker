@@ -7,6 +7,7 @@ import { dismissSplash } from '@/lib/splash';
 import { watchConnection } from '@/store/connection';
 import { Toaster } from '@/components/ui/Toaster';
 import { ConnectionBanner } from '@/components/ConnectionBanner';
+import { LanguageGate } from '@/components/LanguageGate';
 import { router } from '@/router';
 // Imported for its side effect: initialises i18next before anything renders, so
 // the first paint is already in the right language.
@@ -23,10 +24,12 @@ const queryClient = new QueryClient({
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      {/* Both sit outside the router: a connection drop or an error toast has to
-          survive navigation, and neither belongs to any one screen. */}
+      {/* All three sit outside the router: a connection drop, an error toast or
+          the first-launch language choice has to survive navigation, and none of
+          them belongs to any one screen. */}
       <ConnectionBanner />
       <Toaster />
+      <LanguageGate />
       <RouterProvider router={router} />
     </QueryClientProvider>
   </StrictMode>,
