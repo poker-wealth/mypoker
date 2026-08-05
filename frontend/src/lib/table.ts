@@ -19,6 +19,16 @@ export interface Seat {
   isHero?: boolean;
   isDealer?: boolean;
   isWinner?: boolean;
+
+  // ── Live tables only (the demo engine leaves these undefined) ──
+  /** What they last did this street — the bubble over the seat ("Call", "Raise ₮120"). */
+  lastAction?: string;
+  /** False while their socket is down; they still have their seat and their clock. */
+  connected?: boolean;
+  /** They're at the table but not being dealt in. */
+  sittingOut?: boolean;
+  /** Epoch ms this seat's clock expires — set only on the seat that is to act. */
+  deadline?: number;
 }
 
 export type Street = 'preflop' | 'flop' | 'turn' | 'river';

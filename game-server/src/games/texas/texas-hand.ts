@@ -5,6 +5,7 @@ import {
   type Action,
   type BettingConfig,
   type LegalActions,
+  type SeatPublic,
   type Street,
 } from './betting';
 import { settleShowdown, type Pot } from './side-pots';
@@ -98,6 +99,11 @@ export class TexasHand {
 
   legalActions(): LegalActions {
     return this.betting.legalActions();
+  }
+
+  /** Per-seat betting detail (stack, status, chips committed) — what a live table renders. */
+  seats(): SeatPublic[] {
+    return this.betting.seatsPublic();
   }
 
   // ── Play ─────────────────────────────────────────────────────────────────────

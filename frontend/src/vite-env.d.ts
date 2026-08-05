@@ -8,6 +8,10 @@ interface ImportMetaEnv {
    * outside Telegram (no initData). Never set this in a deployed build.
    */
   readonly VITE_DEV_AUTH_BYPASS?: string;
+  /** Base URL of the live-table server, e.g. http://localhost:4200. Defaults to VITE_API_URL. */
+  readonly VITE_TABLES_URL?: string;
+  /** Override only if the game socket isn't at `${VITE_TABLES_URL}/ws`. */
+  readonly VITE_TABLES_WS_URL?: string;
 }
 
 interface ImportMeta {
