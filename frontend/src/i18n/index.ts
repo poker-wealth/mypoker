@@ -22,11 +22,15 @@ import th from './locales/th.json';
  *   1. what the player explicitly picked (persisted)
  *   2. their Telegram interface language
  *   3. the browser's language
- *   4. English
+ *   4. 中文 — the product's primary language
  *
  * Only step 1 is sticky. If the player has never chosen, the app keeps following
- * Telegram — so someone who switches Telegram to Chinese sees MYPOKER in Chinese
- * without hunting for a setting.
+ * Telegram — so someone who switches Telegram to Japanese sees MYPOKER in
+ * Japanese without hunting for a setting.
+ *
+ * Chinese being primary means it is the *floor*, not an override: it decides
+ * what a visitor we know nothing about sees, and what a missing key falls back
+ * to. A player whose Telegram is in English still gets English.
  */
 
 const STORAGE_KEY = 'fp-lang';
