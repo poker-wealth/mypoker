@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Volume2, Settings2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { useTranslation } from 'react-i18next';
 import { PokerTable } from '@/components/poker/PokerTable';
 import { ActionBar } from '@/components/poker/ActionBar';
 import { GAMES } from '@/lib/games';
@@ -9,6 +10,7 @@ import { useDemoHand } from '@/hooks/useDemoHand';
 export function Table() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { t } = useTranslation();
   const game = GAMES.find((g) => g.id === id);
   const { view, heroAct, heroToAct } = useDemoHand();
 
@@ -26,8 +28,12 @@ export function Table() {
           <ChevronLeft size={18} />
         </button>
         <div className="text-center">
-          <div className="text-sm font-bold">{game?.name ?? 'Texas Hold’em'}</div>
-          <div className="text-[0.66rem] text-dim">Hand {view.handId} · Blinds ₮10/20</div>
+          <div className="text-sm font-bold">
+            {game ? t(`gameNames.${game.id}`, { defaultValue: game.name }) : t('gameNames.texas')}
+          </div>
+          <div className="text-[0.66rem] text-dim">
+            {t('table.handLine', { hand: view.handId, blinds: '₮10/20' })}
+          </div>
         </div>
         <div className="flex gap-2">
           <button className="grid size-9 place-items-center rounded-full border border-border bg-surface text-dim active:scale-95">
@@ -65,7 +71,7 @@ export function Table() {
           <ActionBar state={view} onAction={heroAct} />
         ) : (
           <div className="py-3 text-center text-sm text-dim">
-            {view.handOver ? 'Next hand starting…' : 'Waiting for other players…'}
+            {view.handOver ? t('table.nextHand') : t('table.waiting')}
           </div>
         )}
       </div>

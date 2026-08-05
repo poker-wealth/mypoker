@@ -1,22 +1,28 @@
 import { useState } from 'react';
 import { Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { Segmented } from '@/components/ui/Segmented';
 import { GameTile } from '@/components/GameTile';
 import { GAMES, type GameCategory } from '@/lib/games';
 
 type Filter = 'all' | GameCategory;
 
-const COMING_SOON = ['Blackjack', 'Sic Bo', 'Fishing War', 'Sette e Mezzo'];
+const COMING_SOON = ['blackjack', 'sicbo', 'fishingWar', 'setteMezzo'];
 
 export function Games() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [cat, setCat] = useState<Filter>('all');
   const [q, setQ] = useState('');
 
+  const query = q.trim().toLowerCase();
   const shown = GAMES.filter((g) => {
     const inCat = cat === 'all' || g.category === cat;
-    const inQuery = g.name.toLowerCase().includes(q.trim().toLowerCase());
+    // Match the translated name as well as the English one, so searching "牛牛"
+    // works in Chinese and "niu" still works for anyone typing latin characters.
+    const localised = t(`gameNames.${g.id}`, { defaultValue: g.name }).toLowerCase();
+    const inQuery = !query || g.name.toLowerCase().includes(query) || localised.includes(query);
     return inCat && inQuery;
   });
 
@@ -28,7 +34,7 @@ export function Games() {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Search games"
+          placeholder={t('games.searchPlaceholder')}
           className="w-full bg-transparent text-sm text-text placeholder:text-dim focus:outline-none"
         />
       </div>
@@ -37,10 +43,10 @@ export function Games() {
         value={cat}
         onChange={setCat}
         options={[
-          { value: 'all', label: 'All' },
-          { value: 'poker', label: 'Poker' },
-          { value: 'fast', label: 'Fast' },
-          { value: 'cards', label: 'Cards' },
+          { value: 'all', label: t('games.filterAll') },
+          { value: 'poker', label: t('games.filterPoker') },
+          { value: 'fast', label: t('games.filterFast') },
+          { value: 'cards', label: t('games.filterCards') },
         ]}
       />
 
@@ -52,21 +58,23 @@ export function Games() {
         </div>
       ) : (
         <div className="rounded-(--radius-app) border border-border bg-surface py-10 text-center text-sm text-dim">
-          No games match “{q}”.
+          {t('games.noMatch', { query: q })}
         </div>
       )}
 
       {/* Coming soon */}
       <section className="pt-1">
-        <h2 className="mb-2.5 text-sm font-bold text-dim">Coming soon</h2>
+        <h2 className="mb-2.5 text-sm font-bold text-dim">{t('games.comingSoon')}</h2>
         <div className="grid grid-cols-2 gap-3">
-          {COMING_SOON.map((name) => (
+          {COMING_SOON.map((id) => (
             <div
-              key={name}
+              key={id}
               className="flex h-20 items-center justify-between rounded-(--radius-app) border border-dashed border-border bg-surface/50 px-4"
             >
-              <span className="text-sm font-semibold text-dim">{name}</span>
-              <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[0.6rem] font-bold text-dim">SOON</span>
+              <span className="text-sm font-semibold text-dim">{t(`gameNames.${id}`)}</span>
+              <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[0.6rem] font-bold text-dim">
+                {t('games.soonBadge')}
+              </span>
             </div>
           ))}
         </div>

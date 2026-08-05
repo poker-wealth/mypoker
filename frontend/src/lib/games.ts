@@ -2,11 +2,17 @@
  * The game catalog that drives the lobby & games grid. Each entry carries its own
  * visual identity (glyph + gradient) so tiles read as distinct products, not rows.
  * Player counts here are placeholder "live feel" numbers until the lobby socket lands.
+ *
+ * `name` is the English name and doubles as the search haystack; the displayed
+ * name comes from the `gameNames.<id>` translation key. These games have real
+ * Chinese names (斗地主, 牛牛, 德州扑克) — transliterations would read as wrong to
+ * the audience the mockup is aimed at.
  */
 export type GameCategory = 'poker' | 'fast' | 'cards';
 
 export interface GameDef {
   id: string;
+  /** English name. Display via t(`gameNames.${id}`); this is the search fallback. */
   name: string;
   category: GameCategory;
   glyph: string;

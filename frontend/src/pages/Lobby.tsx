@@ -1,11 +1,13 @@
 import { motion } from 'motion/react';
 import { ShieldCheck, Flame, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { GameTile } from '@/components/GameTile';
 import { GAMES, totalPlayers } from '@/lib/games';
 
 export function Lobby() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const hot = GAMES.filter((g) => g.hot);
   const rest = GAMES.filter((g) => !g.hot);
 
@@ -30,12 +32,12 @@ export function Lobby() {
               <span className="absolute inline-flex size-full animate-ping rounded-full bg-white/70" />
               <span className="relative inline-flex size-2 rounded-full bg-white" />
             </span>
-            Daily Jackpot
+            {t('lobby.dailyJackpot')}
           </div>
           <div className="mt-1 text-[2.6rem] font-black leading-none tracking-tight tabular-nums">
             ₮128,450
           </div>
-          <div className="mt-2 text-xs text-white/75">Grows with every hand played across MYPOKER.</div>
+          <div className="mt-2 text-xs text-white/75">{t('lobby.jackpotBlurb')}</div>
         </div>
       </div>
 
@@ -43,12 +45,12 @@ export function Lobby() {
       <div className="flex items-center justify-between rounded-(--radius-app) border border-border bg-surface px-4 py-3">
         <div className="flex items-center gap-2 text-sm">
           <ShieldCheck size={18} className="text-accent" />
-          <span className="text-dim">Provably fair · verifiable on-chain</span>
+          <span className="text-dim">{t('lobby.provablyFair')}</span>
         </div>
         <div className="flex items-center gap-1.5 text-sm font-semibold">
           <span className="size-2 rounded-full bg-success" />
           {totalPlayers().toLocaleString()}
-          <span className="text-dim">online</span>
+          <span className="text-dim">{t('common.online')}</span>
         </div>
       </div>
 
@@ -56,7 +58,7 @@ export function Lobby() {
       <section>
         <div className="mb-2.5 flex items-center gap-1.5">
           <Flame size={16} className="text-danger" />
-          <h2 className="text-sm font-bold">Hot right now</h2>
+          <h2 className="text-sm font-bold">{t('lobby.hotNow')}</h2>
         </div>
         <div className="grid grid-cols-2 gap-3">
           {hot.map((g) => (
@@ -71,9 +73,9 @@ export function Lobby() {
           onClick={() => navigate('/games')}
           className="mb-2.5 flex w-full items-center justify-between"
         >
-          <h2 className="text-sm font-bold">More games</h2>
+          <h2 className="text-sm font-bold">{t('lobby.moreGames')}</h2>
           <span className="flex items-center text-xs text-dim">
-            See all <ChevronRight size={14} />
+            {t('common.seeAll')} <ChevronRight size={14} />
           </span>
         </button>
         <div className="grid grid-cols-2 gap-3">

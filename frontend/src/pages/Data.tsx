@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Segmented } from '@/components/ui/Segmented';
 
 /**
@@ -12,45 +13,50 @@ import { Segmented } from '@/components/ui/Segmented';
 
 type Period = 'today' | '7d' | '30d' | 'all';
 
-const PERIODS: { value: Period; label: string }[] = [
-  { value: 'today', label: 'Today' },
-  { value: '7d', label: '7 days' },
-  { value: '30d', label: '30 days' },
-  { value: 'all', label: 'All' },
+const PERIODS: { value: Period; key: string }[] = [
+  { value: 'today', key: 'data.periodToday' },
+  { value: '7d', key: 'data.period7d' },
+  { value: '30d', key: 'data.period30d' },
+  { value: 'all', key: 'data.periodAll' },
 ];
 
 const OVERVIEW = [
-  { label: 'Hands', value: '1,234' },
-  { label: 'Win rate', value: '52.3%' },
-  { label: 'Net profit', value: '+₮1,234', tone: 'success' as const },
-  { label: 'VPIP', value: '23.1%' },
-  { label: 'PFR', value: '38.7%' },
-  { label: 'Largest pot', value: '₮2,356', tone: 'accent' as const },
+  { key: 'data.hands', value: '1,234' },
+  { key: 'data.winRate', value: '52.3%' },
+  { key: 'data.netProfit', value: '+₮1,234', tone: 'success' as const },
+  { key: 'data.vpip', value: '23.1%' },
+  { key: 'data.pfr', value: '38.7%' },
+  { key: 'data.largestPot', value: '₮2,356', tone: 'accent' as const },
 ];
 
 const TREND = [-180, 120, 60, 340, 280, 520, 610, 900, 1050, 1234];
 
 const DISTRIBUTION = [
-  { label: "Texas Hold'em", pct: 65, color: 'var(--brand)' },
-  { label: 'Niu Niu', pct: 20, color: 'var(--accent)' },
-  { label: 'Baccarat', pct: 10, color: 'var(--success)' },
-  { label: 'Others', pct: 5, color: 'var(--text-dim)' },
+  { key: 'gameNames.texas', pct: 65, color: 'var(--brand)' },
+  { key: 'gameNames.niuniu', pct: 20, color: 'var(--accent)' },
+  { key: 'gameNames.baccarat', pct: 10, color: 'var(--success)' },
+  { key: 'data.others', pct: 5, color: 'var(--text-dim)' },
 ];
 
 export function Data() {
+  const { t } = useTranslation();
   const [period, setPeriod] = useState<Period>('today');
 
   return (
     <div className="space-y-4">
-      <Segmented options={PERIODS} value={period} onChange={setPeriod} />
+      <Segmented
+        options={PERIODS.map((p) => ({ value: p.value, label: t(p.key) }))}
+        value={period}
+        onChange={setPeriod}
+      />
 
       {/* Overview tiles */}
       <section>
-        <h2 className="mb-2.5 text-sm font-bold">Overview</h2>
+        <h2 className="mb-2.5 text-sm font-bold">{t('data.overview')}</h2>
         <div className="grid grid-cols-3 gap-3">
           {OVERVIEW.map((s) => (
             <div
-              key={s.label}
+              key={s.key}
               className="rounded-(--radius-app) border border-border bg-surface px-2 py-3 text-center"
             >
               <div
@@ -65,7 +71,7 @@ export function Data() {
               >
                 {s.value}
               </div>
-              <div className="mt-0.5 text-[0.66rem] text-dim">{s.label}</div>
+              <div className="mt-0.5 text-[0.66rem] text-dim">{t(s.key)}</div>
             </div>
           ))}
         </div>
@@ -74,7 +80,7 @@ export function Data() {
       {/* Profit trend */}
       <section className="rounded-(--radius-app) border border-border bg-surface p-4">
         <div className="mb-3 flex items-baseline justify-between">
-          <h2 className="text-sm font-bold">Profit trend</h2>
+          <h2 className="text-sm font-bold">{t('data.profitTrend')}</h2>
           <span className="text-xs font-semibold text-success tabular-nums">+₮1,234.56</span>
         </div>
         <TrendChart values={TREND} />
@@ -82,17 +88,17 @@ export function Data() {
 
       {/* Play distribution */}
       <section className="rounded-(--radius-app) border border-border bg-surface p-4">
-        <h2 className="mb-3 text-sm font-bold">Play distribution</h2>
+        <h2 className="mb-3 text-sm font-bold">{t('data.playDistribution')}</h2>
         <div className="flex items-center gap-5">
           <DonutChart segments={DISTRIBUTION} />
           <ul className="min-w-0 flex-1 space-y-2">
             {DISTRIBUTION.map((d) => (
-              <li key={d.label} className="flex items-center gap-2 text-xs">
+              <li key={d.key} className="flex items-center gap-2 text-xs">
                 <span
                   className="size-2.5 shrink-0 rounded-full"
                   style={{ background: d.color }}
                 />
-                <span className="min-w-0 flex-1 truncate text-dim">{d.label}</span>
+                <span className="min-w-0 flex-1 truncate text-dim">{t(d.key)}</span>
                 <span className="font-semibold tabular-nums">{d.pct}%</span>
               </li>
             ))}
@@ -101,7 +107,7 @@ export function Data() {
       </section>
 
       <div className="pt-1 text-center text-[0.66rem] text-dim">
-        Sample data — awaiting the stats endpoints.
+        {t('data.pendingEndpoints')}
       </div>
     </div>
   );
@@ -153,7 +159,7 @@ function TrendChart({ values }: { values: number[] }) {
  * Donut built from a single circle per segment. The radius is 50/π so the
  * circumference is exactly 100 — dash lengths are then percentages directly.
  */
-function DonutChart({ segments }: { segments: { label: string; pct: number; color: string }[] }) {
+function DonutChart({ segments }: { segments: { key: string; pct: number; color: string }[] }) {
   const R = 50 / Math.PI;
   let offset = 25; // rotate the start to 12 o'clock
 
@@ -164,7 +170,7 @@ function DonutChart({ segments }: { segments: { label: string; pct: number; colo
         const dash = `${s.pct} ${100 - s.pct}`;
         const el = (
           <circle
-            key={s.label}
+            key={s.key}
             cx="20"
             cy="20"
             r={R}
