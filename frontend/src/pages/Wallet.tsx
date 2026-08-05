@@ -3,8 +3,12 @@ import { ArrowDownLeft, ArrowUpRight, Gift, Info, Copy } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { ListRow } from '@/components/ui/ListRow';
+import { toast } from '@/store/toast';
 
 const QUICK = ['10', '50', '100', '500'];
+
+/** Placeholder until the referral endpoint exists — Victor owns the wallet now. */
+const REFERRAL_CODE = 'MYPOKER';
 
 export function Wallet() {
   const { t } = useTranslation();
@@ -72,7 +76,17 @@ export function Wallet() {
           <div className="text-sm font-semibold">{t('wallet.inviteTitle')}</div>
           <div className="truncate text-xs text-dim">{t('wallet.inviteBlurb')}</div>
         </div>
-        <button className="flex items-center gap-1 rounded-full border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-brand">
+        <button
+          onClick={() => {
+            void navigator.clipboard
+              .writeText(REFERRAL_CODE)
+              .then(() => toast.success(t('toasts.copied')))
+              // Clipboard access is denied in some in-app webviews; say so
+              // rather than leaving the tap looking like it did nothing.
+              .catch(() => toast.error(t('toasts.copyFailed')));
+          }}
+          className="flex items-center gap-1 rounded-full border border-border bg-surface-2 px-3 py-1.5 text-xs font-semibold text-brand active:scale-95"
+        >
           <Copy size={13} /> {t('wallet.code')}
         </button>
       </div>
