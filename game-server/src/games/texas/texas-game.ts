@@ -12,7 +12,7 @@ import {
 import { TexasHand, type HandResult } from './texas-hand';
 import type { PokerVariant } from './variants';
 import { computeSettlement, toTableSettlementRequest, type RakeConfig } from './settlement';
-import type { Action } from './betting';
+import type { Action, SeatPublic, Street } from './betting';
 
 /**
  * TexasGame — a complete, networkable Texas Hold'em table on the game framework.
@@ -209,6 +209,24 @@ export class TexasGame extends BaseGame<TexasPhase, Action, TexasGameEvents> {
   /** Legal actions for the player to act (what the client may offer). */
   legalActions(): ReturnType<TexasHand['legalActions']> | null {
     return this.hand ? this.hand.legalActions() : null;
+  }
+
+  /**
+   * Per-seat betting detail for the current (or just-finished) hand — status and chips committed,
+   * which a live table needs to draw bets in front of each seat. Empty before the first hand.
+   */
+  handSeats(): SeatPublic[] {
+    return this.hand ? this.hand.seats() : [];
+  }
+
+  /** The street the current hand is on, or null before the first hand. */
+  handStreet(): Street | null {
+    return this.hand ? this.hand.street : null;
+  }
+
+  /** Which seat index (into the seated order) holds the button this hand. */
+  buttonIndex(): number {
+    return this.round?.button ?? 0;
   }
 
   /** Provably-fair round data for the current/last hand (for verification + the client). */

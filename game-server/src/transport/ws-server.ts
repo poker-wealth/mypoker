@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import type { Server as HttpServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { WebSocketServer, WebSocket } from 'ws';
 import { generateEphemeralKeyPair, deriveSessionKey } from './crypto';
@@ -35,6 +36,12 @@ export interface GameSocketServerConfig {
   /** Called when a client disconnects (cleanup rooms, etc.). */
   onClose?: (ctx: ClientContext) => void;
   handshakeTimeoutMs?: number;
+  /**
+   * Optional observer for connection lifecycle, including the handshakes that never complete.
+   * Without it, a client that fails to authenticate is indistinguishable from one that never
+   * arrived — which is exactly the case you need to tell apart when a table "won't connect".
+   */
+  onEvent?: (event: { type: 'open' | 'ready' | 'closed'; playerId?: string; reason?: string }) => void;
 }
 
 export class GameSocketServer {
@@ -48,6 +55,19 @@ export class GameSocketServer {
     await new Promise<void>((resolve) => this.wss!.once('listening', resolve));
     this.wss.on('connection', (ws) => this.handleConnection(ws));
     return (this.wss.address() as AddressInfo).port;
+  }
+
+  /**
+   * Share an existing HTTP server instead of taking a port of its own, so the REST API and the game
+   * socket live behind one origin (one URL to configure, one TLS certificate, no CORS dance).
+   */
+  attachTo(server: HttpServer, path?: string): void {
+    this.wss = new WebSocketServer({
+      server,
+      ...(path ? { path } : {}),
+      maxPayload: MAX_MESSAGE_BYTES,
+    });
+    this.wss.on('connection', (ws) => this.handleConnection(ws));
   }
 
   async close(): Promise<void> {
@@ -75,12 +95,15 @@ export class GameSocketServer {
     const sendRaw = (obj: unknown): void => {
       if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
     };
+    const report = this.config.onEvent;
     const close = (reason?: string): void => {
       notifyClose();
+      report?.({ type: 'closed', ...(session ? { playerId: session.playerId } : {}), reason: reason ?? 'closed' });
       ws.close(4000, reason ?? 'closed');
     };
 
     // Step 1: server hello (plaintext — no shared key yet).
+    report?.({ type: 'open' });
     sendRaw({ t: 'server_hello', serverPublicKey: publicKeyB64, connectionId });
 
     const handshakeTimer = setTimeout(() => {
@@ -115,6 +138,7 @@ export class GameSocketServer {
           send: (msg): void => sendRaw(session!.signOutbound(JSON.stringify(msg))),
           close,
         };
+        report?.({ type: 'ready', playerId });
         sendRaw({ t: 'ready' });
         return;
       }
@@ -157,6 +181,13 @@ export class GameSocketServer {
 
     ws.on('close', () => {
       clearTimeout(handshakeTimer);
+      if (!notifiedClose) {
+        report?.({
+          type: 'closed',
+          ...(session ? { playerId: session.playerId } : {}),
+          reason: session ? 'client_left' : 'gave_up_before_handshake',
+        });
+      }
       notifyClose();
     });
   }
