@@ -13,6 +13,7 @@ import {
   confirmWithdrawal,
 } from '../withdrawal/withdrawal-state-machine';
 import { getOrCreatePlayerAccount } from '../wallet/system-accounts';
+import { getPlayerStats, getPlayerHistory } from '../stats/player-stats';
 import { WithdrawalModel } from '../withdrawal/withdrawal.model';
 import { asyncHandler, internalAuth, dataScopeMiddleware, ApiError } from './middleware';
 import { openApiSpec } from './openapi';
@@ -45,6 +46,34 @@ export function buildRouter(): Router {
         locked: Money.fromDecimal128(acc.lockedBalance).toString(),
         clearing: Money.fromDecimal128(acc.clearingBalance).toString(),
       });
+    }),
+  );
+
+  // Derived from the ledger — see src/stats/player-stats.ts for what is and is
+  // not knowable from it. VPIP, PFR and largest-pot are deliberately absent.
+  r.get(
+    '/me/stats',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json(await getPlayerStats(req.dataScope!.playerId));
+    }),
+  );
+
+  const historyQuery = z.object({
+    limit: z.coerce.number().int().positive().max(100).optional(),
+    cursor: z.string().min(1).optional(),
+  });
+  r.get(
+    '/me/history',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { limit, cursor } = historyQuery.parse(req.query);
+      res.json(
+        await getPlayerHistory(req.dataScope!.playerId, {
+          ...(limit !== undefined ? { limit } : {}),
+          ...(cursor !== undefined ? { cursor } : {}),
+        }),
+      );
     }),
   );
 
