@@ -2,7 +2,7 @@
   "name": "@fairplay/game-server",
   "version": "0.1.0",
   "private": true,
-  "description": "FairPlay Game Server \u2014 Unified State Machine, real-time transport, provably-fair. Calls the Financial Core API for all money; never writes balances.",
+  "description": "FairPlay Game Server — Unified State Machine, real-time transport, provably-fair. Calls the Financial Core API for all money; never writes balances.",
   "license": "UNLICENSED",
   "engines": {
     "node": ">=20"
@@ -21,7 +21,8 @@
     "all-games-demo": "ts-node scripts/all-games-demo.ts",
     "web": "ts-node scripts/web-demo.ts",
     "app": "ts-node scripts/app-server.ts",
-    "gateway": "ts-node src/gateway/server.ts"
+    "gateway": "ts-node src/gateway/server.ts",
+    "start": "node dist/gateway/server.js"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
