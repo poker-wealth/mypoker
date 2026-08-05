@@ -37,15 +37,20 @@
   },
   "gameNames": {
     "texas": "德州扑克",
-    "short": "短牌",
-    "redpacket": "红包扫雷",
-    "niuniu": "牛牛",
-    "ddz": "斗地主",
     "baccarat": "百家乐",
     "blackjack": "二十一点",
     "sicbo": "骰宝",
     "fishingWar": "捕鱼大战",
-    "setteMezzo": "七点半"
+    "setteMezzo": "七点半",
+    "short-deck": "短牌",
+    "red-packet": "红包扫雷",
+    "niu-niu": "牛牛",
+    "dou-di-zhu": "斗地主",
+    "omaha": "奥马哈",
+    "san-zhang": "三张",
+    "cowboy-beauty": "牛仔与美女",
+    "lottery": "彩票",
+    "slots": "老虎机"
   },
   "alliance": {
     "joinAlliance": "加入联盟",

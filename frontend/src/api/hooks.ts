@@ -1,5 +1,6 @@
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { fetchStats, fetchHistory, type HistoryPage } from './stats';
+import { fetchLobbyGames } from './lobby';
 import { useSession } from '@/store/session';
 
 /**
@@ -13,6 +14,25 @@ import { useSession } from '@/store/session';
  * Query keys carry the playerId so switching accounts cannot show the previous
  * player's numbers from cache. On a shared device that would be a real leak.
  */
+
+/**
+ * The lobby rail. Public, so it needs no session — and unlike the player-scoped
+ * hooks it works on staging today.
+ *
+ * Retried and refetched on an interval because these are live figures: player
+ * counts and jackpots move while the screen is open. The lobby is also the first
+ * screen most players see, so it gets one retry rather than failing to the
+ * static fallback on a single flaky request.
+ */
+export function useLobbyGames() {
+  return useQuery({
+    queryKey: ['lobby', 'games'],
+    queryFn: fetchLobbyGames,
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    retry: 1,
+  });
+}
 
 export function useStats() {
   const playerId = useSession((s) => s.player?.playerId);

@@ -37,15 +37,20 @@
   },
   "gameNames": {
     "texas": "Texas Hold’em",
-    "short": "Short Deck",
-    "redpacket": "Bao Lì Xì",
-    "niuniu": "Ngưu Ngưu",
-    "ddz": "Đấu Địa Chủ",
     "baccarat": "Baccarat",
     "blackjack": "Xì Dách",
     "sicbo": "Tài Xỉu",
     "fishingWar": "Bắn Cá",
-    "setteMezzo": "Sette e Mezzo"
+    "setteMezzo": "Sette e Mezzo",
+    "short-deck": "Short Deck",
+    "red-packet": "Bao Lì Xì",
+    "niu-niu": "Ngưu Ngưu",
+    "dou-di-zhu": "Đấu Địa Chủ",
+    "omaha": "Omaha",
+    "san-zhang": "Ba Cây",
+    "cowboy-beauty": "Cao Bồi & Người Đẹp",
+    "lottery": "Xổ Số",
+    "slots": "Nổ Hũ"
   },
   "alliance": {
     "joinAlliance": "Tham gia liên minh",

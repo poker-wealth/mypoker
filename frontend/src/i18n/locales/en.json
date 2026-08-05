@@ -37,15 +37,20 @@
   },
   "gameNames": {
     "texas": "Texas Hold’em",
-    "short": "Short Deck",
-    "redpacket": "Red Packet",
-    "niuniu": "Niu Niu",
-    "ddz": "Dou Di Zhu",
     "baccarat": "Baccarat",
     "blackjack": "Blackjack",
     "sicbo": "Sic Bo",
     "fishingWar": "Fishing War",
-    "setteMezzo": "Sette e Mezzo"
+    "setteMezzo": "Sette e Mezzo",
+    "short-deck": "Short Deck",
+    "red-packet": "Red Packet",
+    "niu-niu": "Niu Niu",
+    "dou-di-zhu": "Dou Di Zhu",
+    "omaha": "Omaha",
+    "san-zhang": "San Zhang",
+    "cowboy-beauty": "Cowboy & Beauty",
+    "lottery": "Lottery",
+    "slots": "Slots"
   },
   "alliance": {
     "joinAlliance": "Join Alliance",

@@ -37,15 +37,20 @@
   },
   "gameNames": {
     "texas": "텍사스 홀덤",
-    "short": "숏덱",
-    "redpacket": "레드 패킷",
-    "niuniu": "뉴뉴",
-    "ddz": "두디주",
     "baccarat": "바카라",
     "blackjack": "블랙잭",
     "sicbo": "식보",
     "fishingWar": "피싱 워",
-    "setteMezzo": "세테 에 메조"
+    "setteMezzo": "세테 에 메조",
+    "short-deck": "숏덱",
+    "red-packet": "레드 패킷",
+    "niu-niu": "뉴뉴",
+    "dou-di-zhu": "두디주",
+    "omaha": "오마하",
+    "san-zhang": "싼장",
+    "cowboy-beauty": "카우보이 앤 뷰티",
+    "lottery": "복권",
+    "slots": "슬롯"
   },
   "alliance": {
     "joinAlliance": "얼라이언스 가입",

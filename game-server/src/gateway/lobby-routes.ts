@@ -1,6 +1,5 @@
 import { Router, type Request, type Response } from 'express';
-import { z } from 'zod';
-import { LobbyService, GAME_IDS, type GameId, type TableFilter } from '../lobby';
+import { LobbyService, parseTableFilter } from '../lobby';
 
 /**
  * Lobby reads: what games exist, which tables are running, and how big the
@@ -10,20 +9,9 @@ import { LobbyService, GAME_IDS, type GameId, type TableFilter } from '../lobby'
  * sign up needs to see it first. Nothing here is player-specific, so there is
  * nothing to leak.
  *
- * Backed by the LobbyService the tests already cover, so the numbers are the
- * server's, not a second set invented for the API.
+ * Filter parsing is shared with the serverless lobby function
+ * (src/lobby/query.ts) so the two deployments cannot validate differently.
  */
-
-const filterQuery = z.object({
-  gameId: z.enum(GAME_IDS as unknown as [GameId, ...GameId[]]).optional(),
-  minStakes: z.coerce.number().nonnegative().optional(),
-  maxStakes: z.coerce.number().nonnegative().optional(),
-  hasSeats: z.enum(['true', 'false']).optional(),
-  minJackpot: z.coerce.number().nonnegative().optional(),
-  readyOnly: z.enum(['true', 'false']).optional(),
-  fairness: z.enum(['PROVABLE', 'VENDOR_ATTESTED']).optional(),
-});
-
 export function buildLobbyRouter(lobby: LobbyService): Router {
   const r = Router();
 
@@ -34,19 +22,7 @@ export function buildLobbyRouter(lobby: LobbyService): Router {
 
   /** Running tables, filterable. Powers the Lobby tab's stake and game filters. */
   r.get('/tables', (req: Request, res: Response) => {
-    const q = filterQuery.parse(req.query);
-
-    const filter: TableFilter = {
-      ...(q.gameId !== undefined ? { gameId: q.gameId } : {}),
-      ...(q.minStakes !== undefined ? { minStakes: q.minStakes } : {}),
-      ...(q.maxStakes !== undefined ? { maxStakes: q.maxStakes } : {}),
-      ...(q.hasSeats !== undefined ? { hasSeats: q.hasSeats === 'true' } : {}),
-      ...(q.minJackpot !== undefined ? { minJackpot: q.minJackpot } : {}),
-      ...(q.readyOnly !== undefined ? { readyOnly: q.readyOnly === 'true' } : {}),
-      ...(q.fairness !== undefined ? { fairness: q.fairness } : {}),
-    };
-
-    const tables = lobby.listTables(filter);
+    const tables = lobby.listTables(parseTableFilter(req.query));
     res.json({ tables, count: tables.length });
   });
 

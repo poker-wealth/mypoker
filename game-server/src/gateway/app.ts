@@ -1,5 +1,5 @@
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
-import { ZodError } from 'zod';
+import { FilterError } from '../lobby';
 import type { GatewayConfig } from './config';
 import { buildAuthRouter } from './auth';
 import { buildLobbyRouter } from './lobby-routes';
@@ -37,8 +37,8 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
 
   // Final guard: never let a stack trace reach a client.
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-    if (err instanceof ZodError) {
-      res.status(400).json({ error: 'invalid query', details: err.issues });
+    if (err instanceof FilterError) {
+      res.status(400).json({ error: err.message });
       return;
     }
     const message = err instanceof Error ? err.message : 'internal error';

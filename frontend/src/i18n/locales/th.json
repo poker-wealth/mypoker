@@ -37,15 +37,20 @@
   },
   "gameNames": {
     "texas": "เท็กซัส โฮลเด็ม",
-    "short": "ช็อตเด็ค",
-    "redpacket": "ซองแดง",
-    "niuniu": "นิวนิว",
-    "ddz": "โต้วตี้จู่",
     "baccarat": "บาคาร่า",
     "blackjack": "แบล็คแจ็ค",
     "sicbo": "ไฮโล",
     "fishingWar": "ยิงปลา",
-    "setteMezzo": "เซตเต เอ เมซโซ"
+    "setteMezzo": "เซตเต เอ เมซโซ",
+    "short-deck": "ช็อตเด็ค",
+    "red-packet": "ซองแดง",
+    "niu-niu": "นิวนิว",
+    "dou-di-zhu": "โต้วตี้จู่",
+    "omaha": "โอมาฮา",
+    "san-zhang": "สามใบ",
+    "cowboy-beauty": "คาวบอยกับสาวงาม",
+    "lottery": "ลอตเตอรี",
+    "slots": "สล็อต"
   },
   "alliance": {
     "joinAlliance": "เข้าร่วมพันธมิตร",

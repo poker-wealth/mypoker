@@ -37,15 +37,20 @@
   },
   "gameNames": {
     "texas": "टेक्सास होल्डम",
-    "short": "शॉर्ट डेक",
-    "redpacket": "रेड पैकेट",
-    "niuniu": "नीयू नीयू",
-    "ddz": "दोऊ दी झू",
     "baccarat": "बकारा",
     "blackjack": "ब्लैकजैक",
     "sicbo": "सिक बो",
     "fishingWar": "फिशिंग वॉर",
-    "setteMezzo": "सेत्ते ए मेज़ो"
+    "setteMezzo": "सेत्ते ए मेज़ो",
+    "short-deck": "शॉर्ट डेक",
+    "red-packet": "रेड पैकेट",
+    "niu-niu": "नीयू नीयू",
+    "dou-di-zhu": "दोऊ दी झू",
+    "omaha": "ओमाहा",
+    "san-zhang": "सैन झांग",
+    "cowboy-beauty": "काउबॉय एंड ब्यूटी",
+    "lottery": "लॉटरी",
+    "slots": "स्लॉट्स"
   },
   "alliance": {
     "joinAlliance": "एलायंस से जुड़ें",
