@@ -6,7 +6,6 @@
     "data": "Data",
     "account": "My Account"
   },
-
   "common": {
     "online": "online",
     "members": "members",
@@ -17,7 +16,6 @@
     "loading": "Loading…",
     "retry": "Retry"
   },
-
   "lobby": {
     "dailyJackpot": "Daily Jackpot",
     "jackpotBlurb": "Grows with every hand played across MYPOKER.",
@@ -25,7 +23,6 @@
     "hotNow": "Hot right now",
     "moreGames": "More games"
   },
-
   "games": {
     "searchPlaceholder": "Search games",
     "filterAll": "All",
@@ -38,7 +35,6 @@
     "minBuy": "Min {{amount}}",
     "playersOnline": "{{count}} playing"
   },
-
   "gameNames": {
     "texas": "Texas Hold’em",
     "short": "Short Deck",
@@ -51,7 +47,6 @@
     "fishingWar": "Fishing War",
     "setteMezzo": "Sette e Mezzo"
   },
-
   "alliance": {
     "joinAlliance": "Join Alliance",
     "recommended": "Recommended alliances",
@@ -59,7 +54,6 @@
     "ranking": "Alliance Ranking",
     "pendingEndpoints": "Sample data — awaiting the alliance/league endpoints."
   },
-
   "data": {
     "periodToday": "Today",
     "period7d": "7 days",
@@ -77,7 +71,6 @@
     "others": "Others",
     "pendingEndpoints": "Sample data — awaiting the stats endpoints."
   },
-
   "account": {
     "guest": "Guest Player",
     "notSignedIn": "Not signed in",
@@ -101,7 +94,6 @@
     "signOut": "Sign out",
     "buildLine": "MYPOKER · staging build · v0.1"
   },
-
   "wallet": {
     "totalBalance": "Total Balance",
     "available": "Available",
@@ -117,7 +109,6 @@
     "noTransactions": "No transactions yet",
     "noTransactionsBlurb": "Your deposits & winnings appear here"
   },
-
   "table": {
     "fold": "Fold",
     "check": "Check",
@@ -132,13 +123,26 @@
     "waiting": "Waiting for other players…",
     "nextHand": "Next hand starting…"
   },
-
   "a11y": {
-    "toggleTheme": "Toggle theme"
+    "toggleTheme": "Toggle theme",
+    "dismiss": "Dismiss"
   },
-
   "language": {
     "title": "Language",
     "systemDefault": "Telegram default"
+  },
+  "states": {
+    "offline": "No connection",
+    "reconnecting": "Reconnecting…",
+    "backOnline": "Back online",
+    "error": "Something went wrong",
+    "empty": "Nothing here yet"
+  },
+  "toasts": {
+    "signedIn": "Signed in as {{name}}",
+    "signedOut": "Signed out",
+    "signInFailed": "Sign-in failed",
+    "copied": "Copied",
+    "copyFailed": "Could not copy"
   }
 }

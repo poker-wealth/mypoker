@@ -6,7 +6,6 @@
     "data": "Dữ liệu",
     "account": "Tài khoản"
   },
-
   "common": {
     "online": "trực tuyến",
     "members": "thành viên",
@@ -17,7 +16,6 @@
     "loading": "Đang tải…",
     "retry": "Thử lại"
   },
-
   "lobby": {
     "dailyJackpot": "Jackpot hằng ngày",
     "jackpotBlurb": "Tăng lên theo mỗi ván bài được chơi trên MYPOKER.",
@@ -25,7 +23,6 @@
     "hotNow": "Đang hot",
     "moreGames": "Trò chơi khác"
   },
-
   "games": {
     "searchPlaceholder": "Tìm trò chơi",
     "filterAll": "Tất cả",
@@ -38,7 +35,6 @@
     "minBuy": "Tối thiểu {{amount}}",
     "playersOnline": "{{count}} người đang chơi"
   },
-
   "gameNames": {
     "texas": "Texas Hold’em",
     "short": "Short Deck",
@@ -51,7 +47,6 @@
     "fishingWar": "Bắn Cá",
     "setteMezzo": "Sette e Mezzo"
   },
-
   "alliance": {
     "joinAlliance": "Tham gia liên minh",
     "recommended": "Liên minh đề xuất",
@@ -59,7 +54,6 @@
     "ranking": "Bảng xếp hạng liên minh",
     "pendingEndpoints": "Dữ liệu mẫu — API liên minh chưa được kết nối."
   },
-
   "data": {
     "periodToday": "Hôm nay",
     "period7d": "7 ngày",
@@ -77,7 +71,6 @@
     "others": "Khác",
     "pendingEndpoints": "Dữ liệu mẫu — API thống kê chưa được kết nối."
   },
-
   "account": {
     "guest": "Khách",
     "notSignedIn": "Chưa đăng nhập",
@@ -101,7 +94,6 @@
     "signOut": "Đăng xuất",
     "buildLine": "MYPOKER · bản thử nghiệm · v0.1"
   },
-
   "wallet": {
     "totalBalance": "Tổng số dư",
     "available": "Khả dụng",
@@ -117,7 +109,6 @@
     "noTransactions": "Chưa có giao dịch",
     "noTransactionsBlurb": "Tiền nạp và tiền thắng sẽ hiển thị tại đây"
   },
-
   "table": {
     "fold": "Bỏ bài",
     "check": "Xem bài",
@@ -132,13 +123,26 @@
     "waiting": "Đang chờ người chơi khác…",
     "nextHand": "Ván tiếp theo sắp bắt đầu…"
   },
-
   "a11y": {
-    "toggleTheme": "Đổi giao diện"
+    "toggleTheme": "Đổi giao diện",
+    "dismiss": "Đóng"
   },
-
   "language": {
     "title": "Ngôn ngữ",
     "systemDefault": "Theo Telegram"
+  },
+  "states": {
+    "offline": "Mất kết nối",
+    "reconnecting": "Đang kết nối lại…",
+    "backOnline": "Đã kết nối lại",
+    "error": "Đã xảy ra lỗi",
+    "empty": "Chưa có gì ở đây"
+  },
+  "toasts": {
+    "signedIn": "Đã đăng nhập với {{name}}",
+    "signedOut": "Đã đăng xuất",
+    "signInFailed": "Đăng nhập thất bại",
+    "copied": "Đã sao chép",
+    "copyFailed": "Không thể sao chép"
   }
 }

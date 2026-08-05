@@ -6,7 +6,6 @@
     "data": "ข้อมูล",
     "account": "บัญชี"
   },
-
   "common": {
     "online": "ออนไลน์",
     "members": "สมาชิก",
@@ -17,7 +16,6 @@
     "loading": "กำลังโหลด…",
     "retry": "ลองอีกครั้ง"
   },
-
   "lobby": {
     "dailyJackpot": "แจ็กพอตประจำวัน",
     "jackpotBlurb": "เพิ่มขึ้นทุกตาที่มีการเล่นบน MYPOKER",
@@ -25,7 +23,6 @@
     "hotNow": "กำลังมาแรง",
     "moreGames": "เกมเพิ่มเติม"
   },
-
   "games": {
     "searchPlaceholder": "ค้นหาเกม",
     "filterAll": "ทั้งหมด",
@@ -38,7 +35,6 @@
     "minBuy": "ขั้นต่ำ {{amount}}",
     "playersOnline": "{{count}} คนกำลังเล่น"
   },
-
   "gameNames": {
     "texas": "เท็กซัส โฮลเด็ม",
     "short": "ช็อตเด็ค",
@@ -51,7 +47,6 @@
     "fishingWar": "ยิงปลา",
     "setteMezzo": "เซตเต เอ เมซโซ"
   },
-
   "alliance": {
     "joinAlliance": "เข้าร่วมพันธมิตร",
     "recommended": "พันธมิตรแนะนำ",
@@ -59,7 +54,6 @@
     "ranking": "อันดับพันธมิตร",
     "pendingEndpoints": "ข้อมูลตัวอย่าง — ยังไม่ได้เชื่อมต่อ API พันธมิตร"
   },
-
   "data": {
     "periodToday": "วันนี้",
     "period7d": "7 วัน",
@@ -77,7 +71,6 @@
     "others": "อื่น ๆ",
     "pendingEndpoints": "ข้อมูลตัวอย่าง — ยังไม่ได้เชื่อมต่อ API สถิติ"
   },
-
   "account": {
     "guest": "ผู้เยี่ยมชม",
     "notSignedIn": "ยังไม่ได้เข้าสู่ระบบ",
@@ -101,7 +94,6 @@
     "signOut": "ออกจากระบบ",
     "buildLine": "MYPOKER · เวอร์ชันทดสอบ · v0.1"
   },
-
   "wallet": {
     "totalBalance": "ยอดเงินรวม",
     "available": "ใช้ได้",
@@ -117,7 +109,6 @@
     "noTransactions": "ยังไม่มีรายการ",
     "noTransactionsBlurb": "ยอดฝากและเงินรางวัลจะแสดงที่นี่"
   },
-
   "table": {
     "fold": "หมอบ",
     "check": "เช็ค",
@@ -132,13 +123,26 @@
     "waiting": "กำลังรอผู้เล่นคนอื่น…",
     "nextHand": "ตาถัดไปกำลังจะเริ่ม…"
   },
-
   "a11y": {
-    "toggleTheme": "สลับธีม"
+    "toggleTheme": "สลับธีม",
+    "dismiss": "ปิด"
   },
-
   "language": {
     "title": "ภาษา",
     "systemDefault": "ตาม Telegram"
+  },
+  "states": {
+    "offline": "ไม่มีการเชื่อมต่อ",
+    "reconnecting": "กำลังเชื่อมต่อใหม่…",
+    "backOnline": "กลับมาออนไลน์แล้ว",
+    "error": "เกิดข้อผิดพลาด",
+    "empty": "ยังไม่มีข้อมูล"
+  },
+  "toasts": {
+    "signedIn": "เข้าสู่ระบบในชื่อ {{name}}",
+    "signedOut": "ออกจากระบบแล้ว",
+    "signInFailed": "เข้าสู่ระบบไม่สำเร็จ",
+    "copied": "คัดลอกแล้ว",
+    "copyFailed": "คัดลอกไม่สำเร็จ"
   }
 }

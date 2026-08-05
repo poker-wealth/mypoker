@@ -6,7 +6,6 @@
     "data": "डेटा",
     "account": "खाता"
   },
-
   "common": {
     "online": "ऑनलाइन",
     "members": "सदस्य",
@@ -17,7 +16,6 @@
     "loading": "लोड हो रहा है…",
     "retry": "पुनः प्रयास करें"
   },
-
   "lobby": {
     "dailyJackpot": "डेली जैकपॉट",
     "jackpotBlurb": "MYPOKER पर खेले गए हर हाथ के साथ बढ़ता है।",
@@ -25,7 +23,6 @@
     "hotNow": "अभी लोकप्रिय",
     "moreGames": "और गेम्स"
   },
-
   "games": {
     "searchPlaceholder": "गेम खोजें",
     "filterAll": "सभी",
@@ -38,7 +35,6 @@
     "minBuy": "न्यूनतम {{amount}}",
     "playersOnline": "{{count}} खेल रहे हैं"
   },
-
   "gameNames": {
     "texas": "टेक्सास होल्डम",
     "short": "शॉर्ट डेक",
@@ -51,7 +47,6 @@
     "fishingWar": "फिशिंग वॉर",
     "setteMezzo": "सेत्ते ए मेज़ो"
   },
-
   "alliance": {
     "joinAlliance": "एलायंस से जुड़ें",
     "recommended": "अनुशंसित एलायंस",
@@ -59,7 +54,6 @@
     "ranking": "एलायंस रैंकिंग",
     "pendingEndpoints": "नमूना डेटा — एलायंस एपीआई अभी जुड़ा नहीं है।"
   },
-
   "data": {
     "periodToday": "आज",
     "period7d": "7 दिन",
@@ -77,7 +71,6 @@
     "others": "अन्य",
     "pendingEndpoints": "नमूना डेटा — आँकड़े एपीआई अभी जुड़ा नहीं है।"
   },
-
   "account": {
     "guest": "अतिथि",
     "notSignedIn": "साइन इन नहीं किया",
@@ -101,7 +94,6 @@
     "signOut": "साइन आउट",
     "buildLine": "MYPOKER · स्टेजिंग बिल्ड · v0.1"
   },
-
   "wallet": {
     "totalBalance": "कुल बैलेंस",
     "available": "उपलब्ध",
@@ -117,7 +109,6 @@
     "noTransactions": "अभी कोई लेनदेन नहीं",
     "noTransactionsBlurb": "आपकी जमा राशि और जीत यहाँ दिखेगी"
   },
-
   "table": {
     "fold": "फ़ोल्ड",
     "check": "चेक",
@@ -132,13 +123,26 @@
     "waiting": "अन्य खिलाड़ियों की प्रतीक्षा…",
     "nextHand": "अगला हाथ शुरू हो रहा है…"
   },
-
   "a11y": {
-    "toggleTheme": "थीम बदलें"
+    "toggleTheme": "थीम बदलें",
+    "dismiss": "बंद करें"
   },
-
   "language": {
     "title": "भाषा",
     "systemDefault": "Telegram के अनुसार"
+  },
+  "states": {
+    "offline": "कोई कनेक्शन नहीं",
+    "reconnecting": "पुनः कनेक्ट हो रहा है…",
+    "backOnline": "फिर से ऑनलाइन",
+    "error": "कुछ गलत हो गया",
+    "empty": "अभी यहाँ कुछ नहीं है"
+  },
+  "toasts": {
+    "signedIn": "{{name}} के रूप में साइन इन",
+    "signedOut": "साइन आउट हो गए",
+    "signInFailed": "साइन इन विफल",
+    "copied": "कॉपी हो गया",
+    "copyFailed": "कॉपी नहीं हो सका"
   }
 }

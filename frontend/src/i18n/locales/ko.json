@@ -6,7 +6,6 @@
     "data": "데이터",
     "account": "내 정보"
   },
-
   "common": {
     "online": "접속 중",
     "members": "멤버",
@@ -17,7 +16,6 @@
     "loading": "불러오는 중…",
     "retry": "다시 시도"
   },
-
   "lobby": {
     "dailyJackpot": "데일리 잭팟",
     "jackpotBlurb": "MYPOKER에서 진행되는 모든 핸드마다 잭팟이 쌓입니다.",
@@ -25,7 +23,6 @@
     "hotNow": "인기 게임",
     "moreGames": "더 많은 게임"
   },
-
   "games": {
     "searchPlaceholder": "게임 검색",
     "filterAll": "전체",
@@ -38,7 +35,6 @@
     "minBuy": "최소 {{amount}}",
     "playersOnline": "{{count}}명 플레이 중"
   },
-
   "gameNames": {
     "texas": "텍사스 홀덤",
     "short": "숏덱",
@@ -51,7 +47,6 @@
     "fishingWar": "피싱 워",
     "setteMezzo": "세테 에 메조"
   },
-
   "alliance": {
     "joinAlliance": "얼라이언스 가입",
     "recommended": "추천 얼라이언스",
@@ -59,7 +54,6 @@
     "ranking": "얼라이언스 랭킹",
     "pendingEndpoints": "샘플 데이터 — 얼라이언스 API가 아직 연결되지 않았습니다."
   },
-
   "data": {
     "periodToday": "오늘",
     "period7d": "7일",
@@ -77,7 +71,6 @@
     "others": "기타",
     "pendingEndpoints": "샘플 데이터 — 통계 API가 아직 연결되지 않았습니다."
   },
-
   "account": {
     "guest": "게스트",
     "notSignedIn": "로그인되지 않음",
@@ -101,7 +94,6 @@
     "signOut": "로그아웃",
     "buildLine": "MYPOKER · 스테이징 빌드 · v0.1"
   },
-
   "wallet": {
     "totalBalance": "총 잔액",
     "available": "사용 가능",
@@ -117,7 +109,6 @@
     "noTransactions": "거래 내역이 없습니다",
     "noTransactionsBlurb": "입금과 수익이 여기에 표시됩니다"
   },
-
   "table": {
     "fold": "폴드",
     "check": "체크",
@@ -132,13 +123,26 @@
     "waiting": "다른 플레이어를 기다리는 중…",
     "nextHand": "곧 다음 핸드가 시작됩니다…"
   },
-
   "a11y": {
-    "toggleTheme": "테마 전환"
+    "toggleTheme": "테마 전환",
+    "dismiss": "닫기"
   },
-
   "language": {
     "title": "언어",
     "systemDefault": "Telegram 설정 따르기"
+  },
+  "states": {
+    "offline": "연결 없음",
+    "reconnecting": "다시 연결 중…",
+    "backOnline": "다시 연결됨",
+    "error": "문제가 발생했습니다",
+    "empty": "아직 아무것도 없습니다"
+  },
+  "toasts": {
+    "signedIn": "{{name}}(으)로 로그인했습니다",
+    "signedOut": "로그아웃되었습니다",
+    "signInFailed": "로그인 실패",
+    "copied": "복사되었습니다",
+    "copyFailed": "복사하지 못했습니다"
   }
 }

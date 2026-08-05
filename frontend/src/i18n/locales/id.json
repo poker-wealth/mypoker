@@ -6,7 +6,6 @@
     "data": "Data",
     "account": "Akun"
   },
-
   "common": {
     "online": "online",
     "members": "anggota",
@@ -17,7 +16,6 @@
     "loading": "Memuat…",
     "retry": "Coba lagi"
   },
-
   "lobby": {
     "dailyJackpot": "Jackpot Harian",
     "jackpotBlurb": "Bertambah setiap kali satu ronde dimainkan di MYPOKER.",
@@ -25,7 +23,6 @@
     "hotNow": "Sedang populer",
     "moreGames": "Game lainnya"
   },
-
   "games": {
     "searchPlaceholder": "Cari game",
     "filterAll": "Semua",
@@ -38,7 +35,6 @@
     "minBuy": "Min {{amount}}",
     "playersOnline": "{{count}} sedang bermain"
   },
-
   "gameNames": {
     "texas": "Texas Hold’em",
     "short": "Short Deck",
@@ -51,7 +47,6 @@
     "fishingWar": "Fishing War",
     "setteMezzo": "Sette e Mezzo"
   },
-
   "alliance": {
     "joinAlliance": "Gabung Aliansi",
     "recommended": "Aliansi yang disarankan",
@@ -59,7 +54,6 @@
     "ranking": "Peringkat Aliansi",
     "pendingEndpoints": "Data contoh — API aliansi belum terhubung."
   },
-
   "data": {
     "periodToday": "Hari ini",
     "period7d": "7 hari",
@@ -77,7 +71,6 @@
     "others": "Lainnya",
     "pendingEndpoints": "Data contoh — API statistik belum terhubung."
   },
-
   "account": {
     "guest": "Tamu",
     "notSignedIn": "Belum masuk",
@@ -101,7 +94,6 @@
     "signOut": "Keluar",
     "buildLine": "MYPOKER · versi staging · v0.1"
   },
-
   "wallet": {
     "totalBalance": "Total Saldo",
     "available": "Tersedia",
@@ -117,7 +109,6 @@
     "noTransactions": "Belum ada transaksi",
     "noTransactionsBlurb": "Setoran dan kemenangan Anda akan muncul di sini"
   },
-
   "table": {
     "fold": "Lipat",
     "check": "Cek",
@@ -132,13 +123,26 @@
     "waiting": "Menunggu pemain lain…",
     "nextHand": "Ronde berikutnya segera dimulai…"
   },
-
   "a11y": {
-    "toggleTheme": "Ganti tema"
+    "toggleTheme": "Ganti tema",
+    "dismiss": "Tutup"
   },
-
   "language": {
     "title": "Bahasa",
     "systemDefault": "Ikuti Telegram"
+  },
+  "states": {
+    "offline": "Tidak ada koneksi",
+    "reconnecting": "Menyambungkan ulang…",
+    "backOnline": "Kembali online",
+    "error": "Terjadi kesalahan",
+    "empty": "Belum ada apa-apa"
+  },
+  "toasts": {
+    "signedIn": "Masuk sebagai {{name}}",
+    "signedOut": "Berhasil keluar",
+    "signInFailed": "Gagal masuk",
+    "copied": "Tersalin",
+    "copyFailed": "Gagal menyalin"
   }
 }

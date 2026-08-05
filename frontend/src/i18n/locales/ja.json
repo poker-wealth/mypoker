@@ -6,7 +6,6 @@
     "data": "データ",
     "account": "マイページ"
   },
-
   "common": {
     "online": "オンライン",
     "members": "メンバー",
@@ -17,7 +16,6 @@
     "loading": "読み込み中…",
     "retry": "再試行"
   },
-
   "lobby": {
     "dailyJackpot": "デイリージャックポット",
     "jackpotBlurb": "MYPOKER でプレイされるすべてのハンドで増えていきます。",
@@ -25,7 +23,6 @@
     "hotNow": "人気のゲーム",
     "moreGames": "その他のゲーム"
   },
-
   "games": {
     "searchPlaceholder": "ゲームを検索",
     "filterAll": "すべて",
@@ -38,7 +35,6 @@
     "minBuy": "最低 {{amount}}",
     "playersOnline": "{{count}} 人がプレイ中"
   },
-
   "gameNames": {
     "texas": "テキサスホールデム",
     "short": "ショートデッキ",
@@ -51,7 +47,6 @@
     "fishingWar": "フィッシングウォー",
     "setteMezzo": "セッテ・エ・メッツォ"
   },
-
   "alliance": {
     "joinAlliance": "同盟に参加",
     "recommended": "おすすめの同盟",
@@ -59,7 +54,6 @@
     "ranking": "同盟ランキング",
     "pendingEndpoints": "サンプルデータ — 同盟 API は未接続です。"
   },
-
   "data": {
     "periodToday": "今日",
     "period7d": "7日間",
@@ -77,7 +71,6 @@
     "others": "その他",
     "pendingEndpoints": "サンプルデータ — 統計 API は未接続です。"
   },
-
   "account": {
     "guest": "ゲスト",
     "notSignedIn": "未ログイン",
@@ -101,7 +94,6 @@
     "signOut": "ログアウト",
     "buildLine": "MYPOKER · ステージング版 · v0.1"
   },
-
   "wallet": {
     "totalBalance": "総残高",
     "available": "利用可能",
@@ -117,7 +109,6 @@
     "noTransactions": "取引履歴はありません",
     "noTransactionsBlurb": "入金と勝利金がここに表示されます"
   },
-
   "table": {
     "fold": "フォールド",
     "check": "チェック",
@@ -132,13 +123,26 @@
     "waiting": "他のプレイヤーを待っています…",
     "nextHand": "次のハンドがまもなく開始します…"
   },
-
   "a11y": {
-    "toggleTheme": "テーマを切り替え"
+    "toggleTheme": "テーマを切り替え",
+    "dismiss": "閉じる"
   },
-
   "language": {
     "title": "言語",
     "systemDefault": "Telegram に合わせる"
+  },
+  "states": {
+    "offline": "接続がありません",
+    "reconnecting": "再接続中…",
+    "backOnline": "オンラインに復帰",
+    "error": "問題が発生しました",
+    "empty": "まだ何もありません"
+  },
+  "toasts": {
+    "signedIn": "{{name}} としてログインしました",
+    "signedOut": "ログアウトしました",
+    "signInFailed": "ログインに失敗しました",
+    "copied": "コピーしました",
+    "copyFailed": "コピーできませんでした"
   }
 }

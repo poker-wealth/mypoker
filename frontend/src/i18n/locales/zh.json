@@ -6,7 +6,6 @@
     "data": "数据",
     "account": "我的"
   },
-
   "common": {
     "online": "在线",
     "members": "成员",
@@ -17,7 +16,6 @@
     "loading": "加载中…",
     "retry": "重试"
   },
-
   "lobby": {
     "dailyJackpot": "每日彩池",
     "jackpotBlurb": "MYPOKER 每一手牌都会让彩池增长。",
@@ -25,7 +23,6 @@
     "hotNow": "热门推荐",
     "moreGames": "更多游戏"
   },
-
   "games": {
     "searchPlaceholder": "搜索游戏",
     "filterAll": "全部",
@@ -38,7 +35,6 @@
     "minBuy": "最低 {{amount}}",
     "playersOnline": "{{count}} 人在玩"
   },
-
   "gameNames": {
     "texas": "德州扑克",
     "short": "短牌",
@@ -51,7 +47,6 @@
     "fishingWar": "捕鱼大战",
     "setteMezzo": "七点半"
   },
-
   "alliance": {
     "joinAlliance": "加入联盟",
     "recommended": "推荐联盟",
@@ -59,7 +54,6 @@
     "ranking": "联盟排行",
     "pendingEndpoints": "示例数据 — 联盟接口尚未接入。"
   },
-
   "data": {
     "periodToday": "今日",
     "period7d": "7 天",
@@ -77,7 +71,6 @@
     "others": "其他",
     "pendingEndpoints": "示例数据 — 统计接口尚未接入。"
   },
-
   "account": {
     "guest": "游客",
     "notSignedIn": "未登录",
@@ -101,7 +94,6 @@
     "signOut": "退出登录",
     "buildLine": "MYPOKER · 测试版本 · v0.1"
   },
-
   "wallet": {
     "totalBalance": "总余额",
     "available": "可用",
@@ -117,7 +109,6 @@
     "noTransactions": "暂无交易记录",
     "noTransactionsBlurb": "您的存款和盈利将显示在这里"
   },
-
   "table": {
     "fold": "弃牌",
     "check": "过牌",
@@ -132,13 +123,26 @@
     "waiting": "等待其他玩家…",
     "nextHand": "下一手即将开始…"
   },
-
   "a11y": {
-    "toggleTheme": "切换主题"
+    "toggleTheme": "切换主题",
+    "dismiss": "关闭"
   },
-
   "language": {
     "title": "语言",
     "systemDefault": "跟随 Telegram"
+  },
+  "states": {
+    "offline": "网络已断开",
+    "reconnecting": "正在重新连接…",
+    "backOnline": "已恢复连接",
+    "error": "出错了",
+    "empty": "暂无内容"
+  },
+  "toasts": {
+    "signedIn": "已登录：{{name}}",
+    "signedOut": "已退出登录",
+    "signInFailed": "登录失败",
+    "copied": "已复制",
+    "copyFailed": "复制失败"
   }
 }
