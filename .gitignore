@@ -12,6 +12,9 @@ coverage/
 .env.local
 **/.env
 !**/.env.example
+.deploy-token
+*.pem
+*.key
 
 # Extracted spec text (regenerate with extract_docx.py; source .docx are tracked)
 docs_extracted/
