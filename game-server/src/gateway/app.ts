@@ -1,6 +1,10 @@
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
+import { ZodError } from 'zod';
 import type { GatewayConfig } from './config';
 import { buildAuthRouter } from './auth';
+import { buildLobbyRouter } from './lobby-routes';
+import { buildMeRouter } from './me-routes';
+import type { LobbyService } from '../lobby';
 
 /**
  * The gateway HTTP app — the only backend surface the Mini App talks to.
@@ -10,7 +14,7 @@ import { buildAuthRouter } from './auth';
  * client-facing API: authenticated, and delegating every money operation to the
  * Financial Core.
  */
-export function createGatewayApp(config: GatewayConfig): Express {
+export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): Express {
   const app = express();
 
   app.disable('x-powered-by');
@@ -22,6 +26,10 @@ export function createGatewayApp(config: GatewayConfig): Express {
   });
 
   app.use('/auth', buildAuthRouter(config));
+  app.use('/me', buildMeRouter(config));
+  // Optional so auth-only deployments (and the auth tests) don't have to stand
+  // up a lobby they never read.
+  if (lobby) app.use('/lobby', buildLobbyRouter(lobby));
 
   app.use((_req: Request, res: Response) => {
     res.status(404).json({ error: 'not found' });
@@ -29,6 +37,10 @@ export function createGatewayApp(config: GatewayConfig): Express {
 
   // Final guard: never let a stack trace reach a client.
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    if (err instanceof ZodError) {
+      res.status(400).json({ error: 'invalid query', details: err.issues });
+      return;
+    }
     const message = err instanceof Error ? err.message : 'internal error';
     console.error('[gateway] unhandled error:', message);
     res.status(500).json({ error: 'internal error' });
