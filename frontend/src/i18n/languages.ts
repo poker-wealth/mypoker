@@ -32,14 +32,11 @@ export const LANGUAGES: Language[] = [
 ];
 
 /**
- * The product's primary language.
+ * The product's language.
  *
- * Used when nothing else is known — no saved choice, and neither Telegram nor
- * the browser declares a language we ship. It is also i18next's fallback, so a
- * key missing from any locale renders in Chinese rather than English.
- *
- * Note this does NOT override detection: a player whose Telegram is in English
- * still gets English. It decides only what an unknown visitor sees.
+ * Every player opens in 中文 unless they have picked something else themselves —
+ * Telegram's and the browser's language are not consulted. Also i18next's
+ * fallback, so a key missing from any locale renders in Chinese.
  */
 export const DEFAULT_LANGUAGE = 'zh';
 
@@ -50,6 +47,10 @@ export const DEFAULT_LANGUAGE = 'zh';
  * longest declared alias first, then fall back to the primary subtag. Returns
  * null rather than a default so callers can tell "no preference expressed" apart
  * from "explicitly wants English".
+ *
+ * NOT currently called: the client wants every player to open in 中文 regardless
+ * of their Telegram language. Kept because it is the piece you wire back into
+ * `detectLanguage()` to restore auto-detection, and it is covered by tests.
  */
 export function resolveLanguage(tag: string | null | undefined): string | null {
   if (!tag) return null;

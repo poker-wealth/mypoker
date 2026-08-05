@@ -1,7 +1,6 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import { telegramLanguageCode } from '@/lib/telegram';
-import { LANGUAGES, DEFAULT_LANGUAGE, resolveLanguage } from './languages';
+import { LANGUAGES, DEFAULT_LANGUAGE } from './languages';
 import en from './locales/en.json';
 import zh from './locales/zh.json';
 import ja from './locales/ja.json';
@@ -18,19 +17,22 @@ import th from './locales/th.json';
  * they're a few KB, and a Mini App opening on a phone shouldn't wait on a second
  * network round-trip to render its first screen in the right language.
  *
- * Language is chosen in this order:
+ * MYPOKER is a Chinese-language product with translations, so **everyone opens
+ * in 中文** — including a player whose Telegram is set to English or Japanese.
+ * The only thing that changes it is the player picking a language themselves,
+ * which is then remembered.
+ *
  *   1. what the player explicitly picked (persisted)
- *   2. their Telegram interface language
- *   3. the browser's language
- *   4. 中文 — the product's primary language
+ *   2. 中文
  *
- * Only step 1 is sticky. If the player has never chosen, the app keeps following
- * Telegram — so someone who switches Telegram to Japanese sees MYPOKER in
- * Japanese without hunting for a setting.
+ * Telegram and browser language are deliberately NOT consulted. That is the
+ * client's decision, not an oversight — `resolveLanguage()` and
+ * `telegramLanguageCode()` still exist and are what you would wire back in to
+ * restore auto-detection.
  *
- * Chinese being primary means it is the *floor*, not an override: it decides
- * what a visitor we know nothing about sees, and what a missing key falls back
- * to. A player whose Telegram is in English still gets English.
+ * Because a player can land on a screen they cannot read, the picker in My
+ * Account labels every option in its own language, and sits at a fixed position
+ * in the menu so it can be found by shape rather than by reading.
  */
 
 const STORAGE_KEY = 'fp-lang';
@@ -41,12 +43,7 @@ export function storedLanguage(): string | null {
 }
 
 function detectLanguage(): string {
-  return (
-    storedLanguage() ??
-    resolveLanguage(telegramLanguageCode()) ??
-    resolveLanguage(navigator.language) ??
-    DEFAULT_LANGUAGE
-  );
+  return storedLanguage() ?? DEFAULT_LANGUAGE;
 }
 
 /** Change language and remember the choice. */
@@ -56,12 +53,11 @@ export function setLanguage(code: string): void {
   document.documentElement.lang = code;
 }
 
-/** Forget the explicit choice and follow Telegram again. */
-export function clearLanguagePreference(): void {
+/** Drop the saved choice and go back to 中文. */
+export function resetLanguage(): void {
   localStorage.removeItem(STORAGE_KEY);
-  const code = detectLanguage();
-  void i18n.changeLanguage(code);
-  document.documentElement.lang = code;
+  void i18n.changeLanguage(DEFAULT_LANGUAGE);
+  document.documentElement.lang = DEFAULT_LANGUAGE;
 }
 
 const initial = detectLanguage();
