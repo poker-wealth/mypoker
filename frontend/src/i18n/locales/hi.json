@@ -1,0 +1,144 @@
+{
+  "nav": {
+    "alliance": "एलायंस",
+    "games": "गेम्स",
+    "lobby": "लॉबी",
+    "data": "डेटा",
+    "account": "खाता"
+  },
+
+  "common": {
+    "online": "ऑनलाइन",
+    "members": "सदस्य",
+    "join": "जुड़ें",
+    "viewAll": "सभी देखें",
+    "seeAll": "सभी देखें",
+    "sampleData": "नमूना डेटा",
+    "loading": "लोड हो रहा है…",
+    "retry": "पुनः प्रयास करें"
+  },
+
+  "lobby": {
+    "dailyJackpot": "डेली जैकपॉट",
+    "jackpotBlurb": "MYPOKER पर खेले गए हर हाथ के साथ बढ़ता है।",
+    "provablyFair": "प्रमाणित निष्पक्ष · ऑन-चेन सत्यापन योग्य",
+    "hotNow": "अभी लोकप्रिय",
+    "moreGames": "और गेम्स"
+  },
+
+  "games": {
+    "searchPlaceholder": "गेम खोजें",
+    "filterAll": "सभी",
+    "filterPoker": "पोकर",
+    "filterFast": "फ़ास्ट",
+    "filterCards": "कार्ड",
+    "noMatch": "“{{query}}” से मेल खाता कोई गेम नहीं मिला।",
+    "comingSoon": "जल्द आ रहा है",
+    "soonBadge": "जल्द",
+    "minBuy": "न्यूनतम {{amount}}",
+    "playersOnline": "{{count}} खेल रहे हैं"
+  },
+
+  "gameNames": {
+    "texas": "टेक्सास होल्डम",
+    "short": "शॉर्ट डेक",
+    "redpacket": "रेड पैकेट",
+    "niuniu": "नीयू नीयू",
+    "ddz": "दोऊ दी झू",
+    "baccarat": "बकारा",
+    "blackjack": "ब्लैकजैक",
+    "sicbo": "सिक बो",
+    "fishingWar": "फिशिंग वॉर",
+    "setteMezzo": "सेत्ते ए मेज़ो"
+  },
+
+  "alliance": {
+    "joinAlliance": "एलायंस से जुड़ें",
+    "recommended": "अनुशंसित एलायंस",
+    "create": "एलायंस बनाएँ",
+    "ranking": "एलायंस रैंकिंग",
+    "pendingEndpoints": "नमूना डेटा — एलायंस एपीआई अभी जुड़ा नहीं है।"
+  },
+
+  "data": {
+    "periodToday": "आज",
+    "period7d": "7 दिन",
+    "period30d": "30 दिन",
+    "periodAll": "सभी",
+    "overview": "अवलोकन",
+    "hands": "हाथ",
+    "winRate": "जीत दर",
+    "netProfit": "शुद्ध लाभ",
+    "vpip": "VPIP",
+    "pfr": "PFR",
+    "largestPot": "सबसे बड़ा पॉट",
+    "profitTrend": "लाभ रुझान",
+    "playDistribution": "गेम वितरण",
+    "others": "अन्य",
+    "pendingEndpoints": "नमूना डेटा — आँकड़े एपीआई अभी जुड़ा नहीं है।"
+  },
+
+  "account": {
+    "guest": "अतिथि",
+    "notSignedIn": "साइन इन नहीं किया",
+    "signInTitle": "अपनी प्रगति सहेजने के लिए साइन इन करें",
+    "signInBlurb": "बैलेंस, इतिहास और VIP पुरस्कार सिंक करने के लिए Telegram जोड़ें।",
+    "openInTelegramTitle": "साइन इन करने के लिए Telegram में खोलें",
+    "openInTelegramBlurb": "Telegram के अंदर चलने पर ऐप आपको स्वतः साइन इन कर देता है।",
+    "continueWithTelegram": "Telegram से जारी रखें",
+    "signingIn": "साइन इन हो रहा है…",
+    "vip": "VIP {{tier}}",
+    "id": "आईडी: {{id}}",
+    "statHands": "हाथ",
+    "statWinRate": "जीत दर",
+    "statBiggestWin": "सबसे बड़ी जीत",
+    "wallet": "वॉलेट",
+    "fairness": "निष्पक्षता सत्यापन",
+    "history": "गेम इतिहास",
+    "settings": "सेटिंग्स",
+    "support": "सहायता",
+    "language": "भाषा",
+    "signOut": "साइन आउट",
+    "buildLine": "MYPOKER · स्टेजिंग बिल्ड · v0.1"
+  },
+
+  "wallet": {
+    "totalBalance": "कुल बैलेंस",
+    "available": "उपलब्ध",
+    "inPlay": "खेल में",
+    "deposit": "जमा करें",
+    "withdraw": "निकालें",
+    "quickTopUp": "त्वरित टॉप-अप (USDT)",
+    "inviteTitle": "आमंत्रित करें और कमाएँ",
+    "inviteBlurb": "अपना कोड साझा करें और हर रेक का हिस्सा कमाएँ।",
+    "code": "कोड",
+    "testnetNotice": "स्टेजिंग में <0>केवल टेस्ट फ़ंड</0> उपयोग होते हैं। वास्तविक जमा और निकासी सुरक्षा समीक्षा के बाद शुरू होंगी।",
+    "recentActivity": "हाल की गतिविधि",
+    "noTransactions": "अभी कोई लेनदेन नहीं",
+    "noTransactionsBlurb": "आपकी जमा राशि और जीत यहाँ दिखेगी"
+  },
+
+  "table": {
+    "fold": "फ़ोल्ड",
+    "check": "चेक",
+    "call": "कॉल {{amount}}",
+    "bet": "बेट",
+    "raise": "रेज़",
+    "allIn": "ऑल-इन",
+    "halfPot": "½ पॉट",
+    "threeQuarterPot": "¾ पॉट",
+    "pot": "पॉट",
+    "handLine": "हाथ {{hand}} · ब्लाइंड्स {{blinds}}",
+    "waiting": "अन्य खिलाड़ियों की प्रतीक्षा…",
+    "nextHand": "अगला हाथ शुरू हो रहा है…"
+  },
+
+  "a11y": {
+    "toggleTheme": "थीम बदलें"
+  },
+
+  "language": {
+    "title": "भाषा",
+    "systemDefault": "Telegram के अनुसार"
+  }
+}

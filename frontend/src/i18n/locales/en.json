@@ -1,0 +1,144 @@
+{
+  "nav": {
+    "alliance": "Alliance",
+    "games": "Games",
+    "lobby": "Lobby",
+    "data": "Data",
+    "account": "My Account"
+  },
+
+  "common": {
+    "online": "online",
+    "members": "members",
+    "join": "Join",
+    "viewAll": "View all",
+    "seeAll": "See all",
+    "sampleData": "Sample data",
+    "loading": "Loading…",
+    "retry": "Retry"
+  },
+
+  "lobby": {
+    "dailyJackpot": "Daily Jackpot",
+    "jackpotBlurb": "Grows with every hand played across MYPOKER.",
+    "provablyFair": "Provably fair · verifiable on-chain",
+    "hotNow": "Hot right now",
+    "moreGames": "More games"
+  },
+
+  "games": {
+    "searchPlaceholder": "Search games",
+    "filterAll": "All",
+    "filterPoker": "Poker",
+    "filterFast": "Fast",
+    "filterCards": "Cards",
+    "noMatch": "No games match “{{query}}”.",
+    "comingSoon": "Coming soon",
+    "soonBadge": "SOON",
+    "minBuy": "Min {{amount}}",
+    "playersOnline": "{{count}} playing"
+  },
+
+  "gameNames": {
+    "texas": "Texas Hold’em",
+    "short": "Short Deck",
+    "redpacket": "Red Packet",
+    "niuniu": "Niu Niu",
+    "ddz": "Dou Di Zhu",
+    "baccarat": "Baccarat",
+    "blackjack": "Blackjack",
+    "sicbo": "Sic Bo",
+    "fishingWar": "Fishing War",
+    "setteMezzo": "Sette e Mezzo"
+  },
+
+  "alliance": {
+    "joinAlliance": "Join Alliance",
+    "recommended": "Recommended alliances",
+    "create": "Create Alliance",
+    "ranking": "Alliance Ranking",
+    "pendingEndpoints": "Sample data — awaiting the alliance/league endpoints."
+  },
+
+  "data": {
+    "periodToday": "Today",
+    "period7d": "7 days",
+    "period30d": "30 days",
+    "periodAll": "All",
+    "overview": "Overview",
+    "hands": "Hands",
+    "winRate": "Win rate",
+    "netProfit": "Net profit",
+    "vpip": "VPIP",
+    "pfr": "PFR",
+    "largestPot": "Largest pot",
+    "profitTrend": "Profit trend",
+    "playDistribution": "Play distribution",
+    "others": "Others",
+    "pendingEndpoints": "Sample data — awaiting the stats endpoints."
+  },
+
+  "account": {
+    "guest": "Guest Player",
+    "notSignedIn": "Not signed in",
+    "signInTitle": "Sign in to save your progress",
+    "signInBlurb": "Connect Telegram to sync balance, history & VIP rewards.",
+    "openInTelegramTitle": "Open in Telegram to sign in",
+    "openInTelegramBlurb": "This app signs you in automatically when it runs inside Telegram.",
+    "continueWithTelegram": "Continue with Telegram",
+    "signingIn": "Signing in…",
+    "vip": "VIP {{tier}}",
+    "id": "ID: {{id}}",
+    "statHands": "Hands",
+    "statWinRate": "Win rate",
+    "statBiggestWin": "Biggest win",
+    "wallet": "Wallet",
+    "fairness": "Fairness verification",
+    "history": "Game history",
+    "settings": "Settings",
+    "support": "Support",
+    "language": "Language",
+    "signOut": "Sign out",
+    "buildLine": "MYPOKER · staging build · v0.1"
+  },
+
+  "wallet": {
+    "totalBalance": "Total Balance",
+    "available": "Available",
+    "inPlay": "In play",
+    "deposit": "Deposit",
+    "withdraw": "Withdraw",
+    "quickTopUp": "Quick top-up (USDT)",
+    "inviteTitle": "Invite & earn",
+    "inviteBlurb": "Share your code, earn a cut of every rake.",
+    "code": "Code",
+    "testnetNotice": "Staging uses <0>test funds only</0>. Real deposits & withdrawals go live after the security review.",
+    "recentActivity": "Recent activity",
+    "noTransactions": "No transactions yet",
+    "noTransactionsBlurb": "Your deposits & winnings appear here"
+  },
+
+  "table": {
+    "fold": "Fold",
+    "check": "Check",
+    "call": "Call {{amount}}",
+    "bet": "Bet",
+    "raise": "Raise",
+    "allIn": "All-in",
+    "halfPot": "½ Pot",
+    "threeQuarterPot": "¾ Pot",
+    "pot": "Pot",
+    "handLine": "Hand {{hand}} · Blinds {{blinds}}",
+    "waiting": "Waiting for other players…",
+    "nextHand": "Next hand starting…"
+  },
+
+  "a11y": {
+    "toggleTheme": "Toggle theme"
+  },
+
+  "language": {
+    "title": "Language",
+    "systemDefault": "Telegram default"
+  }
+}

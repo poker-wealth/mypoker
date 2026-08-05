@@ -1,0 +1,144 @@
+{
+  "nav": {
+    "alliance": "Liên minh",
+    "games": "Trò chơi",
+    "lobby": "Sảnh",
+    "data": "Dữ liệu",
+    "account": "Tài khoản"
+  },
+
+  "common": {
+    "online": "trực tuyến",
+    "members": "thành viên",
+    "join": "Tham gia",
+    "viewAll": "Xem tất cả",
+    "seeAll": "Xem tất cả",
+    "sampleData": "Dữ liệu mẫu",
+    "loading": "Đang tải…",
+    "retry": "Thử lại"
+  },
+
+  "lobby": {
+    "dailyJackpot": "Jackpot hằng ngày",
+    "jackpotBlurb": "Tăng lên theo mỗi ván bài được chơi trên MYPOKER.",
+    "provablyFair": "Công bằng minh bạch · xác minh trên chuỗi",
+    "hotNow": "Đang hot",
+    "moreGames": "Trò chơi khác"
+  },
+
+  "games": {
+    "searchPlaceholder": "Tìm trò chơi",
+    "filterAll": "Tất cả",
+    "filterPoker": "Poker",
+    "filterFast": "Nhanh",
+    "filterCards": "Bài",
+    "noMatch": "Không có trò chơi nào khớp với “{{query}}”.",
+    "comingSoon": "Sắp ra mắt",
+    "soonBadge": "SẮP CÓ",
+    "minBuy": "Tối thiểu {{amount}}",
+    "playersOnline": "{{count}} người đang chơi"
+  },
+
+  "gameNames": {
+    "texas": "Texas Hold’em",
+    "short": "Short Deck",
+    "redpacket": "Bao Lì Xì",
+    "niuniu": "Ngưu Ngưu",
+    "ddz": "Đấu Địa Chủ",
+    "baccarat": "Baccarat",
+    "blackjack": "Xì Dách",
+    "sicbo": "Tài Xỉu",
+    "fishingWar": "Bắn Cá",
+    "setteMezzo": "Sette e Mezzo"
+  },
+
+  "alliance": {
+    "joinAlliance": "Tham gia liên minh",
+    "recommended": "Liên minh đề xuất",
+    "create": "Tạo liên minh",
+    "ranking": "Bảng xếp hạng liên minh",
+    "pendingEndpoints": "Dữ liệu mẫu — API liên minh chưa được kết nối."
+  },
+
+  "data": {
+    "periodToday": "Hôm nay",
+    "period7d": "7 ngày",
+    "period30d": "30 ngày",
+    "periodAll": "Tất cả",
+    "overview": "Tổng quan",
+    "hands": "Số ván",
+    "winRate": "Tỷ lệ thắng",
+    "netProfit": "Lợi nhuận ròng",
+    "vpip": "VPIP",
+    "pfr": "PFR",
+    "largestPot": "Pot lớn nhất",
+    "profitTrend": "Xu hướng lợi nhuận",
+    "playDistribution": "Phân bổ trò chơi",
+    "others": "Khác",
+    "pendingEndpoints": "Dữ liệu mẫu — API thống kê chưa được kết nối."
+  },
+
+  "account": {
+    "guest": "Khách",
+    "notSignedIn": "Chưa đăng nhập",
+    "signInTitle": "Đăng nhập để lưu tiến trình của bạn",
+    "signInBlurb": "Kết nối Telegram để đồng bộ số dư, lịch sử và ưu đãi VIP.",
+    "openInTelegramTitle": "Mở trong Telegram để đăng nhập",
+    "openInTelegramBlurb": "Ứng dụng sẽ tự động đăng nhập khi chạy trong Telegram.",
+    "continueWithTelegram": "Tiếp tục với Telegram",
+    "signingIn": "Đang đăng nhập…",
+    "vip": "VIP {{tier}}",
+    "id": "ID: {{id}}",
+    "statHands": "Số ván",
+    "statWinRate": "Tỷ lệ thắng",
+    "statBiggestWin": "Thắng lớn nhất",
+    "wallet": "Ví",
+    "fairness": "Xác minh công bằng",
+    "history": "Lịch sử chơi",
+    "settings": "Cài đặt",
+    "support": "Hỗ trợ",
+    "language": "Ngôn ngữ",
+    "signOut": "Đăng xuất",
+    "buildLine": "MYPOKER · bản thử nghiệm · v0.1"
+  },
+
+  "wallet": {
+    "totalBalance": "Tổng số dư",
+    "available": "Khả dụng",
+    "inPlay": "Đang chơi",
+    "deposit": "Nạp tiền",
+    "withdraw": "Rút tiền",
+    "quickTopUp": "Nạp nhanh (USDT)",
+    "inviteTitle": "Mời bạn bè, nhận thưởng",
+    "inviteBlurb": "Chia sẻ mã của bạn và nhận phần hoa hồng từ mỗi ván.",
+    "code": "Mã mời",
+    "testnetNotice": "Môi trường thử nghiệm chỉ dùng <0>tiền thử nghiệm</0>. Nạp và rút tiền thật sẽ mở sau khi kiểm tra bảo mật.",
+    "recentActivity": "Hoạt động gần đây",
+    "noTransactions": "Chưa có giao dịch",
+    "noTransactionsBlurb": "Tiền nạp và tiền thắng sẽ hiển thị tại đây"
+  },
+
+  "table": {
+    "fold": "Bỏ bài",
+    "check": "Xem bài",
+    "call": "Theo {{amount}}",
+    "bet": "Cược",
+    "raise": "Tố",
+    "allIn": "Tất tay",
+    "halfPot": "½ Pot",
+    "threeQuarterPot": "¾ Pot",
+    "pot": "Pot",
+    "handLine": "Ván {{hand}} · Mù {{blinds}}",
+    "waiting": "Đang chờ người chơi khác…",
+    "nextHand": "Ván tiếp theo sắp bắt đầu…"
+  },
+
+  "a11y": {
+    "toggleTheme": "Đổi giao diện"
+  },
+
+  "language": {
+    "title": "Ngôn ngữ",
+    "systemDefault": "Theo Telegram"
+  }
+}
