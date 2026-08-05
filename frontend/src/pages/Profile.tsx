@@ -11,6 +11,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useSession } from '@/store/session';
 import { useStats } from '@/api/hooks';
+import { errorKey } from '@/api/errors';
 import { isTelegram } from '@/lib/telegram';
 import { LANGUAGES } from '@/i18n/languages';
 
@@ -113,10 +114,11 @@ export function Profile() {
 
           {stats.isError && (
             <div className="rounded-(--radius-app) border border-border bg-surface">
-              <ErrorState
-                message={stats.error instanceof Error ? stats.error.message : undefined}
-                onRetry={() => void stats.refetch()}
-              />
+              {/* Translated copy, not error.message — the raw text is a
+                  diagnostic ("Expected JSON from /me/stats but got text/html")
+                  that tells a player nothing except that something is broken in
+                  a way that sounds like their fault. It goes to the console. */}
+              <ErrorState message={t(errorKey(stats.error))} onRetry={() => void stats.refetch()} />
             </div>
           )}
 

@@ -143,7 +143,9 @@
     "reconnecting": "Đang kết nối lại…",
     "backOnline": "Đã kết nối lại",
     "error": "Đã xảy ra lỗi",
-    "empty": "Chưa có gì ở đây"
+    "empty": "Chưa có gì ở đây",
+    "serviceUnavailable": "Hiện chưa khả dụng",
+    "sessionExpired": "Phiên đăng nhập đã hết hạn — vui lòng đăng nhập lại"
   },
   "toasts": {
     "signedIn": "Đã đăng nhập với {{name}}",

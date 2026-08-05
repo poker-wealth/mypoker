@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryCache, QueryClientProvider } from '@tanstack/react-query';
+import { logError } from '@/api/errors';
 import { RouterProvider } from 'react-router-dom';
 import { initTelegram } from '@/lib/telegram';
 import { dismissSplash } from '@/lib/splash';
@@ -19,6 +20,11 @@ watchConnection();
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
+  // The UI shows translated copy rather than raw error text, so without this the
+  // actual cause would be swallowed entirely. One place, every query.
+  queryCache: new QueryCache({
+    onError: (error, query) => logError(String(query.queryKey[0] ?? 'query'), error),
+  }),
 });
 
 createRoot(document.getElementById('root')!).render(

@@ -143,7 +143,9 @@
     "reconnecting": "Reconnecting…",
     "backOnline": "Back online",
     "error": "Something went wrong",
-    "empty": "Nothing here yet"
+    "empty": "Nothing here yet",
+    "serviceUnavailable": "Not available right now",
+    "sessionExpired": "Your session expired — sign in again"
   },
   "toasts": {
     "signedIn": "Signed in as {{name}}",

@@ -143,7 +143,9 @@
     "reconnecting": "Menyambungkan ulang…",
     "backOnline": "Kembali online",
     "error": "Terjadi kesalahan",
-    "empty": "Belum ada apa-apa"
+    "empty": "Belum ada apa-apa",
+    "serviceUnavailable": "Belum tersedia saat ini",
+    "sessionExpired": "Sesi Anda berakhir — silakan masuk lagi"
   },
   "toasts": {
     "signedIn": "Masuk sebagai {{name}}",

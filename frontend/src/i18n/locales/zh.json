@@ -143,7 +143,9 @@
     "reconnecting": "正在重新连接…",
     "backOnline": "已恢复连接",
     "error": "出错了",
-    "empty": "暂无内容"
+    "empty": "暂无内容",
+    "serviceUnavailable": "暂时无法使用",
+    "sessionExpired": "登录已过期，请重新登录"
   },
   "toasts": {
     "signedIn": "已登录：{{name}}",

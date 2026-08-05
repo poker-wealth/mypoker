@@ -143,7 +143,9 @@
     "reconnecting": "再接続中…",
     "backOnline": "オンラインに復帰",
     "error": "問題が発生しました",
-    "empty": "まだ何もありません"
+    "empty": "まだ何もありません",
+    "serviceUnavailable": "現在ご利用いただけません",
+    "sessionExpired": "セッションの有効期限が切れました。再度ログインしてください"
   },
   "toasts": {
     "signedIn": "{{name}} としてログインしました",
