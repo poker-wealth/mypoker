@@ -1,20 +1,25 @@
 import { useState } from 'react';
-import { ShieldCheck, History, Settings, LifeBuoy, Send, Wallet, LogOut, Languages } from 'lucide-react';
+import { ShieldCheck, History, Settings, LifeBuoy, Send, Wallet, LogOut, Languages, Spade } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ListRow } from '@/components/ui/ListRow';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { LanguageSheet } from '@/components/LanguageSheet';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { useSession } from '@/store/session';
+import { useStats } from '@/api/hooks';
 import { isTelegram } from '@/lib/telegram';
 import { LANGUAGES } from '@/i18n/languages';
 
-const STATS = [
-  { key: 'account.statHands', value: '0' },
-  { key: 'account.statWinRate', value: '—' },
-  { key: 'account.statBiggestWin', value: '₮0' },
-];
+/** Trim financial-core's six-decimal strings to something a person reads. */
+function money(value: string): string {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return value;
+  return `₮${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+}
 
 export function Profile() {
   const navigate = useNavigate();
@@ -22,6 +27,7 @@ export function Profile() {
   const { player, status, error, signIn, signOut } = useSession();
   const signedIn = status === 'authenticated' && player !== null;
   const [languageOpen, setLanguageOpen] = useState(false);
+  const stats = useStats();
 
   const currentLanguage =
     LANGUAGES.find((l) => l.code === i18n.resolvedLanguage)?.label ?? '';
@@ -87,15 +93,63 @@ export function Profile() {
         </div>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
-        {STATS.map((s) => (
-          <div key={s.key} className="rounded-(--radius-app) border border-border bg-surface px-2 py-3 text-center">
-            <div className="text-lg font-black tabular-nums">{s.value}</div>
-            <div className="mt-0.5 text-[0.66rem] text-dim">{t(s.key)}</div>
-          </div>
-        ))}
-      </div>
+      {/* Stats — real, from the ledger. Signed out, this section is simply absent
+          rather than showing zeros that would read as a real record of no wins. */}
+      {signedIn && (
+        <section>
+          {stats.isPending && (
+            <div className="grid grid-cols-3 gap-3">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="rounded-(--radius-app) border border-border bg-surface px-2 py-3"
+                >
+                  <Skeleton className="mx-auto h-6 w-14" />
+                  <Skeleton className="mx-auto mt-2 h-2.5 w-10" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {stats.isError && (
+            <div className="rounded-(--radius-app) border border-border bg-surface">
+              <ErrorState
+                message={stats.error instanceof Error ? stats.error.message : undefined}
+                onRetry={() => void stats.refetch()}
+              />
+            </div>
+          )}
+
+          {/* A new player has real zeros, but three of them read as a record of
+              losing rather than as never having played. Say which it is. */}
+          {stats.isSuccess && stats.data.handsPlayed === 0 && (
+            <div className="rounded-(--radius-app) border border-border bg-surface">
+              <EmptyState
+                icon={Spade}
+                title={t('account.noHands')}
+                description={t('account.noHandsBlurb')}
+                action={{ label: t('nav.lobby'), onClick: () => navigate('/') }}
+              />
+            </div>
+          )}
+
+          {stats.isSuccess && stats.data.handsPlayed > 0 && (
+            <div className="grid grid-cols-3 gap-3">
+              <StatTile label={t('account.statHands')} value={String(stats.data.handsPlayed)} />
+              <StatTile
+                label={t('account.statWinRate')}
+                // Null, not 0, when nothing has been played — '0%' would read as
+                // "you have lost every hand" rather than "you haven't played".
+                value={stats.data.winRate === null ? '—' : `${stats.data.winRate}%`}
+              />
+              <StatTile
+                label={t('account.statBiggestWin')}
+                value={money(stats.data.biggestWin)}
+              />
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Menu */}
       <div className="divide-y divide-border overflow-hidden rounded-(--radius-app) border border-border bg-surface">
@@ -119,6 +173,15 @@ export function Profile() {
       <div className="pt-1 text-center text-[0.66rem] text-dim">{t('account.buildLine')}</div>
 
       <LanguageSheet open={languageOpen} onClose={() => setLanguageOpen(false)} />
+    </div>
+  );
+}
+
+function StatTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-(--radius-app) border border-border bg-surface px-2 py-3 text-center">
+      <div className="text-lg font-black tabular-nums">{value}</div>
+      <div className="mt-0.5 text-[0.66rem] text-dim">{label}</div>
     </div>
   );
 }

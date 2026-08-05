@@ -77,13 +77,28 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   // the banner should come down. Only transport failures mean "no connection".
   onReachabilityChange?.(true);
 
-  const payload: unknown = await res.json().catch(() => null);
+  let parsed = false;
+  const payload: unknown = await res
+    .json()
+    .then((body: unknown) => {
+      parsed = true;
+      return body;
+    })
+    .catch(() => null);
 
   if (!res.ok) {
     if (res.status === 401) onUnauthorized?.();
     const message =
       (payload as { error?: string } | null)?.error ?? `${res.status} ${res.statusText}`;
     throw new ApiError(res.status, message, payload);
+  }
+
+  // A 2xx that isn't JSON is not a success. The SPA fallback answers any
+  // unrouted path with index.html and a 200, so an endpoint that doesn't exist
+  // would otherwise resolve to `null` typed as whatever the caller expected —
+  // and blow up later, far from the cause, on the first property access.
+  if (!parsed) {
+    throw new ApiError(res.status, `Expected JSON from ${path} but got ${res.headers.get('content-type') ?? 'no content-type'}`);
   }
 
   return payload as T;

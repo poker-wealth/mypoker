@@ -92,7 +92,9 @@
     "support": "Support",
     "language": "Language",
     "signOut": "Sign out",
-    "buildLine": "MYPOKER · staging build · v0.1"
+    "buildLine": "MYPOKER · staging build · v0.1",
+    "noHands": "No hands played yet",
+    "noHandsBlurb": "Join a table and your record starts here."
   },
   "wallet": {
     "totalBalance": "Total Balance",

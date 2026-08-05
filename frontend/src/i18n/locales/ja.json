@@ -92,7 +92,9 @@
     "support": "サポート",
     "language": "言語",
     "signOut": "ログアウト",
-    "buildLine": "MYPOKER · ステージング版 · v0.1"
+    "buildLine": "MYPOKER · ステージング版 · v0.1",
+    "noHands": "まだプレイ履歴がありません",
+    "noHandsBlurb": "テーブルに参加すると、ここに記録が表示されます。"
   },
   "wallet": {
     "totalBalance": "総残高",

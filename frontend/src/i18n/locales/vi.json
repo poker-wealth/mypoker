@@ -92,7 +92,9 @@
     "support": "Hỗ trợ",
     "language": "Ngôn ngữ",
     "signOut": "Đăng xuất",
-    "buildLine": "MYPOKER · bản thử nghiệm · v0.1"
+    "buildLine": "MYPOKER · bản thử nghiệm · v0.1",
+    "noHands": "Chưa chơi ván nào",
+    "noHandsBlurb": "Tham gia một bàn và thành tích của bạn sẽ hiện ở đây."
   },
   "wallet": {
     "totalBalance": "Tổng số dư",

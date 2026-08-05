@@ -92,7 +92,9 @@
     "support": "客服支持",
     "language": "语言",
     "signOut": "退出登录",
-    "buildLine": "MYPOKER · 测试版本 · v0.1"
+    "buildLine": "MYPOKER · 测试版本 · v0.1",
+    "noHands": "还没有牌局记录",
+    "noHandsBlurb": "加入牌桌，您的战绩将显示在这里。"
   },
   "wallet": {
     "totalBalance": "总余额",

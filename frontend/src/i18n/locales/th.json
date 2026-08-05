@@ -92,7 +92,9 @@
     "support": "ฝ่ายสนับสนุน",
     "language": "ภาษา",
     "signOut": "ออกจากระบบ",
-    "buildLine": "MYPOKER · เวอร์ชันทดสอบ · v0.1"
+    "buildLine": "MYPOKER · เวอร์ชันทดสอบ · v0.1",
+    "noHands": "ยังไม่ได้เล่นตาไหน",
+    "noHandsBlurb": "เข้าร่วมโต๊ะแล้วสถิติของคุณจะแสดงที่นี่"
   },
   "wallet": {
     "totalBalance": "ยอดเงินรวม",

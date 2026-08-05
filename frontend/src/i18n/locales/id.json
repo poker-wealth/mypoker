@@ -92,7 +92,9 @@
     "support": "Bantuan",
     "language": "Bahasa",
     "signOut": "Keluar",
-    "buildLine": "MYPOKER · versi staging · v0.1"
+    "buildLine": "MYPOKER · versi staging · v0.1",
+    "noHands": "Belum ada ronde dimainkan",
+    "noHandsBlurb": "Gabung ke meja dan rekor Anda dimulai di sini."
   },
   "wallet": {
     "totalBalance": "Total Saldo",
