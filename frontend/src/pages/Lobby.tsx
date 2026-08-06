@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { Filter } from 'lucide-react';
 import { Segmented } from '@/components/ui/Segmented';
-import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useLobbyGames, useTables } from '@/api/hooks';
 import { formatMicros } from '@/api/lobby';
