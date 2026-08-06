@@ -33,9 +33,18 @@ async function forward(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
 
+  // Method and body are forwarded, not assumed: a PATCH arriving here as a GET
+  // would read settings back and report success while writing nothing.
+  const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
+
   try {
     const upstream = await fetch(url, {
-      headers: { authorization: req.headers.authorization ?? '' },
+      method: req.method,
+      headers: {
+        authorization: req.headers.authorization ?? '',
+        ...(hasBody ? { 'content-type': 'application/json' } : {}),
+      },
+      ...(hasBody ? { body: JSON.stringify(req.body ?? {}) } : {}),
       signal: controller.signal,
     });
     const body: unknown = await upstream.json().catch(() => null);
@@ -57,6 +66,8 @@ export function buildMeRouter(config: GatewayConfig): Router {
 
   r.get('/stats', (req, res) => void forward(config, req, res, '/me/stats'));
   r.get('/history', (req, res) => void forward(config, req, res, '/me/history'));
+  r.get('/settings', (req, res) => void forward(config, req, res, '/me/settings'));
+  r.patch('/settings', (req, res) => void forward(config, req, res, '/me/settings'));
 
   return r;
 }

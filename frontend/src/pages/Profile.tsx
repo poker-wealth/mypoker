@@ -165,7 +165,11 @@ export function Profile() {
           leading={<Languages size={18} className="text-dim" />}
           onClick={() => setLanguageOpen(true)}
         />
-        <ListRow title={t('account.settings')} leading={<Settings size={18} className="text-dim" />} onClick={() => {}} />
+        <ListRow
+          title={t('account.settings')}
+          leading={<Settings size={18} className="text-dim" />}
+          onClick={() => navigate('/settings')}
+        />
         <ListRow title={t('account.support')} leading={<LifeBuoy size={18} className="text-dim" />} onClick={() => {}} />
         {signedIn && (
           <ListRow title={t('account.signOut')} leading={<LogOut size={18} className="text-dim" />} onClick={signOut} />

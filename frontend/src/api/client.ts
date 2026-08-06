@@ -45,7 +45,7 @@ export function setReachabilityHandler(handler: (reachable: boolean) => void): v
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
   /** Skip the Authorization header — used by the login call itself. */
   anonymous?: boolean;
@@ -109,4 +109,6 @@ export const api = {
     request<T>(path, { ...options, method: 'GET' }),
   post: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
     request<T>(path, { ...options, method: 'POST', body }),
+  patch: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
+    request<T>(path, { ...options, method: 'PATCH', body }),
 };
