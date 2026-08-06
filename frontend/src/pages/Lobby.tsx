@@ -1,43 +1,12 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { Filter, Zap } from 'lucide-react';
+import { Filter } from 'lucide-react';
 import { Segmented } from '@/components/ui/Segmented';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useLobbyGames, useTables } from '@/api/hooks';
 import { formatMicros } from '@/api/lobby';
-
-function WinnerTicker() {
-  const MOCK_WINNERS = [
-    "Player_772 won $4,200 in Texas Hold'em",
-    'CryptoKing won $1,500 in Slots',
-    'LuckyStar won $800 in Baccarat',
-    'Whale_99 won $12,500 in High Roller',
-  ];
-
-  return (
-    <div className="flex h-8 items-center overflow-hidden rounded-lg bg-surface/50 border border-border px-3">
-      <div className="mr-3 flex shrink-0 items-center gap-1.5 font-bold text-jackpot">
-        <span className="relative flex h-2 w-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-jackpot opacity-75"></span>
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-jackpot"></span>
-        </span>
-        LIVE
-      </div>
-      <div className="relative flex-1 overflow-hidden">
-        <motion.div
-          className="flex whitespace-nowrap text-[0.7rem] font-semibold text-dim"
-          initial={{ x: '100%' }}
-          animate={{ x: '-100%' }}
-          transition={{ duration: 15, repeat: Infinity, ease: 'linear' }}
-        >
-          {MOCK_WINNERS.join(' • ')}
-        </motion.div>
-      </div>
-    </div>
-  );
-}
 
 export function Lobby() {
   const navigate = useNavigate();
@@ -99,12 +68,8 @@ export function Lobby() {
               {jackpot}
             </div>
           )}
-          <div className="mt-1 text-xs font-bold text-success drop-shadow-sm">+ $322.16 / hr</div>
         </div>
       </div>
-
-      {/* Winner Ticker */}
-      <WinnerTicker />
 
       <Segmented
         value={variant}
@@ -132,9 +97,6 @@ export function Lobby() {
             ]}
           />
         </div>
-        <button className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-dim transition-colors hover:text-text">
-          <Filter size={16} />
-        </button>
       </div>
 
       {/* Table list */}
@@ -145,7 +107,6 @@ export function Lobby() {
               <th className="px-3 py-2.5 font-medium">Table</th>
               <th className="px-3 py-2.5 font-medium">Blinds</th>
               <th className="px-3 py-2.5 font-medium">Players</th>
-              <th className="px-3 py-2.5 font-medium">Buy-in</th>
               <th className="px-3 py-2.5 text-right font-medium">Status</th>
             </tr>
           </thead>
@@ -168,7 +129,6 @@ export function Lobby() {
                     {formatMicros(t.stakes / 2, 0)}/{formatMicros(t.stakes, 0)}
                   </td>
                   <td className="px-3 py-3 tabular-nums">{t.players}/{t.maxPlayers}</td>
-                  <td className="px-3 py-3 tabular-nums text-dim">100 BB</td>
                   <td className="px-3 py-3 text-right">
                     <span
                       className={`font-semibold ${t.status === 'OPEN' || t.status === 'WAITING' ? 'text-success' : 'text-dim'
@@ -182,16 +142,6 @@ export function Lobby() {
             )}
           </tbody>
         </table>
-      </div>
-
-      {/* Action buttons */}
-      <div className="grid grid-cols-2 gap-3 pt-2">
-        <Button className="bg-success text-success-fg hover:bg-success/90">
-          <Zap size={16} className="mr-1.5" /> QUICK JOIN
-        </Button>
-        <Button variant="secondary" className="border-border bg-surface text-dim">
-          CREATE PRIVATE TABLE
-        </Button>
       </div>
     </div>
   );

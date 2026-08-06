@@ -99,9 +99,7 @@ export function Data() {
               value={money(stats.data.netProfit, true)}
               tone={Number(stats.data.netProfit) >= 0 ? 'success' : 'danger'}
             />
-            <Tile label="VPIP" value="23.1%" />
-            <Tile label="PFR" value="38.7%" />
-            <Tile label="Largest Pot" value={money(stats.data.biggestWin)} tone="accent" />
+            <Tile label={t('data.biggestWin')} value={money(stats.data.biggestWin)} tone="accent" />
           </div>
         )}
       </section>
@@ -113,43 +111,6 @@ export function Data() {
           <TrendChart rounds={rounds} />
         </section>
       )}
-
-      {/* Play Distribution */}
-      <section className="rounded-(--radius-app) border border-border bg-surface p-4">
-        <h2 className="mb-3 text-[0.75rem] font-bold tracking-wider text-dim uppercase">Play Distribution</h2>
-        <div className="flex items-center gap-6 mt-5 mb-2">
-          <div className="relative size-[90px] shrink-0 ml-2">
-            <svg viewBox="0 0 100 100" className="size-full transform -rotate-90">
-              {/* Xuzhou 20% */}
-              <circle cx="50" cy="50" r="40" fill="transparent" stroke="#22c55e" strokeWidth="16" strokeDasharray="251.2" strokeDashoffset={251.2 * 0.80} />
-              {/* Dezhou 65% */}
-              <circle cx="50" cy="50" r="40" fill="transparent" stroke="#6366f1" strokeWidth="16" strokeDasharray="251.2" strokeDashoffset={251.2 * 0.35} transform="rotate(72, 50, 50)" />
-              {/* Ausha 10% */}
-              <circle cx="50" cy="50" r="40" fill="transparent" stroke="#eab308" strokeWidth="16" strokeDasharray="251.2" strokeDashoffset={251.2 * 0.90} transform="rotate(306, 50, 50)" />
-              {/* Others 5% */}
-              <circle cx="50" cy="50" r="40" fill="transparent" stroke="#3b82f6" strokeWidth="16" strokeDasharray="251.2" strokeDashoffset={251.2 * 0.95} transform="rotate(342, 50, 50)" />
-            </svg>
-          </div>
-          <div className="flex flex-1 flex-col justify-center gap-2">
-            <div className="flex items-center justify-between text-[0.65rem] font-bold text-dim">
-              <div className="flex items-center gap-2"><div className="size-2 rounded-full" style={{ backgroundColor: '#6366f1' }} /> Dezhou</div>
-              <div className="text-text text-[0.7rem]">65%</div>
-            </div>
-            <div className="flex items-center justify-between text-[0.65rem] font-bold text-dim">
-              <div className="flex items-center gap-2"><div className="size-2 rounded-full" style={{ backgroundColor: '#22c55e' }} /> Xuzhou</div>
-              <div className="text-text text-[0.7rem]">20%</div>
-            </div>
-            <div className="flex items-center justify-between text-[0.65rem] font-bold text-dim">
-              <div className="flex items-center gap-2"><div className="size-2 rounded-full" style={{ backgroundColor: '#eab308' }} /> Ausha</div>
-              <div className="text-text text-[0.7rem]">10%</div>
-            </div>
-            <div className="flex items-center justify-between text-[0.65rem] font-bold text-dim">
-              <div className="flex items-center gap-2"><div className="size-2 rounded-full" style={{ backgroundColor: '#3b82f6' }} /> Others</div>
-              <div className="text-text text-[0.7rem]">5%</div>
-            </div>
-          </div>
-        </div>
-      </section>
 
       {/* History */}
       <section>

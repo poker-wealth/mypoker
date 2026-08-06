@@ -13,6 +13,7 @@ import { errorKey } from '@/api/errors';
 import { useSession } from '@/store/session';
 import { useTheme } from '@/store/theme';
 import { LANGUAGES } from '@/i18n/languages';
+import { toast } from '@/store/toast';
 import type { PlayerSettings } from '@/api/settings';
 
 /**
@@ -159,7 +160,7 @@ export function Settings() {
         <ListRow
           title={t('account.support')}
           leading={<LifeBuoy size={18} className="text-dim" />}
-          onClick={() => {}}
+          onClick={() => toast.info(t('account.supportConnecting', { defaultValue: 'Connecting to support...' }))}
         />
       </Section>
 
