@@ -235,5 +235,17 @@
     "vendorAttested": "Nhà cung cấp xác nhận",
     "vendorBlurb": "Nhà cung cấp bên ngoài sở hữu luật chơi; mỗi kết quả đều được ký, nhưng không thể chứng minh bảng trả thưởng không bị đổi",
     "ratesPending": "Tỷ lệ chi trả công bố chưa được hiển thị. Một tỷ lệ chỉ có ý nghĩa khi luật chơi đằng sau nó được cam kết on-chain và đánh phiên bản — trước đó nó chỉ là con số chúng tôi tự khẳng định, đúng điều mà trang này tồn tại để tránh."
+  },
+  "reputation": {
+    "title": "Uy tín",
+    "scope": "Uy tín ảnh hưởng đến những bàn bạn có thể tham gia và quyền trò chuyện. Nó không bao giờ ảnh hưởng đến nạp hay rút tiền.",
+    "toAdvance": "Còn {{count}} ván nữa để đạt 700",
+    "band": {
+      "TRUSTED": "Đáng tin",
+      "GOOD": "Tốt",
+      "FAIR": "Trung bình",
+      "POOR": "Thấp",
+      "VERY_POOR": "Rất thấp"
+    }
   }
 }

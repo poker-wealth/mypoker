@@ -1,5 +1,6 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchSettings, patchSettings, type PlayerSettings, type SettingsPatch } from './settings';
+import { fetchReputation } from './reputation';
 import { fetchStats, fetchHistory, type HistoryPage, type StatsPeriod } from './stats';
 import { fetchLobbyGames, fetchTables, type TableFilter } from './lobby';
 import { useSession } from '@/store/session';
@@ -131,5 +132,17 @@ export function useLobbyTables(filter: TableFilter = {}) {
     staleTime: 10_000,
     refetchInterval: 20_000,
     retry: 1,
+  });
+}
+
+/** Reputation. Changes only on a settled round or an ops finding, so cached long. */
+export function useReputation() {
+  const playerId = useSession((s) => s.player?.playerId);
+
+  return useQuery({
+    queryKey: ['reputation', playerId],
+    queryFn: fetchReputation,
+    enabled: Boolean(playerId),
+    staleTime: 60_000,
   });
 }

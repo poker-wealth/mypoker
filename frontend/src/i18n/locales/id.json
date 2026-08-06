@@ -235,5 +235,17 @@
     "vendorAttested": "Disahkan vendor",
     "vendorBlurb": "Pemasok luar memiliki aturannya; setiap hasil ditandatangani, tetapi tabel pembayaran mereka tidak dapat dibuktikan tidak berubah",
     "ratesPending": "Tingkat pembayaran yang dipublikasikan belum ditampilkan. Sebuah tingkat baru bermakna setelah aturan di baliknya dikomit on-chain dan diberi versi — sebelum itu ia hanyalah angka yang kami klaim tentang diri sendiri, hal yang justru ingin dihindari halaman ini."
+  },
+  "reputation": {
+    "title": "Reputasi",
+    "scope": "Reputasi memengaruhi meja yang bisa Anda ikuti dan akses obrolan. Ini tidak pernah memengaruhi setoran atau penarikan.",
+    "toAdvance": "{{count}} ronde lagi untuk mencapai 700",
+    "band": {
+      "TRUSTED": "Tepercaya",
+      "GOOD": "Baik",
+      "FAIR": "Cukup",
+      "POOR": "Rendah",
+      "VERY_POOR": "Sangat rendah"
+    }
   }
 }

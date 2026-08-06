@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useSession } from '@/store/session';
-import { useStats } from '@/api/hooks';
+import { useStats, useReputation } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
 import { isTelegram } from '@/lib/telegram';
 import { LANGUAGES } from '@/i18n/languages';
@@ -153,6 +153,8 @@ export function Profile() {
         </section>
       )}
 
+      {signedIn && <ReputationRow />}
+
       {/* Menu */}
       <div className="divide-y divide-border overflow-hidden rounded-(--radius-app) border border-border bg-surface">
         {/* Wallet is no longer a tab — this is its entry point. */}
@@ -192,6 +194,61 @@ function StatTile({ label, value }: { label: string; value: string }) {
     <div className="rounded-(--radius-app) border border-border bg-surface px-2 py-3 text-center">
       <div className="text-lg font-black tabular-nums">{value}</div>
       <div className="mt-0.5 text-[0.66rem] text-dim">{label}</div>
+    </div>
+  );
+}
+
+/**
+ * Reputation, on the profile.
+ *
+ * Deliberately free of any language implying consequence for funds. The spec's
+ * wording is unusually direct — a reputation score affecting a withdrawal is a
+ * critical failure — and copy is where that leaks first: "restricted", "limited",
+ * "blocked", even a red warning icon next to a low score, all invite the player
+ * to believe their money is at stake. So a low band is stated plainly and the
+ * line underneath says what it actually governs, which is tables and chat.
+ */
+function ReputationRow() {
+  const { t } = useTranslation();
+  const rep = useReputation();
+
+  if (rep.isPending) {
+    return (
+      <div className="rounded-(--radius-app) border border-border bg-surface p-4">
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="mt-2 h-6 w-16" />
+      </div>
+    );
+  }
+  // Silent on failure. Reputation is context, not something the player came for,
+  // and an error card here would loom larger than the feature it is reporting.
+  if (!rep.isSuccess) return null;
+
+  const { score, band, roundsToAdvance } = rep.data;
+  const tone =
+    band === 'TRUSTED' || band === 'GOOD'
+      ? 'text-success'
+      : band === 'FAIR'
+        ? 'text-text'
+        : 'text-dim';
+
+  return (
+    <div className="rounded-(--radius-app) border border-border bg-surface p-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="text-xs font-bold uppercase tracking-wide text-dim">
+          {t('reputation.title')}
+        </span>
+        <span className="text-[0.66rem] text-dim">{t(`reputation.band.${band}`)}</span>
+      </div>
+      <div className={`mt-1 text-2xl font-black tabular-nums ${tone}`}>{score}</div>
+
+      {roundsToAdvance > 0 && (
+        <div className="mt-2 text-[0.66rem] text-dim">
+          {t('reputation.toAdvance', { count: roundsToAdvance })}
+        </div>
+      )}
+
+      <p className="mt-2 text-[0.66rem] leading-relaxed text-dim">{t('reputation.scope')}</p>
     </div>
   );
 }

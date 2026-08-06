@@ -15,6 +15,7 @@ import {
 import { getOrCreatePlayerAccount } from '../wallet/system-accounts';
 import { getPlayerStats, getPlayerHistory } from '../stats/player-stats';
 import { getSettings, updateSettings } from '../settings/player-settings';
+import { getReputation } from '../reputation/player-reputation';
 import { WithdrawalModel } from '../withdrawal/withdrawal.model';
 import { asyncHandler, internalAuth, dataScopeMiddleware, ApiError } from './middleware';
 import { openApiSpec } from './openapi';
@@ -85,6 +86,17 @@ export function buildRouter(): Router {
           ...(window !== undefined ? { period: window } : {}),
         }),
       );
+    }),
+  );
+
+  // Reputation. Read-only to players, and deliberately NOT money: nothing here
+  // is reachable from the withdrawal path, and the spec calls a reputation score
+  // affecting a withdrawal a critical failure.
+  r.get(
+    '/me/reputation',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json(await getReputation(req.dataScope!.playerId));
     }),
   );
 

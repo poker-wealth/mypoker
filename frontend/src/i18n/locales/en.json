@@ -235,5 +235,17 @@
     "vendorAttested": "Vendor-attested",
     "vendorBlurb": "An outside supplier owns the rules; each result is signed, but their paytable cannot be proven unchanged",
     "ratesPending": "Published payout rates are not shown yet. A rate is only meaningful once the rules behind it are committed on-chain and versioned — until then it would be a number we assert about ourselves, which is what this page exists to avoid."
+  },
+  "reputation": {
+    "title": "Reputation",
+    "scope": "Reputation affects which tables you can join and chat access. It never affects deposits or withdrawals.",
+    "toAdvance": "{{count}} more rounds to reach 700",
+    "band": {
+      "TRUSTED": "Trusted",
+      "GOOD": "Good",
+      "FAIR": "Fair",
+      "POOR": "Poor",
+      "VERY_POOR": "Very poor"
+    }
   }
 }
