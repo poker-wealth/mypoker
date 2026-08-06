@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { Filter, Zap } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 import { Segmented } from '@/components/ui/Segmented';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
