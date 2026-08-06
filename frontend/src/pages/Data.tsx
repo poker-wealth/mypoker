@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Settings } from 'lucide-react';
 import { Segmented } from '@/components/ui/Segmented';
 
 /**
@@ -42,6 +43,13 @@ export function Data() {
 
   return (
     <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-end pb-1 pt-2">
+        <button className="text-dim transition-colors hover:text-text">
+          <Settings size={20} />
+        </button>
+      </div>
+
       <Segmented options={PERIODS} value={period} onChange={setPeriod} />
 
       {/* Overview tiles */}

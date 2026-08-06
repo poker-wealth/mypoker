@@ -13,8 +13,8 @@ const tabs: { to: string; label: string; icon: LucideIcon }[] = [
   { to: '/alliance', label: 'Alliance', icon: Users },
   { to: '/games', label: 'Games', icon: Gamepad2 },
   { to: '/', label: 'Lobby', icon: Home },
-  { to: '/data', label: 'Data', icon: BarChart3 },
-  { to: '/profile', label: 'My Account', icon: User },
+  { to: '/data', label: 'Stats', icon: BarChart3 },
+  { to: '/profile', label: 'Me', icon: User },
 ];
 
 export function BottomNav() {

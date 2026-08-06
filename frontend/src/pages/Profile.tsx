@@ -1,103 +1,97 @@
-import { ShieldCheck, History, Settings, LifeBuoy, Send, Wallet, LogOut } from 'lucide-react';
+import { Settings, User, Crown, ShieldCheck, Users, MessageSquare, LifeBuoy, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ListRow } from '@/components/ui/ListRow';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { useSession } from '@/store/session';
-import { isTelegram } from '@/lib/telegram';
-
-const STATS = [
-  { label: 'Hands', value: '0' },
-  { label: 'Win rate', value: '—' },
-  { label: 'Biggest win', value: '₮0' },
-];
 
 export function Profile() {
   const navigate = useNavigate();
-  const { player, status, error, signIn, signOut } = useSession();
-  const signedIn = status === 'authenticated' && player !== null;
 
   return (
     <div className="space-y-4">
-      {/* Identity */}
-      <div className="flex items-center gap-3 rounded-(--radius-app) border border-border bg-surface p-4">
-        {signedIn && player.photoUrl ? (
-          <img
-            src={player.photoUrl}
-            alt=""
-            className="size-14 shrink-0 rounded-full object-cover"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
+      {/* Header / Top */}
+      <div className="flex items-start justify-between pb-1 pt-2">
+        <div className="flex items-center gap-3">
           <div
             className="grid size-14 shrink-0 place-items-center rounded-full text-lg font-black text-white"
             style={{ backgroundImage: 'var(--brand-gradient)' }}
           >
-            {signedIn ? player.displayName.charAt(0).toUpperCase() : 'M'}
+            M
           </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-semibold">
-            {signedIn ? player.displayName : 'Guest Player'}
-          </div>
-          <div className="truncate text-xs text-dim">
-            {signedIn
-              ? player.username
-                ? `@${player.username}`
-                : `ID: ${player.playerId}`
-              : 'Not signed in'}
+          <div className="min-w-0 flex-1">
+            <div className="text-lg font-bold">MyPoker Player</div>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="flex items-center gap-1 rounded-full bg-yellow-500/20 px-2 py-0.5 text-[0.65rem] font-bold text-yellow-500">
+                <Crown size={10} /> VIP 0
+              </span>
+              <span className="text-xs text-dim">ID: 123456789</span>
+            </div>
           </div>
         </div>
-        <Badge tone="brand">VIP {signedIn ? player.vipTier : 0}</Badge>
+        <button className="text-dim transition-colors hover:text-text">
+          <Settings size={20} />
+        </button>
       </div>
 
-      {/* Sign-in CTA — hidden once signed in */}
-      {!signedIn && (
-        <div className="rounded-(--radius-app) border border-brand/30 bg-brand/5 p-4">
-          <div className="text-sm font-semibold">
-            {status === 'anonymous' ? 'Open in Telegram to sign in' : 'Sign in to save your progress'}
-          </div>
-          <div className="mt-1 text-xs text-dim">
-            {status === 'anonymous'
-              ? 'This app signs you in automatically when it runs inside Telegram.'
-              : 'Connect Telegram to sync balance, history & VIP rewards.'}
-          </div>
-          {status === 'error' && error && (
-            <div className="mt-2 text-xs text-danger">{error}</div>
-          )}
-          {(isTelegram() || status === 'error') && (
-            <Button full className="mt-3" onClick={() => void signIn()} disabled={status === 'authenticating'}>
-              <Send size={17} />
-              {status === 'authenticating' ? 'Signing in…' : 'Continue with Telegram'}
-            </Button>
-          )}
+      {/* Level progress */}
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-bold">Lv. 28</span>
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
+          <div className="h-full w-[68%] rounded-full bg-success" />
         </div>
-      )}
+        <span className="text-xs font-bold text-dim">68%</span>
+      </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
-        {STATS.map((s) => (
-          <div key={s.label} className="rounded-(--radius-app) border border-border bg-surface px-2 py-3 text-center">
-            <div className="text-lg font-black tabular-nums">{s.value}</div>
-            <div className="mt-0.5 text-[0.66rem] text-dim">{s.label}</div>
-          </div>
-        ))}
+      {/* Balance card */}
+      <div className="rounded-2xl border border-border bg-surface p-4">
+        <div className="flex items-center justify-between">
+          <div className="text-xs font-medium text-dim">Total Balance (USDT)</div>
+          <button className="flex items-center gap-1 text-xs text-dim hover:text-text">
+            Detail <ChevronRight size={14} />
+          </button>
+        </div>
+        <div className="mt-1 text-[1.8rem] font-black tabular-nums tracking-tight text-text">
+          12,345.67
+        </div>
+        <div className="mt-0.5 text-[0.7rem] font-medium text-dim">≈ $12,345.67</div>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <Button className="bg-success text-success-fg hover:bg-success/90" onClick={() => navigate('/wallet')}>
+            DEPOSIT
+          </Button>
+          <Button variant="secondary" className="border-border bg-surface text-dim" onClick={() => navigate('/wallet')}>
+            WITHDRAW
+          </Button>
+        </div>
       </div>
 
       {/* Menu */}
       <div className="divide-y divide-border overflow-hidden rounded-(--radius-app) border border-border bg-surface">
-        {/* Wallet is no longer a tab — this is its entry point. */}
-        <ListRow title="Wallet" leading={<Wallet size={18} className="text-brand" />} onClick={() => navigate('/Wallet')} />
-        <ListRow title="Fairness verification" leading={<ShieldCheck size={18} className="text-accent" />} onClick={() => {}} />
-        <ListRow title="Game history" leading={<History size={18} className="text-dim" />} onClick={() => {}} />
+        <ListRow title="Personal Info" leading={<User size={18} className="text-dim" />} onClick={() => {}} />
+        <ListRow 
+          title="VIP Membership" 
+          leading={<Crown size={18} className="text-dim" />} 
+          trailing={<span className="text-xs text-yellow-500">Check Privileges</span>}
+          onClick={() => {}} 
+        />
+        <ListRow title="Security Center" leading={<ShieldCheck size={18} className="text-dim" />} onClick={() => {}} />
+        <ListRow 
+          title="Invite Friends" 
+          leading={<Users size={18} className="text-dim" />} 
+          trailing={<span className="text-xs text-success">Earn Rewards</span>}
+          onClick={() => {}} 
+        />
+        <ListRow 
+          title="Message Center" 
+          leading={<MessageSquare size={18} className="text-dim" />} 
+          trailing={
+            <div className="flex size-5 items-center justify-center rounded-full bg-danger text-[0.65rem] font-bold text-white">
+              12
+            </div>
+          }
+          onClick={() => {}} 
+        />
+        <ListRow title="Customer Support" leading={<LifeBuoy size={18} className="text-dim" />} onClick={() => {}} />
         <ListRow title="Settings" leading={<Settings size={18} className="text-dim" />} onClick={() => {}} />
-        <ListRow title="Support" leading={<LifeBuoy size={18} className="text-dim" />} onClick={() => {}} />
-        {signedIn && (
-          <ListRow title="Sign out" leading={<LogOut size={18} className="text-dim" />} onClick={signOut} />
-        )}
       </div>
-
-      <div className="pt-1 text-center text-[0.66rem] text-dim">MYPOKER · staging build · v0.1</div>
     </div>
   );
 }

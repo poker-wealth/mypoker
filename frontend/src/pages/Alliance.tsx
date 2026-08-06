@@ -21,15 +21,17 @@ const MY_ALLIANCE = {
 };
 
 const RECOMMENDED = [
-  { name: 'Phoenix Club', members: 1892, online: 296, vip: true },
-  { name: 'King Poker', members: 1563, online: 201, vip: false },
-  { name: 'Ace Club', members: 1231, online: 178, vip: false },
-  { name: 'Elite Alliance', members: 987, online: 153, vip: false },
+  { name: 'Phoenix Club', members: 1892, online: 296, vip: true, icon: '/brand/flame.png' },
+  { name: 'King Poker', members: 1563, online: 201, vip: false, icon: '/brand/crown.png' },
+  { name: 'Ace Club', members: 1231, online: 178, vip: false, icon: '/brand/spade.png' },
+  { name: 'Elite Alliance', members: 987, online: 153, vip: false, icon: '/brand/shield.png' },
 ];
 
 export function Alliance() {
   return (
     <div className="space-y-4">
+
+
       {/* My alliance */}
       <div
         className="relative overflow-hidden rounded-2xl border border-border p-4"
@@ -91,8 +93,8 @@ export function Alliance() {
         <div className="divide-y divide-border overflow-hidden rounded-(--radius-app) border border-border bg-surface">
           {RECOMMENDED.map((a) => (
             <div key={a.name} className="flex items-center gap-3 p-3">
-              <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-sm font-black text-dim">
-                {a.name.charAt(0)}
+              <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-2 p-1.5 shadow-inner">
+                <img src={a.icon} alt="" className="size-full object-contain drop-shadow-md" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
