@@ -68,6 +68,9 @@ export function buildMeRouter(config: GatewayConfig): Router {
   r.get('/history', (req, res) => void forwardTo(config, req, res, '/me/history'));
   r.get('/reputation', (req, res) => void forwardTo(config, req, res, '/me/reputation'));
   r.get('/leagues', (req, res) => void forwardTo(config, req, res, '/me/leagues'));
+  r.get('/notifications', (req, res) => void forwardTo(config, req, res, '/me/notifications'));
+  r.post('/notifications/read', (req, res) => void forwardTo(config, req, res, '/me/notifications/read'));
+  r.post('/referral', (req, res) => void forwardTo(config, req, res, '/me/referral'));
   r.get('/settings', (req, res) => void forwardTo(config, req, res, '/me/settings'));
   r.patch('/settings', (req, res) => void forwardTo(config, req, res, '/me/settings'));
 

@@ -35,6 +35,11 @@ import {
   subAgentsOf,
   agentEligibility,
 } from '../agent/agent-store';
+import {
+  notify,
+  listNotifications,
+  markRead,
+} from '../notifications/notification-store';
 import { WithdrawalModel } from '../withdrawal/withdrawal.model';
 import { asyncHandler, internalAuth, dataScopeMiddleware, ApiError } from './middleware';
 import { openApiSpec } from './openapi';
@@ -309,6 +314,63 @@ export function buildRouter(): Router {
       // Permanent and set once — a second call is a no-op, not an update.
       await bindReferral(req.dataScope!.playerId, linkId);
       res.status(204).end();
+    }),
+  );
+
+  // ── Notifications ────────────────────────────────────────────────────────
+  const notificationsQuery = z.object({
+    limit: z.coerce.number().int().positive().max(100).optional(),
+    cursor: z.string().min(1).optional(),
+  });
+  r.get(
+    '/me/notifications',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { limit, cursor } = notificationsQuery.parse(req.query);
+      res.json(
+        await listNotifications(req.dataScope!.playerId, {
+          ...(limit !== undefined ? { limit } : {}),
+          ...(cursor !== undefined ? { cursor } : {}),
+        }),
+      );
+    }),
+  );
+
+  const readBody = z.object({ ids: z.array(z.string().min(1)).optional() });
+  r.post(
+    '/me/notifications/read',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { ids } = readBody.parse(req.body ?? {});
+      const marked = await markRead(req.dataScope!.playerId, ids);
+      res.json({ marked });
+    }),
+  );
+
+  // Raised by services, never by a player: someone who could notify themselves
+  // could notify anyone, and a notification is a claim the platform is making.
+  const notifyBody = z.object({
+    playerId: z.string().min(1),
+    kind: z.enum(['RESULT', 'DEPOSIT', 'PROMO', 'JACKPOT', 'SYSTEM']),
+    titleKey: z.string().min(1),
+    eventId: z.string().min(1),
+    params: z.record(z.union([z.string(), z.number()])).optional(),
+  });
+  r.post(
+    '/internal/notifications',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const body = notifyBody.parse(req.body);
+      const stored = await notify({
+        playerId: body.playerId,
+        kind: body.kind,
+        titleKey: body.titleKey,
+        eventId: body.eventId,
+        ...(body.params !== undefined ? { params: body.params } : {}),
+      });
+      // 'suppressed' is not a failure — the player asked not to be told, and the
+      // caller should be able to tell that apart from an error.
+      res.json({ stored, suppressed: !stored });
     }),
   );
 
