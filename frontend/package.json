@@ -10,7 +10,9 @@
     "check:no-localhost": "node -e \"const{execSync}=require('child_process');let h='';try{h=execSync('grep -rlE \\\"localhost:[0-9]+\\\" dist',{stdio:['ignore','pipe','ignore']}).toString().trim()}catch{};if(h){console.error('\\n  BUILD REJECTED: a localhost API URL was baked into the bundle.\\n  Almost certainly VITE_API_URL in .env.local — Vite loads that in production too.\\n  Use .env.development.local instead.\\n  Files: '+h.replace(/\\n/g,', ')+'\\n');process.exit(1)}\"",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.66.0",
@@ -38,6 +40,7 @@
     "tailwindcss": "^4.0.3",
     "typescript": "~5.7.3",
     "typescript-eslint": "^8.22.0",
-    "vite": "^6.1.0"
+    "vite": "^6.1.0",
+    "vitest": "^4.1.10"
   }
 }

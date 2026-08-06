@@ -1,0 +1,105 @@
+{
+  "roundId": "round-vector-0001",
+  "serverSeed": "853cfcb1380fc2550a1dbeee35b90fd1117ca9c4b2f8ea2f695f22aab6b70f43",
+  "serverCommit": "3d8ae4de019a826dfbccedbb629b86e4b196e76d32f690cd6fbe21ee981bfb81",
+  "allClientSeeds": "64e814d3fa35862abc9dad9d2a8dce4daa1054638b4dab60b3f80e7fd1d0ad0c",
+  "futureBlockHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "finalSeed": "c2043bd06102dd641775bc11affa1e44035cefc1274b687dd5d712603c312a5b",
+  "cards": [
+    "4h",
+    "6s",
+    "7s",
+    "Jc",
+    "Ah",
+    "9d",
+    "Qh",
+    "Ts",
+    "Jh",
+    "Ac",
+    "Qd",
+    "Js",
+    "3d",
+    "5d",
+    "5c",
+    "Td",
+    "3s",
+    "Qs",
+    "4s",
+    "4d",
+    "Ad",
+    "3h",
+    "Kd",
+    "Kh",
+    "8c",
+    "As",
+    "3c",
+    "8s",
+    "9c",
+    "7d",
+    "6h",
+    "Jd",
+    "Th",
+    "Qc",
+    "Kc",
+    "8d",
+    "2h",
+    "6c",
+    "Ks",
+    "7h",
+    "2s",
+    "5s",
+    "5h",
+    "6d",
+    "7c",
+    "2d",
+    "8h",
+    "9h",
+    "2c",
+    "Tc",
+    "4c",
+    "9s"
+  ],
+  "timestamp": 1770000000000,
+  "roundHash": "ec08e5501ca3b5dbe078ea5198614e985b98a4ef4be99590b99ab3ad9c282bf5",
+  "merkleProof": [
+    {
+      "hash": "fc6297b671452162fe21ad3aa19da8508e8f5b7a552f1d8afed50e25c36b6d37",
+      "right": true
+    },
+    {
+      "hash": "ad80a67fd9f2685869bb5c1726f2f89017be7f4b4c2720aaa71c561a2a94e38b",
+      "right": true
+    },
+    {
+      "hash": "14d491556787b67cd03fd280387a8daf71969b0dd6d539769d2bf3bc3ca8cf05",
+      "right": true
+    }
+  ],
+  "merkleRoot": "d242c0ae0a406cf0c2af007546beea5f47f4d486c7b9ef1c122391f6e9251b40",
+  "seatedClientSeeds": [
+    {
+      "seatOrder": 1,
+      "clientSeed": "c3b85d4ded0fb4d7b524a0c2d8bad1cea7daa39a35f625853b64d8c1815d6f1b"
+    },
+    {
+      "seatOrder": 2,
+      "clientSeed": "5edda8ee47c4d0d10a1e7b0c4becf20c581739e1ad9438ec2012fab2e869c358"
+    },
+    {
+      "seatOrder": 3,
+      "clientSeed": "fa4c6de9e474e064966358ce5e81037fc0f92c4dc4fc475b4a28b3d5c1b4ada0"
+    },
+    {
+      "seatOrder": 4,
+      "clientSeed": "ce6f1ab4d691d6134ed1c881fb279aecf7b6421d21895174743f95096e11bd81"
+    },
+    {
+      "seatOrder": 5,
+      "clientSeed": "3d28e3751c2e356d055c66866fb521305c706442f51a5fe99e4a9d53fbf88a9e"
+    },
+    {
+      "seatOrder": 6,
+      "clientSeed": "12ab3f7fc2af6e95880959476bbe88ec300a493864bbd6717a54c5f4d59a0d83"
+    }
+  ]
+}

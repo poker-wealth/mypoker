@@ -157,7 +157,11 @@ export function Profile() {
       <div className="divide-y divide-border overflow-hidden rounded-(--radius-app) border border-border bg-surface">
         {/* Wallet is no longer a tab — this is its entry point. */}
         <ListRow title={t('account.wallet')} leading={<Wallet size={18} className="text-brand" />} onClick={() => navigate('/wallet')} />
-        <ListRow title={t('account.fairness')} leading={<ShieldCheck size={18} className="text-accent" />} onClick={() => {}} />
+        <ListRow
+          title={t('account.fairness')}
+          leading={<ShieldCheck size={18} className="text-accent" />}
+          onClick={() => navigate('/fairness')}
+        />
         <ListRow title={t('account.history')} leading={<History size={18} className="text-dim" />} onClick={() => {}} />
         <ListRow
           title={t('account.language')}

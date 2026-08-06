@@ -165,5 +165,33 @@
     "notifyPromos": "Promosi",
     "about": "Tentang",
     "signInToSync": "Masuk untuk menyinkronkan preferensi Anda"
+  },
+  "fairness": {
+    "title": "Verifikasi keadilan",
+    "intro": "Semua pemeriksaan di bawah berjalan di perangkat Anda. Kami tidak memberi tahu bahwa ronde itu adil — Anda menghitung ulang dan melihatnya sendiri.",
+    "roundData": "Data ronde",
+    "paste": "Tempel data publik dari ronde yang selesai di sini…",
+    "verify": "Verifikasi",
+    "sample": "Contoh",
+    "verified": "Terverifikasi",
+    "verifiedBlurb": "Keenam pemeriksaan lolos. Ronde ini tidak dimanipulasi.",
+    "failed": "Verifikasi gagal",
+    "failedBlurb": "Setidaknya satu pemeriksaan tidak cocok. Buka langkah yang gagal untuk melihat kedua nilai.",
+    "computed": "Dihitung di perangkat Anda",
+    "expected": "Dipublikasikan platform",
+    "couldNotRead": "Tidak dapat membaca data ronde itu:",
+    "badInput": "format tidak dikenali",
+    "step1": "Seed server cocok dengan komitmennya",
+    "step1Blurb": "Server mengunci seed sebelum pembagian dan tidak bisa menukarnya",
+    "step2": "Seed akhir adalah kombinasi yang disepakati",
+    "step2Blurb": "Seed server, semua seed pemain, hash blok masa depan, dan id ronde",
+    "step3": "Seed Anda termasuk di dalamnya",
+    "step3Blurb": "Setiap pemain yang duduk berkontribusi, sesuai urutan kursi",
+    "step4": "Dek tereproduksi persis",
+    "step4Blurb": "Mengocok dengan seed akhir menghasilkan kartu yang sama",
+    "step5": "Tidak ada bagian ronde yang diubah",
+    "step5Blurb": "Tujuh bidang di-hash menjadi hash ronde yang tercatat",
+    "step6": "Ronde ini ada dalam catatan on-chain",
+    "step6Blurb": "Buktinya membangun ulang akar Merkle yang dipublikasikan, jadi tidak bisa dihapus"
   }
 }

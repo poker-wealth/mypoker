@@ -7,6 +7,7 @@ import { Data } from '@/pages/Data';
 import { Wallet } from '@/pages/Wallet';
 import { Profile } from '@/pages/Profile';
 import { Settings } from '@/pages/Settings';
+import { Fairness } from '@/pages/Fairness';
 import { Table } from '@/pages/Table';
 
 export const router = createBrowserRouter([
@@ -23,6 +24,7 @@ export const router = createBrowserRouter([
       // Not a tab — reached from My Account's deposit/withdraw.
       { path: 'wallet', element: <Wallet /> },
       { path: 'settings', element: <Settings /> },
+      { path: 'fairness', element: <Fairness /> },
     ],
   },
   // Full-screen game table (no bottom nav / shell chrome).
