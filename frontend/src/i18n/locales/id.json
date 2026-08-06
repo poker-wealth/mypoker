@@ -21,7 +21,32 @@
     "jackpotBlurb": "Bertambah setiap kali satu ronde dimainkan di MYPOKER.",
     "provablyFair": "Terbukti adil · dapat diverifikasi on-chain",
     "hotNow": "Sedang populer",
-    "moreGames": "Game lainnya"
+    "moreGames": "Game lainnya",
+    "grandJackpot": "Jackpot utama",
+    "fairSecure": "Adil & aman",
+    "colTable": "Meja",
+    "colBlinds": "Blind",
+    "colPlayers": "Pemain",
+    "colBuyIn": "Buy-in",
+    "colStatus": "Status",
+    "quickJoin": "Gabung cepat",
+    "createPrivate": "Buat meja privat",
+    "noTables": "Tidak ada meja yang cocok",
+    "noTablesBlurb": "Coba level taruhan lain.",
+    "tabNotMapped": "Belum dikonfigurasi",
+    "tab": {
+      "dezhou": "Dezhou",
+      "xuzhou": "Xuzhou",
+      "ausha": "Omaha",
+      "macau": "Makau",
+      "others": "Lainnya"
+    },
+    "status": {
+      "open": "Terbuka",
+      "waiting": "Tunggu",
+      "full": "Penuh",
+      "unavailable": "Tutup"
+    }
   },
   "games": {
     "searchPlaceholder": "Cari game",

@@ -1,7 +1,7 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchSettings, patchSettings, type PlayerSettings, type SettingsPatch } from './settings';
 import { fetchStats, fetchHistory, type HistoryPage, type StatsPeriod } from './stats';
-import { fetchLobbyGames } from './lobby';
+import { fetchLobbyGames, fetchTables, type TableFilter } from './lobby';
 import { useSession } from '@/store/session';
 
 /**
@@ -112,5 +112,24 @@ export function useUpdateSettings() {
       if (context?.previous) queryClient.setQueryData(key, context.previous);
     },
     onSuccess: (settled) => queryClient.setQueryData(key, settled),
+  });
+}
+
+/**
+ * Tables for the lobby list.
+ *
+ * Public, like the game rail, so no session is needed. Polled on an interval
+ * because seats fill and empty while the screen is open — a lobby that is stale
+ * sends players to a table that was full a minute ago.
+ */
+export function useLobbyTables(filter: TableFilter = {}) {
+  return useQuery({
+    // The filter is part of the key: switching stake bucket or game type must
+    // fetch, not re-slice a cached list that was fetched under other terms.
+    queryKey: ['lobby', 'tables', filter],
+    queryFn: () => fetchTables(filter),
+    staleTime: 10_000,
+    refetchInterval: 20_000,
+    retry: 1,
   });
 }

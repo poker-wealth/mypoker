@@ -21,7 +21,32 @@
     "jackpotBlurb": "MYPOKER でプレイされるすべてのハンドで増えていきます。",
     "provablyFair": "証明可能な公正性 · オンチェーンで検証可能",
     "hotNow": "人気のゲーム",
-    "moreGames": "その他のゲーム"
+    "moreGames": "その他のゲーム",
+    "grandJackpot": "グランドジャックポット",
+    "fairSecure": "公正・安全",
+    "colTable": "テーブル",
+    "colBlinds": "ブラインド",
+    "colPlayers": "プレイヤー",
+    "colBuyIn": "バイイン",
+    "colStatus": "状態",
+    "quickJoin": "クイック参加",
+    "createPrivate": "プライベートテーブル作成",
+    "noTables": "条件に合うテーブルがありません",
+    "noTablesBlurb": "別のステークをお試しください。",
+    "tabNotMapped": "まだ設定されていません",
+    "tab": {
+      "dezhou": "テキサス",
+      "xuzhou": "シュウジョウ",
+      "ausha": "オマハ",
+      "macau": "マカオ",
+      "others": "その他"
+    },
+    "status": {
+      "open": "受付中",
+      "waiting": "待機",
+      "full": "満席",
+      "unavailable": "利用不可"
+    }
   },
   "games": {
     "searchPlaceholder": "ゲームを検索",

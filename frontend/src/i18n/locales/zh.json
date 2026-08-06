@@ -21,7 +21,32 @@
     "jackpotBlurb": "MYPOKER 每一手牌都会让彩池增长。",
     "provablyFair": "公平可验证 · 链上可查",
     "hotNow": "热门推荐",
-    "moreGames": "更多游戏"
+    "moreGames": "更多游戏",
+    "grandJackpot": "大奖池",
+    "fairSecure": "公平安全",
+    "colTable": "牌桌",
+    "colBlinds": "盲注",
+    "colPlayers": "玩家",
+    "colBuyIn": "买入",
+    "colStatus": "状态",
+    "quickJoin": "快速加入",
+    "createPrivate": "创建私人牌桌",
+    "noTables": "没有符合条件的牌桌",
+    "noTablesBlurb": "试试其他注额。",
+    "tabNotMapped": "尚未配置",
+    "tab": {
+      "dezhou": "德州",
+      "xuzhou": "徐州",
+      "ausha": "奥莎",
+      "macau": "澳门",
+      "others": "其他"
+    },
+    "status": {
+      "open": "进行中",
+      "waiting": "等待中",
+      "full": "已满",
+      "unavailable": "暂不可用"
+    }
   },
   "games": {
     "searchPlaceholder": "搜索游戏",

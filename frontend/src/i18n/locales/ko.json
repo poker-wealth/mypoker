@@ -21,7 +21,32 @@
     "jackpotBlurb": "MYPOKER에서 진행되는 모든 핸드마다 잭팟이 쌓입니다.",
     "provablyFair": "증명 가능한 공정성 · 온체인 검증",
     "hotNow": "인기 게임",
-    "moreGames": "더 많은 게임"
+    "moreGames": "더 많은 게임",
+    "grandJackpot": "그랜드 잭팟",
+    "fairSecure": "공정 · 안전",
+    "colTable": "테이블",
+    "colBlinds": "블라인드",
+    "colPlayers": "플레이어",
+    "colBuyIn": "바이인",
+    "colStatus": "상태",
+    "quickJoin": "빠른 참여",
+    "createPrivate": "프라이빗 테이블 만들기",
+    "noTables": "조건에 맞는 테이블이 없습니다",
+    "noTablesBlurb": "다른 스테이크를 선택해 보세요.",
+    "tabNotMapped": "아직 설정되지 않았습니다",
+    "tab": {
+      "dezhou": "텍사스",
+      "xuzhou": "쉬저우",
+      "ausha": "오마하",
+      "macau": "마카오",
+      "others": "기타"
+    },
+    "status": {
+      "open": "진행 중",
+      "waiting": "대기",
+      "full": "만석",
+      "unavailable": "이용 불가"
+    }
   },
   "games": {
     "searchPlaceholder": "게임 검색",

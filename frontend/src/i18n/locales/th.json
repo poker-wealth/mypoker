@@ -21,7 +21,32 @@
     "jackpotBlurb": "เพิ่มขึ้นทุกตาที่มีการเล่นบน MYPOKER",
     "provablyFair": "ยุติธรรมพิสูจน์ได้ · ตรวจสอบบนเชนได้",
     "hotNow": "กำลังมาแรง",
-    "moreGames": "เกมเพิ่มเติม"
+    "moreGames": "เกมเพิ่มเติม",
+    "grandJackpot": "แกรนด์แจ็กพอต",
+    "fairSecure": "ยุติธรรมและปลอดภัย",
+    "colTable": "โต๊ะ",
+    "colBlinds": "เบลนด์",
+    "colPlayers": "ผู้เล่น",
+    "colBuyIn": "ค่าเข้า",
+    "colStatus": "สถานะ",
+    "quickJoin": "เข้าร่วมด่วน",
+    "createPrivate": "สร้างโต๊ะส่วนตัว",
+    "noTables": "ไม่มีโต๊ะที่ตรงเงื่อนไข",
+    "noTablesBlurb": "ลองระดับเดิมพันอื่น",
+    "tabNotMapped": "ยังไม่ได้ตั้งค่า",
+    "tab": {
+      "dezhou": "เต๋อโจว",
+      "xuzhou": "สวีโจว",
+      "ausha": "โอมาฮา",
+      "macau": "มาเก๊า",
+      "others": "อื่นๆ"
+    },
+    "status": {
+      "open": "เปิด",
+      "waiting": "รอ",
+      "full": "เต็ม",
+      "unavailable": "ปิด"
+    }
   },
   "games": {
     "searchPlaceholder": "ค้นหาเกม",

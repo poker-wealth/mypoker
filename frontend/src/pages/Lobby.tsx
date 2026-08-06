@@ -1,135 +1,253 @@
-import { motion } from 'motion/react';
-import { ShieldCheck, Flame, ChevronRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { GameTile } from '@/components/GameTile';
+import { useNavigate } from 'react-router-dom';
+import { motion } from 'motion/react';
+import { Trophy, Zap, SlidersHorizontal, ShieldCheck } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { GAMES, gameVisual, totalPlayers, type GameDef } from '@/lib/games';
-import { useLobbyGames } from '@/api/hooks';
-import { formatMicros } from '@/api/lobby';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { useLobbyGames, useLobbyTables } from '@/api/hooks';
+import { HIDDEN_GAMES } from '@/lib/games';
+import { cn } from '@/lib/cn';
+import { haptic } from '@/lib/telegram';
+import type { TableView } from '@/api/lobby';
 
 /**
- * The lobby.
+ * Tab 3 — Lobby, to the approved design: grand jackpot, game-type tabs, stake
+ * chips, and a table list you scan like a fixture board.
  *
- * Reads live figures from GET /lobby/games and **falls back to the static
- * catalog** when that can't be reached — deliberately, not as an oversight. This
- * is the shop window: a player opening the app on a flaky train connection
- * should see games, not an error panel. The fallback shows plausible tiles that
- * still navigate; the only thing lost is that the numbers are stale.
- *
- * Jackpot and player counts are the two things that must be real when the server
- * is up, so they're the ones driven by the query.
+ * The table list is the point of this screen. A player choosing where to sit
+ * compares blinds, how full a table is and how deep the money is — so those are
+ * columns, not prose, and the numbers are tabular so they line up down the page.
  */
+
+/** micro-USD → dollars. The server speaks micros everywhere; the UI never does. */
+const usd = (micros: number): number => micros / 1_000_000;
+
+const money = (micros: number, dp = 2): string =>
+  usd(micros).toLocaleString(undefined, { minimumFractionDigits: dp, maximumFractionDigits: dp });
+
+/** Blinds read as a pair — the small blind is conventionally half the big. */
+const blinds = (stakes: number): string => {
+  const big = usd(stakes);
+  const small = big / 2;
+  const fmt = (n: number): string => (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, ''));
+  return `${fmt(small)}/${fmt(big)}`;
+};
+
+/**
+ * Game-type tabs.
+ *
+ * DEZHOU (德州) is Texas and AUSHA is Omaha — those are unambiguous. XUZHOU and
+ * MACAU are in the design but match no game in the server catalog, so they are
+ * declared with a null gameId: the tab renders and reports honestly that it has
+ * no tables rather than silently showing another game's. Confirm with Victor and
+ * fill in the id — that is the whole change.
+ */
+const GAME_TABS: { key: string; gameId: string | null }[] = [
+  { key: 'dezhou', gameId: 'texas' },
+  { key: 'xuzhou', gameId: null },
+  { key: 'ausha', gameId: 'omaha' },
+  { key: 'macau', gameId: null },
+  { key: 'others', gameId: null },
+];
+
+/** Stake buckets, in dollars of big blind. */
+const STAKES: { key: string; min?: number; max?: number }[] = [
+  { key: 'all' },
+  { key: '1/2', min: 2, max: 2 },
+  { key: '5/10', min: 10, max: 10 },
+  { key: '25/50', min: 50, max: 50 },
+  { key: '100/200', min: 200, max: 200 },
+];
+
 export function Lobby() {
-  const navigate = useNavigate();
   const { t } = useTranslation();
-  const lobby = useLobbyGames();
+  const navigate = useNavigate();
+  const [tab, setTab] = useState('dezhou');
+  const [stake, setStake] = useState('all');
 
-  // Merge server truth with client visuals: the server owns who's playing and
-  // how big the jackpot is, we own what a game looks like.
-  const games: GameDef[] = lobby.data
-    ? lobby.data.games.flatMap((g): GameDef[] => {
-        // Unavailable games are dropped rather than greyed out — a vendor being
-        // down is our problem, not something to advertise on the front screen.
-        if (!g.available) return [];
-        // A game the server knows about but we have no artwork for is skipped
-        // rather than rendered blank. It reappears the moment a tile is added.
-        const visual = gameVisual(g.gameId);
-        if (!visual) return [];
-        return [{ ...visual, players: g.players, hot: g.players > 500 }];
-      })
-    : GAMES;
+  const games = useLobbyGames();
+  const activeTab = GAME_TABS.find((g) => g.key === tab)!;
+  const bucket = STAKES.find((s) => s.key === stake)!;
 
-  const hot = games.filter((g) => g.hot);
-  const rest = games.filter((g) => !g.hot);
+  const tables = useLobbyTables({
+    ...(activeTab.gameId ? { gameId: activeTab.gameId } : {}),
+    ...(bucket.min !== undefined ? { minStakes: bucket.min * 1_000_000 } : {}),
+    ...(bucket.max !== undefined ? { maxStakes: bucket.max * 1_000_000 } : {}),
+  });
 
-  const jackpot = lobby.data ? `₮${formatMicros(lobby.data.totalJackpot)}` : '₮128,450';
-  const online = lobby.data
-    ? lobby.data.games.reduce((sum, g) => sum + g.players, 0)
-    : totalPlayers();
+  const rows = useMemo(
+    () => (tables.data?.tables ?? []).filter((tb) => !HIDDEN_GAMES.has(tb.gameId)),
+    [tables.data],
+  );
+
+  const totalJackpot = games.data?.totalJackpot ?? 0;
+
+  // A tab the catalog has no game for can't have tables — say so, rather than
+  // showing an empty list that reads as "no tables right now".
+  const unmappedTab = activeTab.gameId === null && tab !== 'others';
 
   return (
-    <div className="space-y-5">
-      {/* Jackpot hero */}
-      <div
-        className="relative overflow-hidden rounded-2xl border border-border p-5"
-        style={{ boxShadow: 'var(--glow-brand)' }}
-      >
-        <div className="absolute inset-0" style={{ backgroundImage: 'var(--brand-gradient)', opacity: 0.9 }} />
+    <div className="space-y-4">
+      {/* Grand jackpot */}
+      <div className="relative overflow-hidden rounded-(--radius-app) border border-jackpot/30 bg-jackpot/10 p-4">
         <motion.div
-          className="absolute inset-y-0 w-1/3 bg-white/20 blur-2xl"
-          initial={{ x: '-120%' }}
-          animate={{ x: '360%' }}
+          className="pointer-events-none absolute inset-0 -translate-x-full bg-linear-to-r from-transparent via-white/10 to-transparent"
+          animate={{ x: ['-100%', '200%'] }}
           transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut', repeatDelay: 1.5 }}
         />
-        <div className="relative text-white">
-          <div className="flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-wider text-white/80">
-            <span className="relative flex size-2">
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-white/70" />
-              <span className="relative inline-flex size-2 rounded-full bg-white" />
-            </span>
-            {t('lobby.dailyJackpot')}
-          </div>
-          {lobby.isPending ? (
-            <Skeleton className="mt-2 h-10 w-52 bg-white/25" />
-          ) : (
-            <div className="mt-1 text-[2.6rem] font-black leading-none tracking-tight tabular-nums">
-              {jackpot}
+        <div className="relative flex items-center gap-3">
+          <Trophy size={34} className="shrink-0 text-jackpot" />
+          <div className="min-w-0">
+            <div className="text-[0.66rem] font-bold uppercase tracking-widest text-jackpot/80">
+              {t('lobby.grandJackpot')}
             </div>
-          )}
-          <div className="mt-2 text-xs text-white/75">{t('lobby.jackpotBlurb')}</div>
-        </div>
-      </div>
-
-      {/* Live players band */}
-      <div className="flex items-center justify-between rounded-(--radius-app) border border-border bg-surface px-4 py-3">
-        <div className="flex items-center gap-2 text-sm">
-          <ShieldCheck size={18} className="text-accent" />
-          <span className="text-dim">{t('lobby.provablyFair')}</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-sm font-semibold">
-          <span className="size-2 rounded-full bg-success" />
-          {lobby.isPending ? (
-            <Skeleton className="h-4 w-10" />
-          ) : (
-            online.toLocaleString()
-          )}
-          <span className="text-dim">{t('common.online')}</span>
-        </div>
-      </div>
-
-      {/* Hot now */}
-      {hot.length > 0 && (
-        <section>
-          <div className="mb-2.5 flex items-center gap-1.5">
-            <Flame size={16} className="text-danger" />
-            <h2 className="text-sm font-bold">{t('lobby.hotNow')}</h2>
+            <div className="truncate text-2xl font-black tabular-nums text-jackpot">
+              ₮{money(totalJackpot)}
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            {hot.map((g) => (
-              <GameTile key={g.id} game={g} onClick={() => navigate(`/table/${g.id}`)} />
+          <span className="ml-auto shrink-0 self-start rounded-full bg-success/15 px-2 py-1 text-[0.6rem] font-bold text-success">
+            <ShieldCheck size={11} className="mr-1 inline align-[-1px]" />
+            {t('lobby.fairSecure')}
+          </span>
+        </div>
+      </div>
+
+      {/* Game-type tabs */}
+      <div className="flex gap-1 overflow-x-auto border-b border-border">
+        {GAME_TABS.map((g) => (
+          <button
+            key={g.key}
+            onClick={() => {
+              haptic('light');
+              setTab(g.key);
+            }}
+            className={cn(
+              'shrink-0 border-b-2 px-3 pb-2 text-xs font-bold uppercase tracking-wide transition-colors',
+              tab === g.key ? 'border-brand text-brand' : 'border-transparent text-dim',
+            )}
+          >
+            {t(`lobby.tab.${g.key}`)}
+          </button>
+        ))}
+      </div>
+
+      {/* Stake chips */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-0.5">
+        {STAKES.map((s) => (
+          <button
+            key={s.key}
+            onClick={() => {
+              haptic('light');
+              setStake(s.key);
+            }}
+            className={cn(
+              'shrink-0 rounded-full px-3.5 py-1.5 text-xs font-bold transition-colors',
+              stake === s.key ? 'bg-brand text-white' : 'border border-border bg-surface text-dim',
+            )}
+          >
+            {s.key === 'all' ? t('games.filterAll') : s.key}
+          </button>
+        ))}
+        <div className="ml-auto shrink-0 rounded-full border border-border bg-surface p-2 text-dim">
+          <SlidersHorizontal size={14} />
+        </div>
+      </div>
+
+      {/* Table list */}
+      <section>
+        <div className="grid grid-cols-[1.1fr_1fr_0.9fr_1fr_1.1fr] gap-2 px-3 pb-2 text-[0.6rem] font-bold uppercase tracking-wide text-dim">
+          <span>{t('lobby.colTable')}</span>
+          <span>{t('lobby.colBlinds')}</span>
+          <span>{t('lobby.colPlayers')}</span>
+          <span>{t('lobby.colBuyIn')}</span>
+          <span className="text-right">{t('lobby.colStatus')}</span>
+        </div>
+
+        {tables.isPending && (
+          <div className="divide-y divide-border overflow-hidden rounded-(--radius-app) border border-border bg-surface">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="px-3 py-3">
+                <Skeleton className="h-3.5 w-full" />
+              </div>
             ))}
           </div>
-        </section>
-      )}
+        )}
 
-      {/* All games */}
-      <section>
-        <button
-          onClick={() => navigate('/games')}
-          className="mb-2.5 flex w-full items-center justify-between"
-        >
-          <h2 className="text-sm font-bold">{t('lobby.moreGames')}</h2>
-          <span className="flex items-center text-xs text-dim">
-            {t('common.seeAll')} <ChevronRight size={14} />
-          </span>
-        </button>
-        <div className="grid grid-cols-2 gap-3">
-          {rest.map((g) => (
-            <GameTile key={g.id} game={g} onClick={() => navigate(`/table/${g.id}`)} />
-          ))}
-        </div>
+        {!tables.isPending && (unmappedTab || rows.length === 0) && (
+          <div className="rounded-(--radius-app) border border-border bg-surface">
+            <EmptyState
+              icon={SlidersHorizontal}
+              title={unmappedTab ? t('lobby.tabNotMapped') : t('lobby.noTables')}
+              description={unmappedTab ? undefined : t('lobby.noTablesBlurb')}
+            />
+          </div>
+        )}
+
+        {!tables.isPending && !unmappedTab && rows.length > 0 && (
+          <ul className="divide-y divide-border overflow-hidden rounded-(--radius-app) border border-border bg-surface">
+            {rows.map((tb) => (
+              <TableRow key={tb.id} table={tb} onJoin={() => navigate(`/table/${tb.gameId}`)} />
+            ))}
+          </ul>
+        )}
       </section>
+
+      {/* Actions */}
+      <div className="flex gap-2">
+        <Button
+          className="flex-1"
+          onClick={() => {
+            haptic('medium');
+            const first = rows.find((r) => r.seatsFree > 0) ?? rows[0];
+            if (first) navigate(`/table/${first.gameId}`);
+          }}
+          disabled={rows.length === 0}
+        >
+          <Zap size={16} className="mr-1.5" />
+          {t('lobby.quickJoin')}
+        </Button>
+        <Button variant="ghost" className="flex-1" onClick={() => haptic('light')}>
+          {t('lobby.createPrivate')}
+        </Button>
+      </div>
     </div>
+  );
+}
+
+function TableRow({ table, onJoin }: { table: TableView; onJoin: () => void }) {
+  const { t } = useTranslation();
+  // A table you can sit at shows what is in its pot; one you cannot shows why.
+  const joinable = table.status === 'OPEN' && table.seatsFree > 0;
+
+  return (
+    <li>
+      <button
+        onClick={() => {
+          haptic('light');
+          onJoin();
+        }}
+        className="grid w-full grid-cols-[1.1fr_1fr_0.9fr_1fr_1.1fr] items-center gap-2 px-3 py-3 text-left text-xs tabular-nums active:bg-surface-2"
+      >
+        <span className="truncate font-bold text-jackpot">{table.id.toUpperCase()}</span>
+        <span className="truncate">{blinds(table.stakes)}</span>
+        <span className={cn('truncate', table.seatsFree === 0 && 'text-dim')}>
+          {table.players}/{table.maxPlayers}
+        </span>
+        <span className="truncate text-dim">{table.buyInBB} BB</span>
+        <span className="justify-self-end">
+          {joinable ? (
+            <span className="rounded-full bg-success/15 px-2 py-1 text-[0.62rem] font-bold text-success">
+              ₮{money(table.jackpot, 0)}
+            </span>
+          ) : (
+            <span className="rounded-full bg-surface-2 px-2 py-1 text-[0.62rem] font-bold text-dim">
+              {t(`lobby.status.${table.status.toLowerCase()}`)}
+            </span>
+          )}
+        </span>
+      </button>
+    </li>
   );
 }

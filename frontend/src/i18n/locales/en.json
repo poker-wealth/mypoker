@@ -21,7 +21,32 @@
     "jackpotBlurb": "Grows with every hand played across MYPOKER.",
     "provablyFair": "Provably fair · verifiable on-chain",
     "hotNow": "Hot right now",
-    "moreGames": "More games"
+    "moreGames": "More games",
+    "grandJackpot": "Grand jackpot",
+    "fairSecure": "Fair & secure",
+    "colTable": "Table",
+    "colBlinds": "Blinds",
+    "colPlayers": "Players",
+    "colBuyIn": "Buy-in",
+    "colStatus": "Status",
+    "quickJoin": "Quick join",
+    "createPrivate": "Create private table",
+    "noTables": "No tables match",
+    "noTablesBlurb": "Try a different stake level.",
+    "tabNotMapped": "Not configured yet",
+    "tab": {
+      "dezhou": "Dezhou",
+      "xuzhou": "Xuzhou",
+      "ausha": "Ausha",
+      "macau": "Macau",
+      "others": "Others"
+    },
+    "status": {
+      "open": "Open",
+      "waiting": "Wait",
+      "full": "Full",
+      "unavailable": "Closed"
+    }
   },
   "games": {
     "searchPlaceholder": "Search games",

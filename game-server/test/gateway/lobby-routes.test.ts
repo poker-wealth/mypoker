@@ -7,9 +7,9 @@ const $ = (dollars: number): number => dollars * 1_000_000;
 
 function seededLobby(): LobbyService {
   const lobby = new LobbyService();
-  lobby.addTable({ id: 'tx-1', gameId: 'texas', stakes: $(2), players: 6, jackpot: $(52) });
-  lobby.addTable({ id: 'tx-2', gameId: 'texas', stakes: $(20), players: 4, jackpot: $(128) });
-  lobby.addTable({ id: 'nn-1', gameId: 'niu-niu', stakes: $(1), players: 9, jackpot: $(3) });
+  lobby.addTable({ id: 'tx-1', gameId: 'texas', stakes: $(2), players: 6, jackpot: $(52) , buyInBB: 40});
+  lobby.addTable({ id: 'tx-2', gameId: 'texas', stakes: $(20), players: 4, jackpot: $(128) , buyInBB: 40});
+  lobby.addTable({ id: 'nn-1', gameId: 'niu-niu', stakes: $(1), players: 9, jackpot: $(3) , buyInBB: 40});
   return lobby;
 }
 

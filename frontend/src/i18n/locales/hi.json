@@ -21,7 +21,32 @@
     "jackpotBlurb": "MYPOKER पर खेले गए हर हाथ के साथ बढ़ता है।",
     "provablyFair": "प्रमाणित निष्पक्ष · ऑन-चेन सत्यापन योग्य",
     "hotNow": "अभी लोकप्रिय",
-    "moreGames": "और गेम्स"
+    "moreGames": "और गेम्स",
+    "grandJackpot": "ग्रैंड जैकपॉट",
+    "fairSecure": "निष्पक्ष और सुरक्षित",
+    "colTable": "टेबल",
+    "colBlinds": "ब्लाइंड्स",
+    "colPlayers": "खिलाड़ी",
+    "colBuyIn": "बाय-इन",
+    "colStatus": "स्थिति",
+    "quickJoin": "तुरंत जुड़ें",
+    "createPrivate": "निजी टेबल बनाएँ",
+    "noTables": "कोई मेल खाती टेबल नहीं",
+    "noTablesBlurb": "कोई और स्टेक आज़माएँ।",
+    "tabNotMapped": "अभी कॉन्फ़िगर नहीं",
+    "tab": {
+      "dezhou": "देझोउ",
+      "xuzhou": "शूझोउ",
+      "ausha": "ओमाहा",
+      "macau": "मकाओ",
+      "others": "अन्य"
+    },
+    "status": {
+      "open": "खुला",
+      "waiting": "प्रतीक्षा",
+      "full": "भरा",
+      "unavailable": "बंद"
+    }
   },
   "games": {
     "searchPlaceholder": "गेम खोजें",

@@ -21,7 +21,32 @@
     "jackpotBlurb": "Tăng lên theo mỗi ván bài được chơi trên MYPOKER.",
     "provablyFair": "Công bằng minh bạch · xác minh trên chuỗi",
     "hotNow": "Đang hot",
-    "moreGames": "Trò chơi khác"
+    "moreGames": "Trò chơi khác",
+    "grandJackpot": "Jackpot lớn",
+    "fairSecure": "Công bằng & an toàn",
+    "colTable": "Bàn",
+    "colBlinds": "Tiền mù",
+    "colPlayers": "Người chơi",
+    "colBuyIn": "Tiền vào",
+    "colStatus": "Trạng thái",
+    "quickJoin": "Vào nhanh",
+    "createPrivate": "Tạo bàn riêng",
+    "noTables": "Không có bàn phù hợp",
+    "noTablesBlurb": "Thử mức cược khác.",
+    "tabNotMapped": "Chưa được cấu hình",
+    "tab": {
+      "dezhou": "Dezhou",
+      "xuzhou": "Từ Châu",
+      "ausha": "Omaha",
+      "macau": "Ma Cao",
+      "others": "Khác"
+    },
+    "status": {
+      "open": "Đang mở",
+      "waiting": "Chờ",
+      "full": "Đầy",
+      "unavailable": "Đóng"
+    }
   },
   "games": {
     "searchPlaceholder": "Tìm trò chơi",
