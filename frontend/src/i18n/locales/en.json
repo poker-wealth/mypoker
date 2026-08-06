@@ -26,18 +26,28 @@
   "games": {
     "searchPlaceholder": "Search games",
     "filterAll": "All",
-    "filterPoker": "Poker",
-    "filterFast": "Fast",
-    "filterCards": "Cards",
-    "noMatch": "No games match “{{query}}”.",
+    "noMatch": "No games found",
     "comingSoon": "Coming soon",
     "soonBadge": "SOON",
     "minBuy": "Min {{amount}}",
-    "playersOnline": "{{count}} playing"
+    "playersOnline": "{{count}} playing",
+    "sectionPoker": "Poker games",
+    "sectionCard": "Card games",
+    "sectionArcade": "Arcade games",
+    "sectionQuick": "Quick games",
+    "more": "More",
+    "tableCount": "{{count}} tables",
+    "noneInCategory": "Nothing here yet",
+    "tryAnother": "Try a different search.",
+    "filter": {
+      "poker": "Poker",
+      "card": "Card",
+      "arcade": "Arcade",
+      "quick": "Quick"
+    }
   },
   "gameNames": {
     "texas": "Texas Hold’em",
-    "baccarat": "Baccarat",
     "blackjack": "Blackjack",
     "sicbo": "Sic Bo",
     "fishingWar": "Fishing War",
@@ -47,10 +57,11 @@
     "niu-niu": "Niu Niu",
     "dou-di-zhu": "Dou Di Zhu",
     "omaha": "Omaha",
-    "san-zhang": "San Zhang",
-    "cowboy-beauty": "Cowboy & Beauty",
+    "san-zhang": "Zha Jin Hua",
     "lottery": "Lottery",
-    "slots": "Slots"
+    "slots": "Slot Machines",
+    "baccarat": "Baccarat",
+    "cowboy-beauty": "Cowboy & Beauty"
   },
   "alliance": {
     "joinAlliance": "Join Alliance",
@@ -165,5 +176,33 @@
     "notifyPromos": "Promotions",
     "about": "About",
     "signInToSync": "Sign in to sync your preferences"
+  },
+  "fairness": {
+    "title": "Fairness verification",
+    "intro": "Every check below runs on your device. We never tell you a hand was fair — you recompute it and see for yourself.",
+    "roundData": "Round data",
+    "paste": "Paste a finished hand’s published data here…",
+    "verify": "Verify",
+    "sample": "Sample",
+    "verified": "Verified",
+    "verifiedBlurb": "All six checks passed. This hand was not tampered with.",
+    "failed": "Verification failed",
+    "failedBlurb": "At least one check did not match. Open the failed step to see both values.",
+    "computed": "Computed on your device",
+    "expected": "Published by the platform",
+    "couldNotRead": "Could not read that round data:",
+    "badInput": "unrecognised format",
+    "step1": "Server seed matches its commitment",
+    "step1Blurb": "The server locked its seed before the deal and could not swap it after",
+    "step2": "Final seed is the agreed combination",
+    "step2Blurb": "Server seed, all player seeds, a future block hash, and the round id",
+    "step3": "Your seed is in the mix",
+    "step3Blurb": "Every seated player contributed, in seat order",
+    "step4": "The deck reproduces exactly",
+    "step4Blurb": "Shuffling with the final seed gives the same cards that were dealt",
+    "step5": "Nothing about the round was altered",
+    "step5Blurb": "Seven fields hash together to the recorded round hash",
+    "step6": "The round is in the on-chain record",
+    "step6Blurb": "Its proof rebuilds the published Merkle root, so it cannot be deleted"
   }
 }

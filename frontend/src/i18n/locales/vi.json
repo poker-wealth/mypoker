@@ -26,18 +26,28 @@
   "games": {
     "searchPlaceholder": "Tìm trò chơi",
     "filterAll": "Tất cả",
-    "filterPoker": "Poker",
-    "filterFast": "Nhanh",
-    "filterCards": "Bài",
-    "noMatch": "Không có trò chơi nào khớp với “{{query}}”.",
+    "noMatch": "Không tìm thấy trò chơi",
     "comingSoon": "Sắp ra mắt",
     "soonBadge": "SẮP CÓ",
     "minBuy": "Tối thiểu {{amount}}",
-    "playersOnline": "{{count}} người đang chơi"
+    "playersOnline": "{{count}} người đang chơi",
+    "sectionPoker": "Trò chơi poker",
+    "sectionCard": "Trò chơi bài",
+    "sectionArcade": "Trò chơi arcade",
+    "sectionQuick": "Trò chơi nhanh",
+    "more": "Thêm",
+    "tableCount": "{{count}} bàn",
+    "noneInCategory": "Chưa có gì ở đây",
+    "tryAnother": "Thử tìm từ khác.",
+    "filter": {
+      "poker": "Poker",
+      "card": "Bài",
+      "arcade": "Arcade",
+      "quick": "Nhanh"
+    }
   },
   "gameNames": {
     "texas": "Texas Hold’em",
-    "baccarat": "Baccarat",
     "blackjack": "Xì Dách",
     "sicbo": "Tài Xỉu",
     "fishingWar": "Bắn Cá",
@@ -47,10 +57,11 @@
     "niu-niu": "Ngưu Ngưu",
     "dou-di-zhu": "Đấu Địa Chủ",
     "omaha": "Omaha",
-    "san-zhang": "Ba Cây",
-    "cowboy-beauty": "Cao Bồi & Người Đẹp",
+    "san-zhang": "Zha Jin Hua",
     "lottery": "Xổ Số",
-    "slots": "Nổ Hũ"
+    "slots": "Máy đánh bạc",
+    "baccarat": "Baccarat",
+    "cowboy-beauty": "Chàng cao bồi và Người đẹp"
   },
   "alliance": {
     "joinAlliance": "Tham gia liên minh",
@@ -165,5 +176,33 @@
     "notifyPromos": "Khuyến mãi",
     "about": "Giới thiệu",
     "signInToSync": "Đăng nhập để đồng bộ tùy chọn của bạn"
+  },
+  "fairness": {
+    "title": "Xác minh công bằng",
+    "intro": "Mọi kiểm tra bên dưới đều chạy trên thiết bị của bạn. Chúng tôi không nói ván đấu là công bằng — bạn tự tính lại và tự thấy.",
+    "roundData": "Dữ liệu ván",
+    "paste": "Dán dữ liệu công khai của ván đã kết thúc vào đây…",
+    "verify": "Xác minh",
+    "sample": "Mẫu",
+    "verified": "Đã xác minh",
+    "verifiedBlurb": "Cả sáu kiểm tra đều đạt. Ván này không bị can thiệp.",
+    "failed": "Xác minh thất bại",
+    "failedBlurb": "Ít nhất một kiểm tra không khớp. Mở bước thất bại để xem cả hai giá trị.",
+    "computed": "Tính trên thiết bị của bạn",
+    "expected": "Do nền tảng công bố",
+    "couldNotRead": "Không đọc được dữ liệu ván đó:",
+    "badInput": "định dạng không nhận dạng được",
+    "step1": "Hạt giống máy chủ khớp cam kết",
+    "step1Blurb": "Máy chủ khóa hạt giống trước khi chia và không thể đổi sau đó",
+    "step2": "Hạt giống cuối là tổ hợp đã thỏa thuận",
+    "step2Blurb": "Hạt giống máy chủ, mọi hạt giống người chơi, mã băm khối tương lai và mã ván",
+    "step3": "Hạt giống của bạn có trong hỗn hợp",
+    "step3Blurb": "Mọi người chơi có ghế đều góp phần, theo thứ tự ghế",
+    "step4": "Bộ bài tái tạo chính xác",
+    "step4Blurb": "Xáo bằng hạt giống cuối cho ra đúng những lá đã chia",
+    "step5": "Không có gì trong ván bị thay đổi",
+    "step5Blurb": "Bảy trường băm lại thành mã băm ván đã ghi",
+    "step6": "Ván này nằm trong bản ghi on-chain",
+    "step6Blurb": "Bằng chứng của nó dựng lại gốc Merkle đã công bố nên không thể xóa"
   }
 }

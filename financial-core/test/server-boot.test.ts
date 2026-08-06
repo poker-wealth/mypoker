@@ -25,6 +25,12 @@ describe('production server boot (startServer)', () => {
     process.env.INTERNAL_API_SECRET = 'boot-internal-secret';
     process.env.JWT_SECRET = 'boot-jwt-secret';
     process.env.PORT = '0'; // OS-assigned ephemeral port
+    // Pinned, not merely left unset: loadConfig() runs dotenv, so a developer's
+    // real .env leaks in for anything this test doesn't set. A .env pointing at
+    // Atlas carries MONGO_TLS=true, and a TLS handshake against the plain
+    // in-memory mongod fails with an opaque ECONNRESET that looks like a bug in
+    // the boot path rather than in the test's isolation.
+    process.env.MONGO_TLS = 'false';
 
     let running: RunningServer | undefined;
     try {

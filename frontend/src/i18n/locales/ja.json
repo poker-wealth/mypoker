@@ -26,18 +26,28 @@
   "games": {
     "searchPlaceholder": "ゲームを検索",
     "filterAll": "すべて",
-    "filterPoker": "ポーカー",
-    "filterFast": "スピード",
-    "filterCards": "カード",
-    "noMatch": "「{{query}}」に一致するゲームはありません。",
+    "noMatch": "ゲームが見つかりません",
     "comingSoon": "近日公開",
     "soonBadge": "近日",
     "minBuy": "最低 {{amount}}",
-    "playersOnline": "{{count}} 人がプレイ中"
+    "playersOnline": "{{count}} 人がプレイ中",
+    "sectionPoker": "ポーカーゲーム",
+    "sectionCard": "カードゲーム",
+    "sectionArcade": "アーケードゲーム",
+    "sectionQuick": "クイックゲーム",
+    "more": "もっと見る",
+    "tableCount": "{{count}} テーブル",
+    "noneInCategory": "このカテゴリにはまだありません",
+    "tryAnother": "別の語句でお試しください。",
+    "filter": {
+      "poker": "ポーカー",
+      "card": "カード",
+      "arcade": "アーケード",
+      "quick": "クイック"
+    }
   },
   "gameNames": {
     "texas": "テキサスホールデム",
-    "baccarat": "バカラ",
     "blackjack": "ブラックジャック",
     "sicbo": "シックボー",
     "fishingWar": "フィッシングウォー",
@@ -47,10 +57,11 @@
     "niu-niu": "ニュウニュウ",
     "dou-di-zhu": "闘地主",
     "omaha": "オマハ",
-    "san-zhang": "サンジャン",
-    "cowboy-beauty": "カウボーイ＆ビューティー",
+    "san-zhang": "ジャージンホア",
     "lottery": "宝くじ",
-    "slots": "スロット"
+    "slots": "スロットマシン",
+    "baccarat": "バカラ",
+    "cowboy-beauty": "カウボーイ＆ビューティー"
   },
   "alliance": {
     "joinAlliance": "同盟に参加",
@@ -165,5 +176,33 @@
     "notifyPromos": "プロモーション",
     "about": "情報",
     "signInToSync": "ログインすると設定が同期されます"
+  },
+  "fairness": {
+    "title": "公平性の検証",
+    "intro": "以下の検証はすべてお使いの端末で実行されます。当社が公平だと告げるのではなく、ご自身で再計算してご確認ください。",
+    "roundData": "ラウンドデータ",
+    "paste": "終了したハンドの公開データをここに貼り付けてください…",
+    "verify": "検証する",
+    "sample": "サンプル",
+    "verified": "検証済み",
+    "verifiedBlurb": "6つの検証すべてに合格しました。このハンドは改ざんされていません。",
+    "failed": "検証に失敗しました",
+    "failedBlurb": "少なくとも1つの検証が一致しませんでした。失敗したステップを開いて両方の値をご確認ください。",
+    "computed": "お使いの端末での計算値",
+    "expected": "プラットフォーム公開値",
+    "couldNotRead": "そのラウンドデータを読み取れませんでした：",
+    "badInput": "認識できない形式",
+    "step1": "サーバーシードがコミットメントと一致",
+    "step1Blurb": "サーバーは配牌前にシードを固定し、後から差し替えられません",
+    "step2": "最終シードが規定の組み合わせと一致",
+    "step2Blurb": "サーバーシード、全プレイヤーのシード、未来のブロックハッシュ、ラウンドID",
+    "step3": "あなたのシードが含まれています",
+    "step3Blurb": "着席した全プレイヤーが席順で寄与しています",
+    "step4": "デッキが完全に再現されます",
+    "step4Blurb": "最終シードでシャッフルすると実際に配られたカードと一致します",
+    "step5": "ラウンドの内容は変更されていません",
+    "step5Blurb": "7つのフィールドが記録されたラウンドハッシュに一致します",
+    "step6": "このラウンドはオンチェーン記録に含まれています",
+    "step6Blurb": "その証明が公開マークルルートを再構成するため、削除できません"
   }
 }

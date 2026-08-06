@@ -30,6 +30,10 @@
   --success: #3fd07a;
   --danger: #f85677;
   --info: #00d4ff;
+  /* Jackpot gold. Its own token, not --accent: the design uses gold exclusively
+     for accumulated pots, so anything wearing this colour is money on the table.
+     Reusing it for ordinary emphasis would spend that meaning. */
+  --jackpot: #f5b93b;
 
   --felt: #12233f; /* deep indigo table */
 
@@ -59,6 +63,7 @@
   --success: #1f9d54;
   --danger: #dc2650;
   --info: #0891b2;
+  --jackpot: #b07908;
 
   --felt: #1b3a6b;
 
@@ -84,6 +89,7 @@
   --color-success: var(--success);
   --color-danger: var(--danger);
   --color-info: var(--info);
+  --color-jackpot: var(--jackpot);
   --color-felt: var(--felt);
 
   --radius-app: var(--radius);

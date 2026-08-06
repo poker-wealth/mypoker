@@ -26,18 +26,28 @@
   "games": {
     "searchPlaceholder": "搜索游戏",
     "filterAll": "全部",
-    "filterPoker": "扑克",
-    "filterFast": "快速",
-    "filterCards": "棋牌",
-    "noMatch": "没有找到与“{{query}}”匹配的游戏。",
+    "noMatch": "未找到游戏",
     "comingSoon": "即将推出",
     "soonBadge": "敬请期待",
     "minBuy": "最低 {{amount}}",
-    "playersOnline": "{{count}} 人在玩"
+    "playersOnline": "{{count}} 人在玩",
+    "sectionPoker": "扑克游戏",
+    "sectionCard": "棋牌游戏",
+    "sectionArcade": "街机游戏",
+    "sectionQuick": "快速游戏",
+    "more": "更多",
+    "tableCount": "{{count}} 张牌桌",
+    "noneInCategory": "此分类暂无游戏",
+    "tryAnother": "请尝试其他搜索词。",
+    "filter": {
+      "poker": "扑克",
+      "card": "棋牌",
+      "arcade": "街机",
+      "quick": "快速"
+    }
   },
   "gameNames": {
     "texas": "德州扑克",
-    "baccarat": "百家乐",
     "blackjack": "二十一点",
     "sicbo": "骰宝",
     "fishingWar": "捕鱼大战",
@@ -47,10 +57,11 @@
     "niu-niu": "牛牛",
     "dou-di-zhu": "斗地主",
     "omaha": "奥马哈",
-    "san-zhang": "三张",
-    "cowboy-beauty": "牛仔与美女",
+    "san-zhang": "炸金花",
     "lottery": "彩票",
-    "slots": "老虎机"
+    "slots": "老虎机",
+    "baccarat": "百家乐",
+    "cowboy-beauty": "牛仔与美女"
   },
   "alliance": {
     "joinAlliance": "加入联盟",
@@ -165,5 +176,33 @@
     "notifyPromos": "优惠活动",
     "about": "关于",
     "signInToSync": "登录以同步您的偏好设置"
+  },
+  "fairness": {
+    "title": "公平性验证",
+    "intro": "以下所有验证均在您的设备上运行。我们不会告诉您牌局是否公平——由您自己重新计算并亲自确认。",
+    "roundData": "牌局数据",
+    "paste": "在此粘贴已结束牌局的公开数据…",
+    "verify": "验证",
+    "sample": "示例",
+    "verified": "验证通过",
+    "verifiedBlurb": "六项检查全部通过。该牌局未被篡改。",
+    "failed": "验证未通过",
+    "failedBlurb": "至少有一项检查不匹配。展开失败的步骤查看两个数值。",
+    "computed": "您的设备计算结果",
+    "expected": "平台公布数值",
+    "couldNotRead": "无法读取该牌局数据：",
+    "badInput": "无法识别的格式",
+    "step1": "服务器种子与承诺值一致",
+    "step1Blurb": "服务器在发牌前锁定种子，事后无法更换",
+    "step2": "最终种子为约定的组合值",
+    "step2Blurb": "服务器种子、所有玩家种子、未来区块哈希与牌局编号",
+    "step3": "您的种子已包含在内",
+    "step3Blurb": "每位入座玩家均按座位顺序参与",
+    "step4": "牌序完全可复现",
+    "step4Blurb": "使用最终种子洗牌得到与实际发牌相同的结果",
+    "step5": "牌局内容未被更改",
+    "step5Blurb": "七项字段共同哈希得出记录的牌局哈希",
+    "step6": "该牌局已记录于链上",
+    "step6Blurb": "其证明可重建已公布的默克尔根，因此无法被删除"
   }
 }
