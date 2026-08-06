@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Outlet, useLocation } from 'react-router-dom';
+
 import { Header } from './Header';
 import { BottomNav } from './BottomNav';
 import { useTelegramBackButton } from '@/lib/useTelegramBackButton';
