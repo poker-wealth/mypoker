@@ -16,6 +16,14 @@ import { getOrCreatePlayerAccount } from '../wallet/system-accounts';
 import { getPlayerStats, getPlayerHistory } from '../stats/player-stats';
 import { getSettings, updateSettings } from '../settings/player-settings';
 import { getReputation } from '../reputation/player-reputation';
+import {
+  createLeague,
+  getLeague,
+  joinLeague,
+  leaveLeague,
+  leaguesFor,
+  discoverLeagues,
+} from '../league/league-store';
 import { WithdrawalModel } from '../withdrawal/withdrawal.model';
 import { asyncHandler, internalAuth, dataScopeMiddleware, ApiError } from './middleware';
 import { openApiSpec } from './openapi';
@@ -97,6 +105,76 @@ export function buildRouter(): Router {
     dataScopeMiddleware,
     asyncHandler(async (req: Request, res: Response) => {
       res.json(await getReputation(req.dataScope!.playerId));
+    }),
+  );
+
+  // ── Alliances (leagues) ──────────────────────────────────────────────────
+  // Membership is the isolation boundary: every league read below is scoped to
+  // the caller, so a player can never enumerate a league they do not belong to.
+  r.get(
+    '/me/leagues',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json({ leagues: await leaguesFor(req.dataScope!.playerId) });
+    }),
+  );
+
+  // Discovery lists only non-invite-only leagues, by definition of the store.
+  r.get(
+    '/leagues',
+    asyncHandler(async (_req: Request, res: Response) => {
+      res.json({ leagues: await discoverLeagues() });
+    }),
+  );
+
+  const createLeagueBody = z.object({
+    leagueId: z.string().min(3).max(40),
+    name: z.string().min(2).max(40),
+    description: z.string().max(200).optional(),
+    inviteOnly: z.boolean().optional(),
+  });
+  r.post(
+    '/leagues',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const body = createLeagueBody.parse(req.body);
+      const league = await createLeague({
+        leagueId: body.leagueId,
+        name: body.name,
+        // The creator is the owner, taken from the token — never from the body,
+        // which would let anyone found a league in someone else's name.
+        ownerId: req.dataScope!.playerId,
+        ...(body.description !== undefined ? { description: body.description } : {}),
+        ...(body.inviteOnly !== undefined ? { inviteOnly: body.inviteOnly } : {}),
+      });
+      res.status(201).json(league);
+    }),
+  );
+
+  r.get(
+    '/leagues/:leagueId',
+    asyncHandler(async (req: Request, res: Response) => {
+      const league = await getLeague(req.params.leagueId!);
+      if (!league) throw new ApiError(404, 'no such league');
+      res.json(league);
+    }),
+  );
+
+  r.post(
+    '/leagues/:leagueId/join',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      await joinLeague(req.params.leagueId!, req.dataScope!.playerId);
+      res.json(await getLeague(req.params.leagueId!));
+    }),
+  );
+
+  r.post(
+    '/leagues/:leagueId/leave',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      await leaveLeague(req.params.leagueId!, req.dataScope!.playerId);
+      res.status(204).end();
     }),
   );
 

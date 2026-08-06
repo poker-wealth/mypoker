@@ -19,7 +19,7 @@ import { requireAuth } from './auth';
 /** Guard against a hung Financial Core turning into a hung Mini App. */
 const UPSTREAM_TIMEOUT_MS = 8000;
 
-async function forward(
+export async function forwardTo(
   config: GatewayConfig,
   req: Request,
   res: Response,
@@ -64,11 +64,12 @@ export function buildMeRouter(config: GatewayConfig): Router {
   const r = Router();
   r.use(requireAuth(config));
 
-  r.get('/stats', (req, res) => void forward(config, req, res, '/me/stats'));
-  r.get('/history', (req, res) => void forward(config, req, res, '/me/history'));
-  r.get('/reputation', (req, res) => void forward(config, req, res, '/me/reputation'));
-  r.get('/settings', (req, res) => void forward(config, req, res, '/me/settings'));
-  r.patch('/settings', (req, res) => void forward(config, req, res, '/me/settings'));
+  r.get('/stats', (req, res) => void forwardTo(config, req, res, '/me/stats'));
+  r.get('/history', (req, res) => void forwardTo(config, req, res, '/me/history'));
+  r.get('/reputation', (req, res) => void forwardTo(config, req, res, '/me/reputation'));
+  r.get('/leagues', (req, res) => void forwardTo(config, req, res, '/me/leagues'));
+  r.get('/settings', (req, res) => void forwardTo(config, req, res, '/me/settings'));
+  r.patch('/settings', (req, res) => void forwardTo(config, req, res, '/me/settings'));
 
   return r;
 }

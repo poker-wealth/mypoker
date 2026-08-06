@@ -10,6 +10,7 @@ import {
   InvalidWithdrawalTransitionError,
 } from '../wallet/errors';
 import { alertOps } from '../lib/alert';
+import { LeagueError } from '../league/league-store';
 
 // Attach the verified scope to the request (leagueId comes ONLY from here, never the body).
 declare global {
@@ -86,6 +87,13 @@ export function errorHandler(
   }
   if (err instanceof ZodError) {
     res.status(400).json({ error: 'validation_failed', details: err.issues });
+    return;
+  }
+  // A league rule refusal is the caller's problem, not the server's — 'already
+  // exists', 'invite-only', 'not a member'. Without this it surfaces as a 500,
+  // which reads as an outage and invites a retry that can never succeed.
+  if (err instanceof LeagueError) {
+    res.status(409).json({ error: err.message });
     return;
   }
   if (err instanceof RangeError) {

@@ -4,6 +4,7 @@ import type { GatewayConfig } from './config';
 import { buildAuthRouter } from './auth';
 import { buildLobbyRouter } from './lobby-routes';
 import { buildJackpotRouter } from './jackpot-routes';
+import { buildLeagueRouter } from './league-routes';
 import { buildMeRouter } from './me-routes';
 import type { LobbyService } from '../lobby';
 
@@ -28,6 +29,7 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
 
   app.use('/auth', buildAuthRouter(config));
   app.use('/me', buildMeRouter(config));
+  app.use('/leagues', buildLeagueRouter(config));
   // Optional so auth-only deployments (and the auth tests) don't have to stand
   // up a lobby they never read.
   if (lobby) app.use('/lobby', buildLobbyRouter(lobby));
