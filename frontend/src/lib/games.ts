@@ -26,7 +26,9 @@ export type GameId =
   | 'red-packet'
   | 'cowboy-beauty'
   | 'lottery'
-  | 'slots';
+  | 'slots'
+  | 'minesweeper'
+  | 'slot-jihe';
 
 export interface GameDef {
   id: GameId;
@@ -53,7 +55,7 @@ export const GAMES: GameDef[] = [
   { id: 'baccarat', name: 'Baccarat', category: 'card', image: '/brand/cards.png', glyph: '🎴', gradient: ['#bb5cf6', '#f85677'], players: 327, minBuy: '10' },
   
   { id: 'red-packet', name: 'Red Packet', category: 'quick', image: '/brand/envelope.png', glyph: '🧧', gradient: ['#f85677', '#bb5cf6'], players: 1673, minBuy: '1', hot: true },
-  { id: 'minesweeper', name: 'Minesweeper', category: 'quick', image: '/brand/spade.png', glyph: '💣', gradient: ['#00d4ff', '#3fd07a'], players: 2366, minBuy: '5' },
+  { id: 'minesweeper', name: 'Minesweeper', category: 'quick', image: '/brand/minesweepers.png', glyph: '💣', gradient: ['#00d4ff', '#3fd07a'], players: 2366, minBuy: '5' },
   { id: 'slots', name: 'Slot Machines', category: 'arcade', image: '/brand/slots.png', glyph: '🎰', gradient: ['#bb5cf6', '#3fd07a'], players: 2145, minBuy: '0.5' },
   { id: 'slot-jihe', name: 'Slot Jihe', category: 'arcade', image: '/brand/slots.png', glyph: '💎', gradient: ['#6366f1', '#bb5cf6'], players: 843, minBuy: '1' },
   { id: 'cowboy-beauty', name: 'Cowboy & Beauty', category: 'quick', image: '/brand/envelope.png', glyph: '🤠', gradient: ['#f85677', '#6366f1'], players: 486, minBuy: '1' },
