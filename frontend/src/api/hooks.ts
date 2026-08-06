@@ -1,7 +1,7 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchSettings, patchSettings, type PlayerSettings, type SettingsPatch } from './settings';
 import { fetchStats, fetchHistory, type HistoryPage, type StatsPeriod } from './stats';
-import { fetchLobbyGames } from './lobby';
+import { fetchLobbyGames, fetchTables, type TableFilter } from './lobby';
 import { useSession } from '@/store/session';
 
 /**
@@ -32,6 +32,15 @@ export function useLobbyGames() {
     staleTime: 15_000,
     refetchInterval: 30_000,
     retry: 1,
+  });
+}
+
+export function useTables(filter: TableFilter = {}) {
+  return useQuery({
+    queryKey: ['lobby', 'tables', filter],
+    queryFn: () => fetchTables(filter),
+    staleTime: 5_000,
+    refetchInterval: 10_000,
   });
 }
 

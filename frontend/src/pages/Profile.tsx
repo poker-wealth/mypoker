@@ -1,70 +1,96 @@
 import { useState } from 'react';
-import { ShieldCheck, History, Settings, LifeBuoy, Send, Wallet, LogOut, Languages, Spade } from 'lucide-react';
+import { ShieldCheck, Settings, LifeBuoy, Send, LogOut, ChevronRight, Eye, User as UserIcon, Star, Bell, Gift, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ListRow } from '@/components/ui/ListRow';
-import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { LanguageSheet } from '@/components/LanguageSheet';
-import { Skeleton } from '@/components/ui/Skeleton';
-import { ErrorState } from '@/components/ui/ErrorState';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { useSession } from '@/store/session';
-import { useStats } from '@/api/hooks';
-import { errorKey } from '@/api/errors';
 import { isTelegram } from '@/lib/telegram';
-import { LANGUAGES } from '@/i18n/languages';
-
-/** Trim financial-core's six-decimal strings to something a person reads. */
-function money(value: string): string {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return value;
-  return `₮${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-}
+import { toast } from '@/store/toast';
 
 export function Profile() {
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
-  const { player, status, error, signIn, signOut } = useSession();
+  const { t } = useTranslation();
+  const { player, status, signIn, signOut } = useSession();
   const signedIn = status === 'authenticated' && player !== null;
   const [languageOpen, setLanguageOpen] = useState(false);
-  const stats = useStats();
-
-  const currentLanguage =
-    LANGUAGES.find((l) => l.code === i18n.resolvedLanguage)?.label ?? '';
 
   return (
     <div className="space-y-4">
       {/* Identity */}
-      <div className="flex items-center gap-3 rounded-(--radius-app) border border-border bg-surface p-4">
-        {signedIn && player.photoUrl ? (
-          <img
-            src={player.photoUrl}
-            alt=""
-            className="size-14 shrink-0 rounded-full object-cover"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <div
-            className="grid size-14 shrink-0 place-items-center rounded-full text-lg font-black text-white"
-            style={{ backgroundImage: 'var(--brand-gradient)' }}
-          >
-            {signedIn ? player.displayName.charAt(0).toUpperCase() : 'M'}
-          </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-semibold">
-            {signedIn ? player.displayName : t('account.guest')}
-          </div>
-          <div className="truncate text-xs text-dim">
-            {signedIn
-              ? player.username
-                ? `@${player.username}`
-                : t('account.id', { id: player.playerId })
-              : t('account.notSignedIn')}
+      <div className="rounded-(--radius-app) bg-surface p-4 border border-border">
+        <div className="flex items-center gap-3">
+          {signedIn && player.photoUrl ? (
+            <img
+              src={player.photoUrl}
+              alt=""
+              className="size-16 shrink-0 rounded-full object-cover border-2 border-brand"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div
+              className="grid size-16 shrink-0 place-items-center rounded-full text-2xl font-black text-white"
+              style={{ backgroundImage: 'var(--brand-gradient)' }}
+            >
+              {signedIn ? player.displayName.charAt(0).toUpperCase() : 'M'}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between">
+              <div className="truncate text-lg font-bold">
+                {signedIn ? player.displayName : t('account.guest')}
+              </div>
+              <ChevronRight size={20} className="text-dim" />
+            </div>
+            <div className="mt-1 flex items-center gap-2">
+              <div className="flex items-center gap-1 rounded-full bg-yellow-500/20 px-2 py-0.5 text-[0.65rem] font-bold text-yellow-500">
+                <Star size={10} className="fill-yellow-500" /> VIP {signedIn ? player.vipTier : 0}
+              </div>
+            </div>
+            <div className="mt-1.5 truncate text-[0.7rem] font-semibold text-dim">
+              {signedIn
+                ? player.username
+                  ? `@${player.username}`
+                  : `ID: ${player.playerId}`
+                : t('account.notSignedIn')}
+            </div>
           </div>
         </div>
-        <Badge tone="brand">{t('account.vip', { tier: signedIn ? player.vipTier : 0 })}</Badge>
+
+        {/* Progress Bar */}
+        <div className="mt-5 flex items-center gap-3">
+          <div className="text-[0.65rem] font-black tracking-wide">Lv. {signedIn ? '28' : '0'}</div>
+          <div className="h-2 flex-1 rounded-full bg-surface-2 overflow-hidden border border-border/50">
+            <div className={`h-full bg-success rounded-full`} style={{ width: signedIn ? '68%' : '0%' }} />
+          </div>
+          <div className="text-[0.65rem] font-black text-dim tracking-wide">{signedIn ? '68%' : '0%'}</div>
+        </div>
+      </div>
+
+      {/* Balance Card */}
+      <div className="rounded-(--radius-app) bg-surface p-5 border border-border">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-dim">
+            Total Balance (USDT) <Eye size={14} className="cursor-pointer hover:text-text" />
+          </div>
+          <div className="flex items-center gap-0.5 text-[0.7rem] font-bold text-dim cursor-pointer hover:text-text transition-colors" onClick={() => navigate('/wallet')}>
+            Detail <ChevronRight size={14} />
+          </div>
+        </div>
+        <div className="mt-2 text-[1.7rem] font-black tabular-nums tracking-tight">
+          0.00
+        </div>
+        <div className="mt-0.5 text-[0.7rem] font-semibold text-dim">
+          ≈ $0.00
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <Button className="bg-success text-success-fg hover:bg-success/90" onClick={() => navigate('/wallet')}>
+            DEPOSIT
+          </Button>
+          <Button variant="secondary" className="border-border bg-surface-2 hover:bg-surface-2/80" onClick={() => navigate('/wallet')}>
+            WITHDRAW
+          </Button>
+        </div>
       </div>
 
       {/* Sign-in CTA — hidden once signed in */}
@@ -75,14 +101,6 @@ export function Profile() {
               ? t('account.openInTelegramTitle')
               : t('account.signInTitle')}
           </div>
-          <div className="mt-1 text-xs text-dim">
-            {status === 'anonymous'
-              ? t('account.openInTelegramBlurb')
-              : t('account.signInBlurb')}
-          </div>
-          {status === 'error' && error && (
-            <div className="mt-2 text-xs text-danger">{error}</div>
-          )}
           {(isTelegram() || status === 'error') && (
             <Button full className="mt-3" onClick={() => void signIn()} disabled={status === 'authenticating'}>
               <Send size={17} />
@@ -94,100 +112,83 @@ export function Profile() {
         </div>
       )}
 
-      {/* Stats — real, from the ledger. Signed out, this section is simply absent
-          rather than showing zeros that would read as a real record of no wins. */}
-      {signedIn && (
-        <section>
-          {stats.isPending && (
-            <div className="grid grid-cols-3 gap-3">
-              {[0, 1, 2].map((i) => (
-                <div
-                  key={i}
-                  className="rounded-(--radius-app) border border-border bg-surface px-2 py-3"
-                >
-                  <Skeleton className="mx-auto h-6 w-14" />
-                  <Skeleton className="mx-auto mt-2 h-2.5 w-10" />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {stats.isError && (
-            <div className="rounded-(--radius-app) border border-border bg-surface">
-              {/* Translated copy, not error.message — the raw text is a
-                  diagnostic ("Expected JSON from /me/stats but got text/html")
-                  that tells a player nothing except that something is broken in
-                  a way that sounds like their fault. It goes to the console. */}
-              <ErrorState message={t(errorKey(stats.error))} onRetry={() => void stats.refetch()} />
-            </div>
-          )}
-
-          {/* A new player has real zeros, but three of them read as a record of
-              losing rather than as never having played. Say which it is. */}
-          {stats.isSuccess && stats.data.handsPlayed === 0 && (
-            <div className="rounded-(--radius-app) border border-border bg-surface">
-              <EmptyState
-                icon={Spade}
-                title={t('account.noHands')}
-                description={t('account.noHandsBlurb')}
-                action={{ label: t('nav.lobby'), onClick: () => navigate('/') }}
-              />
-            </div>
-          )}
-
-          {stats.isSuccess && stats.data.handsPlayed > 0 && (
-            <div className="grid grid-cols-3 gap-3">
-              <StatTile label={t('account.statHands')} value={String(stats.data.handsPlayed)} />
-              <StatTile
-                label={t('account.statWinRate')}
-                // Null, not 0, when nothing has been played — '0%' would read as
-                // "you have lost every hand" rather than "you haven't played".
-                value={stats.data.winRate === null ? '—' : `${stats.data.winRate}%`}
-              />
-              <StatTile
-                label={t('account.statBiggestWin')}
-                value={money(stats.data.biggestWin)}
-              />
-            </div>
-          )}
-        </section>
-      )}
-
-      {/* Menu */}
-      <div className="divide-y divide-border overflow-hidden rounded-(--radius-app) border border-border bg-surface">
-        {/* Wallet is no longer a tab — this is its entry point. */}
-        <ListRow title={t('account.wallet')} leading={<Wallet size={18} className="text-brand" />} onClick={() => navigate('/wallet')} />
-        <ListRow title={t('account.fairness')} leading={<ShieldCheck size={18} className="text-accent" />} onClick={() => {}} />
-        <ListRow title={t('account.history')} leading={<History size={18} className="text-dim" />} onClick={() => {}} />
-        <ListRow
-          title={t('account.language')}
-          subtitle={currentLanguage}
-          leading={<Languages size={18} className="text-dim" />}
-          onClick={() => setLanguageOpen(true)}
+      {/* Menu List */}
+      <div className="divide-y divide-border/50 overflow-hidden rounded-(--radius-app) bg-surface border border-border">
+        <MenuRow icon={UserIcon} title="Personal Info" onClick={() => toast.info('Personal Info settings coming soon')} />
+        <MenuRow 
+          icon={Star} 
+          title="VIP Membership" 
+          rightText="Check Privileges" 
+          rightTextColor="text-yellow-500" 
+          onClick={() => toast.info('VIP Privileges coming soon')}
         />
-        <ListRow
-          title={t('account.settings')}
-          leading={<Settings size={18} className="text-dim" />}
-          onClick={() => navigate('/settings')}
+        <MenuRow icon={ShieldCheck} title="Security Center" onClick={() => toast.info('Security Center coming soon')} />
+        <MenuRow 
+          icon={Gift} 
+          title="Invite Friends" 
+          rightText="Earn Rewards" 
+          rightTextColor="text-success" 
+          onClick={() => {
+            void navigator.clipboard.writeText('MYPOKER-INVITE');
+            toast.success('Invite code copied to clipboard!');
+          }}
         />
-        <ListRow title={t('account.support')} leading={<LifeBuoy size={18} className="text-dim" />} onClick={() => {}} />
+        <MenuRow 
+          icon={Bell} 
+          title="Message Center" 
+          badge="12" 
+          onClick={() => toast.info('You have 12 unread messages')}
+        />
+        <MenuRow icon={LifeBuoy} title="Customer Support" onClick={() => toast.info('Connecting to Customer Support...')} />
+        <MenuRow icon={Settings} title="Settings" onClick={() => navigate('/settings')} />
+        
         {signedIn && (
-          <ListRow title={t('account.signOut')} leading={<LogOut size={18} className="text-dim" />} onClick={signOut} />
+          <MenuRow icon={LogOut} title={t('account.signOut')} onClick={signOut} />
         )}
       </div>
 
-      <div className="pt-1 text-center text-[0.66rem] text-dim">{t('account.buildLine')}</div>
+      <div className="pt-1 pb-4 text-center text-[0.66rem] text-dim">{t('account.buildLine')}</div>
 
       <LanguageSheet open={languageOpen} onClose={() => setLanguageOpen(false)} />
     </div>
   );
 }
 
-function StatTile({ label, value }: { label: string; value: string }) {
+function MenuRow({ 
+  icon: Icon, 
+  title, 
+  rightText, 
+  rightTextColor, 
+  badge, 
+  onClick 
+}: { 
+  icon: any; 
+  title: string; 
+  rightText?: string; 
+  rightTextColor?: string; 
+  badge?: string; 
+  onClick?: () => void;
+}) {
   return (
-    <div className="rounded-(--radius-app) border border-border bg-surface px-2 py-3 text-center">
-      <div className="text-lg font-black tabular-nums">{value}</div>
-      <div className="mt-0.5 text-[0.66rem] text-dim">{label}</div>
+    <div 
+      className="flex items-center justify-between px-4 py-3.5 cursor-pointer active:bg-surface-2 transition-colors hover:bg-surface-2/50"
+      onClick={onClick}
+    >
+      <div className="flex items-center gap-3">
+        <Icon size={18} className="text-dim" />
+        <span className="text-[0.8rem] font-semibold">{title}</span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        {rightText && (
+          <span className={`text-[0.65rem] font-bold ${rightTextColor}`}>{rightText}</span>
+        )}
+        {badge && (
+          <div className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-danger px-1 text-[0.65rem] font-bold text-white shadow-sm">
+            {badge}
+          </div>
+        )}
+        <ChevronRight size={14} className="text-dim opacity-70" />
+      </div>
     </div>
   );
 }

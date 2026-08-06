@@ -2,9 +2,13 @@ import { useState } from 'react';
 import { Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { motion } from 'motion/react';
 import { Segmented } from '@/components/ui/Segmented';
+import { Skeleton } from '@/components/ui/Skeleton';
 import { GameTile } from '@/components/GameTile';
 import { GAMES, type GameCategory } from '@/lib/games';
+import { useLobbyGames } from '@/api/hooks';
+import { formatMicros } from '@/api/lobby';
 
 type Filter = 'all' | GameCategory;
 
@@ -16,15 +20,26 @@ export function Games() {
   const [cat, setCat] = useState<Filter>('all');
   const [q, setQ] = useState('');
 
+  const lobby = useLobbyGames();
+  const jackpot = lobby.data ? `$ ${formatMicros(lobby.data.totalJackpot)}` : '$ 1,253,842.28';
+
   const query = q.trim().toLowerCase();
-  const shown = GAMES.filter((g) => {
-    const inCat = cat === 'all' || g.category === cat;
-    // Match the translated name as well as the English one, so searching "牛牛"
-    // works in Chinese and "niu" still works for anyone typing latin characters.
-    const localised = t(`gameNames.${g.id}`, { defaultValue: g.name }).toLowerCase();
-    const inQuery = !query || g.name.toLowerCase().includes(query) || localised.includes(query);
-    return inCat && inQuery;
-  });
+  
+  // Group games by category
+  const grouped = {
+    poker: GAMES.filter(g => g.category === 'poker'),
+    card: GAMES.filter(g => g.category === 'card'),
+    quick: GAMES.filter(g => g.category === 'quick' || g.category === 'arcade'),
+  };
+
+  const getShown = (list: typeof GAMES) => {
+    return list.filter((g) => {
+      const inCat = cat === 'all' || g.category === cat;
+      const localised = t(`gameNames.${g.id}`, { defaultValue: g.name }).toLowerCase();
+      const inQuery = !query || g.name.toLowerCase().includes(query) || localised.includes(query);
+      return inCat && inQuery;
+    });
+  };
 
   return (
     <div className="space-y-4">
@@ -39,28 +54,94 @@ export function Games() {
         />
       </div>
 
+      {/* Jackpot hero */}
+      <div
+        className="relative overflow-hidden rounded-2xl border border-border p-5 text-center flex flex-col justify-center h-32"
+        style={{ boxShadow: 'var(--glow-brand)' }}
+      >
+        <div className="absolute inset-0" style={{ backgroundImage: 'var(--brand-gradient)', opacity: 0.9 }} />
+        <img 
+          src="/brand/jackpot.png" 
+          alt="Jackpot" 
+          className="absolute left-0 top-0 h-full object-cover mix-blend-screen opacity-90" 
+          style={{ maskImage: 'linear-gradient(to right, black 50%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to right, black 50%, transparent 100%)' }}
+        />
+        <motion.div
+          className="absolute inset-y-0 w-1/3 bg-white/20 blur-2xl"
+          initial={{ x: '-120%' }}
+          animate={{ x: '360%' }}
+          transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut', repeatDelay: 1.5 }}
+        />
+        <div className="relative text-white z-10 flex flex-col items-center pl-10">
+          <div className="text-[0.7rem] font-bold uppercase tracking-wider text-white/90">
+            Grand Jackpot
+          </div>
+          {lobby.isPending ? (
+            <div className="mt-1 flex justify-center">
+              <Skeleton className="h-10 w-52 bg-white/25" />
+            </div>
+          ) : (
+            <div className="mt-0.5 text-[2.2rem] font-black leading-none tracking-tight tabular-nums text-yellow-400 drop-shadow-sm">
+              {jackpot}
+            </div>
+          )}
+          <div className="mt-1 text-xs font-bold text-success drop-shadow-sm">+ $322.16 / hr</div>
+        </div>
+      </div>
+
       <Segmented
         value={cat}
         onChange={setCat}
         options={[
-          { value: 'all', label: t('games.filterAll') },
-          { value: 'poker', label: t('games.filterPoker') },
-          { value: 'fast', label: t('games.filterFast') },
-          { value: 'cards', label: t('games.filterCards') },
+          { value: 'all', label: 'ALL' },
+          { value: 'poker', label: 'POKER' },
+          { value: 'card', label: 'CARD' },
+          { value: 'arcade', label: 'ARCADE' },
+          { value: 'quick', label: 'QUICK' },
         ]}
       />
 
-      {shown.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3">
-          {shown.map((g) => (
-            <GameTile key={g.id} game={g} onClick={() => navigate(`/table/${g.id}`)} />
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-(--radius-app) border border-border bg-surface py-10 text-center text-sm text-dim">
-          {t('games.noMatch', { query: q })}
-        </div>
-      )}
+      {/* Game Sections */}
+      <div className="space-y-6">
+        {getShown(grouped.poker).length > 0 && (
+          <section>
+            <h2 className="mb-3 text-xs font-bold text-white tracking-wider">POKER GAMES</h2>
+            <div className="grid grid-cols-3 gap-2">
+              {getShown(grouped.poker).map((g) => (
+                <GameTile key={g.id} game={g} onClick={() => navigate(`/table/${g.id}`)} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {getShown(grouped.card).length > 0 && (
+          <section>
+            <h2 className="mb-3 text-xs font-bold text-white tracking-wider">CARD GAMES</h2>
+            <div className="grid grid-cols-3 gap-2">
+              {getShown(grouped.card).map((g) => (
+                <GameTile key={g.id} game={g} onClick={() => navigate(`/table/${g.id}`)} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {getShown(grouped.quick).length > 0 && (
+          <section>
+            <h2 className="mb-3 text-xs font-bold text-white tracking-wider">QUICK GAMES</h2>
+            <div className="grid grid-cols-3 gap-2">
+              {getShown(grouped.quick).map((g) => (
+                <GameTile key={g.id} game={g} onClick={() => navigate(`/table/${g.id}`)} />
+              ))}
+            </div>
+          </section>
+        )}
+        
+        {getShown(GAMES).length === 0 && (
+          <div className="rounded-(--radius-app) border border-border bg-surface py-10 text-center text-sm text-dim">
+            {t('games.noMatch', { query: q })}
+          </div>
+        )}
+      </div>
 
       {/* Coming soon */}
       <section className="pt-1">
