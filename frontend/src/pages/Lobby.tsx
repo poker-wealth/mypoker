@@ -10,7 +10,7 @@ import { formatMicros } from '@/api/lobby';
 
 function WinnerTicker() {
   const MOCK_WINNERS = [
-    'Player_772 won $4,200 in Texas Hold\\'em',
+    "Player_772 won $4,200 in Texas Hold'em",
     'CryptoKing won $1,500 in Slots',
     'LuckyStar won $800 in Baccarat',
     'Whale_99 won $12,500 in High Roller',
