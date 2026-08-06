@@ -1,0 +1,169 @@
+{
+  "nav": {
+    "alliance": "얼라이언스",
+    "games": "게임",
+    "lobby": "로비",
+    "data": "데이터",
+    "account": "내 정보"
+  },
+  "common": {
+    "online": "접속 중",
+    "members": "멤버",
+    "join": "가입",
+    "viewAll": "전체 보기",
+    "seeAll": "전체 보기",
+    "sampleData": "샘플 데이터",
+    "loading": "불러오는 중…",
+    "retry": "다시 시도"
+  },
+  "lobby": {
+    "dailyJackpot": "데일리 잭팟",
+    "jackpotBlurb": "MYPOKER에서 진행되는 모든 핸드마다 잭팟이 쌓입니다.",
+    "provablyFair": "증명 가능한 공정성 · 온체인 검증",
+    "hotNow": "인기 게임",
+    "moreGames": "더 많은 게임"
+  },
+  "games": {
+    "searchPlaceholder": "게임 검색",
+    "filterAll": "전체",
+    "filterPoker": "포커",
+    "filterFast": "스피드",
+    "filterCards": "카드",
+    "noMatch": "“{{query}}”와 일치하는 게임이 없습니다.",
+    "comingSoon": "출시 예정",
+    "soonBadge": "예정",
+    "minBuy": "최소 {{amount}}",
+    "playersOnline": "{{count}}명 플레이 중"
+  },
+  "gameNames": {
+    "texas": "텍사스 홀덤",
+    "baccarat": "바카라",
+    "blackjack": "블랙잭",
+    "sicbo": "식보",
+    "fishingWar": "피싱 워",
+    "setteMezzo": "세테 에 메조",
+    "short-deck": "숏덱",
+    "red-packet": "레드 패킷",
+    "niu-niu": "뉴뉴",
+    "dou-di-zhu": "두디주",
+    "omaha": "오마하",
+    "san-zhang": "싼장",
+    "cowboy-beauty": "카우보이 앤 뷰티",
+    "lottery": "복권",
+    "slots": "슬롯"
+  },
+  "alliance": {
+    "joinAlliance": "얼라이언스 가입",
+    "recommended": "추천 얼라이언스",
+    "create": "얼라이언스 생성",
+    "ranking": "얼라이언스 랭킹",
+    "pendingEndpoints": "샘플 데이터 — 얼라이언스 API가 아직 연결되지 않았습니다."
+  },
+  "data": {
+    "periodToday": "오늘",
+    "period7d": "7일",
+    "period30d": "30일",
+    "periodAll": "전체",
+    "overview": "요약",
+    "hands": "핸드 수",
+    "winRate": "승률",
+    "netProfit": "순수익",
+    "profitTrend": "수익 추이",
+    "recentRounds": "최근 라운드",
+    "noRounds": "이 기간에 라운드가 없습니다",
+    "noRoundsBlurb": "기간을 늘리거나 테이블에 참여해 보세요.",
+    "loadMore": "더 보기",
+    "signInToSee": "로그인하면 기록을 볼 수 있습니다"
+  },
+  "account": {
+    "guest": "게스트",
+    "notSignedIn": "로그인되지 않음",
+    "signInTitle": "로그인하고 기록을 저장하세요",
+    "signInBlurb": "Telegram을 연결하여 잔액, 기록, VIP 혜택을 동기화합니다.",
+    "openInTelegramTitle": "Telegram에서 열어 로그인하세요",
+    "openInTelegramBlurb": "Telegram 안에서 실행하면 자동으로 로그인됩니다.",
+    "continueWithTelegram": "Telegram으로 계속하기",
+    "signingIn": "로그인 중…",
+    "vip": "VIP {{tier}}",
+    "id": "ID: {{id}}",
+    "statHands": "핸드 수",
+    "statWinRate": "승률",
+    "statBiggestWin": "최고 수익",
+    "wallet": "지갑",
+    "fairness": "공정성 검증",
+    "history": "게임 기록",
+    "settings": "설정",
+    "support": "고객 지원",
+    "language": "언어",
+    "signOut": "로그아웃",
+    "buildLine": "MYPOKER · 스테이징 빌드 · v0.1",
+    "noHands": "아직 플레이 기록이 없습니다",
+    "noHandsBlurb": "테이블에 참여하면 기록이 여기에 표시됩니다."
+  },
+  "wallet": {
+    "totalBalance": "총 잔액",
+    "available": "사용 가능",
+    "inPlay": "게임 중",
+    "deposit": "입금",
+    "withdraw": "출금",
+    "quickTopUp": "빠른 충전 (USDT)",
+    "inviteTitle": "친구 초대하고 보상 받기",
+    "inviteBlurb": "초대 코드를 공유하고 레이크의 일부를 받으세요.",
+    "code": "초대 코드",
+    "testnetNotice": "스테이징 환경에서는 <0>테스트 자금만</0> 사용됩니다. 실제 입출금은 보안 검토 후 제공됩니다.",
+    "recentActivity": "최근 내역",
+    "noTransactions": "거래 내역이 없습니다",
+    "noTransactionsBlurb": "입금과 수익이 여기에 표시됩니다"
+  },
+  "table": {
+    "fold": "폴드",
+    "check": "체크",
+    "call": "콜 {{amount}}",
+    "bet": "벳",
+    "raise": "레이즈",
+    "allIn": "올인",
+    "halfPot": "½ 팟",
+    "threeQuarterPot": "¾ 팟",
+    "pot": "팟",
+    "handLine": "{{hand}}번째 핸드 · 블라인드 {{blinds}}",
+    "waiting": "다른 플레이어를 기다리는 중…",
+    "nextHand": "곧 다음 핸드가 시작됩니다…"
+  },
+  "a11y": {
+    "toggleTheme": "테마 전환",
+    "dismiss": "닫기"
+  },
+  "language": {
+    "title": "언어",
+    "systemDefault": "Telegram 설정 따르기"
+  },
+  "states": {
+    "offline": "연결 없음",
+    "reconnecting": "다시 연결 중…",
+    "backOnline": "다시 연결됨",
+    "error": "문제가 발생했습니다",
+    "empty": "아직 아무것도 없습니다",
+    "serviceUnavailable": "현재 사용할 수 없습니다",
+    "sessionExpired": "세션이 만료되었습니다. 다시 로그인해 주세요"
+  },
+  "toasts": {
+    "signedIn": "{{name}}(으)로 로그인했습니다",
+    "signedOut": "로그아웃되었습니다",
+    "signInFailed": "로그인 실패",
+    "copied": "복사되었습니다",
+    "copyFailed": "복사하지 못했습니다"
+  },
+  "settings": {
+    "appearance": "화면",
+    "theme": "다크 모드",
+    "preferences": "환경설정",
+    "sound": "효과음",
+    "haptics": "진동",
+    "notifications": "알림",
+    "notifyResults": "게임 결과",
+    "notifyDeposits": "입출금",
+    "notifyPromos": "프로모션",
+    "about": "정보",
+    "signInToSync": "로그인하면 설정이 동기화됩니다"
+  }
+}

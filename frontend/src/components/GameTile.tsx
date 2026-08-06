@@ -1,5 +1,6 @@
 import { motion } from 'motion/react';
 import { Users } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { GameDef } from '@/lib/games';
 import { haptic } from '@/lib/telegram';
 
@@ -8,6 +9,7 @@ import { haptic } from '@/lib/telegram';
  * watermark, a live-player pill, and the min buy-in. Taps give haptic feedback.
  */
 export function GameTile({ game, onClick }: { game: GameDef; onClick?: () => void }) {
+  const { t } = useTranslation();
   const [from, to] = game.gradient;
   return (
     <motion.button
@@ -36,13 +38,15 @@ export function GameTile({ game, onClick }: { game: GameDef; onClick?: () => voi
       )}
 
       <div className="relative">
-        <div className="font-bold leading-tight">{game.name}</div>
+        <div className="font-bold leading-tight">
+          {t(`gameNames.${game.id}`, { defaultValue: game.name })}
+        </div>
         <div className="mt-1 flex items-center gap-2 text-[0.7rem] text-dim">
           <span className="inline-flex items-center gap-1">
             <Users size={12} /> {game.players.toLocaleString()}
           </span>
           <span className="opacity-40">•</span>
-          <span>min ₮{game.minBuy}</span>
+          <span>{t('games.minBuy', { amount: `₮${game.minBuy}` })}</span>
         </div>
       </div>
     </motion.button>

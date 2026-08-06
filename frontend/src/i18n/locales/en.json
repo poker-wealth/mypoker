@@ -1,0 +1,169 @@
+{
+  "nav": {
+    "alliance": "Alliance",
+    "games": "Games",
+    "lobby": "Lobby",
+    "data": "Data",
+    "account": "My Account"
+  },
+  "common": {
+    "online": "online",
+    "members": "members",
+    "join": "Join",
+    "viewAll": "View all",
+    "seeAll": "See all",
+    "sampleData": "Sample data",
+    "loading": "Loading…",
+    "retry": "Retry"
+  },
+  "lobby": {
+    "dailyJackpot": "Daily Jackpot",
+    "jackpotBlurb": "Grows with every hand played across MYPOKER.",
+    "provablyFair": "Provably fair · verifiable on-chain",
+    "hotNow": "Hot right now",
+    "moreGames": "More games"
+  },
+  "games": {
+    "searchPlaceholder": "Search games",
+    "filterAll": "All",
+    "filterPoker": "Poker",
+    "filterFast": "Fast",
+    "filterCards": "Cards",
+    "noMatch": "No games match “{{query}}”.",
+    "comingSoon": "Coming soon",
+    "soonBadge": "SOON",
+    "minBuy": "Min {{amount}}",
+    "playersOnline": "{{count}} playing"
+  },
+  "gameNames": {
+    "texas": "Texas Hold’em",
+    "baccarat": "Baccarat",
+    "blackjack": "Blackjack",
+    "sicbo": "Sic Bo",
+    "fishingWar": "Fishing War",
+    "setteMezzo": "Sette e Mezzo",
+    "short-deck": "Short Deck",
+    "red-packet": "Red Packet",
+    "niu-niu": "Niu Niu",
+    "dou-di-zhu": "Dou Di Zhu",
+    "omaha": "Omaha",
+    "san-zhang": "San Zhang",
+    "cowboy-beauty": "Cowboy & Beauty",
+    "lottery": "Lottery",
+    "slots": "Slots"
+  },
+  "alliance": {
+    "joinAlliance": "Join Alliance",
+    "recommended": "Recommended alliances",
+    "create": "Create Alliance",
+    "ranking": "Alliance Ranking",
+    "pendingEndpoints": "Sample data — awaiting the alliance/league endpoints."
+  },
+  "data": {
+    "periodToday": "Today",
+    "period7d": "7 days",
+    "period30d": "30 days",
+    "periodAll": "All",
+    "overview": "Overview",
+    "hands": "Hands",
+    "winRate": "Win rate",
+    "netProfit": "Net profit",
+    "profitTrend": "Profit trend",
+    "recentRounds": "Recent rounds",
+    "noRounds": "No rounds in this period",
+    "noRoundsBlurb": "Try a longer period, or join a table.",
+    "loadMore": "Load more",
+    "signInToSee": "Sign in to see your records"
+  },
+  "account": {
+    "guest": "Guest Player",
+    "notSignedIn": "Not signed in",
+    "signInTitle": "Sign in to save your progress",
+    "signInBlurb": "Connect Telegram to sync balance, history & VIP rewards.",
+    "openInTelegramTitle": "Open in Telegram to sign in",
+    "openInTelegramBlurb": "This app signs you in automatically when it runs inside Telegram.",
+    "continueWithTelegram": "Continue with Telegram",
+    "signingIn": "Signing in…",
+    "vip": "VIP {{tier}}",
+    "id": "ID: {{id}}",
+    "statHands": "Hands",
+    "statWinRate": "Win rate",
+    "statBiggestWin": "Biggest win",
+    "wallet": "Wallet",
+    "fairness": "Fairness verification",
+    "history": "Game history",
+    "settings": "Settings",
+    "support": "Support",
+    "language": "Language",
+    "signOut": "Sign out",
+    "buildLine": "MYPOKER · staging build · v0.1",
+    "noHands": "No hands played yet",
+    "noHandsBlurb": "Join a table and your record starts here."
+  },
+  "wallet": {
+    "totalBalance": "Total Balance",
+    "available": "Available",
+    "inPlay": "In play",
+    "deposit": "Deposit",
+    "withdraw": "Withdraw",
+    "quickTopUp": "Quick top-up (USDT)",
+    "inviteTitle": "Invite & earn",
+    "inviteBlurb": "Share your code, earn a cut of every rake.",
+    "code": "Code",
+    "testnetNotice": "Staging uses <0>test funds only</0>. Real deposits & withdrawals go live after the security review.",
+    "recentActivity": "Recent activity",
+    "noTransactions": "No transactions yet",
+    "noTransactionsBlurb": "Your deposits & winnings appear here"
+  },
+  "table": {
+    "fold": "Fold",
+    "check": "Check",
+    "call": "Call {{amount}}",
+    "bet": "Bet",
+    "raise": "Raise",
+    "allIn": "All-in",
+    "halfPot": "½ Pot",
+    "threeQuarterPot": "¾ Pot",
+    "pot": "Pot",
+    "handLine": "Hand {{hand}} · Blinds {{blinds}}",
+    "waiting": "Waiting for other players…",
+    "nextHand": "Next hand starting…"
+  },
+  "a11y": {
+    "toggleTheme": "Toggle theme",
+    "dismiss": "Dismiss"
+  },
+  "language": {
+    "title": "Language",
+    "systemDefault": "Telegram default"
+  },
+  "states": {
+    "offline": "No connection",
+    "reconnecting": "Reconnecting…",
+    "backOnline": "Back online",
+    "error": "Something went wrong",
+    "empty": "Nothing here yet",
+    "serviceUnavailable": "Not available right now",
+    "sessionExpired": "Your session expired — sign in again"
+  },
+  "toasts": {
+    "signedIn": "Signed in as {{name}}",
+    "signedOut": "Signed out",
+    "signInFailed": "Sign-in failed",
+    "copied": "Copied",
+    "copyFailed": "Could not copy"
+  },
+  "settings": {
+    "appearance": "Appearance",
+    "theme": "Dark mode",
+    "preferences": "Preferences",
+    "sound": "Sound effects",
+    "haptics": "Vibration",
+    "notifications": "Notifications",
+    "notifyResults": "Game results",
+    "notifyDeposits": "Deposits & withdrawals",
+    "notifyPromos": "Promotions",
+    "about": "About",
+    "signInToSync": "Sign in to sync your preferences"
+  }
+}

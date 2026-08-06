@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
@@ -8,8 +8,85 @@
     <title>MYPOKER — Fair. On-Chain. Always.</title>
     <!-- Telegram Mini App runtime; harmless in a plain browser -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <!-- Start fetching the splash mark immediately, in parallel with the bundle. -->
+    <link rel="preload" as="image" href="/brand/logo-wordmark.png" />
+
+    <!--
+      Boot screen.
+
+      This lives in the HTML, inline, on purpose. A splash rendered by React
+      cannot remove the white flash it exists to hide — nothing paints until the
+      bundle has downloaded, parsed and mounted, and that gap is exactly the
+      problem. Markup here paints on the browser's first frame.
+
+      The styles are inline for the same reason: the stylesheet is a separate
+      request, and if it lands late the page would flash white before it applies.
+      Everything below is therefore duplicated from index.css rather than shared.
+      If the brand colours change, this block changes too.
+    -->
+    <style>
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.75rem;
+        background: #0d0d1a;
+        opacity: 1;
+        transition: opacity 320ms ease-out;
+      }
+      /* Added by dismissSplash() once the app has painted its first frame. */
+      #splash.is-dismissed {
+        opacity: 0;
+        pointer-events: none;
+      }
+      #splash-mark {
+        width: min(58vw, 260px);
+        height: auto;
+        filter: drop-shadow(0 0 28px rgb(187 92 246 / 0.45));
+        animation: splash-in 520ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+      }
+      #splash-bar {
+        width: 116px;
+        height: 3px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: rgb(255 255 255 / 0.09);
+      }
+      #splash-bar::after {
+        content: '';
+        display: block;
+        width: 40%;
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, #6366f1, #bb5cf6, #00d4ff);
+        animation: splash-sweep 1.15s ease-in-out infinite;
+      }
+      @keyframes splash-in {
+        from { opacity: 0; transform: scale(0.94); }
+        to   { opacity: 1; transform: scale(1); }
+      }
+      @keyframes splash-sweep {
+        0%   { transform: translateX(-100%); }
+        100% { transform: translateX(350%); }
+      }
+      /* Honour the OS setting: show the same screen, just hold it still. */
+      @media (prefers-reduced-motion: reduce) {
+        #splash { transition-duration: 1ms; }
+        #splash-mark { animation: none; }
+        #splash-bar::after { animation: none; width: 100%; }
+      }
+    </style>
   </head>
   <body>
+    <div id="splash">
+      <img id="splash-mark" src="/brand/logo-wordmark.png" alt="MYPOKER" />
+      <div id="splash-bar"></div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

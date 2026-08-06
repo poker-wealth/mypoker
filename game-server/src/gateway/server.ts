@@ -10,11 +10,12 @@
 import { config as loadDotenv } from 'dotenv';
 import { loadConfig } from './config';
 import { createGatewayApp } from './app';
+import { seedLobby } from '../lobby';
 
 loadDotenv();
 
 const config = loadConfig();
-const app = createGatewayApp(config);
+const app = createGatewayApp(config, seedLobby());
 
 app.listen(config.port, () => {
   console.log(`\n  FairPlay gateway — http://localhost:${config.port}\n`);

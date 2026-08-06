@@ -1,8 +1,10 @@
 import { create } from 'zustand';
+import i18n from 'i18next';
 import { setAuthToken, setUnauthorizedHandler, ApiError } from '@/api/client';
 import { loginWithTelegram, loginAsDevPlayer, type Player } from '@/api/auth';
 import { initData } from '@/lib/telegram';
 import { DEV_AUTH_BYPASS } from '@/config';
+import { toast } from '@/store/toast';
 
 /**
  * Who's signed in. The token is persisted so a reload inside Telegram doesn't
@@ -72,9 +74,13 @@ export const useSession = create<SessionState>((set, get) => ({
       setAuthToken(token);
       persist(token, player);
       set({ token, player, status: 'authenticated', error: null });
+      // i18n.t(), not the hook — this runs outside React, and a raw key would
+      // surface on screen as literal `toasts.signedIn`.
+      toast.success(i18n.t('toasts.signedIn', { name: player.displayName }));
     } catch (e) {
-      const message = e instanceof ApiError ? e.message : 'Sign-in failed';
+      const message = e instanceof ApiError ? e.message : i18n.t('toasts.signInFailed');
       set({ status: 'error', error: message });
+      toast.error(message);
     }
   },
 
@@ -86,6 +92,7 @@ export const useSession = create<SessionState>((set, get) => ({
     // would have the app log straight back in and make Sign out a no-op. Signing
     // back in stays possible, but only by tapping the button.
     set({ token: null, player: null, status: 'anonymous', error: null });
+    toast.info(i18n.t('toasts.signedOut'));
   },
 }));
 

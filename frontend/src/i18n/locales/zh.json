@@ -1,0 +1,169 @@
+{
+  "nav": {
+    "alliance": "联盟",
+    "games": "游戏",
+    "lobby": "大厅",
+    "data": "数据",
+    "account": "我的"
+  },
+  "common": {
+    "online": "在线",
+    "members": "成员",
+    "join": "加入",
+    "viewAll": "查看全部",
+    "seeAll": "查看全部",
+    "sampleData": "示例数据",
+    "loading": "加载中…",
+    "retry": "重试"
+  },
+  "lobby": {
+    "dailyJackpot": "每日彩池",
+    "jackpotBlurb": "MYPOKER 每一手牌都会让彩池增长。",
+    "provablyFair": "公平可验证 · 链上可查",
+    "hotNow": "热门推荐",
+    "moreGames": "更多游戏"
+  },
+  "games": {
+    "searchPlaceholder": "搜索游戏",
+    "filterAll": "全部",
+    "filterPoker": "扑克",
+    "filterFast": "快速",
+    "filterCards": "棋牌",
+    "noMatch": "没有找到与“{{query}}”匹配的游戏。",
+    "comingSoon": "即将推出",
+    "soonBadge": "敬请期待",
+    "minBuy": "最低 {{amount}}",
+    "playersOnline": "{{count}} 人在玩"
+  },
+  "gameNames": {
+    "texas": "德州扑克",
+    "baccarat": "百家乐",
+    "blackjack": "二十一点",
+    "sicbo": "骰宝",
+    "fishingWar": "捕鱼大战",
+    "setteMezzo": "七点半",
+    "short-deck": "短牌",
+    "red-packet": "红包扫雷",
+    "niu-niu": "牛牛",
+    "dou-di-zhu": "斗地主",
+    "omaha": "奥马哈",
+    "san-zhang": "三张",
+    "cowboy-beauty": "牛仔与美女",
+    "lottery": "彩票",
+    "slots": "老虎机"
+  },
+  "alliance": {
+    "joinAlliance": "加入联盟",
+    "recommended": "推荐联盟",
+    "create": "创建联盟",
+    "ranking": "联盟排行",
+    "pendingEndpoints": "示例数据 — 联盟接口尚未接入。"
+  },
+  "data": {
+    "periodToday": "今日",
+    "period7d": "7 天",
+    "period30d": "30 天",
+    "periodAll": "全部",
+    "overview": "总览",
+    "hands": "手数",
+    "winRate": "胜率",
+    "netProfit": "净盈利",
+    "profitTrend": "盈利趋势",
+    "recentRounds": "最近牌局",
+    "noRounds": "该时间段内没有牌局",
+    "noRoundsBlurb": "试试更长的时间段，或加入牌桌。",
+    "loadMore": "加载更多",
+    "signInToSee": "登录后查看您的记录"
+  },
+  "account": {
+    "guest": "游客",
+    "notSignedIn": "未登录",
+    "signInTitle": "登录以保存您的进度",
+    "signInBlurb": "连接 Telegram 以同步余额、记录和 VIP 奖励。",
+    "openInTelegramTitle": "请在 Telegram 中打开以登录",
+    "openInTelegramBlurb": "在 Telegram 内运行时，应用会自动为您登录。",
+    "continueWithTelegram": "使用 Telegram 继续",
+    "signingIn": "登录中…",
+    "vip": "VIP {{tier}}",
+    "id": "ID：{{id}}",
+    "statHands": "手数",
+    "statWinRate": "胜率",
+    "statBiggestWin": "最大盈利",
+    "wallet": "钱包",
+    "fairness": "公平性验证",
+    "history": "游戏记录",
+    "settings": "设置",
+    "support": "客服支持",
+    "language": "语言",
+    "signOut": "退出登录",
+    "buildLine": "MYPOKER · 测试版本 · v0.1",
+    "noHands": "还没有牌局记录",
+    "noHandsBlurb": "加入牌桌，您的战绩将显示在这里。"
+  },
+  "wallet": {
+    "totalBalance": "总余额",
+    "available": "可用",
+    "inPlay": "游戏中",
+    "deposit": "存款",
+    "withdraw": "提现",
+    "quickTopUp": "快捷充值 (USDT)",
+    "inviteTitle": "邀请好友，赚取奖励",
+    "inviteBlurb": "分享您的邀请码，从每笔抽水中获得分成。",
+    "code": "邀请码",
+    "testnetNotice": "测试环境仅使用<0>测试资金</0>。真实存取款将在安全审核后开放。",
+    "recentActivity": "最近记录",
+    "noTransactions": "暂无交易记录",
+    "noTransactionsBlurb": "您的存款和盈利将显示在这里"
+  },
+  "table": {
+    "fold": "弃牌",
+    "check": "过牌",
+    "call": "跟注 {{amount}}",
+    "bet": "下注",
+    "raise": "加注",
+    "allIn": "全下",
+    "halfPot": "½ 底池",
+    "threeQuarterPot": "¾ 底池",
+    "pot": "底池",
+    "handLine": "第 {{hand}} 手 · 盲注 {{blinds}}",
+    "waiting": "等待其他玩家…",
+    "nextHand": "下一手即将开始…"
+  },
+  "a11y": {
+    "toggleTheme": "切换主题",
+    "dismiss": "关闭"
+  },
+  "language": {
+    "title": "语言",
+    "systemDefault": "跟随 Telegram"
+  },
+  "states": {
+    "offline": "网络已断开",
+    "reconnecting": "正在重新连接…",
+    "backOnline": "已恢复连接",
+    "error": "出错了",
+    "empty": "暂无内容",
+    "serviceUnavailable": "暂时无法使用",
+    "sessionExpired": "登录已过期，请重新登录"
+  },
+  "toasts": {
+    "signedIn": "已登录：{{name}}",
+    "signedOut": "已退出登录",
+    "signInFailed": "登录失败",
+    "copied": "已复制",
+    "copyFailed": "复制失败"
+  },
+  "settings": {
+    "appearance": "外观",
+    "theme": "深色模式",
+    "preferences": "偏好设置",
+    "sound": "音效",
+    "haptics": "触感反馈",
+    "notifications": "通知",
+    "notifyResults": "牌局结果",
+    "notifyDeposits": "充值与提现",
+    "notifyPromos": "优惠活动",
+    "about": "关于",
+    "signInToSync": "登录以同步您的偏好设置"
+  }
+}

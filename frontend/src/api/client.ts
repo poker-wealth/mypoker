@@ -23,6 +23,7 @@ export class ApiError extends Error {
 
 let authToken: string | null = null;
 let onUnauthorized: (() => void) | null = null;
+let onReachabilityChange: ((reachable: boolean) => void) | null = null;
 
 export function setAuthToken(token: string | null): void {
   authToken = token;
@@ -33,8 +34,18 @@ export function setUnauthorizedHandler(handler: () => void): void {
   onUnauthorized = handler;
 }
 
+/**
+ * Registered by the connection store. Called with `false` when a request cannot
+ * reach the server at all, and `true` as soon as one gets through — which is a
+ * better signal than navigator.onLine, since that only reports whether the
+ * device has an interface, not whether anything is answering on it.
+ */
+export function setReachabilityHandler(handler: (reachable: boolean) => void): void {
+  onReachabilityChange = handler;
+}
+
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
   /** Skip the Authorization header — used by the login call itself. */
   anonymous?: boolean;
@@ -58,16 +69,36 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     });
   } catch (cause) {
     // fetch only rejects on network/CORS failure — the server was never reached.
+    onReachabilityChange?.(false);
     throw new ApiError(0, `Cannot reach the server at ${API_URL}`, cause);
   }
 
-  const payload: unknown = await res.json().catch(() => null);
+  // We got a response, so the server is reachable — even a 500 proves that, and
+  // the banner should come down. Only transport failures mean "no connection".
+  onReachabilityChange?.(true);
+
+  let parsed = false;
+  const payload: unknown = await res
+    .json()
+    .then((body: unknown) => {
+      parsed = true;
+      return body;
+    })
+    .catch(() => null);
 
   if (!res.ok) {
     if (res.status === 401) onUnauthorized?.();
     const message =
       (payload as { error?: string } | null)?.error ?? `${res.status} ${res.statusText}`;
     throw new ApiError(res.status, message, payload);
+  }
+
+  // A 2xx that isn't JSON is not a success. The SPA fallback answers any
+  // unrouted path with index.html and a 200, so an endpoint that doesn't exist
+  // would otherwise resolve to `null` typed as whatever the caller expected —
+  // and blow up later, far from the cause, on the first property access.
+  if (!parsed) {
+    throw new ApiError(res.status, `Expected JSON from ${path} but got ${res.headers.get('content-type') ?? 'no content-type'}`);
   }
 
   return payload as T;
@@ -78,4 +109,6 @@ export const api = {
     request<T>(path, { ...options, method: 'GET' }),
   post: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
     request<T>(path, { ...options, method: 'POST', body }),
+  patch: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
+    request<T>(path, { ...options, method: 'PATCH', body }),
 };
