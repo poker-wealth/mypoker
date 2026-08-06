@@ -203,6 +203,12 @@
     "step5": "Không có gì trong ván bị thay đổi",
     "step5Blurb": "Bảy trường băm lại thành mã băm ván đã ghi",
     "step6": "Ván này nằm trong bản ghi on-chain",
-    "step6Blurb": "Bằng chứng của nó dựng lại gốc Merkle đã công bố nên không thể xóa"
+    "step6Blurb": "Bằng chứng của nó dựng lại gốc Merkle đã công bố nên không thể xóa",
+    "gameFairness": "Tính công bằng của trò chơi",
+    "provable": "Chứng minh được",
+    "provableBlurb": "Chúng tôi sở hữu luật chơi và mọi ván đều xác minh được",
+    "vendorAttested": "Nhà cung cấp xác nhận",
+    "vendorBlurb": "Nhà cung cấp bên ngoài sở hữu luật chơi; mỗi kết quả đều được ký, nhưng không thể chứng minh bảng trả thưởng không bị đổi",
+    "ratesPending": "Tỷ lệ chi trả công bố chưa được hiển thị. Một tỷ lệ chỉ có ý nghĩa khi luật chơi đằng sau nó được cam kết on-chain và đánh phiên bản — trước đó nó chỉ là con số chúng tôi tự khẳng định, đúng điều mà trang này tồn tại để tránh."
   }
 }

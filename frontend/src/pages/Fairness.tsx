@@ -4,6 +4,8 @@ import { Check, X, ShieldCheck, ChevronDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { verifyRound, type RoundVerificationData, type VerificationResult, type StepId } from '@/lib/fairness';
 import { cn } from '@/lib/cn';
+import { useLobbyGames } from '@/api/hooks';
+import { HIDDEN_GAMES, visibleGames } from '@/lib/games';
 import sampleRound from '@/lib/__fixtures__/round-vector.json';
 
 /**
@@ -101,6 +103,8 @@ export function Fairness() {
           {t('fairness.couldNotRead')} <span className="font-mono">{error}</span>
         </div>
       )}
+
+      <GameFairnessList />
 
       {result && (
         <>
@@ -222,5 +226,69 @@ function Value({ label, value, tone }: { label: string; value: string; tone: 'ok
         {value}
       </div>
     </div>
+  );
+}
+
+/**
+ * Which games we can honestly call tamper-proof, and which we cannot.
+ *
+ * This is the deliverable half of the public fairness feed (feature queue #12).
+ * The other half — theoretical and lifetime-actual payout rates with sample sizes
+ * — is not built here on purpose. PROJECT_PLAN places rule-commitment in W11 and
+ * names it a prerequisite for exactly this screen: without versioned rules
+ * committed on-chain, a published rate is a number the platform asserts about
+ * itself, which is the opposite of what this page is for.
+ *
+ * So the tier is shown and the rates are absent. An empty space is honest; an
+ * unverifiable 96.8% is not.
+ */
+function GameFairnessList() {
+  const { t } = useTranslation();
+  const lobby = useLobbyGames();
+
+  // Server tiers when reachable; otherwise the catalog's own, which is the same
+  // data shipped at build time rather than a guess.
+  const games = (lobby.data?.games ?? [])
+    .filter((g) => !HIDDEN_GAMES.has(g.gameId))
+    .map((g) => ({ id: g.gameId, fairness: g.fairness, vendor: g.vendor }));
+
+  const rows = games.length > 0
+    ? games
+    : visibleGames().map((g) => ({ id: g.id, fairness: 'PROVABLE' as const, vendor: undefined }));
+
+  return (
+    <section>
+      <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-dim">
+        {t('fairness.gameFairness')}
+      </h2>
+      <ul className="divide-y divide-border overflow-hidden rounded-(--radius-app) border border-border bg-surface">
+        {rows.map((g) => {
+          const provable = g.fairness === 'PROVABLE';
+          return (
+            <li key={g.id} className="flex items-center gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-semibold">
+                  {t(`gameNames.${g.id}`, { defaultValue: g.id })}
+                </div>
+                <div className="truncate text-[0.66rem] text-dim">
+                  {provable ? t('fairness.provableBlurb') : t('fairness.vendorBlurb', { vendor: g.vendor ?? '' })}
+                </div>
+              </div>
+              <span
+                className={cn(
+                  'shrink-0 rounded-full px-2.5 py-1 text-[0.6rem] font-bold uppercase tracking-wide',
+                  provable ? 'bg-success/15 text-success' : 'bg-jackpot/15 text-jackpot',
+                )}
+              >
+                {provable ? t('fairness.provable') : t('fairness.vendorAttested')}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-2 px-1 text-[0.66rem] leading-relaxed text-dim">
+        {t('fairness.ratesPending')}
+      </p>
+    </section>
   );
 }

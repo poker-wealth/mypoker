@@ -203,6 +203,12 @@
     "step5": "Nothing about the round was altered",
     "step5Blurb": "Seven fields hash together to the recorded round hash",
     "step6": "The round is in the on-chain record",
-    "step6Blurb": "Its proof rebuilds the published Merkle root, so it cannot be deleted"
+    "step6Blurb": "Its proof rebuilds the published Merkle root, so it cannot be deleted",
+    "gameFairness": "Game fairness",
+    "provable": "Provable",
+    "provableBlurb": "We own the rules, and every round is verifiable",
+    "vendorAttested": "Vendor-attested",
+    "vendorBlurb": "An outside supplier owns the rules; each result is signed, but their paytable cannot be proven unchanged",
+    "ratesPending": "Published payout rates are not shown yet. A rate is only meaningful once the rules behind it are committed on-chain and versioned — until then it would be a number we assert about ourselves, which is what this page exists to avoid."
   }
 }

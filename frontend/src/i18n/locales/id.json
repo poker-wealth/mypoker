@@ -203,6 +203,12 @@
     "step5": "Tidak ada bagian ronde yang diubah",
     "step5Blurb": "Tujuh bidang di-hash menjadi hash ronde yang tercatat",
     "step6": "Ronde ini ada dalam catatan on-chain",
-    "step6Blurb": "Buktinya membangun ulang akar Merkle yang dipublikasikan, jadi tidak bisa dihapus"
+    "step6Blurb": "Buktinya membangun ulang akar Merkle yang dipublikasikan, jadi tidak bisa dihapus",
+    "gameFairness": "Keadilan permainan",
+    "provable": "Terbukti",
+    "provableBlurb": "Aturan milik kami, dan setiap ronde dapat diverifikasi",
+    "vendorAttested": "Disahkan vendor",
+    "vendorBlurb": "Pemasok luar memiliki aturannya; setiap hasil ditandatangani, tetapi tabel pembayaran mereka tidak dapat dibuktikan tidak berubah",
+    "ratesPending": "Tingkat pembayaran yang dipublikasikan belum ditampilkan. Sebuah tingkat baru bermakna setelah aturan di baliknya dikomit on-chain dan diberi versi — sebelum itu ia hanyalah angka yang kami klaim tentang diri sendiri, hal yang justru ingin dihindari halaman ini."
   }
 }
