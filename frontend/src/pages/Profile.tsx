@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ShieldCheck, Settings, LifeBuoy, Send, LogOut, ChevronRight, Eye, User as UserIcon, Star, Bell, Gift } from 'lucide-react';
+import { ShieldCheck, Settings, LifeBuoy, Send, LogOut, ChevronRight, User as UserIcon, Star, Bell, Gift, Wallet } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
@@ -70,41 +70,7 @@ export function Profile() {
           </div>
         </div>
 
-        {/* Progress Bar */}
-        <div className="mt-5 flex items-center gap-3">
-          <div className="text-[0.65rem] font-black tracking-wide">Lv. {signedIn ? '28' : '0'}</div>
-          <div className="h-2 flex-1 rounded-full bg-surface-2 overflow-hidden border border-border/50">
-            <div className={`h-full bg-success rounded-full`} style={{ width: signedIn ? '68%' : '0%' }} />
-          </div>
-          <div className="text-[0.65rem] font-black text-dim tracking-wide">{signedIn ? '68%' : '0%'}</div>
-        </div>
-      </div>
 
-      {/* Balance Card */}
-      <div className="rounded-(--radius-app) bg-surface p-5 border border-border">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-dim">
-            Total Balance (USDT) <Eye size={14} className="cursor-pointer hover:text-text" />
-          </div>
-          <div className="flex items-center gap-0.5 text-[0.7rem] font-bold text-dim cursor-pointer hover:text-text transition-colors" onClick={() => navigate('/wallet')}>
-            Detail <ChevronRight size={14} />
-          </div>
-        </div>
-        <div className="mt-2 text-[1.7rem] font-black tabular-nums tracking-tight">
-          0.00
-        </div>
-        <div className="mt-0.5 text-[0.7rem] font-semibold text-dim">
-          ≈ $0.00
-        </div>
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <Button className="bg-success text-success-fg hover:bg-success/90" onClick={() => navigate('/wallet')}>
-            DEPOSIT
-          </Button>
-          <Button variant="secondary" className="border-border bg-surface-2 hover:bg-surface-2/80" onClick={() => navigate('/wallet')}>
-            WITHDRAW
-          </Button>
-        </div>
-      </div>
 
       {/* Stats Block - Only visible when signed in */}
       {signedIn && (
@@ -186,10 +152,15 @@ export function Profile() {
           }}
         />
         <MenuRow 
+          icon={Wallet} 
+          title="Wallet" 
+          rightText="Manage Funds" 
+          onClick={() => navigate('/wallet')}
+        />
+        <MenuRow 
           icon={Bell} 
           title="Message Center" 
-          badge="12" 
-          onClick={() => toast.info('You have 12 unread messages')}
+          onClick={() => toast.info('Message Center coming soon')}
         />
         <MenuRow icon={LifeBuoy} title="Customer Support" onClick={() => toast.info('Connecting to Customer Support...')} />
         <MenuRow icon={Settings} title="Settings" onClick={() => navigate('/settings')} />

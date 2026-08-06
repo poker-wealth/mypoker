@@ -71,8 +71,8 @@ export function Data() {
         <h2 className="mb-2.5 text-sm font-bold">{t('data.overview')}</h2>
 
         {stats.isPending && (
-          <div className="grid grid-cols-3 gap-3">
-            {[0, 1, 2, 3, 4, 5].map((i) => (
+          <div className="grid grid-cols-2 gap-3">
+            {[0, 1, 2, 3].map((i) => (
               <div key={i} className="rounded-(--radius-app) border border-border bg-surface px-3 py-3">
                 <Skeleton className="h-6 w-14" />
                 <Skeleton className="mt-2 h-2.5 w-10" />
@@ -88,7 +88,7 @@ export function Data() {
         )}
 
         {stats.isSuccess && (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <Tile label={t('data.hands')} value={String(stats.data.handsPlayed)} />
             <Tile
               label={t('data.winRate')}
