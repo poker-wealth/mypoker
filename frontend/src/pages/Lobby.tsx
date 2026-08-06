@@ -8,14 +8,56 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useLobbyGames, useTables } from '@/api/hooks';
 import { formatMicros } from '@/api/lobby';
 
+function WinnerTicker() {
+  const MOCK_WINNERS = [
+    'Player_772 won $4,200 in Texas Hold\\'em',
+    'CryptoKing won $1,500 in Slots',
+    'LuckyStar won $800 in Baccarat',
+    'Whale_99 won $12,500 in High Roller',
+  ];
+
+  return (
+    <div className="flex h-8 items-center overflow-hidden rounded-lg bg-surface/50 border border-border px-3">
+      <div className="mr-3 flex shrink-0 items-center gap-1.5 font-bold text-jackpot">
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-jackpot opacity-75"></span>
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-jackpot"></span>
+        </span>
+        LIVE
+      </div>
+      <div className="relative flex-1 overflow-hidden">
+        <motion.div
+          className="flex whitespace-nowrap text-[0.7rem] font-semibold text-dim"
+          initial={{ x: '100%' }}
+          animate={{ x: '-100%' }}
+          transition={{ duration: 15, repeat: Infinity, ease: 'linear' }}
+        >
+          {MOCK_WINNERS.join(' • ')}
+        </motion.div>
+      </div>
+    </div>
+  );
+}
+
 export function Lobby() {
   const navigate = useNavigate();
   const lobby = useLobbyGames();
   const [variant, setVariant] = useState('dezhou');
   const [blinds, setBlinds] = useState('all');
 
+  const stakesMap: Record<string, number | undefined> = {
+    'all': undefined,
+    '1/2': 2_000_000,
+    '5/10': 10_000_000,
+    '25/50': 50_000_000,
+    '100/200': 200_000_000,
+  };
+  const targetStakes = stakesMap[blinds];
+
   const { data: tablesData } = useTables({
-    gameId: variant === 'dezhou' ? 'texas' : variant,
+    gameId: variant === 'dezhou' ? 'texas' : variant === 'all' ? undefined : variant,
+    minStakes: targetStakes,
+    maxStakes: targetStakes,
   });
 
   const jackpot = lobby.data ? `$ ${formatMicros(lobby.data.totalJackpot)}` : '$ 1,253,842.28';
@@ -60,6 +102,9 @@ export function Lobby() {
           <div className="mt-1 text-xs font-bold text-success drop-shadow-sm">+ $322.16 / hr</div>
         </div>
       </div>
+
+      {/* Winner Ticker */}
+      <WinnerTicker />
 
       <Segmented
         value={variant}

@@ -4,9 +4,21 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { LanguageSheet } from '@/components/LanguageSheet';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { ErrorState } from '@/components/ui/ErrorState';
 import { useSession } from '@/store/session';
 import { isTelegram } from '@/lib/telegram';
 import { toast } from '@/store/toast';
+import { useStats } from '@/api/hooks';
+import { errorKey } from '@/api/errors';
+
+/** Trim financial-core's six-decimal strings, keeping the sign. */
+function money(value: string, signed = false): string {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return value;
+  const sign = signed && n > 0 ? '+' : '';
+  return `${sign}₮${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+}
 
 export function Profile() {
   const navigate = useNavigate();
@@ -14,6 +26,7 @@ export function Profile() {
   const { player, status, signIn, signOut } = useSession();
   const signedIn = status === 'authenticated' && player !== null;
   const [languageOpen, setLanguageOpen] = useState(false);
+  const stats = useStats('all');
 
   return (
     <div className="space-y-4">
@@ -92,6 +105,45 @@ export function Profile() {
           </Button>
         </div>
       </div>
+
+      {/* Stats Block - Only visible when signed in */}
+      {signedIn && (
+        <section>
+          {stats.isPending && (
+            <div className="grid grid-cols-3 gap-3">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="rounded-(--radius-app) border border-border bg-surface px-3 py-3">
+                  <Skeleton className="mx-auto h-6 w-14" />
+                  <Skeleton className="mx-auto mt-2 h-2.5 w-10" />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {stats.isError && (
+            <div className="rounded-(--radius-app) border border-border bg-surface">
+              <ErrorState message={t(errorKey(stats.error))} onRetry={() => void stats.refetch()} />
+            </div>
+          )}
+
+          {stats.isSuccess && (
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="rounded-(--radius-app) border border-border bg-surface px-3 py-3">
+                <div className="text-base font-black tabular-nums">{stats.data.handsPlayed}</div>
+                <div className="mt-0.5 text-[0.66rem] text-dim">{t('account.statHands')}</div>
+              </div>
+              <div className="rounded-(--radius-app) border border-border bg-surface px-3 py-3">
+                <div className="text-base font-black tabular-nums">{stats.data.winRate === null ? '—' : `${stats.data.winRate}%`}</div>
+                <div className="mt-0.5 text-[0.66rem] text-dim">{t('account.statWinRate')}</div>
+              </div>
+              <div className="rounded-(--radius-app) border border-border bg-surface px-3 py-3">
+                <div className="text-base font-black tabular-nums text-jackpot">{money(stats.data.biggestWin)}</div>
+                <div className="mt-0.5 text-[0.66rem] text-dim">{t('account.statBiggestWin')}</div>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Sign-in CTA — hidden once signed in */}
       {!signedIn && (
