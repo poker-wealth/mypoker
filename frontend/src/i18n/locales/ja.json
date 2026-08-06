@@ -1,0 +1,169 @@
+{
+  "nav": {
+    "alliance": "同盟",
+    "games": "ゲーム",
+    "lobby": "ロビー",
+    "data": "データ",
+    "account": "マイページ"
+  },
+  "common": {
+    "online": "オンライン",
+    "members": "メンバー",
+    "join": "参加",
+    "viewAll": "すべて見る",
+    "seeAll": "すべて見る",
+    "sampleData": "サンプルデータ",
+    "loading": "読み込み中…",
+    "retry": "再試行"
+  },
+  "lobby": {
+    "dailyJackpot": "デイリージャックポット",
+    "jackpotBlurb": "MYPOKER でプレイされるすべてのハンドで増えていきます。",
+    "provablyFair": "証明可能な公正性 · オンチェーンで検証可能",
+    "hotNow": "人気のゲーム",
+    "moreGames": "その他のゲーム"
+  },
+  "games": {
+    "searchPlaceholder": "ゲームを検索",
+    "filterAll": "すべて",
+    "filterPoker": "ポーカー",
+    "filterFast": "スピード",
+    "filterCards": "カード",
+    "noMatch": "「{{query}}」に一致するゲームはありません。",
+    "comingSoon": "近日公開",
+    "soonBadge": "近日",
+    "minBuy": "最低 {{amount}}",
+    "playersOnline": "{{count}} 人がプレイ中"
+  },
+  "gameNames": {
+    "texas": "テキサスホールデム",
+    "baccarat": "バカラ",
+    "blackjack": "ブラックジャック",
+    "sicbo": "シックボー",
+    "fishingWar": "フィッシングウォー",
+    "setteMezzo": "セッテ・エ・メッツォ",
+    "short-deck": "ショートデッキ",
+    "red-packet": "レッドパケット",
+    "niu-niu": "ニュウニュウ",
+    "dou-di-zhu": "闘地主",
+    "omaha": "オマハ",
+    "san-zhang": "サンジャン",
+    "cowboy-beauty": "カウボーイ＆ビューティー",
+    "lottery": "宝くじ",
+    "slots": "スロット"
+  },
+  "alliance": {
+    "joinAlliance": "同盟に参加",
+    "recommended": "おすすめの同盟",
+    "create": "同盟を作成",
+    "ranking": "同盟ランキング",
+    "pendingEndpoints": "サンプルデータ — 同盟 API は未接続です。"
+  },
+  "data": {
+    "periodToday": "今日",
+    "period7d": "7日間",
+    "period30d": "30日間",
+    "periodAll": "全期間",
+    "overview": "概要",
+    "hands": "ハンド数",
+    "winRate": "勝率",
+    "netProfit": "純利益",
+    "profitTrend": "収支の推移",
+    "recentRounds": "最近のラウンド",
+    "noRounds": "この期間のラウンドはありません",
+    "noRoundsBlurb": "期間を広げるか、テーブルに参加してみてください。",
+    "loadMore": "もっと読み込む",
+    "signInToSee": "ログインすると記録が表示されます"
+  },
+  "account": {
+    "guest": "ゲスト",
+    "notSignedIn": "未ログイン",
+    "signInTitle": "ログインして進行状況を保存",
+    "signInBlurb": "Telegram と連携して残高・履歴・VIP 特典を同期します。",
+    "openInTelegramTitle": "Telegram で開いてログイン",
+    "openInTelegramBlurb": "Telegram 内で起動すると自動的にログインします。",
+    "continueWithTelegram": "Telegram で続行",
+    "signingIn": "ログイン中…",
+    "vip": "VIP {{tier}}",
+    "id": "ID：{{id}}",
+    "statHands": "ハンド数",
+    "statWinRate": "勝率",
+    "statBiggestWin": "最高勝利額",
+    "wallet": "ウォレット",
+    "fairness": "公正性の検証",
+    "history": "プレイ履歴",
+    "settings": "設定",
+    "support": "サポート",
+    "language": "言語",
+    "signOut": "ログアウト",
+    "buildLine": "MYPOKER · ステージング版 · v0.1",
+    "noHands": "まだプレイ履歴がありません",
+    "noHandsBlurb": "テーブルに参加すると、ここに記録が表示されます。"
+  },
+  "wallet": {
+    "totalBalance": "総残高",
+    "available": "利用可能",
+    "inPlay": "プレイ中",
+    "deposit": "入金",
+    "withdraw": "出金",
+    "quickTopUp": "クイック入金 (USDT)",
+    "inviteTitle": "友達を招待して報酬を獲得",
+    "inviteBlurb": "招待コードを共有して、レーキの一部を受け取りましょう。",
+    "code": "招待コード",
+    "testnetNotice": "ステージング環境では<0>テスト資金のみ</0>を使用します。実際の入出金はセキュリティ審査後に開始されます。",
+    "recentActivity": "最近の履歴",
+    "noTransactions": "取引履歴はありません",
+    "noTransactionsBlurb": "入金と勝利金がここに表示されます"
+  },
+  "table": {
+    "fold": "フォールド",
+    "check": "チェック",
+    "call": "コール {{amount}}",
+    "bet": "ベット",
+    "raise": "レイズ",
+    "allIn": "オールイン",
+    "halfPot": "½ ポット",
+    "threeQuarterPot": "¾ ポット",
+    "pot": "ポット",
+    "handLine": "ハンド {{hand}} · ブラインド {{blinds}}",
+    "waiting": "他のプレイヤーを待っています…",
+    "nextHand": "次のハンドがまもなく開始します…"
+  },
+  "a11y": {
+    "toggleTheme": "テーマを切り替え",
+    "dismiss": "閉じる"
+  },
+  "language": {
+    "title": "言語",
+    "systemDefault": "Telegram に合わせる"
+  },
+  "states": {
+    "offline": "接続がありません",
+    "reconnecting": "再接続中…",
+    "backOnline": "オンラインに復帰",
+    "error": "問題が発生しました",
+    "empty": "まだ何もありません",
+    "serviceUnavailable": "現在ご利用いただけません",
+    "sessionExpired": "セッションの有効期限が切れました。再度ログインしてください"
+  },
+  "toasts": {
+    "signedIn": "{{name}} としてログインしました",
+    "signedOut": "ログアウトしました",
+    "signInFailed": "ログインに失敗しました",
+    "copied": "コピーしました",
+    "copyFailed": "コピーできませんでした"
+  },
+  "settings": {
+    "appearance": "外観",
+    "theme": "ダークモード",
+    "preferences": "環境設定",
+    "sound": "効果音",
+    "haptics": "バイブレーション",
+    "notifications": "通知",
+    "notifyResults": "ゲーム結果",
+    "notifyDeposits": "入出金",
+    "notifyPromos": "プロモーション",
+    "about": "情報",
+    "signInToSync": "ログインすると設定が同期されます"
+  }
+}

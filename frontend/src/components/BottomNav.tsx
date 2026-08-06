@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { Users, Gamepad2, Home, BarChart3, User } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/cn';
 import { haptic } from '@/lib/telegram';
 
@@ -9,21 +10,22 @@ import { haptic } from '@/lib/telegram';
  * here — it hangs off My Account (the deposit/withdraw entry point), matching the
  * reference design.
  */
-const tabs: { to: string; label: string; icon: LucideIcon }[] = [
-  { to: '/alliance', label: 'Alliance', icon: Users },
-  { to: '/games', label: 'Games', icon: Gamepad2 },
-  { to: '/', label: 'Lobby', icon: Home },
-  { to: '/data', label: 'Stats', icon: BarChart3 },
-  { to: '/profile', label: 'Me', icon: User },
+const tabs: { to: string; key: string; icon: LucideIcon }[] = [
+  { to: '/alliance', key: 'nav.alliance', icon: Users },
+  { to: '/games', key: 'nav.games', icon: Gamepad2 },
+  { to: '/', key: 'nav.lobby', icon: Home },
+  { to: '/data', key: 'nav.data', icon: BarChart3 },
+  { to: '/profile', key: 'nav.account', icon: User },
 ];
 
 export function BottomNav() {
+  const { t } = useTranslation();
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-[520px] border-t border-border bg-surface/95 backdrop-blur"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      {tabs.map(({ to, label, icon: Icon }) => (
+      {tabs.map(({ to, key, icon: Icon }) => (
         <NavLink
           key={to}
           to={to}
@@ -40,7 +42,7 @@ export function BottomNav() {
                   isActive ? 'text-brand' : 'text-dim',
                 )}
               >
-                {label}
+                {t(key)}
               </span>
             </>
           )}

@@ -1,4 +1,5 @@
 import { Crown, Plus, Trophy, ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 
@@ -28,6 +29,7 @@ const RECOMMENDED = [
 ];
 
 export function Alliance() {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
 
@@ -67,16 +69,17 @@ export function Alliance() {
               <span className="font-semibold text-text">
                 {MY_ALLIANCE.members.toLocaleString()}
               </span>{' '}
-              members
+              {t('common.members')}
             </span>
             <span className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-success" />
-              <span className="font-semibold text-text">{MY_ALLIANCE.online}</span> online
+              <span className="font-semibold text-text">{MY_ALLIANCE.online}</span>{' '}
+              {t('common.online')}
             </span>
           </div>
 
           <Button full className="mt-3.5">
-            Join Alliance
+            {t('alliance.joinAlliance')}
           </Button>
         </div>
       </div>
@@ -84,9 +87,9 @@ export function Alliance() {
       {/* Recommended */}
       <section>
         <div className="mb-2.5 flex items-center justify-between">
-          <h2 className="text-sm font-bold">Recommended alliances</h2>
+          <h2 className="text-sm font-bold">{t('alliance.recommended')}</h2>
           <button className="flex items-center text-xs text-dim">
-            View all <ChevronRight size={14} />
+            {t('common.viewAll')} <ChevronRight size={14} />
           </button>
         </div>
 
@@ -102,15 +105,17 @@ export function Alliance() {
                   {a.vip && <Badge tone="accent">VIP</Badge>}
                 </div>
                 <div className="mt-0.5 flex items-center gap-3 text-[0.68rem] text-dim">
-                  <span>{a.members.toLocaleString()} members</span>
+                  <span>
+                    {a.members.toLocaleString()} {t('common.members')}
+                  </span>
                   <span className="flex items-center gap-1">
                     <span className="size-1.5 rounded-full bg-success" />
-                    {a.online} online
+                    {a.online} {t('common.online')}
                   </span>
                 </div>
               </div>
               <Button size="sm" variant="secondary">
-                Join
+                {t('common.join')}
               </Button>
             </div>
           ))}
@@ -121,16 +126,16 @@ export function Alliance() {
       <div className="grid grid-cols-2 gap-3">
         <button className="flex flex-col items-center gap-1.5 rounded-(--radius-app) border border-border bg-surface py-4 active:scale-[0.98]">
           <Plus size={20} className="text-brand" />
-          <span className="text-xs font-semibold">Create Alliance</span>
+          <span className="text-xs font-semibold">{t('alliance.create')}</span>
         </button>
         <button className="flex flex-col items-center gap-1.5 rounded-(--radius-app) border border-border bg-surface py-4 active:scale-[0.98]">
           <Trophy size={20} className="text-accent" />
-          <span className="text-xs font-semibold">Alliance Ranking</span>
+          <span className="text-xs font-semibold">{t('alliance.ranking')}</span>
         </button>
       </div>
 
       <div className="pt-1 text-center text-[0.66rem] text-dim">
-        Sample data — awaiting the alliance/league endpoints.
+        {t('alliance.pendingEndpoints')}
       </div>
     </div>
   );

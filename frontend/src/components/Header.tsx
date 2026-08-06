@@ -1,4 +1,5 @@
 import { Moon, Sun } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '@/store/theme';
 
 /**
@@ -8,6 +9,7 @@ import { useTheme } from '@/store/theme';
  * to the shell's edges while keeping its content aligned to the page gutter.
  */
 export function Header() {
+  const { t } = useTranslation();
   const { resolved, toggle } = useTheme();
   return (
     <header className="sticky top-0 z-20 -mx-4 mb-1 border-b border-border/60 bg-bg/80 px-4 py-3 backdrop-blur-md">
@@ -23,7 +25,7 @@ export function Header() {
         </div>
         <button
           onClick={toggle}
-          aria-label="Toggle theme"
+          aria-label={t('a11y.toggleTheme')}
           className="grid size-9 place-items-center rounded-full border border-border bg-surface text-dim transition-colors active:scale-95"
         >
           {resolved === 'dark' ? <Sun size={17} /> : <Moon size={17} />}

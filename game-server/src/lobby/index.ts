@@ -16,3 +16,5 @@ export {
   type TableFilter,
   type GameSummary,
 } from './lobby-service';
+export { seedLobby } from './dev-seed';
+export { parseTableFilter, FilterError } from './query';

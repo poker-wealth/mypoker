@@ -1,0 +1,169 @@
+{
+  "nav": {
+    "alliance": "Aliansi",
+    "games": "Game",
+    "lobby": "Lobi",
+    "data": "Data",
+    "account": "Akun"
+  },
+  "common": {
+    "online": "online",
+    "members": "anggota",
+    "join": "Gabung",
+    "viewAll": "Lihat semua",
+    "seeAll": "Lihat semua",
+    "sampleData": "Data contoh",
+    "loading": "Memuat…",
+    "retry": "Coba lagi"
+  },
+  "lobby": {
+    "dailyJackpot": "Jackpot Harian",
+    "jackpotBlurb": "Bertambah setiap kali satu ronde dimainkan di MYPOKER.",
+    "provablyFair": "Terbukti adil · dapat diverifikasi on-chain",
+    "hotNow": "Sedang populer",
+    "moreGames": "Game lainnya"
+  },
+  "games": {
+    "searchPlaceholder": "Cari game",
+    "filterAll": "Semua",
+    "filterPoker": "Poker",
+    "filterFast": "Cepat",
+    "filterCards": "Kartu",
+    "noMatch": "Tidak ada game yang cocok dengan “{{query}}”.",
+    "comingSoon": "Segera hadir",
+    "soonBadge": "SEGERA",
+    "minBuy": "Min {{amount}}",
+    "playersOnline": "{{count}} sedang bermain"
+  },
+  "gameNames": {
+    "texas": "Texas Hold’em",
+    "baccarat": "Bakarat",
+    "blackjack": "Blackjack",
+    "sicbo": "Sicbo",
+    "fishingWar": "Fishing War",
+    "setteMezzo": "Sette e Mezzo",
+    "short-deck": "Short Deck",
+    "red-packet": "Angpao",
+    "niu-niu": "Niu Niu",
+    "dou-di-zhu": "Dou Di Zhu",
+    "omaha": "Omaha",
+    "san-zhang": "San Zhang",
+    "cowboy-beauty": "Koboi & Si Cantik",
+    "lottery": "Lotre",
+    "slots": "Slot"
+  },
+  "alliance": {
+    "joinAlliance": "Gabung Aliansi",
+    "recommended": "Aliansi yang disarankan",
+    "create": "Buat Aliansi",
+    "ranking": "Peringkat Aliansi",
+    "pendingEndpoints": "Data contoh — API aliansi belum terhubung."
+  },
+  "data": {
+    "periodToday": "Hari ini",
+    "period7d": "7 hari",
+    "period30d": "30 hari",
+    "periodAll": "Semua",
+    "overview": "Ringkasan",
+    "hands": "Ronde",
+    "winRate": "Tingkat menang",
+    "netProfit": "Laba bersih",
+    "profitTrend": "Tren keuntungan",
+    "recentRounds": "Ronde terbaru",
+    "noRounds": "Tidak ada ronde pada periode ini",
+    "noRoundsBlurb": "Coba periode lebih panjang, atau gabung ke meja.",
+    "loadMore": "Muat lebih banyak",
+    "signInToSee": "Masuk untuk melihat rekor Anda"
+  },
+  "account": {
+    "guest": "Tamu",
+    "notSignedIn": "Belum masuk",
+    "signInTitle": "Masuk untuk menyimpan progres Anda",
+    "signInBlurb": "Hubungkan Telegram untuk menyinkronkan saldo, riwayat & hadiah VIP.",
+    "openInTelegramTitle": "Buka di Telegram untuk masuk",
+    "openInTelegramBlurb": "Aplikasi akan otomatis memasukkan Anda saat dijalankan di dalam Telegram.",
+    "continueWithTelegram": "Lanjutkan dengan Telegram",
+    "signingIn": "Sedang masuk…",
+    "vip": "VIP {{tier}}",
+    "id": "ID: {{id}}",
+    "statHands": "Ronde",
+    "statWinRate": "Tingkat menang",
+    "statBiggestWin": "Kemenangan terbesar",
+    "wallet": "Dompet",
+    "fairness": "Verifikasi keadilan",
+    "history": "Riwayat permainan",
+    "settings": "Pengaturan",
+    "support": "Bantuan",
+    "language": "Bahasa",
+    "signOut": "Keluar",
+    "buildLine": "MYPOKER · versi staging · v0.1",
+    "noHands": "Belum ada ronde dimainkan",
+    "noHandsBlurb": "Gabung ke meja dan rekor Anda dimulai di sini."
+  },
+  "wallet": {
+    "totalBalance": "Total Saldo",
+    "available": "Tersedia",
+    "inPlay": "Sedang dimainkan",
+    "deposit": "Setor",
+    "withdraw": "Tarik",
+    "quickTopUp": "Isi cepat (USDT)",
+    "inviteTitle": "Undang & dapatkan bonus",
+    "inviteBlurb": "Bagikan kode Anda dan dapatkan bagian dari setiap rake.",
+    "code": "Kode",
+    "testnetNotice": "Staging hanya menggunakan <0>dana uji coba</0>. Setoran dan penarikan asli aktif setelah tinjauan keamanan.",
+    "recentActivity": "Aktivitas terbaru",
+    "noTransactions": "Belum ada transaksi",
+    "noTransactionsBlurb": "Setoran dan kemenangan Anda akan muncul di sini"
+  },
+  "table": {
+    "fold": "Lipat",
+    "check": "Cek",
+    "call": "Call {{amount}}",
+    "bet": "Taruhan",
+    "raise": "Naikkan",
+    "allIn": "All-in",
+    "halfPot": "½ Pot",
+    "threeQuarterPot": "¾ Pot",
+    "pot": "Pot",
+    "handLine": "Ronde {{hand}} · Blind {{blinds}}",
+    "waiting": "Menunggu pemain lain…",
+    "nextHand": "Ronde berikutnya segera dimulai…"
+  },
+  "a11y": {
+    "toggleTheme": "Ganti tema",
+    "dismiss": "Tutup"
+  },
+  "language": {
+    "title": "Bahasa",
+    "systemDefault": "Ikuti Telegram"
+  },
+  "states": {
+    "offline": "Tidak ada koneksi",
+    "reconnecting": "Menyambungkan ulang…",
+    "backOnline": "Kembali online",
+    "error": "Terjadi kesalahan",
+    "empty": "Belum ada apa-apa",
+    "serviceUnavailable": "Belum tersedia saat ini",
+    "sessionExpired": "Sesi Anda berakhir — silakan masuk lagi"
+  },
+  "toasts": {
+    "signedIn": "Masuk sebagai {{name}}",
+    "signedOut": "Berhasil keluar",
+    "signInFailed": "Gagal masuk",
+    "copied": "Tersalin",
+    "copyFailed": "Gagal menyalin"
+  },
+  "settings": {
+    "appearance": "Tampilan",
+    "theme": "Mode gelap",
+    "preferences": "Preferensi",
+    "sound": "Efek suara",
+    "haptics": "Getaran",
+    "notifications": "Notifikasi",
+    "notifyResults": "Hasil permainan",
+    "notifyDeposits": "Setoran & penarikan",
+    "notifyPromos": "Promosi",
+    "about": "Tentang",
+    "signInToSync": "Masuk untuk menyinkronkan preferensi Anda"
+  }
+}

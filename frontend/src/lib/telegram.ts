@@ -12,6 +12,12 @@ interface TelegramWebApp {
   colorScheme: 'light' | 'dark';
   themeParams: Record<string, string>;
   initData: string;
+  /**
+   * The same payload as `initData`, pre-parsed and NOT signature-checked.
+   * Safe for cosmetic decisions like which language to open in; never for
+   * identity — that comes from the server verifying `initData`.
+   */
+  initDataUnsafe?: { user?: { language_code?: string } };
   onEvent: (event: string, handler: () => void) => void;
   offEvent: (event: string, handler: () => void) => void;
   HapticFeedback?: { impactOccurred: (style: string) => void };
@@ -38,6 +44,14 @@ export const initData = (): string => tg()?.initData ?? '';
 
 /** Telegram's own light/dark choice, so the app can follow the client. */
 export const telegramColorScheme = (): 'light' | 'dark' | null => tg()?.colorScheme ?? null;
+
+/**
+ * The player's Telegram interface language, e.g. 'en', 'zh-hans', 'ru'.
+ * Read from the unsigned payload on purpose: picking a language is cosmetic, so
+ * it doesn't need the round-trip that identity does.
+ */
+export const telegramLanguageCode = (): string | null =>
+  tg()?.initDataUnsafe?.user?.language_code ?? null;
 
 export function haptic(style: 'light' | 'medium' | 'heavy' = 'light'): void {
   tg()?.HapticFeedback?.impactOccurred(style);

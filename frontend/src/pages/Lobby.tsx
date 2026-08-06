@@ -1,38 +1,61 @@
-import { useState } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Filter, Zap } from 'lucide-react';
-import { Segmented } from '@/components/ui/Segmented';
-import { Button } from '@/components/ui/Button';
+import { ShieldCheck, Flame, ChevronRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { GameTile } from '@/components/GameTile';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { GAMES, gameVisual, totalPlayers, type GameDef } from '@/lib/games';
+import { useLobbyGames } from '@/api/hooks';
+import { formatMicros } from '@/api/lobby';
 
-const TABLES = [
-  { id: 'T-001', blinds: '1/2', players: '6/9', buyIn: '42 BB', status: 'play', minBuy: '$1,200' },
-  { id: 'T-002', blinds: '1/2', players: '8/9', buyIn: '38 BB', status: 'play', minBuy: '$980' },
-  { id: 'T-003', blinds: '5/10', players: '7/9', buyIn: '88 BB', status: 'play', minBuy: '$2,100' },
-  { id: 'T-004', blinds: '5/10', players: '9/9', buyIn: '112 BB', status: 'wait', minBuy: 'WAIT' },
-  { id: 'T-005', blinds: '25/50', players: '6/9', buyIn: '240 BB', status: 'play', minBuy: '$8,900' },
-  { id: 'T-006', blinds: '100/200', players: '9/9', buyIn: '512 BB', status: 'wait', minBuy: 'WAIT' },
-];
-
+/**
+ * The lobby.
+ *
+ * Reads live figures from GET /lobby/games and **falls back to the static
+ * catalog** when that can't be reached — deliberately, not as an oversight. This
+ * is the shop window: a player opening the app on a flaky train connection
+ * should see games, not an error panel. The fallback shows plausible tiles that
+ * still navigate; the only thing lost is that the numbers are stale.
+ *
+ * Jackpot and player counts are the two things that must be real when the server
+ * is up, so they're the ones driven by the query.
+ */
 export function Lobby() {
-  const [variant, setVariant] = useState('dezhou');
-  const [blinds, setBlinds] = useState('all');
+  const navigate = useNavigate();
+  const { t } = useTranslation();
+  const lobby = useLobbyGames();
+
+  // Merge server truth with client visuals: the server owns who's playing and
+  // how big the jackpot is, we own what a game looks like.
+  const games: GameDef[] = lobby.data
+    ? lobby.data.games.flatMap((g): GameDef[] => {
+        // Unavailable games are dropped rather than greyed out — a vendor being
+        // down is our problem, not something to advertise on the front screen.
+        if (!g.available) return [];
+        // A game the server knows about but we have no artwork for is skipped
+        // rather than rendered blank. It reappears the moment a tile is added.
+        const visual = gameVisual(g.gameId);
+        if (!visual) return [];
+        return [{ ...visual, players: g.players, hot: g.players > 500 }];
+      })
+    : GAMES;
+
+  const hot = games.filter((g) => g.hot);
+  const rest = games.filter((g) => !g.hot);
+
+  const jackpot = lobby.data ? `₮${formatMicros(lobby.data.totalJackpot)}` : '₮128,450';
+  const online = lobby.data
+    ? lobby.data.games.reduce((sum, g) => sum + g.players, 0)
+    : totalPlayers();
 
   return (
-    <div className="flex h-full flex-col space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-end pb-1 pt-2">
-        <div className="flex items-center gap-1.5 rounded-full border border-success/30 bg-success/10 px-2 py-0.5 text-xs font-semibold text-success">
-          <ShieldCheck size={14} /> FAIR & SECURE
-        </div>
-      </div>
-
+    <div className="space-y-5">
       {/* Jackpot hero */}
       <div
-        className="relative overflow-hidden rounded-2xl border border-border p-5 text-center"
+        className="relative overflow-hidden rounded-2xl border border-border p-5"
         style={{ boxShadow: 'var(--glow-brand)' }}
       >
         <div className="absolute inset-0" style={{ backgroundImage: 'var(--brand-gradient)', opacity: 0.9 }} />
-        {/* moving shimmer */}
         <motion.div
           className="absolute inset-y-0 w-1/3 bg-white/20 blur-2xl"
           initial={{ x: '-120%' }}
@@ -40,90 +63,73 @@ export function Lobby() {
           transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut', repeatDelay: 1.5 }}
         />
         <div className="relative text-white">
-          <div className="text-[0.7rem] font-bold uppercase tracking-wider text-white/80">
-            Grand Jackpot
+          <div className="flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-wider text-white/80">
+            <span className="relative flex size-2">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-white/70" />
+              <span className="relative inline-flex size-2 rounded-full bg-white" />
+            </span>
+            {t('lobby.dailyJackpot')}
           </div>
-          <div className="mt-0.5 text-[2.2rem] font-black leading-none tracking-tight tabular-nums text-yellow-400">
-            $ 1,253,842.28
-          </div>
-          <div className="mt-1 text-xs font-semibold text-success drop-shadow-sm">+ $322.16 / hr</div>
+          {lobby.isPending ? (
+            <Skeleton className="mt-2 h-10 w-52 bg-white/25" />
+          ) : (
+            <div className="mt-1 text-[2.6rem] font-black leading-none tracking-tight tabular-nums">
+              {jackpot}
+            </div>
+          )}
+          <div className="mt-2 text-xs text-white/75">{t('lobby.jackpotBlurb')}</div>
         </div>
       </div>
 
-      <Segmented
-        value={variant}
-        onChange={setVariant}
-        options={[
-          { value: 'dezhou', label: 'DEZHOU' },
-          { value: 'xuzhou', label: 'XUZHOU' },
-          { value: 'ausha', label: 'AUSHA' },
-          { value: 'macau', label: 'MACAU' },
-          { value: 'others', label: 'OTHERS' },
-        ]}
-      />
-
-      <div className="flex items-center gap-2">
-        <div className="flex-1">
-          <Segmented
-            value={blinds}
-            onChange={setBlinds}
-            options={[
-              { value: 'all', label: 'ALL' },
-              { value: '1/2', label: '1/2' },
-              { value: '5/10', label: '5/10' },
-              { value: '25/50', label: '25/50' },
-              { value: '100/200', label: '100/200' },
-            ]}
-          />
+      {/* Live players band */}
+      <div className="flex items-center justify-between rounded-(--radius-app) border border-border bg-surface px-4 py-3">
+        <div className="flex items-center gap-2 text-sm">
+          <ShieldCheck size={18} className="text-accent" />
+          <span className="text-dim">{t('lobby.provablyFair')}</span>
         </div>
-        <button className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-dim transition-colors hover:text-text">
-          <Filter size={16} />
-        </button>
+        <div className="flex items-center gap-1.5 text-sm font-semibold">
+          <span className="size-2 rounded-full bg-success" />
+          {lobby.isPending ? (
+            <Skeleton className="h-4 w-10" />
+          ) : (
+            online.toLocaleString()
+          )}
+          <span className="text-dim">{t('common.online')}</span>
+        </div>
       </div>
 
-      {/* Table list */}
-      <div className="flex-1 overflow-auto rounded-(--radius-app) border border-border bg-surface">
-        <table className="w-full text-left text-xs">
-          <thead>
-            <tr className="border-b border-border/50 text-[0.65rem] text-dim">
-              <th className="px-3 py-2.5 font-medium">Table</th>
-              <th className="px-3 py-2.5 font-medium">Blinds</th>
-              <th className="px-3 py-2.5 font-medium">Players</th>
-              <th className="px-3 py-2.5 font-medium">Buy-in</th>
-              <th className="px-3 py-2.5 text-right font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border/50">
-            {TABLES.map((t) => (
-              <tr key={t.id} className="transition-colors active:bg-surface-2">
-                <td className="px-3 py-3 font-semibold text-yellow-500">{t.id}</td>
-                <td className="px-3 py-3 tabular-nums text-dim">{t.blinds}</td>
-                <td className="px-3 py-3 tabular-nums">{t.players}</td>
-                <td className="px-3 py-3 tabular-nums">{t.buyIn}</td>
-                <td className="px-3 py-3 text-right">
-                  <span
-                    className={`font-semibold ${
-                      t.status === 'play' ? 'text-success' : 'text-dim'
-                    }`}
-                  >
-                    {t.minBuy}
-                  </span>
-                </td>
-              </tr>
+      {/* Hot now */}
+      {hot.length > 0 && (
+        <section>
+          <div className="mb-2.5 flex items-center gap-1.5">
+            <Flame size={16} className="text-danger" />
+            <h2 className="text-sm font-bold">{t('lobby.hotNow')}</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {hot.map((g) => (
+              <GameTile key={g.id} game={g} onClick={() => navigate(`/table/${g.id}`)} />
             ))}
-          </tbody>
-        </table>
-      </div>
+          </div>
+        </section>
+      )}
 
-      {/* Action buttons */}
-      <div className="grid grid-cols-2 gap-3 pt-2">
-        <Button className="bg-success text-success-fg hover:bg-success/90">
-          <Zap size={16} className="mr-1.5" /> QUICK JOIN
-        </Button>
-        <Button variant="secondary" className="border-border bg-surface text-dim">
-          CREATE PRIVATE TABLE
-        </Button>
-      </div>
+      {/* All games */}
+      <section>
+        <button
+          onClick={() => navigate('/games')}
+          className="mb-2.5 flex w-full items-center justify-between"
+        >
+          <h2 className="text-sm font-bold">{t('lobby.moreGames')}</h2>
+          <span className="flex items-center text-xs text-dim">
+            {t('common.seeAll')} <ChevronRight size={14} />
+          </span>
+        </button>
+        <div className="grid grid-cols-2 gap-3">
+          {rest.map((g) => (
+            <GameTile key={g.id} game={g} onClick={() => navigate(`/table/${g.id}`)} />
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

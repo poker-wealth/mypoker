@@ -1,0 +1,169 @@
+{
+  "nav": {
+    "alliance": "พันธมิตร",
+    "games": "เกม",
+    "lobby": "ล็อบบี้",
+    "data": "ข้อมูล",
+    "account": "บัญชี"
+  },
+  "common": {
+    "online": "ออนไลน์",
+    "members": "สมาชิก",
+    "join": "เข้าร่วม",
+    "viewAll": "ดูทั้งหมด",
+    "seeAll": "ดูทั้งหมด",
+    "sampleData": "ข้อมูลตัวอย่าง",
+    "loading": "กำลังโหลด…",
+    "retry": "ลองอีกครั้ง"
+  },
+  "lobby": {
+    "dailyJackpot": "แจ็กพอตประจำวัน",
+    "jackpotBlurb": "เพิ่มขึ้นทุกตาที่มีการเล่นบน MYPOKER",
+    "provablyFair": "ยุติธรรมพิสูจน์ได้ · ตรวจสอบบนเชนได้",
+    "hotNow": "กำลังมาแรง",
+    "moreGames": "เกมเพิ่มเติม"
+  },
+  "games": {
+    "searchPlaceholder": "ค้นหาเกม",
+    "filterAll": "ทั้งหมด",
+    "filterPoker": "โป๊กเกอร์",
+    "filterFast": "เกมเร็ว",
+    "filterCards": "ไพ่",
+    "noMatch": "ไม่พบเกมที่ตรงกับ “{{query}}”",
+    "comingSoon": "เร็ว ๆ นี้",
+    "soonBadge": "เร็ว ๆ นี้",
+    "minBuy": "ขั้นต่ำ {{amount}}",
+    "playersOnline": "{{count}} คนกำลังเล่น"
+  },
+  "gameNames": {
+    "texas": "เท็กซัส โฮลเด็ม",
+    "baccarat": "บาคาร่า",
+    "blackjack": "แบล็คแจ็ค",
+    "sicbo": "ไฮโล",
+    "fishingWar": "ยิงปลา",
+    "setteMezzo": "เซตเต เอ เมซโซ",
+    "short-deck": "ช็อตเด็ค",
+    "red-packet": "ซองแดง",
+    "niu-niu": "นิวนิว",
+    "dou-di-zhu": "โต้วตี้จู่",
+    "omaha": "โอมาฮา",
+    "san-zhang": "สามใบ",
+    "cowboy-beauty": "คาวบอยกับสาวงาม",
+    "lottery": "ลอตเตอรี",
+    "slots": "สล็อต"
+  },
+  "alliance": {
+    "joinAlliance": "เข้าร่วมพันธมิตร",
+    "recommended": "พันธมิตรแนะนำ",
+    "create": "สร้างพันธมิตร",
+    "ranking": "อันดับพันธมิตร",
+    "pendingEndpoints": "ข้อมูลตัวอย่าง — ยังไม่ได้เชื่อมต่อ API พันธมิตร"
+  },
+  "data": {
+    "periodToday": "วันนี้",
+    "period7d": "7 วัน",
+    "period30d": "30 วัน",
+    "periodAll": "ทั้งหมด",
+    "overview": "ภาพรวม",
+    "hands": "จำนวนตา",
+    "winRate": "อัตราชนะ",
+    "netProfit": "กำไรสุทธิ",
+    "profitTrend": "แนวโน้มกำไร",
+    "recentRounds": "ตาล่าสุด",
+    "noRounds": "ไม่มีตาในช่วงเวลานี้",
+    "noRoundsBlurb": "ลองเลือกช่วงเวลาที่ยาวขึ้น หรือเข้าร่วมโต๊ะ",
+    "loadMore": "โหลดเพิ่ม",
+    "signInToSee": "เข้าสู่ระบบเพื่อดูสถิติของคุณ"
+  },
+  "account": {
+    "guest": "ผู้เยี่ยมชม",
+    "notSignedIn": "ยังไม่ได้เข้าสู่ระบบ",
+    "signInTitle": "เข้าสู่ระบบเพื่อบันทึกความคืบหน้า",
+    "signInBlurb": "เชื่อมต่อ Telegram เพื่อซิงค์ยอดเงิน ประวัติ และสิทธิพิเศษ VIP",
+    "openInTelegramTitle": "เปิดใน Telegram เพื่อเข้าสู่ระบบ",
+    "openInTelegramBlurb": "แอปจะเข้าสู่ระบบให้อัตโนมัติเมื่อเปิดภายใน Telegram",
+    "continueWithTelegram": "ดำเนินการต่อด้วย Telegram",
+    "signingIn": "กำลังเข้าสู่ระบบ…",
+    "vip": "VIP {{tier}}",
+    "id": "ไอดี: {{id}}",
+    "statHands": "จำนวนตา",
+    "statWinRate": "อัตราชนะ",
+    "statBiggestWin": "ชนะสูงสุด",
+    "wallet": "กระเป๋าเงิน",
+    "fairness": "ตรวจสอบความยุติธรรม",
+    "history": "ประวัติการเล่น",
+    "settings": "ตั้งค่า",
+    "support": "ฝ่ายสนับสนุน",
+    "language": "ภาษา",
+    "signOut": "ออกจากระบบ",
+    "buildLine": "MYPOKER · เวอร์ชันทดสอบ · v0.1",
+    "noHands": "ยังไม่ได้เล่นตาไหน",
+    "noHandsBlurb": "เข้าร่วมโต๊ะแล้วสถิติของคุณจะแสดงที่นี่"
+  },
+  "wallet": {
+    "totalBalance": "ยอดเงินรวม",
+    "available": "ใช้ได้",
+    "inPlay": "อยู่ในเกม",
+    "deposit": "ฝากเงิน",
+    "withdraw": "ถอนเงิน",
+    "quickTopUp": "เติมเงินด่วน (USDT)",
+    "inviteTitle": "ชวนเพื่อนรับรางวัล",
+    "inviteBlurb": "แชร์รหัสของคุณและรับส่วนแบ่งจากทุกค่าน้ำ",
+    "code": "รหัสเชิญ",
+    "testnetNotice": "ระบบทดสอบใช้<0>เงินทดสอบเท่านั้น</0> การฝากและถอนจริงจะเปิดใช้หลังการตรวจสอบความปลอดภัย",
+    "recentActivity": "รายการล่าสุด",
+    "noTransactions": "ยังไม่มีรายการ",
+    "noTransactionsBlurb": "ยอดฝากและเงินรางวัลจะแสดงที่นี่"
+  },
+  "table": {
+    "fold": "หมอบ",
+    "check": "เช็ค",
+    "call": "ตาม {{amount}}",
+    "bet": "เดิมพัน",
+    "raise": "เพิ่มเดิมพัน",
+    "allIn": "ออลอิน",
+    "halfPot": "½ พอต",
+    "threeQuarterPot": "¾ พอต",
+    "pot": "พอต",
+    "handLine": "ตาที่ {{hand}} · บลายด์ {{blinds}}",
+    "waiting": "กำลังรอผู้เล่นคนอื่น…",
+    "nextHand": "ตาถัดไปกำลังจะเริ่ม…"
+  },
+  "a11y": {
+    "toggleTheme": "สลับธีม",
+    "dismiss": "ปิด"
+  },
+  "language": {
+    "title": "ภาษา",
+    "systemDefault": "ตาม Telegram"
+  },
+  "states": {
+    "offline": "ไม่มีการเชื่อมต่อ",
+    "reconnecting": "กำลังเชื่อมต่อใหม่…",
+    "backOnline": "กลับมาออนไลน์แล้ว",
+    "error": "เกิดข้อผิดพลาด",
+    "empty": "ยังไม่มีข้อมูล",
+    "serviceUnavailable": "ยังใช้งานไม่ได้ในขณะนี้",
+    "sessionExpired": "เซสชันหมดอายุ — กรุณาเข้าสู่ระบบใหม่"
+  },
+  "toasts": {
+    "signedIn": "เข้าสู่ระบบในชื่อ {{name}}",
+    "signedOut": "ออกจากระบบแล้ว",
+    "signInFailed": "เข้าสู่ระบบไม่สำเร็จ",
+    "copied": "คัดลอกแล้ว",
+    "copyFailed": "คัดลอกไม่สำเร็จ"
+  },
+  "settings": {
+    "appearance": "การแสดงผล",
+    "theme": "โหมดมืด",
+    "preferences": "การตั้งค่า",
+    "sound": "เสียงประกอบ",
+    "haptics": "การสั่น",
+    "notifications": "การแจ้งเตือน",
+    "notifyResults": "ผลการเล่น",
+    "notifyDeposits": "ฝากและถอน",
+    "notifyPromos": "โปรโมชั่น",
+    "about": "เกี่ยวกับ",
+    "signInToSync": "เข้าสู่ระบบเพื่อซิงค์การตั้งค่าของคุณ"
+  }
+}

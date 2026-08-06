@@ -6,6 +6,9 @@ import { Header } from './Header';
 import { BottomNav } from './BottomNav';
 import { useTelegramBackButton } from '@/lib/useTelegramBackButton';
 import { useSession } from '@/store/session';
+import { useTranslation } from 'react-i18next';
+import { useSettings } from '@/api/hooks';
+import { setLanguage } from '@/i18n';
 
 /**
  * The frame every screen lives in: fixed brand header, an animated page area, and
@@ -34,6 +37,8 @@ export function AppShell() {
     if (status === 'idle') void signIn();
   }, [status, signIn]);
 
+  useAccountLanguage();
+
   return (
     <div className="mx-auto flex min-h-full max-w-[520px] flex-col px-4 pb-24">
       <Header />
@@ -50,4 +55,26 @@ export function AppShell() {
       <BottomNav />
     </div>
   );
+}
+
+/**
+ * Applies the account's stored language once settings arrive.
+ *
+ * This is what makes the preference account-scoped rather than device-scoped: a
+ * player who picked 日本語 on their phone gets 日本語 when they open the app on
+ * a second device, without touching the picker again.
+ *
+ * Only runs when the two actually differ, so it can't fight the local choice on
+ * every render — and it never writes back, so it cannot loop with the picker.
+ */
+function useAccountLanguage(): void {
+  const { i18n } = useTranslation();
+  const settings = useSettings();
+  const accountLanguage = settings.data?.language ?? null;
+
+  useEffect(() => {
+    if (!accountLanguage) return;
+    if (accountLanguage === i18n.resolvedLanguage) return;
+    void setLanguage(accountLanguage);
+  }, [accountLanguage, i18n.resolvedLanguage]);
 }

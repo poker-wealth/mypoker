@@ -6,6 +6,7 @@ import { Games } from '@/pages/Games';
 import { Data } from '@/pages/Data';
 import { Wallet } from '@/pages/Wallet';
 import { Profile } from '@/pages/Profile';
+import { Settings } from '@/pages/Settings';
 import { Table } from '@/pages/Table';
 
 export const router = createBrowserRouter([
@@ -21,6 +22,7 @@ export const router = createBrowserRouter([
       { path: 'profile', element: <Profile /> },
       // Not a tab — reached from My Account's deposit/withdraw.
       { path: 'wallet', element: <Wallet /> },
+      { path: 'settings', element: <Settings /> },
     ],
   },
   // Full-screen game table (no bottom nav / shell chrome).
