@@ -268,5 +268,22 @@
       "DAILY": "sekali sehari",
       "WINDOW": "hanya Sabtu"
     }
+  },
+  "onboarding": {
+    "skip": "Lewati",
+    "next": "Lanjut",
+    "start": "Cari meja",
+    "welcome": {
+      "title": "Selamat datang di MYPOKER",
+      "body": "Texas Hold’em, Omaha, Dou Di Zhu, dan lainnya — dengan pemain sungguhan, sepanjang waktu."
+    },
+    "fair": {
+      "title": "Setiap ronde dapat diverifikasi",
+      "body": "Dek ditentukan oleh server, setiap pemain di meja, dan blok blockchain yang tak seorang pun bisa memprediksi. Anda dapat menghitung ulang ronde mana pun sendiri."
+    },
+    "play": {
+      "title": "Duduk dan mainkan",
+      "body": "Jelajahi lobi, pilih meja sesuai taruhan Anda, dan ambil tempat duduk. Anda bisa menambah dana kapan saja."
+    }
   }
 }

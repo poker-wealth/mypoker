@@ -268,5 +268,22 @@
       "DAILY": "once a day",
       "WINDOW": "Saturdays only"
     }
+  },
+  "onboarding": {
+    "skip": "Skip",
+    "next": "Next",
+    "start": "Find a table",
+    "welcome": {
+      "title": "Welcome to MYPOKER",
+      "body": "Texas Hold’em, Omaha, Dou Di Zhu and more — with real players, around the clock."
+    },
+    "fair": {
+      "title": "Every hand is verifiable",
+      "body": "The deck is decided by the server, every player at the table, and a blockchain block nobody can predict. You can recompute any hand yourself."
+    },
+    "play": {
+      "title": "Sit down and play",
+      "body": "Browse the lobby, pick a table at your stake, and take a seat. You can add funds whenever you’re ready."
+    }
   }
 }

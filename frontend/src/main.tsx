@@ -9,6 +9,7 @@ import { watchConnection } from '@/store/connection';
 import { Toaster } from '@/components/ui/Toaster';
 import { ConnectionBanner } from '@/components/ConnectionBanner';
 import { LanguageGate } from '@/components/LanguageGate';
+import { Onboarding } from '@/components/Onboarding';
 import { router } from '@/router';
 // Imported for its side effect: initialises i18next before anything renders, so
 // the first paint is already in the right language.
@@ -36,6 +37,7 @@ createRoot(document.getElementById('root')!).render(
       <ConnectionBanner />
       <Toaster />
       <LanguageGate />
+      <Onboarding />
       <RouterProvider router={router} />
     </QueryClientProvider>
   </StrictMode>,

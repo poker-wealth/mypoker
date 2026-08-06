@@ -268,5 +268,22 @@
       "DAILY": "mỗi ngày một lần",
       "WINDOW": "chỉ thứ Bảy"
     }
+  },
+  "onboarding": {
+    "skip": "Bỏ qua",
+    "next": "Tiếp",
+    "start": "Tìm bàn chơi",
+    "welcome": {
+      "title": "Chào mừng đến với MYPOKER",
+      "body": "Texas Hold’em, Omaha, Đấu Địa Chủ và nhiều hơn nữa — với người chơi thật, suốt ngày đêm."
+    },
+    "fair": {
+      "title": "Mọi ván đều xác minh được",
+      "body": "Bộ bài được quyết định bởi máy chủ, mọi người chơi tại bàn, và một khối blockchain không ai đoán trước được. Bạn có thể tự tính lại bất kỳ ván nào."
+    },
+    "play": {
+      "title": "Ngồi vào bàn và chơi",
+      "body": "Xem sảnh, chọn bàn theo mức cược của bạn và ngồi vào. Bạn có thể nạp tiền bất cứ lúc nào."
+    }
   }
 }

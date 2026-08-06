@@ -4,6 +4,7 @@ import { Globe } from 'lucide-react';
 import { LANGUAGES } from '@/i18n/languages';
 import { setLanguage, storedLanguage } from '@/i18n';
 import { haptic } from '@/lib/telegram';
+import { useFirstRun } from '@/store/firstRun';
 
 /**
  * First-launch language chooser.
@@ -27,10 +28,14 @@ export function LanguageGate() {
   // other storage.
   const [needsChoice, setNeedsChoice] = useState(() => storedLanguage() === null);
 
+  const markLanguageChosen = useFirstRun((s) => s.markLanguageChosen);
+
   const choose = (code: string): void => {
     haptic('light');
     setLanguage(code);
     setNeedsChoice(false);
+    // Releases the welcome, which waits for a language before it renders.
+    markLanguageChosen();
   };
 
   return (
