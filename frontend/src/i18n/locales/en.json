@@ -26,18 +26,28 @@
   "games": {
     "searchPlaceholder": "Search games",
     "filterAll": "All",
-    "filterPoker": "Poker",
-    "filterFast": "Fast",
-    "filterCards": "Cards",
-    "noMatch": "No games match “{{query}}”.",
+    "noMatch": "No games found",
     "comingSoon": "Coming soon",
     "soonBadge": "SOON",
     "minBuy": "Min {{amount}}",
-    "playersOnline": "{{count}} playing"
+    "playersOnline": "{{count}} playing",
+    "sectionPoker": "Poker games",
+    "sectionCard": "Card games",
+    "sectionArcade": "Arcade games",
+    "sectionQuick": "Quick games",
+    "more": "More",
+    "tableCount": "{{count}} tables",
+    "noneInCategory": "Nothing here yet",
+    "tryAnother": "Try a different search.",
+    "filter": {
+      "poker": "Poker",
+      "card": "Card",
+      "arcade": "Arcade",
+      "quick": "Quick"
+    }
   },
   "gameNames": {
     "texas": "Texas Hold’em",
-    "baccarat": "Baccarat",
     "blackjack": "Blackjack",
     "sicbo": "Sic Bo",
     "fishingWar": "Fishing War",
@@ -47,10 +57,9 @@
     "niu-niu": "Niu Niu",
     "dou-di-zhu": "Dou Di Zhu",
     "omaha": "Omaha",
-    "san-zhang": "San Zhang",
-    "cowboy-beauty": "Cowboy & Beauty",
+    "san-zhang": "Zha Jin Hua",
     "lottery": "Lottery",
-    "slots": "Slots"
+    "slots": "Slot Machines"
   },
   "alliance": {
     "joinAlliance": "Join Alliance",

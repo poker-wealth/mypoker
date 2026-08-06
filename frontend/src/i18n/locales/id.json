@@ -26,18 +26,28 @@
   "games": {
     "searchPlaceholder": "Cari game",
     "filterAll": "Semua",
-    "filterPoker": "Poker",
-    "filterFast": "Cepat",
-    "filterCards": "Kartu",
-    "noMatch": "Tidak ada game yang cocok dengan “{{query}}”.",
+    "noMatch": "Tidak ada permainan ditemukan",
     "comingSoon": "Segera hadir",
     "soonBadge": "SEGERA",
     "minBuy": "Min {{amount}}",
-    "playersOnline": "{{count}} sedang bermain"
+    "playersOnline": "{{count}} sedang bermain",
+    "sectionPoker": "Permainan poker",
+    "sectionCard": "Permainan kartu",
+    "sectionArcade": "Permainan arkade",
+    "sectionQuick": "Permainan cepat",
+    "more": "Lainnya",
+    "tableCount": "{{count}} meja",
+    "noneInCategory": "Belum ada apa pun di sini",
+    "tryAnother": "Coba pencarian lain.",
+    "filter": {
+      "poker": "Poker",
+      "card": "Kartu",
+      "arcade": "Arkade",
+      "quick": "Cepat"
+    }
   },
   "gameNames": {
     "texas": "Texas Hold’em",
-    "baccarat": "Bakarat",
     "blackjack": "Blackjack",
     "sicbo": "Sicbo",
     "fishingWar": "Fishing War",
@@ -47,10 +57,9 @@
     "niu-niu": "Niu Niu",
     "dou-di-zhu": "Dou Di Zhu",
     "omaha": "Omaha",
-    "san-zhang": "San Zhang",
-    "cowboy-beauty": "Koboi & Si Cantik",
+    "san-zhang": "Zha Jin Hua",
     "lottery": "Lotre",
-    "slots": "Slot"
+    "slots": "Mesin slot"
   },
   "alliance": {
     "joinAlliance": "Gabung Aliansi",

@@ -26,18 +26,28 @@
   "games": {
     "searchPlaceholder": "ゲームを検索",
     "filterAll": "すべて",
-    "filterPoker": "ポーカー",
-    "filterFast": "スピード",
-    "filterCards": "カード",
-    "noMatch": "「{{query}}」に一致するゲームはありません。",
+    "noMatch": "ゲームが見つかりません",
     "comingSoon": "近日公開",
     "soonBadge": "近日",
     "minBuy": "最低 {{amount}}",
-    "playersOnline": "{{count}} 人がプレイ中"
+    "playersOnline": "{{count}} 人がプレイ中",
+    "sectionPoker": "ポーカーゲーム",
+    "sectionCard": "カードゲーム",
+    "sectionArcade": "アーケードゲーム",
+    "sectionQuick": "クイックゲーム",
+    "more": "もっと見る",
+    "tableCount": "{{count}} テーブル",
+    "noneInCategory": "このカテゴリにはまだありません",
+    "tryAnother": "別の語句でお試しください。",
+    "filter": {
+      "poker": "ポーカー",
+      "card": "カード",
+      "arcade": "アーケード",
+      "quick": "クイック"
+    }
   },
   "gameNames": {
     "texas": "テキサスホールデム",
-    "baccarat": "バカラ",
     "blackjack": "ブラックジャック",
     "sicbo": "シックボー",
     "fishingWar": "フィッシングウォー",
@@ -47,10 +57,9 @@
     "niu-niu": "ニュウニュウ",
     "dou-di-zhu": "闘地主",
     "omaha": "オマハ",
-    "san-zhang": "サンジャン",
-    "cowboy-beauty": "カウボーイ＆ビューティー",
+    "san-zhang": "ジャージンホア",
     "lottery": "宝くじ",
-    "slots": "スロット"
+    "slots": "スロットマシン"
   },
   "alliance": {
     "joinAlliance": "同盟に参加",

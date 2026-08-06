@@ -26,18 +26,28 @@
   "games": {
     "searchPlaceholder": "गेम खोजें",
     "filterAll": "सभी",
-    "filterPoker": "पोकर",
-    "filterFast": "फ़ास्ट",
-    "filterCards": "कार्ड",
-    "noMatch": "“{{query}}” से मेल खाता कोई गेम नहीं मिला।",
+    "noMatch": "कोई गेम नहीं मिला",
     "comingSoon": "जल्द आ रहा है",
     "soonBadge": "जल्द",
     "minBuy": "न्यूनतम {{amount}}",
-    "playersOnline": "{{count}} खेल रहे हैं"
+    "playersOnline": "{{count}} खेल रहे हैं",
+    "sectionPoker": "पोकर गेम",
+    "sectionCard": "कार्ड गेम",
+    "sectionArcade": "आर्केड गेम",
+    "sectionQuick": "त्वरित गेम",
+    "more": "और",
+    "tableCount": "{{count}} टेबल",
+    "noneInCategory": "इस श्रेणी में अभी कुछ नहीं",
+    "tryAnother": "कोई और खोज आज़माएँ।",
+    "filter": {
+      "poker": "पोकर",
+      "card": "कार्ड",
+      "arcade": "आर्केड",
+      "quick": "त्वरित"
+    }
   },
   "gameNames": {
     "texas": "टेक्सास होल्डम",
-    "baccarat": "बकारा",
     "blackjack": "ब्लैकजैक",
     "sicbo": "सिक बो",
     "fishingWar": "फिशिंग वॉर",
@@ -47,10 +57,9 @@
     "niu-niu": "नीयू नीयू",
     "dou-di-zhu": "दोऊ दी झू",
     "omaha": "ओमाहा",
-    "san-zhang": "सैन झांग",
-    "cowboy-beauty": "काउबॉय एंड ब्यूटी",
+    "san-zhang": "ज़ा जिन हुआ",
     "lottery": "लॉटरी",
-    "slots": "स्लॉट्स"
+    "slots": "स्लॉट मशीन"
   },
   "alliance": {
     "joinAlliance": "एलायंस से जुड़ें",

@@ -26,18 +26,28 @@
   "games": {
     "searchPlaceholder": "Tìm trò chơi",
     "filterAll": "Tất cả",
-    "filterPoker": "Poker",
-    "filterFast": "Nhanh",
-    "filterCards": "Bài",
-    "noMatch": "Không có trò chơi nào khớp với “{{query}}”.",
+    "noMatch": "Không tìm thấy trò chơi",
     "comingSoon": "Sắp ra mắt",
     "soonBadge": "SẮP CÓ",
     "minBuy": "Tối thiểu {{amount}}",
-    "playersOnline": "{{count}} người đang chơi"
+    "playersOnline": "{{count}} người đang chơi",
+    "sectionPoker": "Trò chơi poker",
+    "sectionCard": "Trò chơi bài",
+    "sectionArcade": "Trò chơi arcade",
+    "sectionQuick": "Trò chơi nhanh",
+    "more": "Thêm",
+    "tableCount": "{{count}} bàn",
+    "noneInCategory": "Chưa có gì ở đây",
+    "tryAnother": "Thử tìm từ khác.",
+    "filter": {
+      "poker": "Poker",
+      "card": "Bài",
+      "arcade": "Arcade",
+      "quick": "Nhanh"
+    }
   },
   "gameNames": {
     "texas": "Texas Hold’em",
-    "baccarat": "Baccarat",
     "blackjack": "Xì Dách",
     "sicbo": "Tài Xỉu",
     "fishingWar": "Bắn Cá",
@@ -47,10 +57,9 @@
     "niu-niu": "Ngưu Ngưu",
     "dou-di-zhu": "Đấu Địa Chủ",
     "omaha": "Omaha",
-    "san-zhang": "Ba Cây",
-    "cowboy-beauty": "Cao Bồi & Người Đẹp",
+    "san-zhang": "Zha Jin Hua",
     "lottery": "Xổ Số",
-    "slots": "Nổ Hũ"
+    "slots": "Máy đánh bạc"
   },
   "alliance": {
     "joinAlliance": "Tham gia liên minh",

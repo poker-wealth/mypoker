@@ -26,18 +26,28 @@
   "games": {
     "searchPlaceholder": "搜索游戏",
     "filterAll": "全部",
-    "filterPoker": "扑克",
-    "filterFast": "快速",
-    "filterCards": "棋牌",
-    "noMatch": "没有找到与“{{query}}”匹配的游戏。",
+    "noMatch": "未找到游戏",
     "comingSoon": "即将推出",
     "soonBadge": "敬请期待",
     "minBuy": "最低 {{amount}}",
-    "playersOnline": "{{count}} 人在玩"
+    "playersOnline": "{{count}} 人在玩",
+    "sectionPoker": "扑克游戏",
+    "sectionCard": "棋牌游戏",
+    "sectionArcade": "街机游戏",
+    "sectionQuick": "快速游戏",
+    "more": "更多",
+    "tableCount": "{{count}} 张牌桌",
+    "noneInCategory": "此分类暂无游戏",
+    "tryAnother": "请尝试其他搜索词。",
+    "filter": {
+      "poker": "扑克",
+      "card": "棋牌",
+      "arcade": "街机",
+      "quick": "快速"
+    }
   },
   "gameNames": {
     "texas": "德州扑克",
-    "baccarat": "百家乐",
     "blackjack": "二十一点",
     "sicbo": "骰宝",
     "fishingWar": "捕鱼大战",
@@ -47,8 +57,7 @@
     "niu-niu": "牛牛",
     "dou-di-zhu": "斗地主",
     "omaha": "奥马哈",
-    "san-zhang": "三张",
-    "cowboy-beauty": "牛仔与美女",
+    "san-zhang": "炸金花",
     "lottery": "彩票",
     "slots": "老虎机"
   },

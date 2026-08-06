@@ -26,18 +26,28 @@
   "games": {
     "searchPlaceholder": "ค้นหาเกม",
     "filterAll": "ทั้งหมด",
-    "filterPoker": "โป๊กเกอร์",
-    "filterFast": "เกมเร็ว",
-    "filterCards": "ไพ่",
-    "noMatch": "ไม่พบเกมที่ตรงกับ “{{query}}”",
+    "noMatch": "ไม่พบเกม",
     "comingSoon": "เร็ว ๆ นี้",
     "soonBadge": "เร็ว ๆ นี้",
     "minBuy": "ขั้นต่ำ {{amount}}",
-    "playersOnline": "{{count}} คนกำลังเล่น"
+    "playersOnline": "{{count}} คนกำลังเล่น",
+    "sectionPoker": "เกมโป๊กเกอร์",
+    "sectionCard": "เกมไพ่",
+    "sectionArcade": "เกมอาร์เคด",
+    "sectionQuick": "เกมเร็ว",
+    "more": "เพิ่มเติม",
+    "tableCount": "{{count}} โต๊ะ",
+    "noneInCategory": "ยังไม่มีอะไรที่นี่",
+    "tryAnother": "ลองค้นหาคำอื่น",
+    "filter": {
+      "poker": "โป๊กเกอร์",
+      "card": "ไพ่",
+      "arcade": "อาร์เคด",
+      "quick": "เร็ว"
+    }
   },
   "gameNames": {
     "texas": "เท็กซัส โฮลเด็ม",
-    "baccarat": "บาคาร่า",
     "blackjack": "แบล็คแจ็ค",
     "sicbo": "ไฮโล",
     "fishingWar": "ยิงปลา",
@@ -47,10 +57,9 @@
     "niu-niu": "นิวนิว",
     "dou-di-zhu": "โต้วตี้จู่",
     "omaha": "โอมาฮา",
-    "san-zhang": "สามใบ",
-    "cowboy-beauty": "คาวบอยกับสาวงาม",
+    "san-zhang": "จ๋าจินฮวา",
     "lottery": "ลอตเตอรี",
-    "slots": "สล็อต"
+    "slots": "สล็อตแมชชีน"
   },
   "alliance": {
     "joinAlliance": "เข้าร่วมพันธมิตร",
