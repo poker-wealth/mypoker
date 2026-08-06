@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { ShieldCheck, Filter, Zap } from 'lucide-react';
+import { Filter, Zap } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Segmented } from '@/components/ui/Segmented';
 import { Button } from '@/components/ui/Button';
@@ -11,7 +11,6 @@ import { formatMicros } from '@/api/lobby';
 
 export function Lobby() {
   const navigate = useNavigate();
-  const { t } = useTranslation();
   const lobby = useLobbyGames();
   const [variant, setVariant] = useState('dezhou');
   const [blinds, setBlinds] = useState('all');
