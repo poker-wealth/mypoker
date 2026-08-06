@@ -1,5 +1,4 @@
 import { motion } from 'motion/react';
-import { Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { GameDef } from '@/lib/games';
 import { haptic } from '@/lib/telegram';

@@ -1,12 +1,10 @@
 import { HelpCircle, Settings, ShieldCheck } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 
 /**
  * Route-specific headers based on the active tab.
  */
 export function Header() {
-  const { t } = useTranslation();
   const location = useLocation();
 
   let title = '';
