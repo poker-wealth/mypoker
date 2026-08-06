@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Search, Trophy, MoreHorizontal } from 'lucide-react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useLobbyGames } from '@/api/hooks';
-import { GAMES, CATEGORIES, HIDDEN_GAMES, gameVisual, type GameCategory, type GameDef } from '@/lib/games';
+import { CATEGORIES, visibleGames, gameVisual, type GameCategory, type GameDef } from '@/lib/games';
 import { cn } from '@/lib/cn';
 import { haptic } from '@/lib/telegram';
 
@@ -51,12 +51,11 @@ export function Games() {
    * rather than dropping to zero tables.
    */
   const games = useMemo(() => {
-    const live = new Map(
-      (lobby.data?.games ?? [])
-        .filter((g) => !HIDDEN_GAMES.has(g.gameId))
-        .map((g) => [g.gameId, g]),
-    );
-    return GAMES.map((g) => {
+    const live = new Map((lobby.data?.games ?? []).map((g) => [g.gameId, g]));
+    // visibleGames() applies the launch gate. Filtering only the server list —
+    // as this did at first — hid nothing, because the render is driven by the
+    // catalog and an ungated entry simply fell back to its offline figures.
+    return visibleGames().map((g) => {
       const server = live.get(g.id);
       return server ? { ...g, tables: server.tables, players: server.players, jackpot: server.jackpot } : g;
     });

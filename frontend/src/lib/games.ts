@@ -33,20 +33,21 @@ export type GameId =
   | 'slots';
 
 /**
- * Games the server catalogs but the approved design does not show.
+ * Games in the catalog that aren't on sale yet.
  *
- * Victor's instruction (Aug 6, with the Games mockup): these should not appear.
- * Recorded here rather than by quietly deleting them, because it is a real
- * divergence from the spec and someone will need the reason later:
+ * These exist and are coming — docs/P3-feature-queue.md lists both among the games
+ * to build once the P3 list is done, and Baccarat has its own milestone in the
+ * 12-week plan (player/banker/tie, third-card rule) plus a VIP effective-volume
+ * coefficient of ×0.3. They're withheld only because a tile for a game nobody can
+ * play yet is worse than no tile (Victor, Aug 6).
  *
- *   - Baccarat is in the 12-week plan with its own milestone (player/banker/tie,
- *     third-card rule) and a VIP effective-volume coefficient of ×0.3.
- *   - Cowboy & Beauty likewise has a shipped engine and a catalog entry.
- *
- * So the backend supports both and the spec mandates Baccarat; only the storefront
- * hides them. Removing this set is all it takes to bring them back.
+ * So this is a launch gate, not a deletion. When an engine ships, remove its id
+ * here and the tile appears with its name, art and translations already in place.
  */
 export const HIDDEN_GAMES: ReadonlySet<string> = new Set<GameId>(['baccarat', 'cowboy-beauty']);
+
+/** The catalog minus anything not yet on sale. Use this for anything player-facing. */
+export const visibleGames = (): GameDef[] => GAMES.filter((g) => !HIDDEN_GAMES.has(g.id));
 
 export interface GameDef {
   id: GameId;
@@ -76,11 +77,13 @@ export const GAMES: GameDef[] = [
   // 'san-zhang' (三张) is the same game the design labels Zha Jin Hua (炸金花).
   // Keeping the server's id and translating the label per locale.
   { id: 'san-zhang', name: 'Zha Jin Hua', category: 'card', glyph: '🃏', gradient: ['#3fd07a', '#00d4ff'], tables: 1002, players: 194, jackpot: 9221.1, minBuy: '5' },
+  { id: 'baccarat', name: 'Baccarat', category: 'card', glyph: '🎴', gradient: ['#bb5cf6', '#f85677'], tables: 918, players: 327, jackpot: 41902.55, minBuy: '10' },
 
   // ── QUICK ──────────────────────────────────────────────────────────────────
   { id: 'red-packet', name: 'Red Packet', category: 'quick', glyph: '🧧', gradient: ['#f85677', '#bb5cf6'], tables: 1673, players: 903, jackpot: 12043.5, minBuy: '1', hot: true },
   { id: 'slots', name: 'Slot Machines', category: 'quick', glyph: '🎰', gradient: ['#bb5cf6', '#3fd07a'], tables: 2145, players: 205, jackpot: 31288.4, minBuy: '0.5' },
   { id: 'lottery', name: 'Lottery', category: 'quick', glyph: '🎟', gradient: ['#00d4ff', '#6366f1'], tables: 1120, players: 1120, jackpot: 5210.75, minBuy: '0.2' },
+  { id: 'cowboy-beauty', name: 'Cowboy & Beauty', category: 'quick', glyph: '🤠', gradient: ['#f85677', '#6366f1'], tables: 764, players: 486, jackpot: 7318.9, minBuy: '1' },
 ];
 
 const BY_ID = new Map(GAMES.map((g) => [g.id, g]));
@@ -91,6 +94,8 @@ export function gameVisual(id: string): GameDef | undefined {
 }
 
 export const gamesIn = (category: GameCategory): GameDef[] =>
-  GAMES.filter((g) => g.category === category);
+  visibleGames().filter((g) => g.category === category);
 
-export const totalPlayers = (): number => GAMES.reduce((sum, g) => sum + g.players, 0);
+/** Lobby headline figure — counts only games a player can actually join. */
+export const totalPlayers = (): number =>
+  visibleGames().reduce((sum, g) => sum + g.players, 0);
