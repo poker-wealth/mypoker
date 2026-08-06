@@ -15,7 +15,7 @@ import {
 import { getOrCreatePlayerAccount } from '../wallet/system-accounts';
 import { getPlayerStats, getPlayerHistory } from '../stats/player-stats';
 import { getSettings, updateSettings } from '../settings/player-settings';
-import { getReputation } from '../reputation/player-reputation';
+import { getReputation, ReputationDeductionModel } from '../reputation/player-reputation';
 import {
   createLeague,
   getLeague,
@@ -24,6 +24,17 @@ import {
   leaguesFor,
   discoverLeagues,
 } from '../league/league-store';
+import {
+  createAgent,
+  getAgent,
+  createReferralLink,
+  linksFor,
+  bindReferral,
+  playersOf,
+  summaryFor,
+  subAgentsOf,
+  agentEligibility,
+} from '../agent/agent-store';
 import { WithdrawalModel } from '../withdrawal/withdrawal.model';
 import { asyncHandler, internalAuth, dataScopeMiddleware, ApiError } from './middleware';
 import { openApiSpec } from './openapi';
@@ -174,6 +185,129 @@ export function buildRouter(): Router {
     dataScopeMiddleware,
     asyncHandler(async (req: Request, res: Response) => {
       await leaveLeague(req.params.leagueId!, req.dataScope!.playerId);
+      res.status(204).end();
+    }),
+  );
+
+  // ── Agent Center ─────────────────────────────────────────────────────────
+  // Every route is scoped to the caller's own agency. There is deliberately no
+  // way to read another agent's players, and nothing here returns a balance —
+  // see src/agent/agent-store.ts for why that is structural rather than a
+  // filter someone could forget to apply.
+  r.get(
+    '/me/agent',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const summary = await summaryFor(req.dataScope!.playerId);
+      // Not an error: most players are not agents, and a 404 would make the
+      // client treat an ordinary account as a failure.
+      res.json({ agent: summary });
+    }),
+  );
+
+  r.get(
+    '/me/agent/players',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json({ players: await playersOf(req.dataScope!.playerId) });
+    }),
+  );
+
+  r.get(
+    '/me/agent/links',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json({ links: await linksFor(req.dataScope!.playerId) });
+    }),
+  );
+
+  const linkBody = z.object({ label: z.string().min(1).max(40).optional() });
+  r.post(
+    '/me/agent/links',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { label } = linkBody.parse(req.body);
+      const linkId = await createReferralLink(req.dataScope!.playerId, label);
+      res.status(201).json({ linkId, label: label ?? 'default' });
+    }),
+  );
+
+  r.get(
+    '/me/agent/sub-agents',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json({ subAgents: await subAgentsOf(req.dataScope!.playerId) });
+    }),
+  );
+
+  const subAgentBody = z.object({
+    playerId: z.string().min(1),
+    rateBps: z.number().int().nonnegative(),
+  });
+  r.post(
+    '/me/agent/sub-agents',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const body = subAgentBody.parse(req.body);
+      const parentId = req.dataScope!.playerId;
+      const parent = await getAgent(parentId);
+      if (!parent) throw new ApiError(403, 'not an agent');
+      // The rate bounds (5% to parent minus 5%) are enforced by the gateway,
+      // which owns the agent domain — see game-server/src/agents/commission.ts.
+      // financial-core stores what it is told; restating the rule here would
+      // give two answers to who keeps what, and they would drift.
+      res.status(201).json(
+        await createAgent({
+          agentId: body.playerId,
+          rateBps: body.rateBps,
+          parentAgentId: parentId,
+        }),
+      );
+    }),
+  );
+
+  r.get(
+    '/me/agent/eligibility',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const playerId = req.dataScope!.playerId;
+      const reputation = await getReputation(playerId);
+      // Collusion is already a reputation deduction reason, so the finding is
+      // read from there rather than kept in a second place that could disagree.
+      const deductions = await ReputationDeductionModel.find({ playerId }).lean();
+      res.json(
+        await agentEligibility(playerId, reputation, {
+          hasConfirmedCollusion: deductions.some((d) => d.reason === 'COLLUSION_CONFIRMED'),
+          antiBotHighRisk: deductions.some((d) => d.reason === 'BOT_CONFIRMED'),
+        }),
+      );
+    }),
+  );
+
+  // Enrolment is an OPS action, not self-service. The spec routes agent
+  // applications through customer service; a public endpoint would let anyone
+  // clearing the numeric bar start taking a cut of the rake.
+  const enrolBody = z.object({
+    playerId: z.string().min(1),
+    rateBps: z.number().int().nonnegative(),
+  });
+  r.post(
+    '/internal/agents',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const body = enrolBody.parse(req.body);
+      res.status(201).json(await createAgent({ agentId: body.playerId, rateBps: body.rateBps }));
+    }),
+  );
+
+  const bindBody = z.object({ linkId: z.string().min(1) });
+  r.post(
+    '/me/referral',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { linkId } = bindBody.parse(req.body);
+      // Permanent and set once — a second call is a no-op, not an update.
+      await bindReferral(req.dataScope!.playerId, linkId);
       res.status(204).end();
     }),
   );
