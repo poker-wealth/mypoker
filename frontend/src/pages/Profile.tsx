@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ShieldCheck, Settings, LifeBuoy, Send, LogOut, ChevronRight, Eye, User as UserIcon, Star, Bell, Gift } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
@@ -161,9 +162,9 @@ function MenuRow({
   rightTextColor, 
   badge, 
   onClick 
-}: { 
-  icon: any; 
-  title: string; 
+}: {
+  icon: LucideIcon;
+  title: string;
   rightText?: string; 
   rightTextColor?: string; 
   badge?: string; 
