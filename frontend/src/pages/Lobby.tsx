@@ -1,135 +1,154 @@
+import { useState } from 'react';
 import { motion } from 'motion/react';
-import { ShieldCheck, Flame, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { GameTile } from '@/components/GameTile';
+import { Filter, Zap } from 'lucide-react';
+import { Segmented } from '@/components/ui/Segmented';
+import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { GAMES, gameVisual, totalPlayers, type GameDef } from '@/lib/games';
-import { useLobbyGames } from '@/api/hooks';
+import { useLobbyGames, useTables } from '@/api/hooks';
 import { formatMicros } from '@/api/lobby';
 
-/**
- * The lobby.
- *
- * Reads live figures from GET /lobby/games and **falls back to the static
- * catalog** when that can't be reached — deliberately, not as an oversight. This
- * is the shop window: a player opening the app on a flaky train connection
- * should see games, not an error panel. The fallback shows plausible tiles that
- * still navigate; the only thing lost is that the numbers are stale.
- *
- * Jackpot and player counts are the two things that must be real when the server
- * is up, so they're the ones driven by the query.
- */
 export function Lobby() {
   const navigate = useNavigate();
-  const { t } = useTranslation();
   const lobby = useLobbyGames();
+  const [variant, setVariant] = useState('dezhou');
+  const [blinds, setBlinds] = useState('all');
 
-  // Merge server truth with client visuals: the server owns who's playing and
-  // how big the jackpot is, we own what a game looks like.
-  const games: GameDef[] = lobby.data
-    ? lobby.data.games.flatMap((g): GameDef[] => {
-        // Unavailable games are dropped rather than greyed out — a vendor being
-        // down is our problem, not something to advertise on the front screen.
-        if (!g.available) return [];
-        // A game the server knows about but we have no artwork for is skipped
-        // rather than rendered blank. It reappears the moment a tile is added.
-        const visual = gameVisual(g.gameId);
-        if (!visual) return [];
-        return [{ ...visual, players: g.players, hot: g.players > 500 }];
-      })
-    : GAMES;
+  const { data: tablesData } = useTables({
+    gameId: variant === 'dezhou' ? 'texas' : variant,
+  });
 
-  const hot = games.filter((g) => g.hot);
-  const rest = games.filter((g) => !g.hot);
+  const jackpot = lobby.data ? `$ ${formatMicros(lobby.data.totalJackpot)}` : '$ 1,253,842.28';
 
-  const jackpot = lobby.data ? `₮${formatMicros(lobby.data.totalJackpot)}` : '₮128,450';
-  const online = lobby.data
-    ? lobby.data.games.reduce((sum, g) => sum + g.players, 0)
-    : totalPlayers();
+  const tables = tablesData?.tables || [];
 
   return (
-    <div className="space-y-5">
+    <div className="flex h-full flex-col space-y-4">
+      {/* Header removed and moved to Header.tsx */}
+
       {/* Jackpot hero */}
       <div
-        className="relative overflow-hidden rounded-2xl border border-border p-5"
+        className="relative overflow-hidden rounded-2xl border border-border p-5 text-center flex flex-col justify-center h-32"
         style={{ boxShadow: 'var(--glow-brand)' }}
       >
         <div className="absolute inset-0" style={{ backgroundImage: 'var(--brand-gradient)', opacity: 0.9 }} />
+        <img 
+          src="/brand/jackpot.png" 
+          alt="Jackpot" 
+          className="absolute left-0 top-0 h-full object-cover mix-blend-screen opacity-90" 
+          style={{ maskImage: 'linear-gradient(to right, black 50%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to right, black 50%, transparent 100%)' }}
+        />
         <motion.div
           className="absolute inset-y-0 w-1/3 bg-white/20 blur-2xl"
           initial={{ x: '-120%' }}
           animate={{ x: '360%' }}
           transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut', repeatDelay: 1.5 }}
         />
-        <div className="relative text-white">
-          <div className="flex items-center gap-1.5 text-[0.7rem] font-semibold uppercase tracking-wider text-white/80">
-            <span className="relative flex size-2">
-              <span className="absolute inline-flex size-full animate-ping rounded-full bg-white/70" />
-              <span className="relative inline-flex size-2 rounded-full bg-white" />
-            </span>
-            {t('lobby.dailyJackpot')}
+        <div className="relative text-white z-10 flex flex-col items-center pl-10">
+          <div className="text-[0.7rem] font-bold uppercase tracking-wider text-white/90">
+            Grand Jackpot
           </div>
           {lobby.isPending ? (
-            <Skeleton className="mt-2 h-10 w-52 bg-white/25" />
+            <div className="mt-1 flex justify-center">
+              <Skeleton className="h-10 w-52 bg-white/25" />
+            </div>
           ) : (
-            <div className="mt-1 text-[2.6rem] font-black leading-none tracking-tight tabular-nums">
+            <div className="mt-0.5 text-[2.2rem] font-black leading-none tracking-tight tabular-nums text-yellow-400 drop-shadow-sm">
               {jackpot}
             </div>
           )}
-          <div className="mt-2 text-xs text-white/75">{t('lobby.jackpotBlurb')}</div>
+          <div className="mt-1 text-xs font-bold text-success drop-shadow-sm">+ $322.16 / hr</div>
         </div>
       </div>
 
-      {/* Live players band */}
-      <div className="flex items-center justify-between rounded-(--radius-app) border border-border bg-surface px-4 py-3">
-        <div className="flex items-center gap-2 text-sm">
-          <ShieldCheck size={18} className="text-accent" />
-          <span className="text-dim">{t('lobby.provablyFair')}</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-sm font-semibold">
-          <span className="size-2 rounded-full bg-success" />
-          {lobby.isPending ? (
-            <Skeleton className="h-4 w-10" />
-          ) : (
-            online.toLocaleString()
-          )}
-          <span className="text-dim">{t('common.online')}</span>
-        </div>
-      </div>
+      <Segmented
+        value={variant}
+        onChange={setVariant}
+        options={[
+          { value: 'dezhou', label: 'DEZHOU' },
+          { value: 'xuzhou', label: 'XUZHOU' },
+          { value: 'ausha', label: 'AUSHA' },
+          { value: 'macau', label: 'MACAU' },
+          { value: 'others', label: 'OTHERS' },
+        ]}
+      />
 
-      {/* Hot now */}
-      {hot.length > 0 && (
-        <section>
-          <div className="mb-2.5 flex items-center gap-1.5">
-            <Flame size={16} className="text-danger" />
-            <h2 className="text-sm font-bold">{t('lobby.hotNow')}</h2>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            {hot.map((g) => (
-              <GameTile key={g.id} game={g} onClick={() => navigate(`/table/${g.id}`)} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* All games */}
-      <section>
-        <button
-          onClick={() => navigate('/games')}
-          className="mb-2.5 flex w-full items-center justify-between"
-        >
-          <h2 className="text-sm font-bold">{t('lobby.moreGames')}</h2>
-          <span className="flex items-center text-xs text-dim">
-            {t('common.seeAll')} <ChevronRight size={14} />
-          </span>
+      <div className="flex items-center gap-2">
+        <div className="flex-1">
+          <Segmented
+            value={blinds}
+            onChange={setBlinds}
+            options={[
+              { value: 'all', label: 'ALL' },
+              { value: '1/2', label: '1/2' },
+              { value: '5/10', label: '5/10' },
+              { value: '25/50', label: '25/50' },
+              { value: '100/200', label: '100/200' },
+            ]}
+          />
+        </div>
+        <button className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-dim transition-colors hover:text-text">
+          <Filter size={16} />
         </button>
-        <div className="grid grid-cols-2 gap-3">
-          {rest.map((g) => (
-            <GameTile key={g.id} game={g} onClick={() => navigate(`/table/${g.id}`)} />
-          ))}
-        </div>
-      </section>
+      </div>
+
+      {/* Table list */}
+      <div className="flex-1 overflow-auto rounded-(--radius-app) border border-border bg-surface">
+        <table className="w-full text-left text-xs">
+          <thead>
+            <tr className="border-b border-border/50 text-[0.65rem] text-dim">
+              <th className="px-3 py-2.5 font-medium">Table</th>
+              <th className="px-3 py-2.5 font-medium">Blinds</th>
+              <th className="px-3 py-2.5 font-medium">Players</th>
+              <th className="px-3 py-2.5 font-medium">Buy-in</th>
+              <th className="px-3 py-2.5 text-right font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/50">
+            {tables.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-8 text-center text-dim">
+                  No tables found
+                </td>
+              </tr>
+            ) : (
+              tables.map((t) => (
+                <tr
+                  key={t.id}
+                  onClick={() => navigate(`/table/${t.id}`)}
+                  className="cursor-pointer transition-colors active:bg-surface-2 hover:bg-surface-2/50"
+                >
+                  <td className="px-3 py-3 font-semibold text-yellow-500">{t.name.split('·')[0].trim()}</td>
+                  <td className="px-3 py-3 tabular-nums text-dim">
+                    {formatMicros(t.stakes / 2, 0)}/{formatMicros(t.stakes, 0)}
+                  </td>
+                  <td className="px-3 py-3 tabular-nums">{t.players}/{t.maxPlayers}</td>
+                  <td className="px-3 py-3 tabular-nums text-dim">100 BB</td>
+                  <td className="px-3 py-3 text-right">
+                    <span
+                      className={`font-semibold ${t.status === 'OPEN' || t.status === 'WAITING' ? 'text-success' : 'text-dim'
+                        }`}
+                    >
+                      {t.status === 'WAITING' ? 'WAIT' : t.status === 'FULL' ? 'FULL' : 'PLAY'}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Action buttons */}
+      <div className="grid grid-cols-2 gap-3 pt-2">
+        <Button className="bg-success text-success-fg hover:bg-success/90">
+          <Zap size={16} className="mr-1.5" /> QUICK JOIN
+        </Button>
+        <Button variant="secondary" className="border-border bg-surface text-dim">
+          CREATE PRIVATE TABLE
+        </Button>
+      </div>
     </div>
   );
 }
+

@@ -1,35 +1,49 @@
-import { Moon, Sun } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
-import { useTheme } from '@/store/theme';
+import { HelpCircle, Settings, ShieldCheck } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 
 /**
- * Global brand header: the spade-M mark + MYPOKER wordmark (both auto-trimmed from
- * the source PNGs), and the theme toggle. Sticky, with a blurred bar and hairline
- * border so it reads as real app chrome. The -mx-4/px-4 pairing lets the bar bleed
- * to the shell's edges while keeping its content aligned to the page gutter.
+ * Route-specific headers based on the active tab.
  */
 export function Header() {
-  const { t } = useTranslation();
-  const { resolved, toggle } = useTheme();
-  return (
-    <header className="sticky top-0 z-20 -mx-4 mb-1 border-b border-border/60 bg-bg/80 px-4 py-3 backdrop-blur-md">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <img
-            src="/brand/logo-mark.png"
-            alt=""
-            className="size-9 shrink-0"
-            style={{ filter: 'drop-shadow(0 0 9px rgb(187 92 246 / 0.5))' }}
-          />
-          <img src="/brand/logo-wordmark.png" alt="MYPOKER" className="h-[26px] w-auto" />
+  const location = useLocation();
+
+  let title = '';
+  let rightElement = null;
+
+  switch (location.pathname) {
+    case '/alliance':
+      title = 'ALLIANCE';
+      rightElement = <HelpCircle size={18} className="text-dim" />;
+      break;
+    case '/games':
+      title = 'GAMES';
+      break;
+    case '/':
+      title = 'LOBBY';
+      rightElement = (
+        <div className="flex items-center gap-1.5 rounded-md border border-success/30 bg-success/10 px-2 py-0.5 text-[0.65rem] font-bold text-success uppercase tracking-wide">
+          <ShieldCheck size={13} /> FAIR & SECURE
         </div>
-        <button
-          onClick={toggle}
-          aria-label={t('a11y.toggleTheme')}
-          className="grid size-9 place-items-center rounded-full border border-border bg-surface text-dim transition-colors active:scale-95"
-        >
-          {resolved === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
-        </button>
+      );
+      break;
+    case '/data':
+      title = 'STATS';
+      rightElement = <Settings size={18} className="text-dim" />;
+      break;
+    case '/profile':
+      title = '';
+      rightElement = <Settings size={18} className="text-dim" />;
+      break;
+    default:
+      title = 'MY POKER';
+      break;
+  }
+
+  return (
+    <header className="sticky top-0 z-20 -mx-4 mb-1 bg-bg/95 px-4 pb-3 pt-4 backdrop-blur-md">
+      <div className="flex items-center justify-between">
+        <h1 className="text-base font-black tracking-tight">{title}</h1>
+        <div>{rightElement}</div>
       </div>
     </header>
   );
