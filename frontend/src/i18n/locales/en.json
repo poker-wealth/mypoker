@@ -68,13 +68,12 @@
     "hands": "Hands",
     "winRate": "Win rate",
     "netProfit": "Net profit",
-    "vpip": "VPIP",
-    "pfr": "PFR",
-    "largestPot": "Largest pot",
     "profitTrend": "Profit trend",
-    "playDistribution": "Play distribution",
-    "others": "Others",
-    "pendingEndpoints": "Sample data — awaiting the stats endpoints."
+    "recentRounds": "Recent rounds",
+    "noRounds": "No rounds in this period",
+    "noRoundsBlurb": "Try a longer period, or join a table.",
+    "loadMore": "Load more",
+    "signInToSee": "Sign in to see your records"
   },
   "account": {
     "guest": "Guest Player",
@@ -153,5 +152,18 @@
     "signInFailed": "Sign-in failed",
     "copied": "Copied",
     "copyFailed": "Could not copy"
+  },
+  "settings": {
+    "appearance": "Appearance",
+    "theme": "Dark mode",
+    "preferences": "Preferences",
+    "sound": "Sound effects",
+    "haptics": "Vibration",
+    "notifications": "Notifications",
+    "notifyResults": "Game results",
+    "notifyDeposits": "Deposits & withdrawals",
+    "notifyPromos": "Promotions",
+    "about": "About",
+    "signInToSync": "Sign in to sync your preferences"
   }
 }

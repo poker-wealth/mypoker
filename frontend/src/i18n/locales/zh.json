@@ -68,13 +68,12 @@
     "hands": "手数",
     "winRate": "胜率",
     "netProfit": "净盈利",
-    "vpip": "入池率",
-    "pfr": "翻前加注率",
-    "largestPot": "最大彩池",
     "profitTrend": "盈利趋势",
-    "playDistribution": "游戏分布",
-    "others": "其他",
-    "pendingEndpoints": "示例数据 — 统计接口尚未接入。"
+    "recentRounds": "最近牌局",
+    "noRounds": "该时间段内没有牌局",
+    "noRoundsBlurb": "试试更长的时间段，或加入牌桌。",
+    "loadMore": "加载更多",
+    "signInToSee": "登录后查看您的记录"
   },
   "account": {
     "guest": "游客",
@@ -153,5 +152,18 @@
     "signInFailed": "登录失败",
     "copied": "已复制",
     "copyFailed": "复制失败"
+  },
+  "settings": {
+    "appearance": "外观",
+    "theme": "深色模式",
+    "preferences": "偏好设置",
+    "sound": "音效",
+    "haptics": "触感反馈",
+    "notifications": "通知",
+    "notifyResults": "牌局结果",
+    "notifyDeposits": "充值与提现",
+    "notifyPromos": "优惠活动",
+    "about": "关于",
+    "signInToSync": "登录以同步您的偏好设置"
   }
 }

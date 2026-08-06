@@ -68,13 +68,12 @@
     "hands": "핸드 수",
     "winRate": "승률",
     "netProfit": "순수익",
-    "vpip": "VPIP",
-    "pfr": "PFR",
-    "largestPot": "최대 팟",
     "profitTrend": "수익 추이",
-    "playDistribution": "게임 분포",
-    "others": "기타",
-    "pendingEndpoints": "샘플 데이터 — 통계 API가 아직 연결되지 않았습니다."
+    "recentRounds": "최근 라운드",
+    "noRounds": "이 기간에 라운드가 없습니다",
+    "noRoundsBlurb": "기간을 늘리거나 테이블에 참여해 보세요.",
+    "loadMore": "더 보기",
+    "signInToSee": "로그인하면 기록을 볼 수 있습니다"
   },
   "account": {
     "guest": "게스트",
@@ -153,5 +152,18 @@
     "signInFailed": "로그인 실패",
     "copied": "복사되었습니다",
     "copyFailed": "복사하지 못했습니다"
+  },
+  "settings": {
+    "appearance": "화면",
+    "theme": "다크 모드",
+    "preferences": "환경설정",
+    "sound": "효과음",
+    "haptics": "진동",
+    "notifications": "알림",
+    "notifyResults": "게임 결과",
+    "notifyDeposits": "입출금",
+    "notifyPromos": "프로모션",
+    "about": "정보",
+    "signInToSync": "로그인하면 설정이 동기화됩니다"
   }
 }

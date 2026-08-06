@@ -68,13 +68,12 @@
     "hands": "ハンド数",
     "winRate": "勝率",
     "netProfit": "純利益",
-    "vpip": "VPIP",
-    "pfr": "PFR",
-    "largestPot": "最大ポット",
     "profitTrend": "収支の推移",
-    "playDistribution": "プレイ分布",
-    "others": "その他",
-    "pendingEndpoints": "サンプルデータ — 統計 API は未接続です。"
+    "recentRounds": "最近のラウンド",
+    "noRounds": "この期間のラウンドはありません",
+    "noRoundsBlurb": "期間を広げるか、テーブルに参加してみてください。",
+    "loadMore": "もっと読み込む",
+    "signInToSee": "ログインすると記録が表示されます"
   },
   "account": {
     "guest": "ゲスト",
@@ -153,5 +152,18 @@
     "signInFailed": "ログインに失敗しました",
     "copied": "コピーしました",
     "copyFailed": "コピーできませんでした"
+  },
+  "settings": {
+    "appearance": "外観",
+    "theme": "ダークモード",
+    "preferences": "環境設定",
+    "sound": "効果音",
+    "haptics": "バイブレーション",
+    "notifications": "通知",
+    "notifyResults": "ゲーム結果",
+    "notifyDeposits": "入出金",
+    "notifyPromos": "プロモーション",
+    "about": "情報",
+    "signInToSync": "ログインすると設定が同期されます"
   }
 }

@@ -68,13 +68,12 @@
     "hands": "จำนวนตา",
     "winRate": "อัตราชนะ",
     "netProfit": "กำไรสุทธิ",
-    "vpip": "VPIP",
-    "pfr": "PFR",
-    "largestPot": "พอตสูงสุด",
     "profitTrend": "แนวโน้มกำไร",
-    "playDistribution": "สัดส่วนการเล่น",
-    "others": "อื่น ๆ",
-    "pendingEndpoints": "ข้อมูลตัวอย่าง — ยังไม่ได้เชื่อมต่อ API สถิติ"
+    "recentRounds": "ตาล่าสุด",
+    "noRounds": "ไม่มีตาในช่วงเวลานี้",
+    "noRoundsBlurb": "ลองเลือกช่วงเวลาที่ยาวขึ้น หรือเข้าร่วมโต๊ะ",
+    "loadMore": "โหลดเพิ่ม",
+    "signInToSee": "เข้าสู่ระบบเพื่อดูสถิติของคุณ"
   },
   "account": {
     "guest": "ผู้เยี่ยมชม",
@@ -153,5 +152,18 @@
     "signInFailed": "เข้าสู่ระบบไม่สำเร็จ",
     "copied": "คัดลอกแล้ว",
     "copyFailed": "คัดลอกไม่สำเร็จ"
+  },
+  "settings": {
+    "appearance": "การแสดงผล",
+    "theme": "โหมดมืด",
+    "preferences": "การตั้งค่า",
+    "sound": "เสียงประกอบ",
+    "haptics": "การสั่น",
+    "notifications": "การแจ้งเตือน",
+    "notifyResults": "ผลการเล่น",
+    "notifyDeposits": "ฝากและถอน",
+    "notifyPromos": "โปรโมชั่น",
+    "about": "เกี่ยวกับ",
+    "signInToSync": "เข้าสู่ระบบเพื่อซิงค์การตั้งค่าของคุณ"
   }
 }

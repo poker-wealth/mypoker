@@ -68,13 +68,12 @@
     "hands": "हाथ",
     "winRate": "जीत दर",
     "netProfit": "शुद्ध लाभ",
-    "vpip": "VPIP",
-    "pfr": "PFR",
-    "largestPot": "सबसे बड़ा पॉट",
     "profitTrend": "लाभ रुझान",
-    "playDistribution": "गेम वितरण",
-    "others": "अन्य",
-    "pendingEndpoints": "नमूना डेटा — आँकड़े एपीआई अभी जुड़ा नहीं है।"
+    "recentRounds": "हाल के राउंड",
+    "noRounds": "इस अवधि में कोई राउंड नहीं",
+    "noRoundsBlurb": "लंबी अवधि चुनें, या किसी टेबल से जुड़ें।",
+    "loadMore": "और लोड करें",
+    "signInToSee": "अपने रिकॉर्ड देखने के लिए साइन इन करें"
   },
   "account": {
     "guest": "अतिथि",
@@ -153,5 +152,18 @@
     "signInFailed": "साइन इन विफल",
     "copied": "कॉपी हो गया",
     "copyFailed": "कॉपी नहीं हो सका"
+  },
+  "settings": {
+    "appearance": "दिखावट",
+    "theme": "डार्क मोड",
+    "preferences": "प्राथमिकताएँ",
+    "sound": "ध्वनि प्रभाव",
+    "haptics": "कंपन",
+    "notifications": "सूचनाएँ",
+    "notifyResults": "गेम परिणाम",
+    "notifyDeposits": "जमा और निकासी",
+    "notifyPromos": "प्रचार",
+    "about": "बारे में",
+    "signInToSync": "अपनी प्राथमिकताएँ सिंक करने के लिए साइन इन करें"
   }
 }

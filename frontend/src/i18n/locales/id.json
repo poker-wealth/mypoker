@@ -68,13 +68,12 @@
     "hands": "Ronde",
     "winRate": "Tingkat menang",
     "netProfit": "Laba bersih",
-    "vpip": "VPIP",
-    "pfr": "PFR",
-    "largestPot": "Pot terbesar",
     "profitTrend": "Tren keuntungan",
-    "playDistribution": "Distribusi permainan",
-    "others": "Lainnya",
-    "pendingEndpoints": "Data contoh — API statistik belum terhubung."
+    "recentRounds": "Ronde terbaru",
+    "noRounds": "Tidak ada ronde pada periode ini",
+    "noRoundsBlurb": "Coba periode lebih panjang, atau gabung ke meja.",
+    "loadMore": "Muat lebih banyak",
+    "signInToSee": "Masuk untuk melihat rekor Anda"
   },
   "account": {
     "guest": "Tamu",
@@ -153,5 +152,18 @@
     "signInFailed": "Gagal masuk",
     "copied": "Tersalin",
     "copyFailed": "Gagal menyalin"
+  },
+  "settings": {
+    "appearance": "Tampilan",
+    "theme": "Mode gelap",
+    "preferences": "Preferensi",
+    "sound": "Efek suara",
+    "haptics": "Getaran",
+    "notifications": "Notifikasi",
+    "notifyResults": "Hasil permainan",
+    "notifyDeposits": "Setoran & penarikan",
+    "notifyPromos": "Promosi",
+    "about": "Tentang",
+    "signInToSync": "Masuk untuk menyinkronkan preferensi Anda"
   }
 }

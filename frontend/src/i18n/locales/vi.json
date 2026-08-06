@@ -68,13 +68,12 @@
     "hands": "Số ván",
     "winRate": "Tỷ lệ thắng",
     "netProfit": "Lợi nhuận ròng",
-    "vpip": "VPIP",
-    "pfr": "PFR",
-    "largestPot": "Pot lớn nhất",
     "profitTrend": "Xu hướng lợi nhuận",
-    "playDistribution": "Phân bổ trò chơi",
-    "others": "Khác",
-    "pendingEndpoints": "Dữ liệu mẫu — API thống kê chưa được kết nối."
+    "recentRounds": "Ván gần đây",
+    "noRounds": "Không có ván nào trong kỳ này",
+    "noRoundsBlurb": "Thử khoảng thời gian dài hơn, hoặc tham gia một bàn.",
+    "loadMore": "Tải thêm",
+    "signInToSee": "Đăng nhập để xem thành tích của bạn"
   },
   "account": {
     "guest": "Khách",
@@ -153,5 +152,18 @@
     "signInFailed": "Đăng nhập thất bại",
     "copied": "Đã sao chép",
     "copyFailed": "Không thể sao chép"
+  },
+  "settings": {
+    "appearance": "Giao diện",
+    "theme": "Chế độ tối",
+    "preferences": "Tùy chọn",
+    "sound": "Hiệu ứng âm thanh",
+    "haptics": "Rung",
+    "notifications": "Thông báo",
+    "notifyResults": "Kết quả ván chơi",
+    "notifyDeposits": "Nạp & rút tiền",
+    "notifyPromos": "Khuyến mãi",
+    "about": "Giới thiệu",
+    "signInToSync": "Đăng nhập để đồng bộ tùy chọn của bạn"
   }
 }

@@ -14,6 +14,7 @@ import {
 } from '../withdrawal/withdrawal-state-machine';
 import { getOrCreatePlayerAccount } from '../wallet/system-accounts';
 import { getPlayerStats, getPlayerHistory } from '../stats/player-stats';
+import { getSettings, updateSettings } from '../settings/player-settings';
 import { WithdrawalModel } from '../withdrawal/withdrawal.model';
 import { asyncHandler, internalAuth, dataScopeMiddleware, ApiError } from './middleware';
 import { openApiSpec } from './openapi';
@@ -49,31 +50,70 @@ export function buildRouter(): Router {
     }),
   );
 
+  const period = z.enum(['today', '7d', '30d', 'all']).optional();
+  const statsQuery = z.object({ period });
+
   // Derived from the ledger — see src/stats/player-stats.ts for what is and is
   // not knowable from it. VPIP, PFR and largest-pot are deliberately absent.
   r.get(
     '/me/stats',
     dataScopeMiddleware,
     asyncHandler(async (req: Request, res: Response) => {
-      res.json(await getPlayerStats(req.dataScope!.playerId));
+      const { period } = statsQuery.parse(req.query);
+      res.json(
+        await getPlayerStats(req.dataScope!.playerId, {
+          ...(period !== undefined ? { period } : {}),
+        }),
+      );
     }),
   );
 
   const historyQuery = z.object({
     limit: z.coerce.number().int().positive().max(100).optional(),
     cursor: z.string().min(1).optional(),
+    period,
   });
   r.get(
     '/me/history',
     dataScopeMiddleware,
     asyncHandler(async (req: Request, res: Response) => {
-      const { limit, cursor } = historyQuery.parse(req.query);
+      const { limit, cursor, period: window } = historyQuery.parse(req.query);
       res.json(
         await getPlayerHistory(req.dataScope!.playerId, {
           ...(limit !== undefined ? { limit } : {}),
           ...(cursor !== undefined ? { cursor } : {}),
+          ...(window !== undefined ? { period: window } : {}),
         }),
       );
+    }),
+  );
+
+  // Preferences. Deliberately NOT money — no transaction, no balance, and
+  // nothing here may ever gate a withdrawal.
+  r.get(
+    '/me/settings',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json(await getSettings(req.dataScope!.playerId));
+    }),
+  );
+
+  const settingsBody = z.object({
+    // Explicit null clears the override and returns the player to following
+    // their Telegram language, which is different from "leave unchanged".
+    language: z.string().min(2).max(12).nullable().optional(),
+    sound: z.boolean().optional(),
+    haptics: z.boolean().optional(),
+    notifyResults: z.boolean().optional(),
+    notifyDeposits: z.boolean().optional(),
+    notifyPromos: z.boolean().optional(),
+  });
+  r.patch(
+    '/me/settings',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const patch = settingsBody.parse(req.body);
+      res.json(await updateSettings(req.dataScope!.playerId, patch));
     }),
   );
 

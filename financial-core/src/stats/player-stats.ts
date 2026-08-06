@@ -94,14 +94,19 @@ interface RoundRow {
  */
 async function roundsFor(
   accountId: string,
-  options: { before?: Date; limit?: number } = {},
+  options: { before?: Date; since?: Date; limit?: number } = {},
 ): Promise<RoundRow[]> {
   const match: Record<string, unknown> = {
     accountId,
     type: { $in: GAME_TYPES },
     businessId: { $ne: null },
   };
-  if (options.before) match.createdAt = { $lt: options.before };
+  // `before` paginates, `since` bounds the reporting period. Both can apply at
+  // once — page 3 of "last 7 days" needs each.
+  const createdAt: Record<string, Date> = {};
+  if (options.before) createdAt.$lt = options.before;
+  if (options.since) createdAt.$gte = options.since;
+  if (Object.keys(createdAt).length > 0) match.createdAt = createdAt;
 
   const pipeline: PipelineStage[] = [
     { $match: match },
@@ -128,9 +133,45 @@ async function roundsFor(
   return LedgerModel.aggregate<RoundRow>(pipeline);
 }
 
-export async function getPlayerStats(playerId: string): Promise<PlayerStats> {
+/** Reporting windows the Data tab offers. */
+export type StatsPeriod = 'today' | '7d' | '30d' | 'all';
+
+export const STATS_PERIODS: StatsPeriod[] = ['today', '7d', '30d', 'all'];
+
+/**
+ * Start of a reporting window, or undefined for all time.
+ *
+ * "Today" is UTC, not the player's local midnight — the server has no reliable
+ * timezone for them, and a boundary that shifts per request is worse than one
+ * that is consistently explainable. Revisit if players start reporting that
+ * their day rolls over at the wrong time.
+ */
+export function periodStart(period: StatsPeriod, now: Date = new Date()): Date | undefined {
+  const DAY_MS = 86_400_000;
+  switch (period) {
+    case 'today': {
+      const start = new Date(now);
+      start.setUTCHours(0, 0, 0, 0);
+      return start;
+    }
+    case '7d':
+      return new Date(now.getTime() - 7 * DAY_MS);
+    case '30d':
+      return new Date(now.getTime() - 30 * DAY_MS);
+    case 'all':
+      return undefined;
+  }
+}
+
+export async function getPlayerStats(
+  playerId: string,
+  options: { period?: StatsPeriod; now?: Date } = {},
+): Promise<PlayerStats> {
   const account = await getOrCreatePlayerAccount(playerId);
-  const rounds = await roundsFor(account._id);
+  // Clock is injected rather than mocked: jest's fake timers freeze the ones
+  // Mongo's driver depends on, and the query never returns.
+  const since = periodStart(options.period ?? 'all', options.now ?? new Date());
+  const rounds = await roundsFor(account._id, since ? { since } : {});
 
   let netProfit = Money.ZERO;
   let biggestWin = Money.ZERO;
@@ -162,7 +203,7 @@ export async function getPlayerStats(playerId: string): Promise<PlayerStats> {
 
 export async function getPlayerHistory(
   playerId: string,
-  options: { limit?: number; cursor?: string } = {},
+  options: { limit?: number; cursor?: string; period?: StatsPeriod; now?: Date } = {},
 ): Promise<HistoryPage> {
   const limit = Math.min(Math.max(options.limit ?? 20, 1), 100);
   const account = await getOrCreatePlayerAccount(playerId);
@@ -171,10 +212,12 @@ export async function getPlayerHistory(
   if (before && Number.isNaN(before.getTime())) {
     throw new RangeError('cursor must be an ISO timestamp');
   }
+  const since = periodStart(options.period ?? 'all', options.now ?? new Date());
 
   // Fetch one extra to learn whether another page exists, without a count query.
   const rows = await roundsFor(account._id, {
     ...(before ? { before } : {}),
+    ...(since ? { since } : {}),
     limit: limit + 1,
   });
 

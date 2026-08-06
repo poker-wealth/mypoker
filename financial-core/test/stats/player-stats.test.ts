@@ -1,5 +1,5 @@
 import { Decimal128 } from 'bson';
-import { getPlayerStats, getPlayerHistory } from '../../src/stats/player-stats';
+import { getPlayerStats, getPlayerHistory, periodStart } from '../../src/stats/player-stats';
 import { LedgerModel } from '../../src/wallet/ledger.model';
 import { getOrCreatePlayerAccount } from '../../src/wallet/system-accounts';
 import { LedgerType, LedgerDirection } from '../../src/domain/account-types';
@@ -209,5 +209,76 @@ describe('getPlayerHistory', () => {
 
   it('rejects a malformed cursor rather than silently returning page one', async () => {
     await expect(getPlayerHistory(PLAYER, { cursor: 'not-a-date' })).rejects.toThrow(RangeError);
+  });
+});
+
+/**
+ * Period filtering. The failure mode here is silent: a wrong boundary still
+ * returns plausible numbers, just for the wrong window, and nothing errors.
+ *
+ * The clock is passed in rather than mocked — jest fake timers freeze the timers
+ * Mongo drives its connection on, and the queries below simply never return.
+ */
+describe('reporting periods', () => {
+  const HOUR = 3_600_000;
+  const DAY = 86_400_000;
+  const NOW = new Date('2026-06-15T12:00:00.000Z');
+
+  beforeEach(async () => {
+    await wonRound('r-today', '10', '30', new Date(NOW.getTime() - 2 * HOUR));
+    await wonRound('r-3d', '10', '20', new Date(NOW.getTime() - 3 * DAY));
+    await lostRound('r-20d', '10', new Date(NOW.getTime() - 20 * DAY));
+    await lostRound('r-90d', '10', new Date(NOW.getTime() - 90 * DAY));
+  });
+
+  it('bounds each window at the right instant', () => {
+    expect(periodStart('all', NOW)).toBeUndefined();
+    // Midnight UTC of the same day, not 24 hours back.
+    expect(periodStart('today', NOW)?.toISOString()).toBe('2026-06-15T00:00:00.000Z');
+    expect(periodStart('7d', NOW)?.toISOString()).toBe('2026-06-08T12:00:00.000Z');
+    expect(periodStart('30d', NOW)?.toISOString()).toBe('2026-05-16T12:00:00.000Z');
+  });
+
+  it('counts only rounds inside the window', async () => {
+    expect((await getPlayerStats(PLAYER, { period: 'today', now: NOW })).handsPlayed).toBe(1);
+    expect((await getPlayerStats(PLAYER, { period: '7d', now: NOW })).handsPlayed).toBe(2);
+    expect((await getPlayerStats(PLAYER, { period: '30d', now: NOW })).handsPlayed).toBe(3);
+    expect((await getPlayerStats(PLAYER, { period: 'all', now: NOW })).handsPlayed).toBe(4);
+  });
+
+  it('sums profit over the window only, not all time', async () => {
+    // today: staked 10, paid 30 -> +20
+    expect((await getPlayerStats(PLAYER, { period: 'today', now: NOW })).netProfit).toBe('20.000000');
+    // 7d adds the 3-day round (+10) -> +30
+    expect((await getPlayerStats(PLAYER, { period: '7d', now: NOW })).netProfit).toBe('30.000000');
+    // 30d adds a 10 loss -> +20
+    expect((await getPlayerStats(PLAYER, { period: '30d', now: NOW })).netProfit).toBe('20.000000');
+    // all time adds another 10 loss -> +10
+    expect((await getPlayerStats(PLAYER, { period: 'all', now: NOW })).netProfit).toBe('10.000000');
+  });
+
+  it('defaults to all time when no period is given', async () => {
+    expect((await getPlayerStats(PLAYER)).handsPlayed).toBe(4);
+  });
+
+  it('filters history by period as well as stats', async () => {
+    const week = await getPlayerHistory(PLAYER, { period: '7d', now: NOW });
+    expect(week.entries.map((e) => e.roundId).sort()).toEqual(['r-3d', 'r-today']);
+  });
+
+  it('paginates within a period rather than escaping it', async () => {
+    const first = await getPlayerHistory(PLAYER, { period: '30d', now: NOW, limit: 2 });
+    expect(first.entries).toHaveLength(2);
+    expect(first.nextCursor).not.toBeNull();
+
+    // Page two must stay inside 30d and must not reach the 90-day round.
+    const second = await getPlayerHistory(PLAYER, {
+      period: '30d',
+      now: NOW,
+      limit: 2,
+      cursor: first.nextCursor!,
+    });
+    expect(second.entries.map((e) => e.roundId)).toEqual(['r-20d']);
+    expect(second.nextCursor).toBeNull();
   });
 });

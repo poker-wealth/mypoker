@@ -39,14 +39,22 @@ export interface HistoryPage {
   nextCursor: string | null;
 }
 
-export function fetchStats(): Promise<PlayerStats> {
-  return api.get<PlayerStats>('/me/stats');
+/** Reporting windows the Data tab offers. Must match financial-core's StatsPeriod. */
+export type StatsPeriod = 'today' | '7d' | '30d' | 'all';
+
+export function fetchStats(period?: StatsPeriod): Promise<PlayerStats> {
+  const suffix = period && period !== 'all' ? `?period=${period}` : '';
+  return api.get<PlayerStats>(`/me/stats${suffix}`);
 }
 
-export function fetchHistory(params: { limit?: number; cursor?: string } = {}): Promise<HistoryPage> {
+export function fetchHistory(
+  params: { limit?: number; cursor?: string; period?: StatsPeriod } = {},
+): Promise<HistoryPage> {
   const query = new URLSearchParams();
   if (params.limit !== undefined) query.set('limit', String(params.limit));
   if (params.cursor) query.set('cursor', params.cursor);
+  // 'all' is the server default; sending it would only make cache keys noisier.
+  if (params.period && params.period !== 'all') query.set('period', params.period);
   const suffix = query.toString();
   return api.get<HistoryPage>(`/me/history${suffix ? `?${suffix}` : ''}`);
 }
