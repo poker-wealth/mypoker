@@ -8,6 +8,7 @@ import { Wallet } from '@/pages/Wallet';
 import { Profile } from '@/pages/Profile';
 import { Settings } from '@/pages/Settings';
 import { Fairness } from '@/pages/Fairness';
+import { Jackpot } from '@/pages/Jackpot';
 import { Table } from '@/pages/Table';
 
 export const router = createBrowserRouter([
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
       { path: 'wallet', element: <Wallet /> },
       { path: 'settings', element: <Settings /> },
       { path: 'fairness', element: <Fairness /> },
+      { path: 'jackpot', element: <Jackpot /> },
     ],
   },
   // Full-screen game table (no bottom nav / shell chrome).

@@ -247,5 +247,26 @@
       "POOR": "Thấp",
       "VERY_POOR": "Rất thấp"
     }
+  },
+  "jackpot": {
+    "totalPools": "Tổng quỹ thưởng",
+    "paysOut": "trả {{pct}}%",
+    "needsMore": "Cần thêm ₮{{amount}} để hạng này có thể trả thưởng",
+    "windowOpen": "Khung giờ Grand đang mở",
+    "windowClosed": "Khung giờ Grand đã đóng",
+    "opensIn": "Mở sau {{time}}",
+    "closesIn": "Đóng sau {{time}}",
+    "howItWorks": "Quỹ thưởng tăng từ 0,5% lợi nhuận của mỗi người thắng — người thua không bao giờ đóng góp. Một hạng chỉ có thể trả thưởng khi quỹ vượt mức tối thiểu hiển thị, và Grand còn cần có người chơi ngồi bàn trong khung giờ thứ Bảy.",
+    "tier": {
+      "MINI": "Mini",
+      "MINOR": "Minor",
+      "MAJOR": "Major",
+      "GRAND": "Grand"
+    },
+    "cadence": {
+      "ROUNDS": "sau vài ván",
+      "DAILY": "mỗi ngày một lần",
+      "WINDOW": "chỉ thứ Bảy"
+    }
   }
 }

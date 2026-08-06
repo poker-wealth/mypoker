@@ -247,5 +247,26 @@
       "POOR": "Poor",
       "VERY_POOR": "Very poor"
     }
+  },
+  "jackpot": {
+    "totalPools": "Total in pools",
+    "paysOut": "pays {{pct}}%",
+    "needsMore": "₮{{amount}} more before this tier can pay out",
+    "windowOpen": "Grand window is open",
+    "windowClosed": "Grand window closed",
+    "opensIn": "Opens in {{time}}",
+    "closesIn": "Closes in {{time}}",
+    "howItWorks": "Pools grow from 0.5% of each winner’s profit — losing players never contribute. A tier can only pay out once its pool passes the minimum shown, and Grand additionally requires players seated during the Saturday window.",
+    "tier": {
+      "MINI": "Mini",
+      "MINOR": "Minor",
+      "MAJOR": "Major",
+      "GRAND": "Grand"
+    },
+    "cadence": {
+      "ROUNDS": "every few rounds",
+      "DAILY": "once a day",
+      "WINDOW": "Saturdays only"
+    }
   }
 }

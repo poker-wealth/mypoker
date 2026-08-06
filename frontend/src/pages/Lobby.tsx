@@ -91,7 +91,10 @@ export function Lobby() {
   return (
     <div className="space-y-4">
       {/* Grand jackpot */}
-      <div className="relative overflow-hidden rounded-(--radius-app) border border-jackpot/30 bg-jackpot/10 p-4">
+      <div
+        onClick={() => { haptic('light'); navigate('/jackpot'); }}
+        className="relative cursor-pointer overflow-hidden rounded-(--radius-app) border border-jackpot/30 bg-jackpot/10 p-4 active:scale-[0.99]"
+      >
         <motion.div
           className="pointer-events-none absolute inset-0 -translate-x-full bg-linear-to-r from-transparent via-white/10 to-transparent"
           animate={{ x: ['-100%', '200%'] }}

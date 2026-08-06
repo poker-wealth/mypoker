@@ -247,5 +247,26 @@
       "POOR": "Rendah",
       "VERY_POOR": "Sangat rendah"
     }
+  },
+  "jackpot": {
+    "totalPools": "Total dalam pool",
+    "paysOut": "membayar {{pct}}%",
+    "needsMore": "Perlu ₮{{amount}} lagi sebelum tingkat ini bisa membayar",
+    "windowOpen": "Jendela Grand terbuka",
+    "windowClosed": "Jendela Grand tertutup",
+    "opensIn": "Buka dalam {{time}}",
+    "closesIn": "Tutup dalam {{time}}",
+    "howItWorks": "Pool tumbuh dari 0,5% keuntungan setiap pemenang — pemain yang kalah tidak pernah menyumbang. Sebuah tingkat baru bisa membayar setelah poolnya melewati minimum yang ditampilkan, dan Grand juga memerlukan pemain yang duduk selama jendela Sabtu.",
+    "tier": {
+      "MINI": "Mini",
+      "MINOR": "Minor",
+      "MAJOR": "Major",
+      "GRAND": "Grand"
+    },
+    "cadence": {
+      "ROUNDS": "setiap beberapa ronde",
+      "DAILY": "sekali sehari",
+      "WINDOW": "hanya Sabtu"
+    }
   }
 }

@@ -247,5 +247,26 @@
       "POOR": "やや低い",
       "VERY_POOR": "低い"
     }
+  },
+  "jackpot": {
+    "totalPools": "プール総額",
+    "paysOut": "{{pct}}% 払い出し",
+    "needsMore": "この階層が払い出すまであと ₮{{amount}}",
+    "windowOpen": "グランド時間帯 開放中",
+    "windowClosed": "グランド時間帯 終了",
+    "opensIn": "{{time}} 後に開放",
+    "closesIn": "{{time}} 後に終了",
+    "howItWorks": "プールは各勝者の利益の 0.5% から積み立てられます。負けたプレイヤーの拠出は一切ありません。表示された最低額を超えて初めて払い出しが可能になり、グランドはさらに土曜の時間帯に着席者がいることが条件です。",
+    "tier": {
+      "MINI": "ミニ",
+      "MINOR": "マイナー",
+      "MAJOR": "メジャー",
+      "GRAND": "グランド"
+    },
+    "cadence": {
+      "ROUNDS": "数ラウンドごと",
+      "DAILY": "1日1回",
+      "WINDOW": "土曜のみ"
+    }
   }
 }

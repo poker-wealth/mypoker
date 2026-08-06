@@ -247,5 +247,26 @@
       "POOR": "较低",
       "VERY_POOR": "很低"
     }
+  },
+  "jackpot": {
+    "totalPools": "奖池总额",
+    "paysOut": "派彩 {{pct}}%",
+    "needsMore": "还需 ₮{{amount}} 该等级才能派彩",
+    "windowOpen": "大奖时段开放中",
+    "windowClosed": "大奖时段已关闭",
+    "opensIn": "{{time}} 后开放",
+    "closesIn": "{{time}} 后关闭",
+    "howItWorks": "奖池来自每位赢家利润的 0.5%——输家不会有任何投入。只有当奖池超过所示最低额，该等级才能派彩；大奖还需在周六时段内有玩家在座。",
+    "tier": {
+      "MINI": "小奖",
+      "MINOR": "中奖",
+      "MAJOR": "大奖",
+      "GRAND": "超级大奖"
+    },
+    "cadence": {
+      "ROUNDS": "每隔数局",
+      "DAILY": "每日一次",
+      "WINDOW": "仅限周六"
+    }
   }
 }

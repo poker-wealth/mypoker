@@ -3,6 +3,7 @@ import { FilterError } from '../lobby';
 import type { GatewayConfig } from './config';
 import { buildAuthRouter } from './auth';
 import { buildLobbyRouter } from './lobby-routes';
+import { buildJackpotRouter } from './jackpot-routes';
 import { buildMeRouter } from './me-routes';
 import type { LobbyService } from '../lobby';
 
@@ -30,6 +31,8 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
   // Optional so auth-only deployments (and the auth tests) don't have to stand
   // up a lobby they never read.
   if (lobby) app.use('/lobby', buildLobbyRouter(lobby));
+  // Jackpot pools are derived from the same tables, so it shares the gate.
+  if (lobby) app.use('/jackpot', buildJackpotRouter(lobby));
 
   app.use((_req: Request, res: Response) => {
     res.status(404).json({ error: 'not found' });

@@ -1,6 +1,7 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchSettings, patchSettings, type PlayerSettings, type SettingsPatch } from './settings';
 import { fetchReputation } from './reputation';
+import { fetchJackpot } from './jackpot';
 import { fetchStats, fetchHistory, type HistoryPage, type StatsPeriod } from './stats';
 import { fetchLobbyGames, fetchTables, type TableFilter } from './lobby';
 import { useSession } from '@/store/session';
@@ -144,5 +145,16 @@ export function useReputation() {
     queryFn: fetchReputation,
     enabled: Boolean(playerId),
     staleTime: 60_000,
+  });
+}
+
+/** Jackpot pools. Public, and polled — the headline figure should visibly move. */
+export function useJackpot() {
+  return useQuery({
+    queryKey: ['jackpot'],
+    queryFn: fetchJackpot,
+    staleTime: 10_000,
+    refetchInterval: 30_000,
+    retry: 1,
   });
 }

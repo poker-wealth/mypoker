@@ -247,5 +247,26 @@
       "POOR": "낮음",
       "VERY_POOR": "매우 낮음"
     }
+  },
+  "jackpot": {
+    "totalPools": "총 적립금",
+    "paysOut": "{{pct}}% 지급",
+    "needsMore": "이 등급이 지급되려면 ₮{{amount}} 더 필요합니다",
+    "windowOpen": "그랜드 시간대 열림",
+    "windowClosed": "그랜드 시간대 종료",
+    "opensIn": "{{time}} 후 시작",
+    "closesIn": "{{time}} 후 종료",
+    "howItWorks": "적립금은 승자 이익의 0.5%에서 쌓입니다. 패한 플레이어는 전혀 부담하지 않습니다. 표시된 최소액을 넘어야 해당 등급이 지급될 수 있으며, 그랜드는 토요일 시간대에 착석한 플레이어가 있어야 합니다.",
+    "tier": {
+      "MINI": "미니",
+      "MINOR": "마이너",
+      "MAJOR": "메이저",
+      "GRAND": "그랜드"
+    },
+    "cadence": {
+      "ROUNDS": "몇 라운드마다",
+      "DAILY": "하루 한 번",
+      "WINDOW": "토요일에만"
+    }
   }
 }
