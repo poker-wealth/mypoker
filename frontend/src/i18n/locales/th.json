@@ -185,7 +185,9 @@
     "waitingOne": "กำลังรอผู้เล่นอีกคนนั่งลง…",
     "livePoker": "โป๊กเกอร์สด",
     "tableDesign": "ดีไซน์โต๊ะ",
-    "demoSubtitle": "{{game}} เดโม · ตาที่ {{hand}} · เบลนด์ {{blinds}}"
+    "demoSubtitle": "{{game}} เดโม · ตาที่ {{hand}} · เบลนด์ {{blinds}}",
+    "signingIn": "กำลังเข้าสู่ระบบ…",
+    "signInToSit": "เข้าสู่ระบบเพื่อนั่งโต๊ะ"
   },
   "a11y": {
     "toggleTheme": "สลับธีม",

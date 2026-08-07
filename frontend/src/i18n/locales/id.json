@@ -185,7 +185,9 @@
     "waitingOne": "Menunggu pemain lain duduk…",
     "livePoker": "Poker langsung",
     "tableDesign": "Desain meja",
-    "demoSubtitle": "Demo {{game}} · Ronde {{hand}} · Blind {{blinds}}"
+    "demoSubtitle": "Demo {{game}} · Ronde {{hand}} · Blind {{blinds}}",
+    "signingIn": "Sedang masuk…",
+    "signInToSit": "Masuk untuk duduk"
   },
   "a11y": {
     "toggleTheme": "Ganti tema",

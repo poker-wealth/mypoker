@@ -323,7 +323,7 @@ function SigningIn({ onBack }: { onBack: () => void }) {
       style={{ background: 'radial-gradient(ellipse at top, #14142a 0%, var(--bg) 70%)' }}
     >
       <TopBar subtitle={t('table.livePoker')} onBack={onBack} />
-      <div className="flex flex-1 items-center justify-center text-sm text-dim">Signing you in…</div>
+      <div className="flex flex-1 items-center justify-center text-sm text-dim">{t('table.signingIn')}</div>
     </div>
   );
 }
@@ -343,7 +343,7 @@ function SignedOut({ onBack }: { onBack: () => void }) {
     >
       <TopBar subtitle={t('table.livePoker')} onBack={onBack} />
       <div className="mx-auto w-full max-w-sm flex-1 px-6 pt-16 text-center">
-        <h2 className="text-lg font-bold">Sign in to take a seat</h2>
+        <h2 className="text-lg font-bold">{t('table.signInToSit')}</h2>
         <p className="mt-2 text-sm text-dim">
           Live tables seat real players, so the table needs to know who you are before it can deal
           you in.

@@ -185,7 +185,9 @@
     "waitingOne": "等待另一位玩家入座…",
     "livePoker": "实时德州",
     "tableDesign": "牌桌样式",
-    "demoSubtitle": "{{game}} 演示 · 第 {{hand}} 局 · 盲注 {{blinds}}"
+    "demoSubtitle": "{{game}} 演示 · 第 {{hand}} 局 · 盲注 {{blinds}}",
+    "signingIn": "正在登录…",
+    "signInToSit": "登录后即可入座"
   },
   "a11y": {
     "toggleTheme": "切换主题",

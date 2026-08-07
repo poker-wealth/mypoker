@@ -185,7 +185,9 @@
     "waitingOne": "다른 플레이어가 앉기를 기다리는 중…",
     "livePoker": "라이브 포커",
     "tableDesign": "테이블 디자인",
-    "demoSubtitle": "{{game}} 데모 · 핸드 {{hand}} · 블라인드 {{blinds}}"
+    "demoSubtitle": "{{game}} 데모 · 핸드 {{hand}} · 블라인드 {{blinds}}",
+    "signingIn": "로그인 중…",
+    "signInToSit": "로그인하고 착석하기"
   },
   "a11y": {
     "toggleTheme": "테마 전환",

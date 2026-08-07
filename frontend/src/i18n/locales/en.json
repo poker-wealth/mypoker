@@ -185,7 +185,9 @@
     "waitingOne": "Waiting for another player to sit down…",
     "livePoker": "Live poker",
     "tableDesign": "Table design",
-    "demoSubtitle": "{{game}} demo · Hand {{hand}} · Blinds {{blinds}}"
+    "demoSubtitle": "{{game}} demo · Hand {{hand}} · Blinds {{blinds}}",
+    "signingIn": "Signing you in…",
+    "signInToSit": "Sign in to take a seat"
   },
   "a11y": {
     "toggleTheme": "Toggle theme",

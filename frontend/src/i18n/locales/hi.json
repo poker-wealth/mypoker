@@ -185,7 +185,9 @@
     "waitingOne": "किसी और खिलाड़ी के बैठने की प्रतीक्षा…",
     "livePoker": "लाइव पोकर",
     "tableDesign": "टेबल डिज़ाइन",
-    "demoSubtitle": "{{game}} डेमो · हाथ {{hand}} · ब्लाइंड्स {{blinds}}"
+    "demoSubtitle": "{{game}} डेमो · हाथ {{hand}} · ब्लाइंड्स {{blinds}}",
+    "signingIn": "साइन इन हो रहा है…",
+    "signInToSit": "बैठने के लिए साइन इन करें"
   },
   "a11y": {
     "toggleTheme": "थीम बदलें",

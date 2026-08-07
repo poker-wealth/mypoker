@@ -185,7 +185,9 @@
     "waitingOne": "もう一人の着席を待っています…",
     "livePoker": "ライブポーカー",
     "tableDesign": "テーブルデザイン",
-    "demoSubtitle": "{{game}} デモ · ハンド {{hand}} · ブラインド {{blinds}}"
+    "demoSubtitle": "{{game}} デモ · ハンド {{hand}} · ブラインド {{blinds}}",
+    "signingIn": "ログイン中…",
+    "signInToSit": "ログインして着席"
   },
   "a11y": {
     "toggleTheme": "テーマを切り替え",
