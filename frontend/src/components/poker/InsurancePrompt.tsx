@@ -41,11 +41,11 @@ export interface InsuranceQuote {
   payoutOdds: number;
 }
 
-const usd = (micros: number): string =>
-  (micros / 1_000_000).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+// Table-currency chips, NOT micro-USD. The live room's stakes are chip units
+// (blinds 10/20, buy-ins in the hundreds) and the quote is priced in the same —
+// an earlier version divided by 1e6 here and would have shown a 2,000-chip
+// coverage as 0.00.
+const chips = (amount: number): string => amount.toLocaleString();
 
 export function InsurancePrompt({
   quote,
@@ -112,7 +112,7 @@ export function InsurancePrompt({
                 <div className="text-[0.62rem] uppercase tracking-wide text-dim">
                   {t('insurance.payout')}
                 </div>
-                <div className="text-lg font-bold tabular-nums">₮{usd(quote.coverage)}</div>
+                <div className="text-lg font-bold tabular-nums">₮{chips(quote.coverage)}</div>
               </div>
             </div>
 
@@ -143,7 +143,7 @@ export function InsurancePrompt({
                   onAccept(quote);
                 }}
               >
-                {t('insurance.accept', { premium: usd(quote.premium) })}
+                {t('insurance.accept', { premium: chips(quote.premium) })}
               </Button>
             </div>
           </div>

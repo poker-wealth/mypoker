@@ -42,32 +42,6 @@ export const DEFAULT_COEFFICIENT = 0.4;
 export const coefficientFor = (gameId: string): number =>
   VOLUME_COEFFICIENT[gameId] ?? DEFAULT_COEFFICIENT;
 
-export type VipTier = 'V1' | 'V2' | 'V3' | 'V4' | 'V5';
-
-export interface TierSpec {
-  tier: VipTier;
-  title: string;
-  /** Cumulative effective volume required, micro-USD. */
-  threshold: number;
-}
-
-/** Thresholds exactly as FairPlay_v5.9_FINAL_EN §10.2 tabulates them. */
-export const TIERS: readonly TierSpec[] = [
-  { tier: 'V1', title: 'Wanderer', threshold: 0 },
-  { tier: 'V2', title: 'Rising Star', threshold: 10_000_000_000 }, // $10,000
-  { tier: 'V3', title: 'Gold', threshold: 100_000_000_000 }, // $100,000
-  { tier: 'V4', title: 'Platinum', threshold: 500_000_000_000 }, // $500,000
-  { tier: 'V5', title: 'Black Gold', threshold: 2_000_000_000_000 }, // $2,000,000
-];
-
-export function tierFor(cumulativeEffective: number): TierSpec {
-  // Walk down so the highest satisfied threshold wins.
-  for (let i = TIERS.length - 1; i >= 0; i--) {
-    if (cumulativeEffective >= TIERS[i]!.threshold) return TIERS[i]!;
-  }
-  return TIERS[0]!;
-}
-
 interface VolumeDoc {
   /** `${playerId}:${gameId}:${month}` — month is YYYY-MM, so monthly retention
    *  tracking and lifetime totals come from the same rows. */
@@ -146,20 +120,24 @@ export interface GameBreakdown {
   actualRtp: string | null;
 }
 
-export interface VipStanding {
-  tier: VipTier;
-  title: string;
+/**
+ * The volume FACTS — no tier, no progress.
+ *
+ * The VIP ladder (thresholds, titles, grace-period demotion) lives in
+ * game-server/src/players/vip.ts and the gateway applies it. A copy of the
+ * ladder previously lived here and its tier titles had already drifted from the
+ * canonical module's (owner renamed them Jul 15; this file still had the spec's
+ * originals) — the drift is why this file now carries facts only.
+ */
+export interface VolumeFacts {
   /** Cumulative effective volume, micro-USD. Permanent, never resets. */
   cumulativeEffective: number;
   /** This calendar month's effective volume, for retention. */
   monthlyEffective: number;
-  next: { tier: VipTier; title: string; threshold: number; remaining: number } | null;
-  /** 0–100, progress from the current threshold to the next. */
-  progressPct: number;
   breakdown: GameBreakdown[];
 }
 
-export async function getVipStanding(playerId: string, at: Date = new Date()): Promise<VipStanding> {
+export async function getVolumeFacts(playerId: string, at: Date = new Date()): Promise<VolumeFacts> {
   const rows = await VolumeModel.find({ playerId }).lean();
   const thisMonth = monthKey(at);
 
@@ -167,18 +145,6 @@ export async function getVipStanding(playerId: string, at: Date = new Date()): P
   const monthlyEffective = rows
     .filter((r) => r.month === thisMonth)
     .reduce((sum, r) => sum + r.effective, 0);
-
-  const current = tierFor(cumulativeEffective);
-  const currentIndex = TIERS.findIndex((t) => t.tier === current.tier);
-  const nextSpec = TIERS[currentIndex + 1] ?? null;
-
-  // Progress is measured between the two thresholds, not from zero — otherwise a
-  // V4 shows 25% while being most of the way to V5.
-  const span = nextSpec ? nextSpec.threshold - current.threshold : 0;
-  const progressPct =
-    nextSpec && span > 0
-      ? Math.min(100, Math.max(0, ((cumulativeEffective - current.threshold) / span) * 100))
-      : 100;
 
   // Collapse the monthly rows into one entry per game.
   const byGame = new Map<string, GameBreakdown>();
@@ -202,19 +168,8 @@ export async function getVipStanding(playerId: string, at: Date = new Date()): P
   }
 
   return {
-    tier: current.tier,
-    title: current.title,
     cumulativeEffective,
     monthlyEffective,
-    next: nextSpec
-      ? {
-          tier: nextSpec.tier,
-          title: nextSpec.title,
-          threshold: nextSpec.threshold,
-          remaining: Math.max(0, nextSpec.threshold - cumulativeEffective),
-        }
-      : null,
-    progressPct: Number(progressPct.toFixed(1)),
     breakdown: [...byGame.values()].sort((a, b) => b.effective - a.effective),
   };
 }

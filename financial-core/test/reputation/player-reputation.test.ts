@@ -1,11 +1,8 @@
 import { Decimal128 } from 'bson';
 import {
-  getReputation,
-  deductReputation,
-  bandFor,
-  ReputationDeductionModel,
-  STARTING_SCORE,
-  CLEAN_ROUNDS_FOR_ADVANCE,
+  getReputationFacts,
+  recordFinding,
+  ReputationFindingModel,
 } from '../../src/reputation/player-reputation';
 import { LedgerModel } from '../../src/wallet/ledger.model';
 import { AccountModel } from '../../src/wallet/account.model';
@@ -14,10 +11,11 @@ import { LedgerType, LedgerDirection } from '../../src/domain/account-types';
 import { startTestDb, stopTestDb, clearCollections, ensureIndexes } from '../db-helper';
 
 /**
- * The spec calls a reputation score affecting a withdrawal a critical failure,
- * so the last describe block below is the important one: it asserts the module
- * cannot reach the withdrawal path at all, rather than trusting that nobody will
- * wire it up later.
+ * financial-core stores reputation FACTS; the scoring rules live in
+ * game-server/src/players/reputation.ts and are tested there
+ * (test/players/derivation.test.ts). What this file guards is the storage —
+ * and the iron rule, which survives the refactor in an even stronger form:
+ * there is no longer a score in this service for a withdrawal to branch on.
  */
 
 const PLAYER = 'p-reputation-test';
@@ -34,7 +32,6 @@ beforeEach(async () => {
   accountId = (await getOrCreatePlayerAccount(PLAYER))._id;
 });
 
-/** Play `n` rounds, as settlement would record them. */
 async function playRounds(n: number): Promise<void> {
   const docs = Array.from({ length: n }, (_, i) => ({
     _id: `rep-r${i}`,
@@ -50,129 +47,41 @@ async function playRounds(n: number): Promise<void> {
   await LedgerModel.insertMany(docs);
 }
 
-describe('starting position', () => {
-  it('starts a new account at 500', async () => {
-    const rep = await getReputation(PLAYER);
-    expect(rep.score).toBe(STARTING_SCORE);
-    expect(rep.roundsPlayed).toBe(0);
-    expect(rep.roundsToAdvance).toBe(CLEAN_ROUNDS_FOR_ADVANCE);
+describe('facts', () => {
+  it('reports rounds from the ledger and no findings for a clean account', async () => {
+    await playRounds(7);
+    const facts = await getReputationFacts(PLAYER);
+    expect(facts).toEqual({ roundsPlayed: 7, findings: [] });
   });
 
-  it('puts a new account in FAIR, not at the bottom', async () => {
-    // 500 must not read as a bad score — everyone starts there.
-    expect((await getReputation(PLAYER)).band).toBe('AVERAGE');
-  });
-});
+  it('returns findings oldest first', async () => {
+    await recordFinding({ playerId: PLAYER, reason: 'CHALLENGE_FAIL', confirmedBy: 'ops', findingId: 'f1' });
+    await recordFinding({ playerId: PLAYER, reason: 'BOT_CONFIRMED', confirmedBy: 'ops', findingId: 'f2' });
 
-describe('the 100-round auto-advance', () => {
-  it('does not advance at 99 rounds', async () => {
-    await playRounds(99);
-    const rep = await getReputation(PLAYER);
-    expect(rep.score).toBe(500);
-    expect(rep.roundsToAdvance).toBe(1);
+    const facts = await getReputationFacts(PLAYER);
+    expect(facts.findings).toEqual(['CHALLENGE_FAIL', 'BOT_CONFIRMED']);
   });
 
-  it('advances to 700 at exactly 100 rounds, with no manual trigger', async () => {
-    await playRounds(CLEAN_ROUNDS_FOR_ADVANCE);
-    const rep = await getReputation(PLAYER);
-    expect(rep.score).toBe(700);
-    expect(rep.band).toBe('GOOD');
-    expect(rep.roundsToAdvance).toBe(0);
+  it('will not record the same finding twice', async () => {
+    await recordFinding({ playerId: PLAYER, reason: 'BOT_CONFIRMED', confirmedBy: 'ops', findingId: 'same' });
+    await recordFinding({ playerId: PLAYER, reason: 'BOT_CONFIRMED', confirmedBy: 'ops', findingId: 'same' });
+
+    expect(await ReputationFindingModel.countDocuments({ playerId: PLAYER })).toBe(1);
   });
 
-  it('does not keep climbing past 700', async () => {
-    await playRounds(500);
-    expect((await getReputation(PLAYER)).score).toBe(700);
-  });
-});
-
-describe('deductions', () => {
-  it('applies the spec amounts exactly', async () => {
-    expect((await deductReputation({ playerId: PLAYER, reason: 'VERIFICATION_FAILED', confirmedBy: 'ops', findingId: 'f1' })).score).toBe(480);
-    expect((await deductReputation({ playerId: PLAYER, reason: 'BOT_CONFIRMED', confirmedBy: 'ops', findingId: 'f2' })).score).toBe(330);
-    // Collusion additionally forces the Very Poor tier, so the running total
-    // (500-20-150-200 = 130) is already inside it and stands.
-    expect((await deductReputation({ playerId: PLAYER, reason: 'COLLUSION_CONFIRMED', confirmedBy: 'ops', findingId: 'f3' })).score).toBe(130);
-  });
-
-  it('drops a confirmed colluder directly to VERY_POOR', async () => {
-    // The spec says collusion "drops directly to this tier", which its -200
-    // does not achieve alone: 500 - 200 = 300, the bottom of POOR.
-    const rep = await deductReputation({ playerId: PLAYER, reason: 'COLLUSION_CONFIRMED', confirmedBy: 'ops', findingId: 'f1' });
-    expect(rep.band).toBe('VERY_POOR');
-    expect(rep.score).toBeLessThanOrEqual(299);
-  });
-
-  it('drops an advanced player to VERY_POOR too, not merely to AVERAGE', async () => {
-    // Without the tier rule this player would sit at 700 - 200 = 500.
-    await playRounds(CLEAN_ROUNDS_FOR_ADVANCE);
-    const rep = await deductReputation({ playerId: PLAYER, reason: 'COLLUSION_CONFIRMED', confirmedBy: 'ops', findingId: 'f1' });
-    expect(rep.band).toBe('VERY_POOR');
-  });
-
-  it('will not dock the same finding twice', async () => {
-    await deductReputation({ playerId: PLAYER, reason: 'BOT_CONFIRMED', confirmedBy: 'ops', findingId: 'same-finding' });
-    const again = await deductReputation({ playerId: PLAYER, reason: 'BOT_CONFIRMED', confirmedBy: 'ops', findingId: 'same-finding' });
-
-    // A retried ops action, or a replayed queue message, must not compound.
-    expect(again.score).toBe(350);
-    expect(await ReputationDeductionModel.countDocuments({ playerId: PLAYER })).toBe(1);
-  });
-
-  it('never goes below zero', async () => {
-    for (let i = 0; i < 5; i++) {
-      await deductReputation({ playerId: PLAYER, reason: 'COLLUSION_CONFIRMED', confirmedBy: 'ops', findingId: `f${i}` });
-    }
-    expect((await getReputation(PLAYER)).score).toBe(0);
-  });
-
-  it('deducts from the advanced score, not the starting one', async () => {
-    await playRounds(CLEAN_ROUNDS_FOR_ADVANCE);
-    const rep = await deductReputation({ playerId: PLAYER, reason: 'VERIFICATION_FAILED', confirmedBy: 'ops', findingId: 'f1' });
-    expect(rep.score).toBe(680);
-  });
-
-  it('keeps one player’s deductions off another', async () => {
-    await deductReputation({ playerId: PLAYER, reason: 'COLLUSION_CONFIRMED', confirmedBy: 'ops', findingId: 'f1' });
-    expect((await getReputation('p-someone-else')).score).toBe(500);
-  });
-});
-
-describe('bands', () => {
-  // Boundaries per FairPlay_v5.9_FINAL_EN 10.1. Every edge is asserted on both
-  // sides — an off-by-one here silently mislabels a whole band of players.
-  it('maps each score to its band', () => {
-    expect(bandFor(1000)).toBe('EXCELLENT');
-    expect(bandFor(900)).toBe('EXCELLENT');
-    expect(bandFor(899)).toBe('GOOD');
-    expect(bandFor(700)).toBe('GOOD');
-    expect(bandFor(699)).toBe('AVERAGE');
-    expect(bandFor(500)).toBe('AVERAGE');
-    expect(bandFor(499)).toBe('POOR');
-    expect(bandFor(300)).toBe('POOR');
-    expect(bandFor(299)).toBe('VERY_POOR');
-    expect(bandFor(0)).toBe('VERY_POOR');
-  });
-
-  it('places a new account in AVERAGE and an advanced one in GOOD', () => {
-    // The two scores the spec actually pins: 500 on signup, 700 after 100
-    // clean rounds.
-    expect(bandFor(500)).toBe('AVERAGE');
-    expect(bandFor(700)).toBe('GOOD');
+  it('keeps one player’s findings off another', async () => {
+    await recordFinding({ playerId: PLAYER, reason: 'COLLUSION_CONFIRMED', confirmedBy: 'ops', findingId: 'f1' });
+    expect((await getReputationFacts('p-someone-else')).findings).toEqual([]);
   });
 });
 
 describe('IRON RULE: reputation never blocks funds', () => {
   it('is not imported by any withdrawal or balance module', () => {
-    // A static check, deliberately. Any import is the beginning of a branch on
-    // reputation somewhere in the money path, and the spec calls that a critical
-    // failure — so it should fail here, at the boundary, not in review.
     const fs = require('node:fs') as typeof import('node:fs');
     const path = require('node:path') as typeof import('node:path');
 
     const moneyDirs = ['withdrawal', 'wallet', 'settlement', 'deposit', 'clearing'];
     const offenders: string[] = [];
-
     for (const dir of moneyDirs) {
       const full = path.join(__dirname, '..', '..', 'src', dir);
       if (!fs.existsSync(full)) continue;
@@ -182,19 +91,15 @@ describe('IRON RULE: reputation never blocks funds', () => {
         if (/from\s+['"].*reputation/.test(source)) offenders.push(`${dir}/${file}`);
       }
     }
-
     expect(offenders).toEqual([]);
   });
 
-  it('exposes nothing a withdrawal could gate on', async () => {
-    await deductReputation({ playerId: PLAYER, reason: 'COLLUSION_CONFIRMED', confirmedBy: 'ops', findingId: 'f1' });
-    const rep = await getReputation(PLAYER);
+  it('holds no score at all — only history', async () => {
+    await recordFinding({ playerId: PLAYER, reason: 'COLLUSION_CONFIRMED', confirmedBy: 'ops', findingId: 'f1' });
+    const facts = await getReputationFacts(PLAYER);
 
-    // Worst possible standing, and the shape still carries no permission flag —
-    // no `canWithdraw`, no `blocked`, no `restricted`. There is nothing to read.
-    expect(rep.band).toBe('VERY_POOR');
-    expect(Object.keys(rep).sort()).toEqual(
-      ['band', 'deducted', 'roundsPlayed', 'roundsToAdvance', 'score'].sort(),
-    );
+    // Post-refactor the strongest possible form of the rule: this service has
+    // nothing a withdrawal COULD branch on, not even a number.
+    expect(Object.keys(facts).sort()).toEqual(['findings', 'roundsPlayed']);
   });
 });

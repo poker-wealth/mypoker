@@ -66,6 +66,36 @@ export function deduct(score: number, points: number): number {
   return clampScore(score - Math.abs(points));
 }
 
+/** Top of the Very Poor band — where a confirmed collusion lands, per spec. */
+export const VERY_POOR_CEILING = 299;
+
+/** A stored human-confirmed finding, as the Financial Core records it. */
+export type FindingReason = 'CHALLENGE_FAIL' | 'BOT_CONFIRMED' | 'COLLUSION_CONFIRMED';
+
+/**
+ * Derive a player's score from durable facts: rounds played and confirmed findings.
+ *
+ * This is THE derivation — the Financial Core stores the facts (it has the
+ * database) and the gateway calls this to turn them into a score, so the scoring
+ * rules live in exactly one place. A copy of these rules previously grew in
+ * financial-core and its VIP titles had already drifted from this module's by
+ * the time it was found; that is the failure mode this function exists to end.
+ *
+ * Spec §10.1 details honoured here:
+ *   • 500 start, auto-advance to 700 after 100 normal rounds, deductions after.
+ *   • A confirmed collusion "drops directly to this tier" (Very Poor) — which
+ *     plain subtraction does not achieve: 500−200=300 is the floor of POOR, and
+ *     an advanced 700−200=500 is AVERAGE. So the ceiling is enforced, not
+ *     inferred from arithmetic.
+ */
+export function scoreFor(roundsPlayed: number, findings: readonly FindingReason[]): number {
+  const base = scoreAfterNormalRounds(NEW_ACCOUNT_SCORE, roundsPlayed);
+  const deducted = findings.reduce((sum, r) => sum + DEDUCTION[r], 0);
+  let score = clampScore(base - deducted);
+  if (findings.includes('COLLUSION_CONFIRMED')) score = Math.min(score, VERY_POOR_CEILING);
+  return score;
+}
+
 /** May this reputation sit at a table of the given stake? Access only — never money. */
 export function canAccessTable(score: number, stake: number): boolean {
   return stake <= bandOf(score).maxStakeAccess;

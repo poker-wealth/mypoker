@@ -309,10 +309,10 @@
     "coefficientNote": "Games count differently toward VIP: Texas ×1.0, Niu Niu ×0.5, Baccarat ×0.3, others ×0.4. This keeps low-rake games from being a shortcut up the tiers.",
     "tiers": "Tiers",
     "title": {
-      "V1": "Wanderer",
-      "V2": "Rising Star",
+      "V1": "Bronze",
+      "V2": "Silver",
       "V3": "Gold",
-      "V4": "Platinum",
+      "V4": "Diamond",
       "V5": "Black Gold"
     },
     "perks": {

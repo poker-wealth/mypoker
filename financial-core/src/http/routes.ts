@@ -15,7 +15,7 @@ import {
 import { getOrCreatePlayerAccount } from '../wallet/system-accounts';
 import { getPlayerStats, getPlayerHistory } from '../stats/player-stats';
 import { getSettings, updateSettings } from '../settings/player-settings';
-import { getReputation, ReputationDeductionModel } from '../reputation/player-reputation';
+import { getReputationFacts } from '../reputation/player-reputation';
 import {
   createLeague,
   getLeague,
@@ -33,14 +33,13 @@ import {
   playersOf,
   summaryFor,
   subAgentsOf,
-  agentEligibility,
 } from '../agent/agent-store';
 import {
   notify,
   listNotifications,
   markRead,
 } from '../notifications/notification-store';
-import { getVipStanding, recordVolume } from '../vip/volume-tracker';
+import { getVolumeFacts, recordVolume } from '../vip/volume-tracker';
 import { AccountModel } from '../wallet/account.model';
 import { WithdrawalModel } from '../withdrawal/withdrawal.model';
 import { asyncHandler, internalAuth, dataScopeMiddleware, ApiError } from './middleware';
@@ -115,14 +114,15 @@ export function buildRouter(): Router {
     }),
   );
 
-  // Reputation. Read-only to players, and deliberately NOT money: nothing here
-  // is reachable from the withdrawal path, and the spec calls a reputation score
-  // affecting a withdrawal a critical failure.
+  // Reputation FACTS. The score is derived by the gateway from the canonical
+  // rules in game-server/src/players/reputation.ts — this service stores what
+  // happened and stays out of the scoring business. Still NOT money: nothing
+  // here is reachable from the withdrawal path.
   r.get(
     '/me/reputation',
     dataScopeMiddleware,
     asyncHandler(async (req: Request, res: Response) => {
-      res.json(await getReputation(req.dataScope!.playerId));
+      res.json(await getReputationFacts(req.dataScope!.playerId));
     }),
   );
 
@@ -273,21 +273,16 @@ export function buildRouter(): Router {
     }),
   );
 
+  // Facts for the gateway's eligibility derivation: rounds, findings, and
+  // whether this player is already an agent. The 700 threshold and the scoring
+  // that reaches it live gateway-side with the rest of the reputation rules.
   r.get(
     '/me/agent/eligibility',
     dataScopeMiddleware,
     asyncHandler(async (req: Request, res: Response) => {
       const playerId = req.dataScope!.playerId;
-      const reputation = await getReputation(playerId);
-      // Collusion is already a reputation deduction reason, so the finding is
-      // read from there rather than kept in a second place that could disagree.
-      const deductions = await ReputationDeductionModel.find({ playerId }).lean();
-      res.json(
-        await agentEligibility(playerId, reputation, {
-          hasConfirmedCollusion: deductions.some((d) => d.reason === 'COLLUSION_CONFIRMED'),
-          antiBotHighRisk: deductions.some((d) => d.reason === 'BOT_CONFIRMED'),
-        }),
-      );
+      const facts = await getReputationFacts(playerId);
+      res.json({ ...facts, alreadyAgent: (await getAgent(playerId)) !== null });
     }),
   );
 
@@ -398,11 +393,13 @@ export function buildRouter(): Router {
   );
 
   // ── VIP ──────────────────────────────────────────────────────────────────
+  // Volume FACTS. The ladder (thresholds, titles, progress) is applied by the
+  // gateway from game-server/src/players/vip.ts.
   r.get(
     '/me/vip',
     dataScopeMiddleware,
     asyncHandler(async (req: Request, res: Response) => {
-      res.json(await getVipStanding(req.dataScope!.playerId));
+      res.json(await getVolumeFacts(req.dataScope!.playerId));
     }),
   );
 

@@ -1,12 +1,17 @@
 import {
   recordVolume,
-  getVipStanding,
-  tierFor,
+  getVolumeFacts,
   coefficientFor,
   monthKey,
   VolumeModel,
-  TIERS,
 } from '../../src/vip/volume-tracker';
+
+/**
+ * The tier ladder and progress arithmetic moved to game-server/src/players/vip
+ * (tested in test/players/derivation.test.ts) when the duplicated copy here was
+ * deleted. This file now guards what this service actually owns: the
+ * coefficients (their only home), the write path, and the per-game facts.
+ */
 import { startTestDb, stopTestDb, clearCollections } from '../db-helper';
 
 /**
@@ -36,35 +41,12 @@ describe('coefficients', () => {
   });
 });
 
-describe('tier thresholds', () => {
-  it('matches the spec table exactly', () => {
-    expect(tierFor(0).tier).toBe('V1');
-    expect(tierFor($(9_999)).tier).toBe('V1');
-    expect(tierFor($(10_000)).tier).toBe('V2');
-    expect(tierFor($(99_999)).tier).toBe('V2');
-    expect(tierFor($(100_000)).tier).toBe('V3');
-    expect(tierFor($(499_999)).tier).toBe('V3');
-    expect(tierFor($(500_000)).tier).toBe('V4');
-    expect(tierFor($(1_999_999)).tier).toBe('V4');
-    expect(tierFor($(2_000_000)).tier).toBe('V5');
-  });
-
-  it('carries the titles from the spec', () => {
-    expect(TIERS.map((t) => t.title)).toEqual([
-      'Wanderer',
-      'Rising Star',
-      'Gold',
-      'Platinum',
-      'Black Gold',
-    ]);
-  });
-});
 
 describe('recording volume', () => {
   it('applies the coefficient at write time', async () => {
     await recordVolume({ playerId: PLAYER, gameId: 'baccarat', staked: $(1000), won: $(900) });
 
-    const standing = await getVipStanding(PLAYER);
+    const standing = await getVolumeFacts(PLAYER);
     // $1,000 staked at ×0.3.
     expect(standing.cumulativeEffective).toBe($(300));
     expect(standing.breakdown[0]!.staked).toBe($(1000));
@@ -74,7 +56,7 @@ describe('recording volume', () => {
     for (let i = 0; i < 3; i++) {
       await recordVolume({ playerId: PLAYER, gameId: 'texas', staked: $(100), won: $(80) });
     }
-    const standing = await getVipStanding(PLAYER);
+    const standing = await getVolumeFacts(PLAYER);
     expect(standing.breakdown[0]!.rounds).toBe(3);
     expect(standing.cumulativeEffective).toBe($(300));
   });
@@ -86,7 +68,7 @@ describe('recording volume', () => {
 
   it('keeps one player’s volume off another', async () => {
     await recordVolume({ playerId: PLAYER, gameId: 'texas', staked: $(1000), won: 0 });
-    expect((await getVipStanding('tg-someone-else')).cumulativeEffective).toBe(0);
+    expect((await getVolumeFacts('tg-someone-else')).cumulativeEffective).toBe(0);
   });
 });
 
@@ -96,59 +78,24 @@ describe('the coefficients do what the spec says they are for', () => {
     await recordVolume({ playerId: 'tg-texas', gameId: 'texas', staked: $(50_000), won: 0 });
     await recordVolume({ playerId: 'tg-bacc', gameId: 'baccarat', staked: $(50_000), won: 0 });
 
-    const texas = await getVipStanding('tg-texas');
-    const baccarat = await getVipStanding('tg-bacc');
+    const texas = await getVolumeFacts('tg-texas');
+    const baccarat = await getVolumeFacts('tg-bacc');
 
     // Texas counts in full and clears V2 at $10,000. Baccarat counts at ×0.3,
     // so $50,000 staked is $15,000 effective — also V2, but a third of the way
     // to V3 rather than half.
     expect(texas.cumulativeEffective).toBe($(50_000));
     expect(baccarat.cumulativeEffective).toBe($(15_000));
-    expect(texas.progressPct).toBeGreaterThan(baccarat.progressPct);
   });
 
-  it('needs 3.33× the Baccarat volume to reach a Texas tier', async () => {
-    // $100,000 of Texas buys V3. In Baccarat that costs $333,334 staked —
-    // and the boundary is exact: $333,333 gives $99,999.90 effective, ninety
-    // cents short, and stays V2.
-    await recordVolume({ playerId: 'tg-short', gameId: 'baccarat', staked: $(333_333), won: 0 });
-    expect((await getVipStanding('tg-short')).tier).toBe('V2');
-
-    await recordVolume({ playerId: 'tg-bacc', gameId: 'baccarat', staked: $(333_334), won: 0 });
-    expect((await getVipStanding('tg-bacc')).tier).toBe('V3');
+  it('needs 3.33x the Baccarat volume for the same effective figure', async () => {
+    // The boundary is exact: $333,333 staked gives $99,999.90 effective --
+    // ninety cents short of the $100,000 a Texas player reaches at face value.
+    await recordVolume({ playerId: 'tg-bacc', gameId: 'baccarat', staked: $(333_333), won: 0 });
+    expect((await getVolumeFacts('tg-bacc')).cumulativeEffective).toBe(99_999_900_000);
   });
 });
 
-describe('progress to the next tier', () => {
-  it('measures between thresholds, not from zero', async () => {
-    // $300,000 effective: V3 ($100k) heading to V4 ($500k) — half way.
-    await recordVolume({ playerId: PLAYER, gameId: 'texas', staked: $(300_000), won: 0 });
-
-    const standing = await getVipStanding(PLAYER);
-    expect(standing.tier).toBe('V3');
-    expect(standing.next!.tier).toBe('V4');
-    expect(standing.next!.remaining).toBe($(200_000));
-    // Measured from zero this would read 60% and a V4 would show 25% while
-    // being most of the way to V5.
-    expect(standing.progressPct).toBe(50);
-  });
-
-  it('reports no next tier at V5', async () => {
-    await recordVolume({ playerId: PLAYER, gameId: 'texas', staked: $(2_000_000), won: 0 });
-    const standing = await getVipStanding(PLAYER);
-
-    expect(standing.tier).toBe('V5');
-    expect(standing.next).toBeNull();
-    expect(standing.progressPct).toBe(100);
-  });
-
-  it('starts a new player at V1 with V2 ahead', async () => {
-    const standing = await getVipStanding(PLAYER);
-    expect(standing.tier).toBe('V1');
-    expect(standing.next!.tier).toBe('V2');
-    expect(standing.next!.remaining).toBe($(10_000));
-  });
-});
 
 describe('monthly tracking, for retention', () => {
   it('separates this month from lifetime', async () => {
@@ -158,7 +105,7 @@ describe('monthly tracking, for retention', () => {
     await recordVolume({ playerId: PLAYER, gameId: 'texas', staked: $(1000), won: 0, at: lastMonth });
     await recordVolume({ playerId: PLAYER, gameId: 'texas', staked: $(400), won: 0, at: now });
 
-    const standing = await getVipStanding(PLAYER, now);
+    const standing = await getVolumeFacts(PLAYER, now);
     // Cumulative is permanent and never resets; monthly is the retention gate.
     expect(standing.cumulativeEffective).toBe($(1400));
     expect(standing.monthlyEffective).toBe($(400));
@@ -175,7 +122,7 @@ describe('per-game breakdown', () => {
     await recordVolume({ playerId: PLAYER, gameId: 'texas', staked: $(1000), won: $(950) });
     await recordVolume({ playerId: PLAYER, gameId: 'baccarat', staked: $(1000), won: $(600) });
 
-    const standing = await getVipStanding(PLAYER);
+    const standing = await getVolumeFacts(PLAYER);
     const texas = standing.breakdown.find((b) => b.gameId === 'texas')!;
     const baccarat = standing.breakdown.find((b) => b.gameId === 'baccarat')!;
 
@@ -185,7 +132,7 @@ describe('per-game breakdown', () => {
 
   it('reports null RTP rather than 0% when nothing was staked', async () => {
     // No rounds at all — 0% would read as "this game never pays out".
-    expect((await getVipStanding(PLAYER)).breakdown).toEqual([]);
+    expect((await getVolumeFacts(PLAYER)).breakdown).toEqual([]);
   });
 
   it('orders by effective volume, heaviest first', async () => {
@@ -193,7 +140,7 @@ describe('per-game breakdown', () => {
     await recordVolume({ playerId: PLAYER, gameId: 'texas', staked: $(900), won: 0 });
 
     // Baccarat staked more but Texas counts fully — 900 > 300.
-    expect((await getVipStanding(PLAYER)).breakdown.map((b) => b.gameId)).toEqual([
+    expect((await getVolumeFacts(PLAYER)).breakdown.map((b) => b.gameId)).toEqual([
       'texas',
       'baccarat',
     ]);

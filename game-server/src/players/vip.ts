@@ -90,3 +90,36 @@ export function reconcileVip(state: VipState, cumulativeVolume: number, now: num
 export function vipSpec(tier: VipTier): VipTierSpec {
   return VIP_TIERS[indexOf(tier)]!;
 }
+
+export interface VipProgress {
+  tier: VipTier;
+  title: string;
+  next: { tier: VipTier; title: string; threshold: number; remaining: number } | null;
+  /** 0–100, measured BETWEEN the two thresholds — a V4 most of the way to V5
+   *  should not read 25% just because the scale starts at zero. */
+  progressPct: number;
+}
+
+/** Tier + progress for a cumulative effective volume (micro-USD). One home for
+ *  this arithmetic, beside the ladder it measures. */
+export function vipProgress(cumulativeVolume: number): VipProgress {
+  const current = tierForVolume(cumulativeVolume);
+  const nextSpec = VIP_TIERS[indexOf(current.tier) + 1] ?? null;
+  const span = nextSpec ? nextSpec.volumeRequired - current.volumeRequired : 0;
+  const pct = nextSpec && span > 0
+    ? Math.min(100, Math.max(0, ((cumulativeVolume - current.volumeRequired) / span) * 100))
+    : 100;
+  return {
+    tier: current.tier,
+    title: current.title,
+    next: nextSpec
+      ? {
+          tier: nextSpec.tier,
+          title: nextSpec.title,
+          threshold: nextSpec.volumeRequired,
+          remaining: Math.max(0, nextSpec.volumeRequired - cumulativeVolume),
+        }
+      : null,
+    progressPct: Number(pct.toFixed(1)),
+  };
+}

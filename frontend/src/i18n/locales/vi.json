@@ -309,10 +309,10 @@
     "coefficientNote": "Mỗi trò tính vào VIP khác nhau: Texas ×1,0, Niu Niu ×0,5, Baccarat ×0,3, còn lại ×0,4. Điều này ngăn các trò rake thấp trở thành lối tắt lên hạng.",
     "tiers": "Các hạng",
     "title": {
-      "V1": "Lữ khách",
-      "V2": "Ngôi sao mới",
+      "V1": "Đồng",
+      "V2": "Bạc",
       "V3": "Vàng",
-      "V4": "Bạch kim",
+      "V4": "Kim cương",
       "V5": "Hắc Kim"
     },
     "perks": {

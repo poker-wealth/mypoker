@@ -309,10 +309,10 @@
     "coefficientNote": "Setiap permainan dihitung berbeda untuk VIP: Texas ×1,0, Niu Niu ×0,5, Bakarat ×0,3, lainnya ×0,4. Ini mencegah permainan ber-rake rendah menjadi jalan pintas naik tingkat.",
     "tiers": "Tingkatan",
     "title": {
-      "V1": "Pengembara",
-      "V2": "Bintang Baru",
+      "V1": "Perunggu",
+      "V2": "Perak",
       "V3": "Emas",
-      "V4": "Platinum",
+      "V4": "Berlian",
       "V5": "Emas Hitam"
     },
     "perks": {
