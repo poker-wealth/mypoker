@@ -326,10 +326,10 @@
     "coefficientNote": "VIP 환산 비율은 게임마다 다릅니다. 텍사스 ×1.0, 뉴뉴 ×0.5, 바카라 ×0.3, 기타 ×0.4. 레이크가 낮은 게임이 승급의 지름길이 되지 않도록 하기 위함입니다.",
     "tiers": "등급",
     "title": {
-      "V1": "브론즈",
-      "V2": "실버",
+      "V1": "방랑자",
+      "V2": "라이징 스타",
       "V3": "골드",
-      "V4": "다이아몬드",
+      "V4": "플래티넘",
       "V5": "블랙 골드"
     },
     "perks": {
@@ -384,9 +384,62 @@
     "tab": {
       "overview": "개요",
       "players": "플레이어",
-      "links": "링크",
-      "subAgents": "하위"
-    }
+      "promotion": "홍보",
+      "settlements": "기록"
+    },
+    "range": {
+      "today": "오늘",
+      "week": "이번 주",
+      "30d": "30일",
+      "all": "전체"
+    },
+    "sort": {
+      "volume": "볼륨순",
+      "vip": "VIP순",
+      "activity": "활동순"
+    },
+    "source": {
+      "all": "전체",
+      "DIRECT": "직속",
+      "OVERRIDE": "하위"
+    },
+    "badgeAgent": "에이전트",
+    "badgeSub": "하위 에이전트",
+    "todayCommission": "오늘 커미션",
+    "todayCommissionShort": "오늘",
+    "playersUnderManagement": "관리 플레이어 {{count}}명",
+    "directCommission": "직속 플레이어",
+    "overrideCommission": "하위 에이전트 상납",
+    "trend": "일별 커미션",
+    "vipLinkage": "VIP 연동 보너스",
+    "vipLinkageBlurb": "{{count}}명이 V4 또는 V5입니다. 등급을 유지하는 동안 매월 추가 커미션이 지급됩니다.",
+    "bySource": "이번 달 발생 출처",
+    "subAgentBlock": "하위 에이전트",
+    "subAgentPlayers": "{{count}}명",
+    "upstreamThisMonth": "이번 달 상납",
+    "volumeToday": "오늘 {{amount}}",
+    "volumeMonth": "이번 달 {{amount}}",
+    "thisMonth": "이번 달",
+    "lifetimeVolume": "누적 볼륨",
+    "lifetimeCommission": "누적 커미션",
+    "lastActive": "최근 활동",
+    "never": "플레이 기록 없음",
+    "sourceLink": "가입 경로",
+    "joined": "가입일",
+    "primaryLink": "기본 링크",
+    "shareToTg": "공유",
+    "subAgentManagement": "하위 에이전트 요율",
+    "editRate": "요율 수정",
+    "editRatePrompt": "이 하위 에이전트의 요율(5~25):",
+    "rateInvalid": "숫자를 입력하세요.",
+    "rateUpdated": "변경되었습니다. 다음 정산 핸드부터 적용됩니다.",
+    "rateChangeNote": "요율 변경은 다음 정산 핸드부터 적용되며 이미 정산된 핸드는 재계산되지 않습니다.",
+    "exportCsv": "CSV 내보내기",
+    "truncated": "최근 기록만 표시됩니다. 전체 기간은 CSV로 내보내세요.",
+    "noRecords": "해당 기간 기록 없음",
+    "noRecordsBlurb": "커미션은 핸드 정산 즉시 지급됩니다. 대기나 승인 절차가 없습니다.",
+    "viaSubAgent": "{{id}} 경유",
+    "rakeWas": "레이크 {{amount}}"
   },
   "insurance": {
     "title": "보험 이용 가능",
@@ -395,5 +448,12 @@
     "decline": "괜찮습니다",
     "accept": "₮{{premium}}에 가입",
     "taken": "보험에 가입했습니다"
+  },
+  "context": {
+    "enter": "입장",
+    "exit": "나가기",
+    "inLeague": "{{name}} 내부",
+    "isolationNote": "리그 테이블과 지갑만 표시됩니다. 플랫폼 테이블은 숨겨집니다.",
+    "backToPlatform": "플랫폼 로비로 돌아가기"
   }
 }

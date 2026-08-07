@@ -326,10 +326,10 @@
     "coefficientNote": "VIP への換算はゲームごとに異なります。テキサス ×1.0、牛牛 ×0.5、バカラ ×0.3、その他 ×0.4。低レーキのゲームが昇格の近道にならないようにするためです。",
     "tiers": "ランク",
     "title": {
-      "V1": "ブロンズ",
-      "V2": "シルバー",
+      "V1": "ワンダラー",
+      "V2": "ライジングスター",
       "V3": "ゴールド",
-      "V4": "ダイヤモンド",
+      "V4": "プラチナ",
       "V5": "ブラックゴールド"
     },
     "perks": {
@@ -384,9 +384,62 @@
     "tab": {
       "overview": "概要",
       "players": "プレイヤー",
-      "links": "リンク",
-      "subAgents": "サブ"
-    }
+      "promotion": "プロモ",
+      "settlements": "記録"
+    },
+    "range": {
+      "today": "今日",
+      "week": "今週",
+      "30d": "30日",
+      "all": "全期間"
+    },
+    "sort": {
+      "volume": "取扱量順",
+      "vip": "VIP順",
+      "activity": "活動順"
+    },
+    "source": {
+      "all": "すべて",
+      "DIRECT": "直属",
+      "OVERRIDE": "配下"
+    },
+    "badgeAgent": "エージェント",
+    "badgeSub": "サブエージェント",
+    "todayCommission": "本日のコミッション",
+    "todayCommissionShort": "本日",
+    "playersUnderManagement": "管理プレイヤー {{count}} 名",
+    "directCommission": "直属プレイヤー",
+    "overrideCommission": "サブエージェント上納",
+    "trend": "日次コミッション",
+    "vipLinkage": "VIP連動ボーナス",
+    "vipLinkageBlurb": "{{count}} 名がV4またはV5です。維持されている限り毎月上乗せが続きます。",
+    "bySource": "今月の発生元",
+    "subAgentBlock": "サブエージェント",
+    "subAgentPlayers": "{{count}} 名",
+    "upstreamThisMonth": "今月の上納",
+    "volumeToday": "本日 {{amount}}",
+    "volumeMonth": "今月 {{amount}}",
+    "thisMonth": "今月",
+    "lifetimeVolume": "累計取扱量",
+    "lifetimeCommission": "累計コミッション",
+    "lastActive": "最終プレイ",
+    "never": "未プレイ",
+    "sourceLink": "登録経路",
+    "joined": "登録日",
+    "primaryLink": "メインリンク",
+    "shareToTg": "共有",
+    "subAgentManagement": "サブエージェント料率",
+    "editRate": "料率を変更",
+    "editRatePrompt": "このサブエージェントの料率（5〜25）：",
+    "rateInvalid": "数値を入力してください。",
+    "rateUpdated": "更新しました。次のハンド精算から適用されます。",
+    "rateChangeNote": "料率変更は次のハンド精算から適用され、精算済みのハンドは再計算されません。",
+    "exportCsv": "CSV出力",
+    "truncated": "直近の記録のみ表示しています。全期間はCSVで出力してください。",
+    "noRecords": "この期間の記録はありません",
+    "noRecordsBlurb": "コミッションはハンド精算と同時に即時付与されます。",
+    "viaSubAgent": "{{id}} 経由",
+    "rakeWas": "レーキ {{amount}}"
   },
   "insurance": {
     "title": "保険を利用できます",
@@ -395,5 +448,12 @@
     "decline": "見送る",
     "accept": "₮{{premium}} で加入",
     "taken": "保険に加入しました"
+  },
+  "context": {
+    "enter": "入る",
+    "exit": "出る",
+    "inLeague": "{{name}} 内",
+    "isolationNote": "リーグのテーブルとウォレットのみ。プラットフォームのテーブルは非表示です。",
+    "backToPlatform": "プラットフォームロビーへ戻る"
   }
 }

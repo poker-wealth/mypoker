@@ -8,6 +8,8 @@ import {
   playersOf,
   summaryFor,
   subAgentsOf,
+  setSubAgentRate,
+  AgentError,
   AgentCommissionModel,
   ReferralBindingModel,
 } from '../../src/agent/agent-store';
@@ -194,17 +196,44 @@ describe('IRON RULE: an agent never sees a player balance', () => {
   it('exposes no balance field on a referred player', async () => {
     const [row] = await playersOf(AGENT_A);
 
-    // The complete set of what an agent may know about someone they referred.
-    // If this list ever grows a balance, this test is the thing that says no.
+    // The complete set of what an agent may know about someone they referred,
+    // and an allowlist rather than a "does not contain balance" check: a new
+    // field has to be added here deliberately, which is the moment someone has
+    // to justify it.
+    //
+    // Every entry is §13.4 Tab 2 data — what the player STAKED and what that
+    // earned the agent. None of it is what the player HOLDS, and the difference
+    // is the rule: volume is the agent's business, balance never is.
     expect(Object.keys(row!).sort()).toEqual(
-      ['boundAt', 'commissionGenerated', 'lastActiveAt', 'playerId', 'rounds'].sort(),
+      [
+        'boundAt',
+        'commissionGenerated',
+        'lastActiveAt',
+        'playerId',
+        'rounds',
+        'linkId', //           which referral link they registered through
+        'viaAgentId', //       the sub-agent they sit under, if any
+        'todayVolume', //      staked today — NOT held
+        'monthVolume', //      staked this month — NOT held
+        'todayCommission', //  what the AGENT earned today
+        'monthCommission', //  what the AGENT earned this month
+        'lifetimeEffective', // cumulative staked volume, for the VIP ladder
+      ].sort(),
     );
   });
 
   it('exposes no balance on the agent summary either', async () => {
     const summary = await summaryFor(AGENT_A);
     expect(Object.keys(summary!).sort()).toEqual(
-      ['agentId', 'playerCount', 'rateBps', 'status', 'subAgentCount', 'totalCommission'].sort(),
+      [
+        'agentId',
+        'parentAgentId', // which tier of agent they are, for §13.4's badge
+        'playerCount',
+        'rateBps',
+        'status',
+        'subAgentCount',
+        'totalCommission',
+      ].sort(),
     );
   });
 
@@ -220,5 +249,35 @@ describe('IRON RULE: an agent never sees a player balance', () => {
     // No import is the cheapest possible guarantee: a balance cannot leak from
     // a module that has no way to read one.
     expect(source).not.toMatch(/from\s+['"].*(wallet|account\.model|system-accounts)/);
+  });
+});
+
+describe('setSubAgentRate — B’s rate is set and owned by A (§13.1)', () => {
+  const AGENT_B = 'agent-b';
+  const OUTSIDER = 'agent-outsider';
+
+  beforeEach(async () => {
+    await createAgent({ agentId: AGENT_A, rateBps: 3000 });
+    await createAgent({ agentId: OUTSIDER, rateBps: 3000 });
+    await createAgent({ agentId: AGENT_B, rateBps: 1000, parentAgentId: AGENT_A });
+  });
+
+  it('lets the parent change their own sub-agent’s rate', async () => {
+    await setSubAgentRate(AGENT_A, AGENT_B, 2000);
+    const [sub] = await subAgentsOf(AGENT_A);
+    expect(sub!.rateBps).toBe(2000);
+  });
+
+  it('refuses another agent trying to set someone else’s sub-agent', async () => {
+    // Not a permission message: an agent asking about a sub-agent that is not
+    // theirs should not learn that it exists.
+    await expect(setSubAgentRate(OUTSIDER, AGENT_B, 2000)).rejects.toThrow(AgentError);
+
+    const [sub] = await subAgentsOf(AGENT_A);
+    expect(sub!.rateBps).toBe(1000);
+  });
+
+  it('refuses an unknown sub-agent', async () => {
+    await expect(setSubAgentRate(AGENT_A, 'nobody', 2000)).rejects.toThrow(AgentError);
   });
 });

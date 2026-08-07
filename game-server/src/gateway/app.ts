@@ -40,7 +40,9 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
   });
   // Optional so auth-only deployments (and the auth tests) don't have to stand
   // up a lobby they never read.
-  if (lobby) app.use('/lobby', buildLobbyRouter(lobby));
+  // Config passed so the lobby can resolve a league context; without it the
+  // router serves the public lobby only.
+  if (lobby) app.use('/lobby', buildLobbyRouter(lobby, config));
   // Jackpot pools are derived from the same tables, so it shares the gate.
   if (lobby) app.use('/jackpot', buildJackpotRouter(lobby));
 

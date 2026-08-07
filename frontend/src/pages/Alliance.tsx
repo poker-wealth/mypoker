@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { Shield, Users, Plus, Crown, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -9,6 +10,7 @@ import { Sheet } from '@/components/ui/Sheet';
 import { useMyLeagues, useDiscoverLeagues, useCreateLeague, useJoinLeague } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
 import { useSession } from '@/store/session';
+import { useContextStore } from '@/store/context';
 import { toast } from '@/lib/toast';
 import { haptic } from '@/lib/telegram';
 import type { League } from '@/api/leagues';
@@ -32,9 +34,22 @@ export function Alliance() {
   const mine = useMyLeagues();
   const discover = useDiscoverLeagues();
   const join = useJoinLeague();
+  const navigate = useNavigate();
+
+  const activeLeagueId = useContextStore((s) => s.leagueId);
+  const enterLeague = useContextStore((s) => s.enterLeague);
+  const leavePlatformContext = useContextStore((s) => s.leavePlatformContext);
+  const leaveContextIfGone = useContextStore((s) => s.leaveContextIfGone);
 
   const myIds = new Set((mine.data?.leagues ?? []).map((l) => l.leagueId));
   const joinable = (discover.data?.leagues ?? []).filter((l) => !myIds.has(l.leagueId));
+
+  // A context that outlived its membership shows an empty lobby with no
+  // explanation. The server would refuse the league anyway; this makes the
+  // client stop asking.
+  useEffect(() => {
+    if (mine.isSuccess) leaveContextIfGone(mine.data.leagues.map((l) => l.leagueId));
+  }, [mine.isSuccess, mine.data, leaveContextIfGone]);
 
   return (
     <div className="space-y-4">
@@ -71,7 +86,31 @@ export function Alliance() {
         {signedIn && mine.isSuccess && mine.data.leagues.length > 0 && (
           <div className="space-y-2">
             {mine.data.leagues.map((l) => (
-              <LeagueCard key={l.leagueId} league={l} mine />
+              <LeagueCard
+                key={l.leagueId}
+                league={l}
+                mine
+                action={
+                  activeLeagueId === l.leagueId ? (
+                    <Button variant="ghost" onClick={() => leavePlatformContext()}>
+                      {t('context.exit')}
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => {
+                        haptic('light');
+                        enterLeague(l.leagueId, l.name);
+                        // Straight to the room: entering an alliance and staying
+                        // on a list of alliances makes the switch feel like it
+                        // did not happen.
+                        navigate('/lobby');
+                      }}
+                    >
+                      {t('context.enter')}
+                    </Button>
+                  )
+                }
+              />
             ))}
           </div>
         )}

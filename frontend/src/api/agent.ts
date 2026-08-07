@@ -10,6 +10,8 @@ import { api } from './client';
 
 export interface AgentSummary {
   agentId: string;
+  /** Null for a top-level agent, set for a sub-agent — §13.4's tier badge. */
+  parentAgentId: string | null;
   rateBps: number;
   status: 'ACTIVE' | 'SUSPENDED';
   totalCommission: number;
@@ -17,12 +19,48 @@ export interface AgentSummary {
   subAgentCount: number;
 }
 
+/** The four periods §13.4 offers. The server decides what each one covers. */
+export type AgentRange = 'today' | 'week' | '30d' | 'all';
+
+export type ActivityStatus = 'ACTIVE' | 'DORMANT' | 'CHURNED';
+
 export interface ReferredPlayer {
   playerId: string;
   commissionGenerated: number;
   rounds: number;
   boundAt: string;
   lastActiveAt: string | null;
+  linkId: string;
+  /** Set when this player sits under a sub-agent rather than directly. */
+  viaAgentId: string | null;
+  todayVolume: number;
+  monthVolume: number;
+  todayCommission: number;
+  monthCommission: number;
+  lifetimeEffective: number;
+  /** Derived by the gateway from the same ladder the VIP page uses. */
+  vipTier: 'V1' | 'V2' | 'V3' | 'V4' | 'V5';
+  vipTitle: string;
+  activity: ActivityStatus;
+}
+
+/** Tab 1's three rows. */
+export interface CommissionBreakdown {
+  total: number;
+  direct: number;
+  override: number;
+}
+
+export interface SettlementRecord {
+  recordId: string;
+  at: string;
+  playerId: string;
+  viaAgentId: string | null;
+  kind: 'DIRECT' | 'OVERRIDE';
+  gameId: string;
+  roundId: string;
+  rakeAmount: number;
+  amount: number;
 }
 
 export interface ReferralLink {
@@ -65,3 +103,23 @@ export const fetchSubAgents = (): Promise<{ subAgents: SubAgent[] }> =>
 
 export const createReferralLinkApi = (body: { label?: string }): Promise<ReferralLink> =>
   api.post<ReferralLink>('/agent/links', body);
+
+export const fetchCommissionBreakdown = (range: AgentRange): Promise<CommissionBreakdown> =>
+  api.get<CommissionBreakdown>(`/agent/breakdown?range=${range}`);
+
+export const fetchCommissionSeries = (
+  range: AgentRange,
+): Promise<{ points: { date: string; amount: number }[] }> =>
+  api.get<{ points: { date: string; amount: number }[] }>(`/agent/series?range=${range}`);
+
+export const fetchSettlements = (
+  range: AgentRange,
+  source?: 'DIRECT' | 'OVERRIDE',
+): Promise<{ records: SettlementRecord[]; truncated: boolean }> =>
+  api.get<{ records: SettlementRecord[]; truncated: boolean }>(
+    `/agent/settlements?range=${range}${source ? `&source=${source}` : ''}`,
+  );
+
+/** §13.1 — B's rate is set and owned by A. Bounds are enforced server-side. */
+export const setSubAgentRateApi = (subAgentId: string, rateBps: number): Promise<{ ok: true }> =>
+  api.patch<{ ok: true }>(`/agent/sub-agents/${encodeURIComponent(subAgentId)}`, { rateBps });

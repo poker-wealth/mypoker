@@ -35,6 +35,10 @@ import {
   playersOf,
   summaryFor,
   subAgentsOf,
+  commissionBreakdown,
+  commissionSeries,
+  settlementRecords,
+  setSubAgentRate,
 } from '../agent/agent-store';
 import {
   notify,
@@ -222,6 +226,56 @@ export function buildRouter(): Router {
     }),
   );
 
+  // The dashboard reads take an explicit window rather than a named range like
+  // "this week". Naming periods is a rule — which day a week starts on, which
+  // timezone "today" means — and rules live in the gateway. This layer answers
+  // for the dates it is given.
+  const windowQuery = z.object({
+    from: z.string().datetime(),
+    to: z.string().datetime(),
+  });
+
+  const parseWindow = (req: Request): { from: Date; to: Date } => {
+    const { from, to } = windowQuery.parse(req.query);
+    return { from: new Date(from), to: new Date(to) };
+  };
+
+  r.get(
+    '/me/agent/breakdown',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json(await commissionBreakdown(req.dataScope!.playerId, parseWindow(req)));
+    }),
+  );
+
+  r.get(
+    '/me/agent/series',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json({ points: await commissionSeries(req.dataScope!.playerId, parseWindow(req)) });
+    }),
+  );
+
+  const settlementQuery = windowQuery.extend({
+    source: z.enum(['DIRECT', 'OVERRIDE']).optional(),
+    limit: z.coerce.number().int().positive().max(1000).optional(),
+  });
+  r.get(
+    '/me/agent/settlements',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const q = settlementQuery.parse(req.query);
+      res.json(
+        await settlementRecords(req.dataScope!.playerId, {
+          from: new Date(q.from),
+          to: new Date(q.to),
+          ...(q.source ? { source: q.source } : {}),
+          ...(q.limit ? { limit: q.limit } : {}),
+        }),
+      );
+    }),
+  );
+
   r.get(
     '/me/agent/links',
     dataScopeMiddleware,
@@ -272,6 +326,19 @@ export function buildRouter(): Router {
           parentAgentId: parentId,
         }),
       );
+    }),
+  );
+
+  const rateBody = z.object({ rateBps: z.number().int().nonnegative() });
+  r.patch(
+    '/me/agent/sub-agents/:subAgentId',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { rateBps } = rateBody.parse(req.body);
+      // Bounds are the gateway's, same as creation above. This stores what it
+      // is told, scoped to the caller's own sub-agents.
+      await setSubAgentRate(req.dataScope!.playerId, String(req.params.subAgentId), rateBps);
+      res.json({ ok: true });
     }),
   );
 

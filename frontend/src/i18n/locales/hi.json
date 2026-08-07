@@ -326,10 +326,10 @@
     "coefficientNote": "VIP के लिए हर गेम अलग तरह से गिना जाता है: टेक्सास ×1.0, नियू नियू ×0.5, बकारा ×0.3, अन्य ×0.4। इससे कम-रेक वाले गेम स्तर बढ़ाने का शॉर्टकट नहीं बनते।",
     "tiers": "स्तर",
     "title": {
-      "V1": "ब्रॉन्ज़",
-      "V2": "सिल्वर",
+      "V1": "वांडरर",
+      "V2": "राइज़िंग स्टार",
       "V3": "गोल्ड",
-      "V4": "डायमंड",
+      "V4": "प्लैटिनम",
       "V5": "ब्लैक गोल्ड"
     },
     "perks": {
@@ -382,11 +382,64 @@
     "eligibleNote": "आप शर्त पूरी करते हैं। आवेदन के लिए ग्राहक सेवा से संपर्क करें।",
     "notEligibleNote": "प्रतिष्ठा बढ़ाने के लिए खेलते रहें। 100 सामान्य राउंड के बाद यह 700 हो जाती है।",
     "tab": {
-      "overview": "अवलोकन",
+      "overview": "सारांश",
       "players": "खिलाड़ी",
-      "links": "लिंक",
-      "subAgents": "उप-एजेंट"
-    }
+      "promotion": "प्रचार",
+      "settlements": "रिकॉर्ड"
+    },
+    "range": {
+      "today": "आज",
+      "week": "इस हफ़्ते",
+      "30d": "30 दिन",
+      "all": "सभी"
+    },
+    "sort": {
+      "volume": "वॉल्यूम से",
+      "vip": "VIP से",
+      "activity": "सक्रियता से"
+    },
+    "source": {
+      "all": "सभी",
+      "DIRECT": "प्रत्यक्ष",
+      "OVERRIDE": "सब-एजेंट"
+    },
+    "badgeAgent": "एजेंट",
+    "badgeSub": "सब-एजेंट",
+    "todayCommission": "आज का कमीशन",
+    "todayCommissionShort": "आज",
+    "playersUnderManagement": "{{count}} खिलाड़ी प्रबंधन में",
+    "directCommission": "प्रत्यक्ष खिलाड़ी",
+    "overrideCommission": "सब-एजेंट से",
+    "trend": "दैनिक कमीशन",
+    "vipLinkage": "VIP लिंकेज बोनस",
+    "vipLinkageBlurb": "आपके {{count}} खिलाड़ी V4 या V5 पर हैं। जब तक वे टियर बनाए रखेंगे, हर महीने अतिरिक्त कमीशन मिलेगा।",
+    "bySource": "इस महीने के स्रोत",
+    "subAgentBlock": "सब-एजेंट",
+    "subAgentPlayers": "{{count}} खिलाड़ी",
+    "upstreamThisMonth": "इस महीने ऊपर",
+    "volumeToday": "आज {{amount}}",
+    "volumeMonth": "महीना {{amount}}",
+    "thisMonth": "इस महीने",
+    "lifetimeVolume": "कुल वॉल्यूम",
+    "lifetimeCommission": "कुल कमीशन",
+    "lastActive": "अंतिम सक्रियता",
+    "never": "कभी नहीं खेला",
+    "sourceLink": "पंजीकरण स्रोत",
+    "joined": "शामिल हुए",
+    "primaryLink": "मुख्य लिंक",
+    "shareToTg": "साझा करें",
+    "subAgentManagement": "सब-एजेंट दरें",
+    "editRate": "दर बदलें",
+    "editRatePrompt": "इस सब-एजेंट की कमीशन दर (5–25):",
+    "rateInvalid": "संख्या दर्ज करें।",
+    "rateUpdated": "अपडेट हो गया, अगले सेटल हैंड से लागू।",
+    "rateChangeNote": "दर परिवर्तन अगले सेटल हैंड से लागू होता है। पहले सेटल हुए हैंड दोबारा नहीं गिने जाते।",
+    "exportCsv": "CSV निर्यात",
+    "truncated": "केवल हाल के रिकॉर्ड दिख रहे हैं। पूरी अवधि के लिए CSV निर्यात करें।",
+    "noRecords": "इस अवधि में कोई रिकॉर्ड नहीं",
+    "noRecordsBlurb": "हैंड सेटल होते ही कमीशन तुरंत जमा होता है — कोई प्रतीक्षा या अनुमोदन नहीं।",
+    "viaSubAgent": "{{id}} के माध्यम से",
+    "rakeWas": "रेक {{amount}}"
   },
   "insurance": {
     "title": "बीमा उपलब्ध",
@@ -395,5 +448,12 @@
     "decline": "नहीं चाहिए",
     "accept": "₮{{premium}} में बीमा करें",
     "taken": "बीमा ले लिया"
+  },
+  "context": {
+    "enter": "प्रवेश",
+    "exit": "बाहर",
+    "inLeague": "{{name}} के अंदर",
+    "isolationNote": "केवल लीग टेबल और वॉलेट। प्लेटफ़ॉर्म टेबल छिपे हैं।",
+    "backToPlatform": "प्लेटफ़ॉर्म लॉबी पर लौटें"
   }
 }

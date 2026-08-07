@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useLobbyGames, useTables } from '@/api/hooks';
 import { formatMicros } from '@/api/lobby';
+import { ContextBanner } from '@/components/ContextBanner';
 
 export function Lobby() {
   const navigate = useNavigate();
@@ -28,6 +29,9 @@ export function Lobby() {
   return (
     <div className="flex h-full flex-col space-y-4">
       {/* Header removed and moved to Header.tsx */}
+
+      {/* Which system these tables belong to. Silent when on the platform. */}
+      <ContextBanner />
 
       {/* Jackpot hero */}
       <div

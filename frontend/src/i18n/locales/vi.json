@@ -326,10 +326,10 @@
     "coefficientNote": "Mỗi trò tính vào VIP khác nhau: Texas ×1,0, Niu Niu ×0,5, Baccarat ×0,3, còn lại ×0,4. Điều này ngăn các trò rake thấp trở thành lối tắt lên hạng.",
     "tiers": "Các hạng",
     "title": {
-      "V1": "Đồng",
-      "V2": "Bạc",
+      "V1": "Lữ Khách",
+      "V2": "Ngôi Sao Mới",
       "V3": "Vàng",
-      "V4": "Kim cương",
+      "V4": "Bạch Kim",
       "V5": "Hắc Kim"
     },
     "perks": {
@@ -384,9 +384,62 @@
     "tab": {
       "overview": "Tổng quan",
       "players": "Người chơi",
-      "links": "Liên kết",
-      "subAgents": "Cấp dưới"
-    }
+      "promotion": "Quảng bá",
+      "settlements": "Bản ghi"
+    },
+    "range": {
+      "today": "Hôm nay",
+      "week": "Tuần này",
+      "30d": "30 ngày",
+      "all": "Tất cả"
+    },
+    "sort": {
+      "volume": "Theo doanh số",
+      "vip": "Theo VIP",
+      "activity": "Theo hoạt động"
+    },
+    "source": {
+      "all": "Tất cả",
+      "DIRECT": "Trực tiếp",
+      "OVERRIDE": "Đại lý phụ"
+    },
+    "badgeAgent": "Đại lý",
+    "badgeSub": "Đại lý phụ",
+    "todayCommission": "Hoa hồng hôm nay",
+    "todayCommissionShort": "Hôm nay",
+    "playersUnderManagement": "Quản lý {{count}} người chơi",
+    "directCommission": "Người chơi trực tiếp",
+    "overrideCommission": "Từ đại lý phụ",
+    "trend": "Hoa hồng theo ngày",
+    "vipLinkage": "Thưởng liên kết VIP",
+    "vipLinkageBlurb": "{{count}} người chơi đạt V4 hoặc V5. Bạn nhận thêm hoa hồng mỗi tháng họ giữ hạng.",
+    "bySource": "Nguồn tháng này",
+    "subAgentBlock": "Đại lý phụ",
+    "subAgentPlayers": "{{count}} người chơi",
+    "upstreamThisMonth": "Nộp lên tháng này",
+    "volumeToday": "Hôm nay {{amount}}",
+    "volumeMonth": "Tháng {{amount}}",
+    "thisMonth": "Tháng này",
+    "lifetimeVolume": "Doanh số tích lũy",
+    "lifetimeCommission": "Hoa hồng tích lũy",
+    "lastActive": "Hoạt động cuối",
+    "never": "Chưa từng chơi",
+    "sourceLink": "Đăng ký qua",
+    "joined": "Tham gia",
+    "primaryLink": "Liên kết chính",
+    "shareToTg": "Chia sẻ",
+    "subAgentManagement": "Tỷ lệ đại lý phụ",
+    "editRate": "Sửa tỷ lệ",
+    "editRatePrompt": "Tỷ lệ hoa hồng cho đại lý phụ này (5–25):",
+    "rateInvalid": "Vui lòng nhập số.",
+    "rateUpdated": "Đã cập nhật, áp dụng từ ván kế tiếp.",
+    "rateChangeNote": "Thay đổi tỷ lệ áp dụng từ ván kế tiếp. Các ván đã thanh toán không tính lại.",
+    "exportCsv": "Xuất CSV",
+    "truncated": "Chỉ hiển thị bản ghi gần nhất. Xuất CSV để xem toàn bộ.",
+    "noRecords": "Không có bản ghi trong kỳ này",
+    "noRecordsBlurb": "Hoa hồng được cộng ngay khi ván kết thúc, không chờ duyệt.",
+    "viaSubAgent": "qua {{id}}",
+    "rakeWas": "phí {{amount}}"
   },
   "insurance": {
     "title": "Có bảo hiểm",
@@ -395,5 +448,12 @@
     "decline": "Không, cảm ơn",
     "accept": "Mua bảo hiểm ₮{{premium}}",
     "taken": "Đã mua bảo hiểm"
+  },
+  "context": {
+    "enter": "Vào",
+    "exit": "Thoát",
+    "inLeague": "Đang ở {{name}}",
+    "isolationNote": "Chỉ bàn và ví của liên minh. Bàn nền tảng đã bị ẩn.",
+    "backToPlatform": "Quay lại sảnh nền tảng"
   }
 }

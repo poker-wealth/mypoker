@@ -1,4 +1,5 @@
 import { api } from './client';
+import { contextParam } from '@/store/context';
 
 /**
  * Lobby reads. Public — no token needed, which is why these work on staging
@@ -59,15 +60,28 @@ export interface TableFilter {
   fairness?: FairnessTier;
 }
 
-export function fetchLobbyGames(): Promise<LobbyGames> {
-  return api.get<LobbyGames>('/lobby/games');
+/**
+ * Every lobby read takes the context explicitly.
+ *
+ * Not read from the store inside these functions: a caller that forgets to pass
+ * it then silently gets the platform lobby, and a defaulted argument is visible
+ * at the call site where the omission can be noticed. The server re-checks
+ * membership regardless — this only decides which question is asked.
+ */
+export function fetchLobbyGames(leagueId: string | null = null): Promise<LobbyGames> {
+  const ctx = contextParam(leagueId);
+  return api.get<LobbyGames>(`/lobby/games${ctx ? `?${ctx}` : ''}`);
 }
 
-export function fetchTables(filter: TableFilter = {}): Promise<{ tables: TableView[]; count: number }> {
+export function fetchTables(
+  filter: TableFilter = {},
+  leagueId: string | null = null,
+): Promise<{ tables: TableView[]; count: number }> {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(filter)) {
     if (value !== undefined) query.set(key, String(value));
   }
+  if (leagueId) query.set('leagueId', leagueId);
   const suffix = query.toString();
   return api.get(`/lobby/tables${suffix ? `?${suffix}` : ''}`);
 }

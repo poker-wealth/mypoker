@@ -326,10 +326,10 @@
     "coefficientNote": "Games count differently toward VIP: Texas ×1.0, Niu Niu ×0.5, Baccarat ×0.3, others ×0.4. This keeps low-rake games from being a shortcut up the tiers.",
     "tiers": "Tiers",
     "title": {
-      "V1": "Bronze",
-      "V2": "Silver",
+      "V1": "Wanderer",
+      "V2": "Rising Star",
       "V3": "Gold",
-      "V4": "Diamond",
+      "V4": "Platinum",
       "V5": "Black Gold"
     },
     "perks": {
@@ -384,9 +384,62 @@
     "tab": {
       "overview": "Overview",
       "players": "Players",
-      "links": "Links",
-      "subAgents": "Sub-agents"
-    }
+      "promotion": "Promotion",
+      "settlements": "Records"
+    },
+    "range": {
+      "today": "Today",
+      "week": "This Week",
+      "30d": "30 Days",
+      "all": "All Time"
+    },
+    "sort": {
+      "volume": "By volume",
+      "vip": "By VIP",
+      "activity": "By activity"
+    },
+    "source": {
+      "all": "All",
+      "DIRECT": "Direct",
+      "OVERRIDE": "Sub-agent"
+    },
+    "badgeAgent": "Agent",
+    "badgeSub": "Sub-agent",
+    "todayCommission": "Today's commission",
+    "todayCommissionShort": "Today",
+    "playersUnderManagement": "{{count}} players under management",
+    "directCommission": "Direct players",
+    "overrideCommission": "Sub-agent upstream",
+    "trend": "Daily commission",
+    "vipLinkage": "VIP linkage bonus",
+    "vipLinkageBlurb": "{{count}} of your players hold V4 or V5. You earn an ongoing uplift on their commission for every month they keep it.",
+    "bySource": "Top sources this month",
+    "subAgentBlock": "Sub-agents",
+    "subAgentPlayers": "{{count}} players",
+    "upstreamThisMonth": "Upstream, month",
+    "volumeToday": "Today {{amount}}",
+    "volumeMonth": "Month {{amount}}",
+    "thisMonth": "This month",
+    "lifetimeVolume": "Lifetime volume",
+    "lifetimeCommission": "Lifetime commission",
+    "lastActive": "Last active",
+    "never": "Never played",
+    "sourceLink": "Registered via",
+    "joined": "Joined",
+    "primaryLink": "Primary link",
+    "shareToTg": "Share",
+    "subAgentManagement": "Sub-agent rates",
+    "editRate": "Edit rate",
+    "editRatePrompt": "Commission rate for this sub-agent, as a percentage (5–25):",
+    "rateInvalid": "Enter a number.",
+    "rateUpdated": "Rate updated. Applies from the next settled hand.",
+    "rateChangeNote": "A rate change takes effect from the next settled hand. Hands already settled are not recalculated.",
+    "exportCsv": "Export CSV",
+    "truncated": "Showing the most recent records only. Export the CSV for the full period.",
+    "noRecords": "No records in this period",
+    "noRecordsBlurb": "Commission is credited the moment a hand settles — no waiting, no approval.",
+    "viaSubAgent": "via {{id}}",
+    "rakeWas": "rake {{amount}}"
   },
   "insurance": {
     "title": "Insurance available",
@@ -395,5 +448,12 @@
     "decline": "No thanks",
     "accept": "Insure ₮{{premium}}",
     "taken": "Insurance taken"
+  },
+  "context": {
+    "enter": "Enter",
+    "exit": "Exit",
+    "inLeague": "Inside {{name}}",
+    "isolationNote": "League tables and wallet only. Platform tables are hidden.",
+    "backToPlatform": "Back to the platform lobby"
   }
 }

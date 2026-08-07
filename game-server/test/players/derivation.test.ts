@@ -66,15 +66,15 @@ describe('scoreFor — facts in, score out', () => {
 });
 
 describe('vipProgress — the one ladder', () => {
-  it('carries the owner’s Jul 15 titles, not the spec originals', () => {
-    // Precedence: owner’s word beats the spec. A copy of this ladder in
-    // financial-core still had the spec’s Wanderer/Rising Star when it was
-    // found — the drift this test exists to prevent recurring.
+  it('carries the spec’s titles (v5.9 §10.2)', () => {
+    // These were Bronze/Silver/Gold/Diamond/Black Gold, attributed to an owner
+    // renaming on Jul 15 that no document in the repo records. The spec is the
+    // only written source, and Victor's instruction is to follow it.
     expect(VIP_TIERS.map((t) => t.title)).toEqual([
-      'Bronze',
-      'Silver',
+      'Wanderer',
+      'Rising Star',
       'Gold',
-      'Diamond',
+      'Platinum',
       'Black Gold',
     ]);
   });

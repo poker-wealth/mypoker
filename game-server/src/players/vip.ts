@@ -25,13 +25,17 @@ export interface VipTierSpec {
 
 const USD = 1_000_000;
 
-// Display titles (owner branding, Jul 15): clean ladder with an exclusive top tier. Internal ids
-// stay V1–V5; only the labels changed — no thresholds or privileges moved.
+// Titles and thresholds per FairPlay v5.9 §10.2.
+//
+// These carried owner-branding labels (Bronze/Silver/Gold/Diamond/Black Gold) attributed to a
+// Jul 15 renaming, but no document in the repo records that decision, and the spec is the only
+// written source. Restored to spec on Victor's instruction. Internal ids stay V1–V5, so nothing
+// downstream keys off the label.
 export const VIP_TIERS: readonly VipTierSpec[] = [
-  { tier: 'V1', title: 'Bronze', volumeRequired: 0, withdrawalPriority: 0, instantAutoTransfer: false, proTrackerHud: false },
-  { tier: 'V2', title: 'Silver', volumeRequired: 10_000 * USD, withdrawalPriority: 1, instantAutoTransfer: false, proTrackerHud: false },
+  { tier: 'V1', title: 'Wanderer', volumeRequired: 0, withdrawalPriority: 0, instantAutoTransfer: false, proTrackerHud: false },
+  { tier: 'V2', title: 'Rising Star', volumeRequired: 10_000 * USD, withdrawalPriority: 1, instantAutoTransfer: false, proTrackerHud: false },
   { tier: 'V3', title: 'Gold', volumeRequired: 100_000 * USD, withdrawalPriority: 2, instantAutoTransfer: false, proTrackerHud: true },
-  { tier: 'V4', title: 'Diamond', volumeRequired: 500_000 * USD, withdrawalPriority: 3, instantAutoTransfer: false, proTrackerHud: true },
+  { tier: 'V4', title: 'Platinum', volumeRequired: 500_000 * USD, withdrawalPriority: 3, instantAutoTransfer: false, proTrackerHud: true },
   { tier: 'V5', title: 'Black Gold', volumeRequired: 2_000_000 * USD, withdrawalPriority: 4, instantAutoTransfer: true, proTrackerHud: true },
 ];
 
