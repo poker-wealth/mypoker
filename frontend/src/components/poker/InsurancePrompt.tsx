@@ -24,13 +24,21 @@ import { haptic } from '@/lib/telegram';
  * on expiry rather than blocking the table indefinitely.
  */
 
+/**
+ * Exactly the shape game-server/src/games/texas/underwriting.ts already emits.
+ *
+ * Mirrored rather than redefined: that module is the one the engine calls, and a
+ * second definition of "what a quote is" would drift into showing a number the
+ * server never sent.
+ */
 export interface InsuranceQuote {
-  /** Decimal odds, e.g. '1.85'. The only figure shown. */
-  odds: string;
-  /** micro-USD */
-  maxPayout: number;
-  /** micro-USD */
+  /** What the player pays, micro-USD. */
   premium: number;
+  /** What they receive if the hand goes against them, micro-USD. */
+  coverage: number;
+  /** coverage / premium — e.g. 20 means "pay 5 to receive 100". The only
+   *  derived figure the UI shows, and the only one it is given. */
+  payoutOdds: number;
 }
 
 const usd = (micros: number): string =>
@@ -96,13 +104,15 @@ export function InsurancePrompt({
                 <div className="text-[0.62rem] uppercase tracking-wide text-dim">
                   {t('insurance.odds')}
                 </div>
-                <div className="text-2xl font-black tabular-nums text-accent">{quote.odds}</div>
+                <div className="text-2xl font-black tabular-nums text-accent">
+                  {quote.payoutOdds.toFixed(2)}
+                </div>
               </div>
               <div className="text-right">
                 <div className="text-[0.62rem] uppercase tracking-wide text-dim">
                   {t('insurance.payout')}
                 </div>
-                <div className="text-lg font-bold tabular-nums">₮{usd(quote.maxPayout)}</div>
+                <div className="text-lg font-bold tabular-nums">₮{usd(quote.coverage)}</div>
               </div>
             </div>
 
