@@ -260,7 +260,8 @@
     "vendorBlurb": "Pemasok luar memiliki aturannya; setiap hasil ditandatangani, tetapi tabel pembayaran mereka tidak dapat dibuktikan tidak berubah",
     "ratesPending": "Tingkat pembayaran yang dipublikasikan belum ditampilkan. Sebuah tingkat baru bermakna setelah aturan di baliknya dikomit on-chain dan diberi versi — sebelum itu ia hanyalah angka yang kami klaim tentang diri sendiri, hal yang justru ingin dihindari halaman ini.",
     "actualRate": "Pengembalian aktual {{rate}}% dari {{count}} ronde",
-    "theoreticalRate": "dinyatakan {{rate}}%"
+    "theoreticalRate": "dinyatakan {{rate}}%",
+    "ownSeedUnchecked": "Data ronde ini tidak memuat seed Anda, jadi langkah ini hanya memeriksa konsistensi daftar seed — bukan apakah seed Anda ada di dalamnya pada kursi Anda."
   },
   "reputation": {
     "title": "Reputasi",
@@ -334,7 +335,7 @@
     "perks": {
       "V1": "Panel statistik dasar. Batas dan antrean penarikan standar.",
       "V2": "Grafik arus modal. Batas penarikan harian lebih tinggi. Emoji premium.",
-      "V3": "Pro Tracker HUD (VPIP, PFR, statistik posisi). Kanal dukungan khusus.",
+      "V3": "Pro Tracker HUD (VPIP, PFR, statistik posisi) — segera hadir. Kanal dukungan khusus.",
       "V4": "Antrean penarikan prioritas. Penandaan lawan tanpa batas. Concierge 1-on-1. Meja Elite.",
       "V5": "Transfer otomatis instan. Profil head-to-head langsung. Meja Emas Hitam. Efek masuk layar penuh."
     }

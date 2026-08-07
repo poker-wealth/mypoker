@@ -146,6 +146,7 @@ export function Fairness() {
                 expected={s.expected}
                 computedLabel={t('fairness.computed')}
                 expectedLabel={t('fairness.expected')}
+                caveat={s.note === 'OWN_SEED_NOT_CHECKED' ? t('fairness.ownSeedUnchecked') : null}
               />
             ))}
           </ul>
@@ -164,6 +165,7 @@ function StepRow({
   expected,
   computedLabel,
   expectedLabel,
+  caveat,
 }: {
   index: number;
   pass: boolean;
@@ -173,6 +175,8 @@ function StepRow({
   expected: string;
   computedLabel: string;
   expectedLabel: string;
+  /** Set when the step passed in a weaker form than its full one. */
+  caveat?: string | null;
 }) {
   // A failed step opens by default — the evidence is the reason to be here.
   const [open, setOpen] = useState(!pass);
@@ -183,10 +187,16 @@ function StepRow({
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-surface-2"
       >
+        {/* A qualified pass gets its own colour. Rendering it as an ordinary
+            green tick would tell a player something was proven that wasn't. */}
         <div
           className={cn(
             'grid size-6 shrink-0 place-items-center rounded-full',
-            pass ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger',
+            !pass
+              ? 'bg-danger/15 text-danger'
+              : caveat
+                ? 'bg-jackpot/15 text-jackpot'
+                : 'bg-success/15 text-success',
           )}
         >
           {pass ? <Check size={14} /> : <X size={14} />}
@@ -205,6 +215,11 @@ function StepRow({
 
       {open && (
         <div className="space-y-2 border-t border-border bg-bg/40 px-4 py-3">
+          {caveat && (
+            <p className="rounded-lg bg-jackpot/10 px-2.5 py-2 text-[0.66rem] leading-relaxed text-jackpot">
+              {caveat}
+            </p>
+          )}
           <Value label={computedLabel} value={computed} tone={pass ? 'ok' : 'bad'} />
           <Value label={expectedLabel} value={expected} tone="neutral" />
         </div>

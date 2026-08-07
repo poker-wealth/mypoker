@@ -41,6 +41,20 @@ export interface RoundVerificationData {
   merkleProof: ProofNode[];
   merkleRoot: string;
   seatedClientSeeds: SeatedClientSeed[];
+  /**
+   * The viewing player's OWN seed and seat, when they sat in this round.
+   *
+   * Step 3 is not really about the aggregate hash — it is about the player
+   * confirming their own contribution survived into it (v6.0 §6, "verify own
+   * ClientSeed at correct seat position"). Without this, a platform could
+   * substitute a player's seed for one it chose, merge the result honestly,
+   * and every hash in the round would still reconcile.
+   *
+   * Absent when verifying a round you did not play — the tool is public and
+   * any historical round can be checked by anyone. Step 3 then reports what it
+   * could and could not establish rather than passing silently.
+   */
+  mine?: SeatedClientSeed;
 }
 
 export type StepId = 1 | 2 | 3 | 4 | 5 | 6;
@@ -52,6 +66,12 @@ export interface StepResult {
   computed: string;
   /** What the round data claims. Equal to `computed` when the step passes. */
   expected: string;
+  /**
+   * Set when a step proved less than its full form — currently only Step 3
+   * verifying a round the viewer did not sit in. A passing step with a note is
+   * NOT the same as a passing step without one, and the UI says so.
+   */
+  note?: 'OWN_SEED_NOT_CHECKED';
 }
 
 export interface VerificationResult {
@@ -114,6 +134,21 @@ export const serverCommitOf = (serverSeed: string): Promise<string> => sha256Hex
 export function mergeClientSeeds(seeds: readonly SeatedClientSeed[]): Promise<string> {
   const ordered = [...seeds].sort((a, b) => a.seatOrder - b.seatOrder).map((s) => s.clientSeed);
   return sha256Hex(ordered.join(''));
+}
+
+/**
+ * Is the player's own seed present, at the seat they actually occupied?
+ *
+ * Both halves matter. A seed that appears at someone else's seat changes the
+ * concatenation order and so changes every card dealt — finding it "somewhere"
+ * in the list is not the same as finding it where it belongs.
+ */
+export function ownSeedAtSeat(
+  seeds: readonly SeatedClientSeed[],
+  mine: SeatedClientSeed,
+): boolean {
+  const seated = seeds.find((s) => s.seatOrder === mine.seatOrder);
+  return seated?.clientSeed === mine.clientSeed;
 }
 
 /** final_seed = SHA256(server_seed + all_client_seeds + future_block_hash + round_id). */
@@ -279,12 +314,23 @@ export async function verifyRound(d: RoundVerificationData): Promise<Verificatio
     expected: d.finalSeed,
   });
 
+  // Step 3 is two claims, not one: the aggregate is well-formed, AND the
+  // viewer's own seed is inside it at their seat. The merge alone proves only
+  // that the platform hashed *some* list consistently — swapping a player's
+  // seed for one of its own and re-merging passes that check every time. The
+  // own-seed half is the entire reason v6.0 added this step.
   const merged = await mergeClientSeeds(d.seatedClientSeeds);
+  const mergeOk = merged === d.allClientSeeds;
+  const ownSeedOk = d.mine ? ownSeedAtSeat(d.seatedClientSeeds, d.mine) : null;
   steps.push({
     step: 3,
-    pass: merged === d.allClientSeeds,
-    computed: merged,
-    expected: d.allClientSeeds,
+    pass: mergeOk && ownSeedOk !== false,
+    computed: ownSeedOk === false ? `seat ${d.mine?.seatOrder}: seed not found` : merged,
+    expected: ownSeedOk === false ? (d.mine?.clientSeed ?? '') : d.allClientSeeds,
+    // A round the viewer did not play still verifies — anyone may check any
+    // historical round — but it proves strictly less, and saying so is the
+    // difference between a verifier and a green tick.
+    ...(ownSeedOk === null ? { note: 'OWN_SEED_NOT_CHECKED' as const } : {}),
   });
 
   // Step 4 compares whole decks; the hashes above are per-value, so summarise the

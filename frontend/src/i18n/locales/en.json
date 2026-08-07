@@ -260,7 +260,8 @@
     "vendorBlurb": "An outside supplier owns the rules; each result is signed, but their paytable cannot be proven unchanged",
     "ratesPending": "Published payout rates are not shown yet. A rate is only meaningful once the rules behind it are committed on-chain and versioned — until then it would be a number we assert about ourselves, which is what this page exists to avoid.",
     "actualRate": "Actual return {{rate}}% over {{count}} rounds",
-    "theoreticalRate": "stated {{rate}}%"
+    "theoreticalRate": "stated {{rate}}%",
+    "ownSeedUnchecked": "This round data carries no seed of yours, so this step checked only that the seed list is consistent — not that your own seed is in it at your seat."
   },
   "reputation": {
     "title": "Reputation",
@@ -334,7 +335,7 @@
     "perks": {
       "V1": "Basic stats panel. Standard withdrawal limits and queue.",
       "V2": "Capital flow chart. Higher daily withdrawal limit. Premium emojis.",
-      "V3": "Pro Tracker HUD (VPIP, PFR, positional stats). Dedicated support channel.",
+      "V3": "Pro Tracker HUD (VPIP, PFR, positional stats) — coming soon. Dedicated support channel.",
       "V4": "Priority withdrawal queue. Unlimited opponent tagging. 1-on-1 concierge. Elite tables.",
       "V5": "Instant auto-transfer. Live head-to-head profiling. Black Gold tables. Full-screen entry effect."
     }

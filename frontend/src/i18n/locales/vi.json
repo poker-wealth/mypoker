@@ -260,7 +260,8 @@
     "vendorBlurb": "Nhà cung cấp bên ngoài sở hữu luật chơi; mỗi kết quả đều được ký, nhưng không thể chứng minh bảng trả thưởng không bị đổi",
     "ratesPending": "Tỷ lệ chi trả công bố chưa được hiển thị. Một tỷ lệ chỉ có ý nghĩa khi luật chơi đằng sau nó được cam kết on-chain và đánh phiên bản — trước đó nó chỉ là con số chúng tôi tự khẳng định, đúng điều mà trang này tồn tại để tránh.",
     "actualRate": "Tỷ lệ trả thực tế {{rate}}% ({{count}} ván)",
-    "theoreticalRate": "công bố {{rate}}%"
+    "theoreticalRate": "công bố {{rate}}%",
+    "ownSeedUnchecked": "Dữ liệu ván này không chứa seed của bạn, nên bước này chỉ kiểm tra tính nhất quán của danh sách seed, chưa xác minh seed của bạn có trong đó tại đúng vị trí ngồi hay không."
   },
   "reputation": {
     "title": "Uy tín",
@@ -334,7 +335,7 @@
     "perks": {
       "V1": "Bảng thống kê cơ bản. Hạn mức và hàng đợi rút tiền tiêu chuẩn.",
       "V2": "Biểu đồ dòng vốn. Hạn mức rút hằng ngày cao hơn. Emoji cao cấp.",
-      "V3": "Pro Tracker HUD (VPIP, PFR, thống kê vị trí). Kênh hỗ trợ riêng.",
+      "V3": "Pro Tracker HUD (VPIP, PFR, thống kê vị trí) — sắp ra mắt. Kênh hỗ trợ riêng.",
       "V4": "Hàng đợi rút tiền ưu tiên. Gắn thẻ đối thủ không giới hạn. Trợ lý riêng 1-1. Bàn Elite.",
       "V5": "Tự động chuyển tiền tức thì. Phân tích đối đầu trực tiếp. Bàn Hắc Kim. Hiệu ứng vào bàn toàn màn hình."
     }
