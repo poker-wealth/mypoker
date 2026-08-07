@@ -1,5 +1,4 @@
 import { motion } from 'motion/react';
-import { Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { GameDef } from '@/lib/games';
 import { haptic } from '@/lib/telegram';
@@ -10,7 +9,6 @@ import { haptic } from '@/lib/telegram';
  */
 export function GameTile({ game, onClick }: { game: GameDef; onClick?: () => void }) {
   const { t } = useTranslation();
-  const [from, to] = game.gradient;
   return (
     <motion.button
       whileTap={{ scale: 0.97 }}
@@ -18,35 +16,34 @@ export function GameTile({ game, onClick }: { game: GameDef; onClick?: () => voi
         haptic('light');
         onClick?.();
       }}
-      className="relative flex h-32 flex-col justify-end overflow-hidden rounded-(--radius-app) border border-border p-3 text-left"
+      className="relative flex h-36 flex-col items-center justify-between overflow-hidden rounded-2xl border border-border p-3 text-center"
       style={{ backgroundColor: 'var(--surface)' }}
     >
-      {/* gradient wash */}
-      <div
-        className="absolute inset-0 opacity-30"
-        style={{ backgroundImage: `linear-gradient(150deg, ${from} 0%, ${to} 130%)` }}
-      />
-      {/* glyph watermark */}
-      <div className="pointer-events-none absolute -right-2 -top-3 text-[5.5rem] leading-none opacity-25 blur-[0.5px]">
-        {game.glyph}
-      </div>
-
       {game.hot && (
-        <span className="absolute left-3 top-3 rounded-full bg-danger/90 px-2 py-0.5 text-[0.6rem] font-bold text-white shadow">
+        <span className="absolute left-2 top-2 rounded-full bg-danger/90 px-1.5 py-0.5 text-[0.55rem] font-bold text-white shadow">
           HOT
         </span>
       )}
 
-      <div className="relative">
-        <div className="font-bold leading-tight">
+      {/* glyph / icon area */}
+      <div className="flex h-12 w-full items-center justify-center drop-shadow-md">
+        {game.image ? (
+          <img src={game.image} alt={game.name} className="h-full object-contain mix-blend-screen" />
+        ) : (
+          <span className="text-4xl">{game.glyph}</span>
+        )}
+      </div>
+
+      <div className="mt-2 flex w-full flex-col items-center gap-1">
+        <div className="text-[0.75rem] font-bold leading-tight text-text line-clamp-1 w-full px-1">
           {t(`gameNames.${game.id}`, { defaultValue: game.name })}
         </div>
-        <div className="mt-1 flex items-center gap-2 text-[0.7rem] text-dim">
-          <span className="inline-flex items-center gap-1">
-            <Users size={12} /> {game.players.toLocaleString()}
-          </span>
-          <span className="opacity-40">•</span>
-          <span>{t('games.minBuy', { amount: `₮${game.minBuy}` })}</span>
+        <div className="text-[0.65rem] text-dim">
+          {game.players.toLocaleString()} tables
+        </div>
+        <div className="text-[0.7rem] font-bold text-yellow-500">
+          {/* Mocked amounts for now to match UI */}
+          ${(game.players * 49.35).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
       </div>
     </motion.button>

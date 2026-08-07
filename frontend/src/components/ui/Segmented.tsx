@@ -33,7 +33,7 @@ export function Segmented<T extends string>({ options, value, onChange }: Segmen
             {active && (
               <motion.span
                 layoutId={pillId}
-                className="absolute inset-0 rounded-[calc(var(--radius-app)-0.25rem)]"
+                className="absolute inset-0 rounded-[calc(var(--radius-app)-0.25rem)] shadow-sm"
                 style={{ backgroundImage: 'var(--brand-gradient)' }}
                 transition={{ type: 'spring', damping: 30, stiffness: 380 }}
               />

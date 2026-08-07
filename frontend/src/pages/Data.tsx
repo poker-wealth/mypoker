@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Button } from '@/components/ui/Button';
-import { useStats, useHistory } from '@/api/hooks';
+import { useStats, useHistory, useVip } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
 import { useSession } from '@/store/session';
 import type { StatsPeriod } from '@/api/stats';
@@ -71,11 +71,11 @@ export function Data() {
         <h2 className="mb-2.5 text-sm font-bold">{t('data.overview')}</h2>
 
         {stats.isPending && (
-          <div className="grid grid-cols-2 gap-3">
-            {[0, 1, 2, 3].map((i) => (
+          <div className="grid grid-cols-3 gap-3">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
               <div key={i} className="rounded-(--radius-app) border border-border bg-surface px-3 py-3">
-                <Skeleton className="h-6 w-20" />
-                <Skeleton className="mt-2 h-2.5 w-14" />
+                <Skeleton className="h-6 w-14" />
+                <Skeleton className="mt-2 h-2.5 w-10" />
               </div>
             ))}
           </div>
@@ -88,7 +88,7 @@ export function Data() {
         )}
 
         {stats.isSuccess && (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <Tile label={t('data.hands')} value={String(stats.data.handsPlayed)} />
             <Tile
               label={t('data.winRate')}
@@ -99,6 +99,11 @@ export function Data() {
               value={money(stats.data.netProfit, true)}
               tone={Number(stats.data.netProfit) >= 0 ? 'success' : 'danger'}
             />
+            {/* VPIP and PFR are not here on purpose. They need preflop ACTION
+                data — did the player voluntarily put money in, did they raise —
+                and the ledger records only a round's net movement. The mockup
+                shows 23.1% and 38.7%; those are design-document numbers, and
+                printing them next to real figures makes all six look real. */}
             <Tile label={t('account.statBiggestWin')} value={money(stats.data.biggestWin)} tone="accent" />
           </div>
         )}
@@ -107,10 +112,16 @@ export function Data() {
       {/* Trend — derived from the rounds listed below, so the two always agree. */}
       {rounds.length > 1 && (
         <section className="rounded-(--radius-app) border border-border bg-surface p-4">
-          <h2 className="mb-3 text-sm font-bold">{t('data.profitTrend')}</h2>
+          <h2 className="mb-3 text-[0.7rem] font-bold uppercase tracking-wider text-dim">Profit Trend (USDT)</h2>
           <TrendChart rounds={rounds} />
         </section>
       )}
+
+      {/* Play distribution — real, from the VIP volume tracker, which records
+          per-game rounds at settlement. The mockup's fixed 65/20/10/5 split is
+          replaced rather than kept: a pie chart of invented percentages is a
+          claim about how this player spends their time. */}
+      <PlayDistribution />
 
       {/* History */}
       <section>
@@ -271,5 +282,84 @@ function TrendChart({ rounds }: { rounds: HistoryEntry[] }) {
       />
       <circle cx={last[0]} cy={last[1]} r="1.8" fill={stroke} vectorEffect="non-scaling-stroke" />
     </svg>
+  );
+}
+
+/**
+ * Where the player actually spends their time, from the VIP volume tracker.
+ *
+ * That tracker records rounds per game at settlement, so this is the same source
+ * the VIP ladder grades on — meaning the donut and the tier can never tell
+ * different stories about the same player.
+ *
+ * Absent entirely when there is nothing to show. An empty or single-segment
+ * donut communicates less than no donut, and takes more space doing it.
+ */
+function PlayDistribution() {
+  const { t } = useTranslation();
+  const vip = useVip();
+
+  const games = vip.data?.breakdown ?? [];
+  const totalRounds = games.reduce((sum, g) => sum + g.rounds, 0);
+  if (totalRounds === 0) return null;
+
+  // Distinct hues rather than the brand ramp: adjacent segments have to be told
+  // apart at 90px, which a single-hue gradient does not manage.
+  const COLORS = ['#6366f1', '#22c55e', '#eab308', '#3b82f6', '#f85677', '#00d4ff'];
+
+  // Circumference of r=40 is 251.2, so a segment's dash length is its share of
+  // that. Offsets accumulate so segments sit end to end rather than overlapping.
+  const CIRCUMFERENCE = 251.2;
+  let offset = 0;
+  const segments = games.map((g, i) => {
+    const share = g.rounds / totalRounds;
+    const seg = { g, share, color: COLORS[i % COLORS.length]!, offset };
+    offset += share;
+    return seg;
+  });
+
+  return (
+    <section className="rounded-(--radius-app) border border-border bg-surface p-4">
+      <h2 className="mb-3 text-[0.75rem] font-bold uppercase tracking-wider text-dim">
+        {t('data.playDistribution')}
+      </h2>
+      <div className="mb-2 mt-5 flex items-center gap-6">
+        <div className="relative ml-2 size-[90px] shrink-0">
+          <svg viewBox="0 0 100 100" className="size-full -rotate-90">
+            {segments.map((s) => (
+              <circle
+                key={s.g.gameId}
+                cx="50"
+                cy="50"
+                r="40"
+                fill="transparent"
+                stroke={s.color}
+                strokeWidth="16"
+                strokeDasharray={`${s.share * CIRCUMFERENCE} ${CIRCUMFERENCE}`}
+                strokeDashoffset={-s.offset * CIRCUMFERENCE}
+              />
+            ))}
+          </svg>
+        </div>
+        <ul className="flex flex-1 flex-col justify-center gap-2">
+          {segments.map((s) => (
+            <li
+              key={s.g.gameId}
+              className="flex items-center justify-between text-[0.65rem] font-bold text-dim"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
+                <span className="truncate">
+                  {t(`gameNames.${s.g.gameId}`, { defaultValue: s.g.gameId })}
+                </span>
+              </span>
+              <span className="shrink-0 text-[0.7rem] text-text tabular-nums">
+                {Math.round(s.share * 100)}%
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </section>
   );
 }

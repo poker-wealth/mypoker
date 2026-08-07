@@ -48,6 +48,15 @@ export function useLobbyGames() {
   });
 }
 
+export function useTables(filter: TableFilter = {}) {
+  return useQuery({
+    queryKey: ['lobby', 'tables', filter],
+    queryFn: () => fetchTables(filter),
+    staleTime: 5_000,
+    refetchInterval: 10_000,
+  });
+}
+
 export function useStats(period: StatsPeriod = 'all') {
   const playerId = useSession((s) => s.player?.playerId);
 
