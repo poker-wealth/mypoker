@@ -277,7 +277,9 @@
       "ROUNDS": "sau vài ván",
       "DAILY": "mỗi ngày một lần",
       "WINDOW": "chỉ thứ Bảy"
-    }
+    },
+    "youWon": "Trúng jackpot",
+    "tapToDismiss": "Chạm bất kỳ đâu để tiếp tục"
   },
   "onboarding": {
     "skip": "Bỏ qua",

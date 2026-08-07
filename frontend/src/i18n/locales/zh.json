@@ -277,7 +277,9 @@
       "ROUNDS": "每隔数局",
       "DAILY": "每日一次",
       "WINDOW": "仅限周六"
-    }
+    },
+    "youWon": "恭喜中奖",
+    "tapToDismiss": "点击任意处继续"
   },
   "onboarding": {
     "skip": "跳过",

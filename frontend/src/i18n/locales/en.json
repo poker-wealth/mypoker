@@ -277,7 +277,9 @@
       "ROUNDS": "every few rounds",
       "DAILY": "once a day",
       "WINDOW": "Saturdays only"
-    }
+    },
+    "youWon": "Jackpot won",
+    "tapToDismiss": "Tap anywhere to continue"
   },
   "onboarding": {
     "skip": "Skip",

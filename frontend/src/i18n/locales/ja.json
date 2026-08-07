@@ -277,7 +277,9 @@
       "ROUNDS": "数ラウンドごと",
       "DAILY": "1日1回",
       "WINDOW": "土曜のみ"
-    }
+    },
+    "youWon": "ジャックポット獲得",
+    "tapToDismiss": "タップして続ける"
   },
   "onboarding": {
     "skip": "スキップ",

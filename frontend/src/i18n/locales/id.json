@@ -277,7 +277,9 @@
       "ROUNDS": "setiap beberapa ronde",
       "DAILY": "sekali sehari",
       "WINDOW": "hanya Sabtu"
-    }
+    },
+    "youWon": "Jackpot dimenangkan",
+    "tapToDismiss": "Ketuk di mana saja untuk lanjut"
   },
   "onboarding": {
     "skip": "Lewati",

@@ -277,7 +277,9 @@
       "ROUNDS": "몇 라운드마다",
       "DAILY": "하루 한 번",
       "WINDOW": "토요일에만"
-    }
+    },
+    "youWon": "잭팟 당첨",
+    "tapToDismiss": "아무 곳이나 탭하여 계속"
   },
   "onboarding": {
     "skip": "건너뛰기",
