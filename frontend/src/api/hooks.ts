@@ -3,6 +3,7 @@ import { fetchSettings, patchSettings, type PlayerSettings, type SettingsPatch }
 import { fetchReputation } from './reputation';
 import { fetchJackpot } from './jackpot';
 import { fetchVip } from './vip';
+import { fetchMyLeagues, fetchLeagues, createLeagueApi, joinLeagueApi } from './leagues';
 import { fetchStats, fetchHistory, type HistoryPage, type StatsPeriod } from './stats';
 import { fetchLobbyGames, fetchTables, type TableFilter } from './lobby';
 import { useSession } from '@/store/session';
@@ -169,5 +170,39 @@ export function useVip() {
     queryFn: fetchVip,
     enabled: Boolean(playerId),
     staleTime: 60_000,
+  });
+}
+
+// ── Alliances ───────────────────────────────────────────────────────────────
+
+export function useMyLeagues() {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery({
+    queryKey: ['leagues', 'mine', playerId],
+    queryFn: fetchMyLeagues,
+    enabled: Boolean(playerId),
+    staleTime: 30_000,
+  });
+}
+
+/** Public — browsing alliances should not need an account. */
+export function useDiscoverLeagues() {
+  return useQuery({ queryKey: ['leagues', 'discover'], queryFn: fetchLeagues, staleTime: 30_000 });
+}
+
+export function useCreateLeague() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createLeagueApi,
+    // Both lists change: the new league is mine, and it becomes discoverable.
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['leagues'] }),
+  });
+}
+
+export function useJoinLeague() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: joinLeagueApi,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['leagues'] }),
   });
 }

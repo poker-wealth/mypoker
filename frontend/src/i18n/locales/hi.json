@@ -89,11 +89,21 @@
     "cowboy-beauty": "काउबॉय और सुंदरी"
   },
   "alliance": {
-    "joinAlliance": "एलायंस से जुड़ें",
-    "recommended": "अनुशंसित एलायंस",
-    "create": "एलायंस बनाएँ",
-    "ranking": "एलायंस रैंकिंग",
-    "pendingEndpoints": "नमूना डेटा — एलायंस एपीआई अभी जुड़ा नहीं है।"
+    "create": "गठबंधन बनाएँ",
+    "mine": "आपके गठबंधन",
+    "discover": "खोजें",
+    "signInToJoin": "गठबंधन में शामिल होने के लिए साइन इन करें",
+    "noneYet": "अभी किसी गठबंधन में नहीं",
+    "noneYetBlurb": "नीचे से जुड़ें, या अपना बनाएँ।",
+    "nothingToJoin": "अभी कोई खुला गठबंधन नहीं",
+    "members": "{{count}} सदस्य",
+    "join": "जुड़ें",
+    "joined": "{{name}} में शामिल हुए",
+    "created": "{{name}} बन गया",
+    "name": "गठबंधन का नाम",
+    "namePlaceholder": "जैसे ड्रैगन अलायंस",
+    "inviteOnly": "केवल आमंत्रण",
+    "inviteOnlyBlurb": "खोज में नहीं दिखेगा। केवल आमंत्रित लोग जुड़ सकते हैं।"
   },
   "data": {
     "periodToday": "आज",

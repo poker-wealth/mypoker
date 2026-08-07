@@ -89,11 +89,21 @@
     "cowboy-beauty": "Koboi & Si Cantik"
   },
   "alliance": {
-    "joinAlliance": "Gabung Aliansi",
-    "recommended": "Aliansi yang disarankan",
-    "create": "Buat Aliansi",
-    "ranking": "Peringkat Aliansi",
-    "pendingEndpoints": "Data contoh — API aliansi belum terhubung."
+    "create": "Buat aliansi",
+    "mine": "Aliansi Anda",
+    "discover": "Jelajahi",
+    "signInToJoin": "Masuk untuk bergabung dengan aliansi",
+    "noneYet": "Belum tergabung dalam aliansi",
+    "noneYetBlurb": "Gabung di bawah, atau buat sendiri.",
+    "nothingToJoin": "Belum ada aliansi terbuka saat ini",
+    "members": "{{count}} anggota",
+    "join": "Gabung",
+    "joined": "Bergabung dengan {{name}}",
+    "created": "{{name}} dibuat",
+    "name": "Nama aliansi",
+    "namePlaceholder": "mis. Aliansi Naga",
+    "inviteOnly": "Hanya undangan",
+    "inviteOnlyBlurb": "Disembunyikan dari Jelajahi. Hanya yang Anda undang bisa bergabung."
   },
   "data": {
     "periodToday": "Hari ini",

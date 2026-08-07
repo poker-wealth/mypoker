@@ -89,11 +89,21 @@
     "cowboy-beauty": "カウボーイ＆ビューティー"
   },
   "alliance": {
-    "joinAlliance": "同盟に参加",
-    "recommended": "おすすめの同盟",
     "create": "同盟を作成",
-    "ranking": "同盟ランキング",
-    "pendingEndpoints": "サンプルデータ — 同盟 API は未接続です。"
+    "mine": "参加中の同盟",
+    "discover": "さがす",
+    "signInToJoin": "ログインすると同盟に参加できます",
+    "noneYet": "まだ同盟に参加していません",
+    "noneYetBlurb": "下から参加するか、ご自身で作成してください。",
+    "nothingToJoin": "現在参加できる同盟はありません",
+    "members": "メンバー {{count}} 名",
+    "join": "参加",
+    "joined": "{{name}} に参加しました",
+    "created": "{{name}} を作成しました",
+    "name": "同盟名",
+    "namePlaceholder": "例：ドラゴン同盟",
+    "inviteOnly": "招待制",
+    "inviteOnlyBlurb": "「さがす」に表示されません。招待した方のみ参加できます。"
   },
   "data": {
     "periodToday": "今日",

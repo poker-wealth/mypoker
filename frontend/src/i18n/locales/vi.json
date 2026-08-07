@@ -89,11 +89,21 @@
     "cowboy-beauty": "Chàng cao bồi và Người đẹp"
   },
   "alliance": {
-    "joinAlliance": "Tham gia liên minh",
-    "recommended": "Liên minh đề xuất",
     "create": "Tạo liên minh",
-    "ranking": "Bảng xếp hạng liên minh",
-    "pendingEndpoints": "Dữ liệu mẫu — API liên minh chưa được kết nối."
+    "mine": "Liên minh của bạn",
+    "discover": "Khám phá",
+    "signInToJoin": "Đăng nhập để tham gia liên minh",
+    "noneYet": "Chưa tham gia liên minh nào",
+    "noneYetBlurb": "Tham gia bên dưới, hoặc tự tạo một liên minh.",
+    "nothingToJoin": "Hiện không có liên minh nào mở",
+    "members": "{{count}} thành viên",
+    "join": "Tham gia",
+    "joined": "Đã tham gia {{name}}",
+    "created": "Đã tạo {{name}}",
+    "name": "Tên liên minh",
+    "namePlaceholder": "ví dụ: Liên minh Rồng",
+    "inviteOnly": "Chỉ theo lời mời",
+    "inviteOnlyBlurb": "Ẩn khỏi mục Khám phá. Chỉ người bạn mời mới tham gia được."
   },
   "data": {
     "periodToday": "Hôm nay",

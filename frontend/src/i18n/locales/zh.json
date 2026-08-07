@@ -89,11 +89,21 @@
     "cowboy-beauty": "牛仔与美女"
   },
   "alliance": {
-    "joinAlliance": "加入联盟",
-    "recommended": "推荐联盟",
     "create": "创建联盟",
-    "ranking": "联盟排行",
-    "pendingEndpoints": "示例数据 — 联盟接口尚未接入。"
+    "mine": "我的联盟",
+    "discover": "发现",
+    "signInToJoin": "登录后加入联盟",
+    "noneYet": "尚未加入任何联盟",
+    "noneYetBlurb": "可在下方加入，或自行创建。",
+    "nothingToJoin": "暂时没有开放的联盟",
+    "members": "{{count}} 名成员",
+    "join": "加入",
+    "joined": "已加入 {{name}}",
+    "created": "{{name}} 已创建",
+    "name": "联盟名称",
+    "namePlaceholder": "例如：巨龙联盟",
+    "inviteOnly": "仅限邀请",
+    "inviteOnlyBlurb": "不在“发现”中显示，仅受邀者可加入。"
   },
   "data": {
     "periodToday": "今日",

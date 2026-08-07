@@ -89,11 +89,21 @@
     "cowboy-beauty": "Cowboy & Beauty"
   },
   "alliance": {
-    "joinAlliance": "Join Alliance",
-    "recommended": "Recommended alliances",
-    "create": "Create Alliance",
-    "ranking": "Alliance Ranking",
-    "pendingEndpoints": "Sample data — awaiting the alliance/league endpoints."
+    "create": "Create an alliance",
+    "mine": "Your alliances",
+    "discover": "Discover",
+    "signInToJoin": "Sign in to join an alliance",
+    "noneYet": "Not in an alliance yet",
+    "noneYetBlurb": "Join one below, or start your own.",
+    "nothingToJoin": "No open alliances right now",
+    "members": "{{count}} members",
+    "join": "Join",
+    "joined": "Joined {{name}}",
+    "created": "{{name}} created",
+    "name": "Alliance name",
+    "namePlaceholder": "e.g. Dragon Alliance",
+    "inviteOnly": "Invite only",
+    "inviteOnlyBlurb": "Hidden from Discover. Only people you invite can join."
   },
   "data": {
     "periodToday": "Today",

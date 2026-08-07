@@ -1,140 +1,253 @@
-import { Crown, Plus, Trophy, ChevronRight } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Badge } from '@/components/ui/Badge';
+import { Shield, Users, Plus, Crown, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { Sheet } from '@/components/ui/Sheet';
+import { useMyLeagues, useDiscoverLeagues, useCreateLeague, useJoinLeague } from '@/api/hooks';
+import { errorKey } from '@/api/errors';
+import { useSession } from '@/store/session';
+import { toast } from '@/lib/toast';
+import { haptic } from '@/lib/telegram';
+import type { League } from '@/api/leagues';
 
 /**
- * Tab 1 — Alliance (club) lobby: the alliance you belong to, alliances you could
- * join, and the create/ranking entry points.
+ * Tab 1 — Alliance.
  *
- * Presentational for now. The league/club system exists on the game-server
- * (`src/league`) but has no client-facing endpoint yet, so this renders from the
- * sample below and is marked as such — same convention as Lobby/Games. Swap
- * SAMPLE_* for query hooks when the endpoints land; the markup shouldn't change.
+ * Two lists, deliberately separate: the ones you belong to, and the ones you
+ * could join. Merging them and marking membership with a badge makes "am I in
+ * this?" a thing to scan for, when it is the first question the screen should
+ * answer.
+ *
+ * Invite-only leagues never appear in discovery — that is enforced server-side,
+ * not filtered here.
  */
-
-const MY_ALLIANCE = {
-  name: 'Dragon Alliance',
-  id: '123456',
-  members: 2451,
-  online: 342,
-  vip: true,
-};
-
-const RECOMMENDED = [
-  { name: 'Phoenix Club', members: 1892, online: 296, vip: true },
-  { name: 'King Poker', members: 1563, online: 201, vip: false },
-  { name: 'Ace Club', members: 1231, online: 178, vip: false },
-  { name: 'Elite Alliance', members: 987, online: 153, vip: false },
-];
-
 export function Alliance() {
   const { t } = useTranslation();
+  const signedIn = useSession((s) => s.status === 'authenticated');
+  const [createOpen, setCreateOpen] = useState(false);
+
+  const mine = useMyLeagues();
+  const discover = useDiscoverLeagues();
+  const join = useJoinLeague();
+
+  const myIds = new Set((mine.data?.leagues ?? []).map((l) => l.leagueId));
+  const joinable = (discover.data?.leagues ?? []).filter((l) => !myIds.has(l.leagueId));
+
   return (
     <div className="space-y-4">
-      {/* My alliance */}
-      <div
-        className="relative overflow-hidden rounded-2xl border border-border p-4"
-        style={{ boxShadow: 'var(--glow-brand)' }}
-      >
-        <div
-          className="absolute inset-0"
-          style={{ backgroundImage: 'var(--brand-gradient)', opacity: 0.14 }}
-        />
-        <div className="relative">
-          <div className="flex items-center gap-3">
-            <div
-              className="grid size-12 shrink-0 place-items-center rounded-xl text-lg font-black text-white"
-              style={{ backgroundImage: 'var(--brand-gradient)' }}
-            >
-              {MY_ALLIANCE.name.charAt(0)}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <span className="truncate font-bold">{MY_ALLIANCE.name}</span>
-                {MY_ALLIANCE.vip && (
-                  <Badge tone="accent">
-                    <Crown size={10} className="mr-0.5" /> VIP
-                  </Badge>
-                )}
-              </div>
-              <div className="mt-0.5 text-xs text-dim">ID: {MY_ALLIANCE.id}</div>
-            </div>
-          </div>
-
-          <div className="mt-3 flex items-center gap-4 text-xs text-dim">
-            <span>
-              <span className="font-semibold text-text">
-                {MY_ALLIANCE.members.toLocaleString()}
-              </span>{' '}
-              {t('common.members')}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="size-2 rounded-full bg-success" />
-              <span className="font-semibold text-text">{MY_ALLIANCE.online}</span>{' '}
-              {t('common.online')}
-            </span>
-          </div>
-
-          <Button full className="mt-3.5">
-            {t('alliance.joinAlliance')}
-          </Button>
-        </div>
-      </div>
-
-      {/* Recommended */}
+      {/* Mine */}
       <section>
-        <div className="mb-2.5 flex items-center justify-between">
-          <h2 className="text-sm font-bold">{t('alliance.recommended')}</h2>
-          <button className="flex items-center text-xs text-dim">
-            {t('common.viewAll')} <ChevronRight size={14} />
-          </button>
-        </div>
+        <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-dim">
+          {t('alliance.mine')}
+        </h2>
 
-        <div className="divide-y divide-border overflow-hidden rounded-(--radius-app) border border-border bg-surface">
-          {RECOMMENDED.map((a) => (
-            <div key={a.name} className="flex items-center gap-3 p-3">
-              <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-surface-2 text-sm font-black text-dim">
-                {a.name.charAt(0)}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <span className="truncate text-sm font-semibold">{a.name}</span>
-                  {a.vip && <Badge tone="accent">VIP</Badge>}
-                </div>
-                <div className="mt-0.5 flex items-center gap-3 text-[0.68rem] text-dim">
-                  <span>
-                    {a.members.toLocaleString()} {t('common.members')}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="size-1.5 rounded-full bg-success" />
-                    {a.online} {t('common.online')}
-                  </span>
-                </div>
-              </div>
-              <Button size="sm" variant="secondary">
-                {t('common.join')}
-              </Button>
-            </div>
-          ))}
-        </div>
+        {!signedIn && (
+          <div className="rounded-(--radius-app) border border-border bg-surface">
+            <EmptyState icon={Shield} title={t('alliance.signInToJoin')} />
+          </div>
+        )}
+
+        {signedIn && mine.isPending && <Skeleton className="h-24 w-full rounded-(--radius-app)" />}
+
+        {signedIn && mine.isError && (
+          <div className="rounded-(--radius-app) border border-border bg-surface">
+            <ErrorState message={t(errorKey(mine.error))} onRetry={() => void mine.refetch()} />
+          </div>
+        )}
+
+        {signedIn && mine.isSuccess && mine.data.leagues.length === 0 && (
+          <div className="rounded-(--radius-app) border border-border bg-surface">
+            <EmptyState
+              icon={Shield}
+              title={t('alliance.noneYet')}
+              description={t('alliance.noneYetBlurb')}
+            />
+          </div>
+        )}
+
+        {signedIn && mine.isSuccess && mine.data.leagues.length > 0 && (
+          <div className="space-y-2">
+            {mine.data.leagues.map((l) => (
+              <LeagueCard key={l.leagueId} league={l} mine />
+            ))}
+          </div>
+        )}
       </section>
 
-      {/* Actions */}
-      <div className="grid grid-cols-2 gap-3">
-        <button className="flex flex-col items-center gap-1.5 rounded-(--radius-app) border border-border bg-surface py-4 active:scale-[0.98]">
-          <Plus size={20} className="text-brand" />
-          <span className="text-xs font-semibold">{t('alliance.create')}</span>
-        </button>
-        <button className="flex flex-col items-center gap-1.5 rounded-(--radius-app) border border-border bg-surface py-4 active:scale-[0.98]">
-          <Trophy size={20} className="text-accent" />
-          <span className="text-xs font-semibold">{t('alliance.ranking')}</span>
-        </button>
-      </div>
+      {/* Discover */}
+      <section>
+        <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-dim">
+          {t('alliance.discover')}
+        </h2>
 
-      <div className="pt-1 text-center text-[0.66rem] text-dim">
-        {t('alliance.pendingEndpoints')}
-      </div>
+        {discover.isPending && (
+          <div className="space-y-2">
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-20 w-full rounded-(--radius-app)" />
+            ))}
+          </div>
+        )}
+
+        {discover.isError && (
+          <div className="rounded-(--radius-app) border border-border bg-surface">
+            <ErrorState
+              message={t(errorKey(discover.error))}
+              onRetry={() => void discover.refetch()}
+            />
+          </div>
+        )}
+
+        {discover.isSuccess && joinable.length === 0 && (
+          <div className="rounded-(--radius-app) border border-border bg-surface">
+            <EmptyState icon={Users} title={t('alliance.nothingToJoin')} />
+          </div>
+        )}
+
+        {joinable.map((l) => (
+          <div key={l.leagueId} className="mb-2">
+            <LeagueCard
+              league={l}
+              action={
+                signedIn ? (
+                  <Button
+                    variant="ghost"
+                    disabled={join.isPending}
+                    onClick={() => {
+                      haptic('light');
+                      join.mutate(l.leagueId, {
+                        onSuccess: () => toast.success(t('alliance.joined', { name: l.name })),
+                        onError: (e) =>
+                          toast.error(e instanceof Error ? e.message : t('states.error')),
+                      });
+                    }}
+                  >
+                    {t('alliance.join')}
+                  </Button>
+                ) : undefined
+              }
+            />
+          </div>
+        ))}
+      </section>
+
+      {signedIn && (
+        <Button full variant="ghost" onClick={() => setCreateOpen(true)}>
+          <Plus size={16} className="mr-1.5" />
+          {t('alliance.create')}
+        </Button>
+      )}
+
+      <CreateSheet open={createOpen} onClose={() => setCreateOpen(false)} />
     </div>
+  );
+}
+
+function LeagueCard({
+  league,
+  mine,
+  action,
+}: {
+  league: League;
+  mine?: boolean;
+  action?: React.ReactNode;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="flex items-center gap-3 rounded-(--radius-app) border border-border bg-surface p-4">
+      <div
+        className="grid size-11 shrink-0 place-items-center rounded-xl text-white"
+        style={{ backgroundImage: 'var(--brand-gradient)' }}
+      >
+        <Shield size={20} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <span className="truncate font-semibold">{league.name}</span>
+          {mine && <Crown size={13} className="shrink-0 text-jackpot" />}
+          {league.inviteOnly && <Lock size={12} className="shrink-0 text-dim" />}
+        </div>
+        <div className="truncate text-[0.66rem] text-dim">
+          {t('alliance.members', { count: league.memberCount })}
+          {league.description ? ` · ${league.description}` : ''}
+        </div>
+      </div>
+      {action}
+    </div>
+  );
+}
+
+function CreateSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
+  const [name, setName] = useState('');
+  const [inviteOnly, setInviteOnly] = useState(false);
+  const create = useCreateLeague();
+
+  const submit = (): void => {
+    const trimmed = name.trim();
+    if (trimmed.length < 2) return;
+
+    // The id is derived from the name rather than asked for. A player naming
+    // their alliance should not also have to invent a URL-safe identifier, and
+    // the random suffix keeps two "Dragon Alliance"s from colliding.
+    const slug = trimmed
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 24);
+    const leagueId = `${slug || 'league'}-${Math.random().toString(36).slice(2, 8)}`;
+
+    create.mutate(
+      { leagueId, name: trimmed, inviteOnly },
+      {
+        onSuccess: () => {
+          toast.success(t('alliance.created', { name: trimmed }));
+          setName('');
+          setInviteOnly(false);
+          onClose();
+        },
+        onError: (e) => toast.error(e instanceof Error ? e.message : t('states.error')),
+      },
+    );
+  };
+
+  return (
+    <Sheet open={open} onClose={onClose} title={t('alliance.create')}>
+      <div className="space-y-3 p-4">
+        <div>
+          <label htmlFor="league-name" className="text-xs font-semibold text-dim">
+            {t('alliance.name')}
+          </label>
+          <input
+            id="league-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={40}
+            placeholder={t('alliance.namePlaceholder')}
+            className="mt-1 w-full rounded-(--radius-app) border border-border bg-surface px-3 py-2.5 text-sm text-text placeholder:text-dim"
+          />
+        </div>
+
+        <label className="flex items-center justify-between rounded-(--radius-app) border border-border bg-surface px-4 py-3">
+          <span className="min-w-0">
+            <span className="block text-sm font-medium">{t('alliance.inviteOnly')}</span>
+            <span className="block text-[0.66rem] text-dim">{t('alliance.inviteOnlyBlurb')}</span>
+          </span>
+          <input
+            type="checkbox"
+            checked={inviteOnly}
+            onChange={(e) => setInviteOnly(e.target.checked)}
+            className="size-4 shrink-0 accent-[var(--brand)]"
+          />
+        </label>
+
+        <Button full disabled={name.trim().length < 2 || create.isPending} onClick={submit}>
+          {create.isPending ? t('states.loading') : t('alliance.create')}
+        </Button>
+      </div>
+    </Sheet>
   );
 }

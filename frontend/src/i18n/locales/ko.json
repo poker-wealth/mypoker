@@ -89,11 +89,21 @@
     "cowboy-beauty": "카우보이와 미녀"
   },
   "alliance": {
-    "joinAlliance": "얼라이언스 가입",
-    "recommended": "추천 얼라이언스",
-    "create": "얼라이언스 생성",
-    "ranking": "얼라이언스 랭킹",
-    "pendingEndpoints": "샘플 데이터 — 얼라이언스 API가 아직 연결되지 않았습니다."
+    "create": "얼라이언스 만들기",
+    "mine": "내 얼라이언스",
+    "discover": "둘러보기",
+    "signInToJoin": "로그인하면 얼라이언스에 참여할 수 있습니다",
+    "noneYet": "아직 참여한 얼라이언스가 없습니다",
+    "noneYetBlurb": "아래에서 참여하거나 직접 만들어 보세요.",
+    "nothingToJoin": "지금은 참여 가능한 얼라이언스가 없습니다",
+    "members": "멤버 {{count}}명",
+    "join": "참여",
+    "joined": "{{name}}에 참여했습니다",
+    "created": "{{name}}을(를) 만들었습니다",
+    "name": "얼라이언스 이름",
+    "namePlaceholder": "예: 드래곤 얼라이언스",
+    "inviteOnly": "초대 전용",
+    "inviteOnlyBlurb": "둘러보기에 표시되지 않습니다. 초대한 사람만 참여할 수 있습니다."
   },
   "data": {
     "periodToday": "오늘",
