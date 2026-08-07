@@ -109,7 +109,8 @@
     "signOut": "Keluar",
     "buildLine": "MYPOKER · versi staging · v0.1",
     "noHands": "Belum ada ronde dimainkan",
-    "noHandsBlurb": "Gabung ke meja dan rekor Anda dimulai di sini."
+    "noHandsBlurb": "Gabung ke meja dan rekor Anda dimulai di sini.",
+    "signInBlurbGoogle": "Masuk dengan Google untuk menyinkronkan saldo, riwayat & hadiah VIP."
   },
   "wallet": {
     "totalBalance": "Total Saldo",
@@ -175,7 +176,8 @@
     "notifyDeposits": "Setoran & penarikan",
     "notifyPromos": "Promosi",
     "about": "Tentang",
-    "signInToSync": "Masuk untuk menyinkronkan preferensi Anda"
+    "signInToSync": "Masuk untuk menyinkronkan preferensi Anda",
+    "account": "Akun"
   },
   "fairness": {
     "title": "Verifikasi keadilan",

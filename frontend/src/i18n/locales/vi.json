@@ -109,7 +109,8 @@
     "signOut": "Đăng xuất",
     "buildLine": "MYPOKER · bản thử nghiệm · v0.1",
     "noHands": "Chưa chơi ván nào",
-    "noHandsBlurb": "Tham gia một bàn và thành tích của bạn sẽ hiện ở đây."
+    "noHandsBlurb": "Tham gia một bàn và thành tích của bạn sẽ hiện ở đây.",
+    "signInBlurbGoogle": "Đăng nhập bằng Google để đồng bộ số dư, lịch sử và ưu đãi VIP."
   },
   "wallet": {
     "totalBalance": "Tổng số dư",
@@ -175,7 +176,8 @@
     "notifyDeposits": "Nạp & rút tiền",
     "notifyPromos": "Khuyến mãi",
     "about": "Giới thiệu",
-    "signInToSync": "Đăng nhập để đồng bộ tùy chọn của bạn"
+    "signInToSync": "Đăng nhập để đồng bộ tùy chọn của bạn",
+    "account": "Tài khoản"
   },
   "fairness": {
     "title": "Xác minh công bằng",

@@ -446,8 +446,8 @@ function TrendChart({ rounds }: { rounds: HistoryEntry[] }) {
               cornerRadius: 10,
               caretSize: 4,
               callbacks: {
-                label: (ctx) => signedMoney(ctx.parsed.y),
-                labelTextColor: (ctx) => (ctx.parsed.y >= 0 ? gain : loss),
+                label: (ctx) => signedMoney(ctx.parsed.y ?? 0),
+                labelTextColor: (ctx) => ((ctx.parsed.y ?? 0) >= 0 ? gain : loss),
               },
             },
           },

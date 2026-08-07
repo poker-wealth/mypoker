@@ -109,7 +109,8 @@
     "signOut": "退出登录",
     "buildLine": "MYPOKER · 测试版本 · v0.1",
     "noHands": "还没有牌局记录",
-    "noHandsBlurb": "加入牌桌，您的战绩将显示在这里。"
+    "noHandsBlurb": "加入牌桌，您的战绩将显示在这里。",
+    "signInBlurbGoogle": "使用 Google 登录以同步余额、记录和 VIP 奖励。"
   },
   "wallet": {
     "totalBalance": "总余额",
@@ -175,7 +176,8 @@
     "notifyDeposits": "充值与提现",
     "notifyPromos": "优惠活动",
     "about": "关于",
-    "signInToSync": "登录以同步您的偏好设置"
+    "signInToSync": "登录以同步您的偏好设置",
+    "account": "账户"
   },
   "fairness": {
     "title": "公平性验证",

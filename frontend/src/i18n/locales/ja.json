@@ -109,7 +109,8 @@
     "signOut": "ログアウト",
     "buildLine": "MYPOKER · ステージング版 · v0.1",
     "noHands": "まだプレイ履歴がありません",
-    "noHandsBlurb": "テーブルに参加すると、ここに記録が表示されます。"
+    "noHandsBlurb": "テーブルに参加すると、ここに記録が表示されます。",
+    "signInBlurbGoogle": "Google でログインして残高・履歴・VIP 特典を同期します。"
   },
   "wallet": {
     "totalBalance": "総残高",
@@ -175,7 +176,8 @@
     "notifyDeposits": "入出金",
     "notifyPromos": "プロモーション",
     "about": "情報",
-    "signInToSync": "ログインすると設定が同期されます"
+    "signInToSync": "ログインすると設定が同期されます",
+    "account": "アカウント"
   },
   "fairness": {
     "title": "公平性の検証",

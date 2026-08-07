@@ -109,7 +109,8 @@
     "signOut": "로그아웃",
     "buildLine": "MYPOKER · 스테이징 빌드 · v0.1",
     "noHands": "아직 플레이 기록이 없습니다",
-    "noHandsBlurb": "테이블에 참여하면 기록이 여기에 표시됩니다."
+    "noHandsBlurb": "테이블에 참여하면 기록이 여기에 표시됩니다.",
+    "signInBlurbGoogle": "Google로 로그인하여 잔액, 기록, VIP 혜택을 동기화합니다."
   },
   "wallet": {
     "totalBalance": "총 잔액",
@@ -175,7 +176,8 @@
     "notifyDeposits": "입출금",
     "notifyPromos": "프로모션",
     "about": "정보",
-    "signInToSync": "로그인하면 설정이 동기화됩니다"
+    "signInToSync": "로그인하면 설정이 동기화됩니다",
+    "account": "계정"
   },
   "fairness": {
     "title": "공정성 검증",

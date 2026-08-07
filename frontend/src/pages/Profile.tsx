@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Settings, ChevronRight, Eye, EyeOff, User as UserIcon, Star, ShieldCheck, Gift, Bell, LifeBuoy } from 'lucide-react';
+import { Settings, ChevronRight, Eye, EyeOff, User as UserIcon, Star, ShieldCheck, Gift, Bell, LifeBuoy, Send, LogOut } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
@@ -8,7 +9,6 @@ import { useBalance, useStats } from '@/api/hooks';
 import { isTelegram } from '@/lib/telegram';
 import { useGoogleLogin } from '@react-oauth/google';
 import { toast } from '@/store/toast';
-import { Send, LogOut } from 'lucide-react';
 
 export function Profile() {
   const navigate = useNavigate();
@@ -222,9 +222,9 @@ function MenuRow({
   rightTextColor, 
   badge, 
   onClick 
-}: { 
-  icon: any; 
-  title: string; 
+}: {
+  icon: LucideIcon;
+  title: string;
   rightText?: string; 
   rightTextColor?: string; 
   badge?: string; 

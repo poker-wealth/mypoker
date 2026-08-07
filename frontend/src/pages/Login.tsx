@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mail, Lock, ChevronLeft, User } from 'lucide-react';
+import { Mail, Lock, ChevronLeft, User, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useSession } from '@/store/session';
 import { useGoogleLogin } from '@react-oauth/google';
@@ -16,6 +16,7 @@ export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const googleLogin = useGoogleLogin({
@@ -184,13 +185,22 @@ export function Login() {
                         <Lock size={16} />
                       </div>
                       <input
-                        type="password"
+                        type={showPassword ? 'text' : 'password'}
                         required
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="h-12 w-full rounded-xl border border-border bg-black/30 pl-10 pr-4 text-[0.95rem] text-text placeholder:text-text/30 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+                        className="h-12 w-full rounded-xl border border-border bg-black/30 pl-10 pr-10 text-[0.95rem] text-text placeholder:text-text/30 focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
                         placeholder="••••••••"
                       />
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onClick={() => setShowPassword((v) => !v)}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        className="absolute inset-y-0 right-0 grid w-10 place-items-center text-dim hover:text-text"
+                      >
+                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
                     </div>
                   </div>
 
