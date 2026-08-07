@@ -9,7 +9,7 @@ import { api } from './client';
  * calls a reputation score affecting a withdrawal a critical failure.
  */
 
-export type ReputationBand = 'VERY_POOR' | 'POOR' | 'FAIR' | 'GOOD' | 'TRUSTED';
+export type ReputationBand = 'VERY_POOR' | 'POOR' | 'AVERAGE' | 'GOOD' | 'EXCELLENT';
 
 export interface Reputation {
   score: number;

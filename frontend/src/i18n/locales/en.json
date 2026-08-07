@@ -241,9 +241,9 @@
     "scope": "Reputation affects which tables you can join and chat access. It never affects deposits or withdrawals.",
     "toAdvance": "{{count}} more rounds to reach 700",
     "band": {
-      "TRUSTED": "Trusted",
+      "EXCELLENT": "Excellent",
       "GOOD": "Good",
-      "FAIR": "Fair",
+      "AVERAGE": "Average",
       "POOR": "Poor",
       "VERY_POOR": "Very poor"
     }

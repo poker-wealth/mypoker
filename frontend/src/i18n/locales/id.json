@@ -241,9 +241,9 @@
     "scope": "Reputasi memengaruhi meja yang bisa Anda ikuti dan akses obrolan. Ini tidak pernah memengaruhi setoran atau penarikan.",
     "toAdvance": "{{count}} ronde lagi untuk mencapai 700",
     "band": {
-      "TRUSTED": "Tepercaya",
+      "EXCELLENT": "Sangat baik",
       "GOOD": "Baik",
-      "FAIR": "Cukup",
+      "AVERAGE": "Rata-rata",
       "POOR": "Rendah",
       "VERY_POOR": "Sangat rendah"
     }

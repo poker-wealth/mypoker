@@ -241,9 +241,9 @@
     "scope": "Uy tín ảnh hưởng đến những bàn bạn có thể tham gia và quyền trò chuyện. Nó không bao giờ ảnh hưởng đến nạp hay rút tiền.",
     "toAdvance": "Còn {{count}} ván nữa để đạt 700",
     "band": {
-      "TRUSTED": "Đáng tin",
+      "EXCELLENT": "Xuất sắc",
       "GOOD": "Tốt",
-      "FAIR": "Trung bình",
+      "AVERAGE": "Trung bình",
       "POOR": "Thấp",
       "VERY_POOR": "Rất thấp"
     }

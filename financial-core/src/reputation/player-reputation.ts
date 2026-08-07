@@ -42,21 +42,36 @@ export const DEDUCTIONS = {
 export type DeductionReason = keyof typeof DEDUCTIONS;
 
 /**
- * The five bands.
+ * The five bands, exactly as FairPlay_v5.9_FINAL_EN §10.1 defines them.
  *
- * Only "Very Poor" is named in the spec (a confirmed collusion, −200, lands
- * there) and the anchors are fixed: 500 on signup, 700 after 100 clean rounds,
- * which is also the agent-eligibility threshold. The boundaries between are
- * mine and want confirming — they are presentation, and no logic branches on
- * them.
+ *   Excellent  900–1000  exclusive frame, priority support, high-stakes access
+ *   Good       700–899   standard access (reached after 100 normal rounds)
+ *   Average    500–699   new account default, no restrictions
+ *   Poor       300–499   blocked from high-stakes tables. Funds NOT affected.
+ *   Very Poor    0–299   low-stakes tables only. Funds NOT affected.
+ *
+ * An earlier version of this file invented its own boundaries and names before
+ * the base spec had been read. They were wrong in three ways — wrong cut-offs,
+ * wrong labels, and a scale capped at 700 when it runs to 1000.
+ *
+ * Note the ceiling: nothing currently awards points above the 700 auto-advance,
+ * so EXCELLENT is unreachable today. That is a gap in the scoring rules, not in
+ * the bands — the spec defines the tier without saying how a player earns their
+ * way into it. Left present and honest rather than quietly dropped.
  */
-export type ReputationBand = 'VERY_POOR' | 'POOR' | 'FAIR' | 'GOOD' | 'TRUSTED';
+export type ReputationBand = 'VERY_POOR' | 'POOR' | 'AVERAGE' | 'GOOD' | 'EXCELLENT';
+
+/** Maximum score the scale allows, per spec. */
+export const MAX_SCORE = 1000;
+
+/** Top of the Very Poor band — where a confirmed collusion lands, per spec. */
+export const VERY_POOR_CEILING = 299;
 
 export function bandFor(score: number): ReputationBand {
-  if (score >= 700) return 'TRUSTED';
-  if (score >= 600) return 'GOOD';
-  if (score >= 500) return 'FAIR';
-  if (score >= 350) return 'POOR';
+  if (score >= 900) return 'EXCELLENT';
+  if (score >= 700) return 'GOOD';
+  if (score >= 500) return 'AVERAGE';
+  if (score >= 300) return 'POOR';
   return 'VERY_POOR';
 }
 
@@ -109,9 +124,20 @@ export async function getReputation(playerId: string): Promise<Reputation> {
   const roundsPlayed = stats.handsPlayed;
   const advanced = roundsPlayed >= CLEAN_ROUNDS_FOR_ADVANCE;
 
-  // Floor at zero: a negative reputation is not a concept the spec defines, and
-  // a score below zero would make the bands meaningless.
-  const score = Math.max(0, STARTING_SCORE + (advanced ? ADVANCE_BONUS : 0) - deducted);
+  // Clamped to the documented 0–1000 scale at both ends. A negative reputation
+  // is not a concept the spec defines, and a score outside the range would fall
+  // through every band.
+  const raw = STARTING_SCORE + (advanced ? ADVANCE_BONUS : 0) - deducted;
+  let score = Math.min(MAX_SCORE, Math.max(0, raw));
+
+  // Confirmed collusion "drops directly to this tier" (Very Poor), per spec —
+  // which is more than its -200 achieves on its own. A new account at 500 would
+  // land on 300 (Poor), and one that had advanced to 700 on 500 (Average),
+  // neither of which is the stated outcome. So the tier is enforced, not
+  // inferred from the arithmetic.
+  if (deductions.some((d) => d.reason === 'COLLUSION_CONFIRMED')) {
+    score = Math.min(score, VERY_POOR_CEILING);
+  }
 
   return {
     score,

@@ -226,9 +226,9 @@ function ReputationRow() {
 
   const { score, band, roundsToAdvance } = rep.data;
   const tone =
-    band === 'TRUSTED' || band === 'GOOD'
+    band === 'EXCELLENT' || band === 'GOOD'
       ? 'text-success'
-      : band === 'FAIR'
+      : band === 'AVERAGE'
         ? 'text-text'
         : 'text-dim';
 

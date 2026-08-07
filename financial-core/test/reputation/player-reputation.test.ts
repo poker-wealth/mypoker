@@ -60,7 +60,7 @@ describe('starting position', () => {
 
   it('puts a new account in FAIR, not at the bottom', async () => {
     // 500 must not read as a bad score — everyone starts there.
-    expect((await getReputation(PLAYER)).band).toBe('FAIR');
+    expect((await getReputation(PLAYER)).band).toBe('AVERAGE');
   });
 });
 
@@ -76,7 +76,7 @@ describe('the 100-round auto-advance', () => {
     await playRounds(CLEAN_ROUNDS_FOR_ADVANCE);
     const rep = await getReputation(PLAYER);
     expect(rep.score).toBe(700);
-    expect(rep.band).toBe('TRUSTED');
+    expect(rep.band).toBe('GOOD');
     expect(rep.roundsToAdvance).toBe(0);
   });
 
@@ -90,12 +90,23 @@ describe('deductions', () => {
   it('applies the spec amounts exactly', async () => {
     expect((await deductReputation({ playerId: PLAYER, reason: 'VERIFICATION_FAILED', confirmedBy: 'ops', findingId: 'f1' })).score).toBe(480);
     expect((await deductReputation({ playerId: PLAYER, reason: 'BOT_CONFIRMED', confirmedBy: 'ops', findingId: 'f2' })).score).toBe(330);
+    // Collusion additionally forces the Very Poor tier, so the running total
+    // (500-20-150-200 = 130) is already inside it and stands.
     expect((await deductReputation({ playerId: PLAYER, reason: 'COLLUSION_CONFIRMED', confirmedBy: 'ops', findingId: 'f3' })).score).toBe(130);
   });
 
-  it('puts a confirmed colluder in VERY_POOR, as the spec names it', async () => {
+  it('drops a confirmed colluder directly to VERY_POOR', async () => {
+    // The spec says collusion "drops directly to this tier", which its -200
+    // does not achieve alone: 500 - 200 = 300, the bottom of POOR.
     const rep = await deductReputation({ playerId: PLAYER, reason: 'COLLUSION_CONFIRMED', confirmedBy: 'ops', findingId: 'f1' });
-    expect(rep.score).toBe(300);
+    expect(rep.band).toBe('VERY_POOR');
+    expect(rep.score).toBeLessThanOrEqual(299);
+  });
+
+  it('drops an advanced player to VERY_POOR too, not merely to AVERAGE', async () => {
+    // Without the tier rule this player would sit at 700 - 200 = 500.
+    await playRounds(CLEAN_ROUNDS_FOR_ADVANCE);
+    const rep = await deductReputation({ playerId: PLAYER, reason: 'COLLUSION_CONFIRMED', confirmedBy: 'ops', findingId: 'f1' });
     expect(rep.band).toBe('VERY_POOR');
   });
 
@@ -128,16 +139,26 @@ describe('deductions', () => {
 });
 
 describe('bands', () => {
+  // Boundaries per FairPlay_v5.9_FINAL_EN 10.1. Every edge is asserted on both
+  // sides — an off-by-one here silently mislabels a whole band of players.
   it('maps each score to its band', () => {
-    expect(bandFor(700)).toBe('TRUSTED');
-    expect(bandFor(699)).toBe('GOOD');
-    expect(bandFor(600)).toBe('GOOD');
-    expect(bandFor(599)).toBe('FAIR');
-    expect(bandFor(500)).toBe('FAIR');
+    expect(bandFor(1000)).toBe('EXCELLENT');
+    expect(bandFor(900)).toBe('EXCELLENT');
+    expect(bandFor(899)).toBe('GOOD');
+    expect(bandFor(700)).toBe('GOOD');
+    expect(bandFor(699)).toBe('AVERAGE');
+    expect(bandFor(500)).toBe('AVERAGE');
     expect(bandFor(499)).toBe('POOR');
-    expect(bandFor(350)).toBe('POOR');
-    expect(bandFor(349)).toBe('VERY_POOR');
+    expect(bandFor(300)).toBe('POOR');
+    expect(bandFor(299)).toBe('VERY_POOR');
     expect(bandFor(0)).toBe('VERY_POOR');
+  });
+
+  it('places a new account in AVERAGE and an advanced one in GOOD', () => {
+    // The two scores the spec actually pins: 500 on signup, 700 after 100
+    // clean rounds.
+    expect(bandFor(500)).toBe('AVERAGE');
+    expect(bandFor(700)).toBe('GOOD');
   });
 });
 

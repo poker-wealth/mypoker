@@ -241,9 +241,9 @@
     "scope": "信誉影响您可加入的牌桌与聊天权限，不会影响充值或提现。",
     "toAdvance": "再进行 {{count}} 局即可达到 700",
     "band": {
-      "TRUSTED": "信誉卓越",
+      "EXCELLENT": "极佳",
       "GOOD": "良好",
-      "FAIR": "一般",
+      "AVERAGE": "一般",
       "POOR": "较低",
       "VERY_POOR": "很低"
     }
