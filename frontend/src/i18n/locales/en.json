@@ -334,5 +334,39 @@
     "vipUp": "You reached {{tier}}",
     "addressChanged": "Your withdrawal address was changed",
     "promo": "{{text}}"
+  },
+  "agent": {
+    "title": "Agent Center",
+    "signInToSee": "Sign in to see the Agent Center",
+    "totalCommission": "Total commission",
+    "rateLine": "Your rate: {{rate}}% of rake",
+    "players": "Players",
+    "subAgents": "Sub-agents",
+    "earned": "earned",
+    "roundsPlayed": "{{count}} rounds",
+    "noPlayers": "No referred players yet",
+    "noPlayersBlurb": "Share a referral link to start.",
+    "noBalancesNote": "You can see what players generate for you, never what they hold. Balances are not shared with agents.",
+    "noLinks": "No referral links yet",
+    "noLinksBlurb": "Create one per channel to see which works.",
+    "registrations": "{{count}} joined",
+    "copyLink": "Copy link",
+    "linkCopied": "Referral link copied",
+    "newLink": "New link",
+    "linkCreated": "Link created",
+    "linkLabelPrompt": "Name this link (e.g. Telegram, Twitter)",
+    "noSubAgents": "No sub-agents",
+    "noSubAgentsBlurb": "Sub-agents earn a share you set, from your own rate.",
+    "becomeTitle": "Become an agent",
+    "becomeBlurb": "Agents earn a share of the rake from players they bring in. Applications go through customer service.",
+    "requirement": "Reputation required",
+    "eligibleNote": "You meet the requirement. Contact customer service to apply.",
+    "notEligibleNote": "Keep playing to build reputation. It rises to 700 after 100 clean rounds.",
+    "tab": {
+      "overview": "Overview",
+      "players": "Players",
+      "links": "Links",
+      "subAgents": "Sub-agents"
+    }
   }
 }

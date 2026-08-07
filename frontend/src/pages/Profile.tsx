@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ShieldCheck, History, Settings, LifeBuoy, Send, Wallet, LogOut, Languages, Spade } from 'lucide-react';
+import { ShieldCheck, History, Settings, LifeBuoy, Send, Wallet, LogOut, Languages, Spade, Bell, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ListRow } from '@/components/ui/ListRow';
@@ -166,7 +166,17 @@ export function Profile() {
           leading={<ShieldCheck size={18} className="text-accent" />}
           onClick={() => navigate('/fairness')}
         />
-        <ListRow title={t('account.history')} leading={<History size={18} className="text-dim" />} onClick={() => {}} />
+        <ListRow
+          title={t('notifications.title')}
+          leading={<Bell size={18} className="text-brand" />}
+          onClick={() => navigate('/notifications')}
+        />
+        <ListRow
+          title={t('agent.title')}
+          leading={<TrendingUp size={18} className="text-success" />}
+          onClick={() => navigate('/agent')}
+        />
+        <ListRow title={t('account.history')} leading={<History size={18} className="text-dim" />} onClick={() => navigate('/data')} />
         <ListRow
           title={t('account.language')}
           subtitle={currentLanguage}

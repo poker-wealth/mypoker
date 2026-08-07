@@ -334,5 +334,39 @@
     "vipUp": "{{tier}}에 도달했습니다",
     "addressChanged": "출금 주소가 변경되었습니다",
     "promo": "{{text}}"
+  },
+  "agent": {
+    "title": "에이전트 센터",
+    "signInToSee": "로그인하면 에이전트 센터를 볼 수 있습니다",
+    "totalCommission": "누적 수수료",
+    "rateLine": "내 요율: 레이크의 {{rate}}%",
+    "players": "플레이어",
+    "subAgents": "하위 에이전트",
+    "earned": "획득",
+    "roundsPlayed": "{{count}} 라운드",
+    "noPlayers": "아직 추천한 플레이어가 없습니다",
+    "noPlayersBlurb": "추천 링크를 공유해 시작하세요.",
+    "noBalancesNote": "플레이어가 발생시킨 실적만 볼 수 있으며 잔액은 볼 수 없습니다. 잔액은 에이전트에게 공유되지 않습니다.",
+    "noLinks": "아직 추천 링크가 없습니다",
+    "noLinksBlurb": "채널별로 만들면 어디가 효과적인지 비교할 수 있습니다.",
+    "registrations": "{{count}}명 가입",
+    "copyLink": "링크 복사",
+    "linkCopied": "추천 링크를 복사했습니다",
+    "newLink": "새 링크",
+    "linkCreated": "링크를 만들었습니다",
+    "linkLabelPrompt": "이 링크의 이름 (예: Telegram, Twitter)",
+    "noSubAgents": "하위 에이전트가 없습니다",
+    "noSubAgentsBlurb": "하위 에이전트는 내 요율에서 내가 정한 몫을 받습니다.",
+    "becomeTitle": "에이전트 되기",
+    "becomeBlurb": "에이전트는 데려온 플레이어의 레이크에서 일정 몫을 받습니다. 신청은 고객센터를 통해 진행됩니다.",
+    "requirement": "필요 평판",
+    "eligibleNote": "조건을 충족했습니다. 고객센터로 신청하세요.",
+    "notEligibleNote": "계속 플레이해 평판을 쌓으세요. 정상 라운드 100회 후 700에 도달합니다.",
+    "tab": {
+      "overview": "개요",
+      "players": "플레이어",
+      "links": "링크",
+      "subAgents": "하위"
+    }
   }
 }

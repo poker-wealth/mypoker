@@ -334,5 +334,39 @@
     "vipUp": "Bạn đã đạt {{tier}}",
     "addressChanged": "Địa chỉ rút tiền của bạn đã thay đổi",
     "promo": "{{text}}"
+  },
+  "agent": {
+    "title": "Trung tâm Đại lý",
+    "signInToSee": "Đăng nhập để xem Trung tâm Đại lý",
+    "totalCommission": "Tổng hoa hồng",
+    "rateLine": "Tỷ lệ của bạn: {{rate}}% tiền xâu",
+    "players": "Người chơi",
+    "subAgents": "Đại lý cấp dưới",
+    "earned": "đã kiếm",
+    "roundsPlayed": "{{count}} ván",
+    "noPlayers": "Chưa có người chơi được giới thiệu",
+    "noPlayersBlurb": "Chia sẻ liên kết giới thiệu để bắt đầu.",
+    "noBalancesNote": "Bạn thấy những gì người chơi tạo ra cho bạn, không phải số dư của họ. Số dư không được chia sẻ với đại lý.",
+    "noLinks": "Chưa có liên kết giới thiệu",
+    "noLinksBlurb": "Tạo mỗi kênh một liên kết để so sánh hiệu quả.",
+    "registrations": "{{count}} đã tham gia",
+    "copyLink": "Sao chép liên kết",
+    "linkCopied": "Đã sao chép liên kết giới thiệu",
+    "newLink": "Liên kết mới",
+    "linkCreated": "Đã tạo liên kết",
+    "linkLabelPrompt": "Đặt tên liên kết (ví dụ: Telegram, Twitter)",
+    "noSubAgents": "Chưa có đại lý cấp dưới",
+    "noSubAgentsBlurb": "Đại lý cấp dưới hưởng phần bạn đặt, trích từ tỷ lệ của bạn.",
+    "becomeTitle": "Trở thành đại lý",
+    "becomeBlurb": "Đại lý hưởng một phần tiền xâu từ người chơi họ giới thiệu. Đăng ký qua bộ phận hỗ trợ.",
+    "requirement": "Uy tín yêu cầu",
+    "eligibleNote": "Bạn đã đủ điều kiện. Liên hệ hỗ trợ để đăng ký.",
+    "notEligibleNote": "Tiếp tục chơi để tăng uy tín. Sau 100 ván bình thường sẽ đạt 700.",
+    "tab": {
+      "overview": "Tổng quan",
+      "players": "Người chơi",
+      "links": "Liên kết",
+      "subAgents": "Cấp dưới"
+    }
   }
 }

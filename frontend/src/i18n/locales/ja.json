@@ -334,5 +334,39 @@
     "vipUp": "{{tier}} に到達しました",
     "addressChanged": "出金アドレスが変更されました",
     "promo": "{{text}}"
+  },
+  "agent": {
+    "title": "エージェントセンター",
+    "signInToSee": "ログインするとエージェントセンターが表示されます",
+    "totalCommission": "累計コミッション",
+    "rateLine": "あなたのレート：レーキの {{rate}}%",
+    "players": "プレイヤー",
+    "subAgents": "サブエージェント",
+    "earned": "獲得",
+    "roundsPlayed": "{{count}} ラウンド",
+    "noPlayers": "紹介したプレイヤーはまだいません",
+    "noPlayersBlurb": "紹介リンクを共有して始めましょう。",
+    "noBalancesNote": "プレイヤーがあなたにもたらした実績のみ表示され、残高は表示されません。残高がエージェントに共有されることはありません。",
+    "noLinks": "紹介リンクがまだありません",
+    "noLinksBlurb": "チャネルごとに作成すると効果を比較できます。",
+    "registrations": "{{count}} 人登録",
+    "copyLink": "リンクをコピー",
+    "linkCopied": "紹介リンクをコピーしました",
+    "newLink": "新しいリンク",
+    "linkCreated": "リンクを作成しました",
+    "linkLabelPrompt": "このリンクの名前（例：Telegram、Twitter）",
+    "noSubAgents": "サブエージェントはいません",
+    "noSubAgentsBlurb": "サブエージェントはあなたのレートから、あなたが設定した割合を得ます。",
+    "becomeTitle": "エージェントになる",
+    "becomeBlurb": "エージェントは紹介したプレイヤーのレーキから分配を受け取ります。申請はカスタマーサービス経由です。",
+    "requirement": "必要な信頼度",
+    "eligibleNote": "条件を満たしています。カスタマーサービスへお申し込みください。",
+    "notEligibleNote": "プレイを続けて信頼度を上げましょう。通常の100ラウンドで700に到達します。",
+    "tab": {
+      "overview": "概要",
+      "players": "プレイヤー",
+      "links": "リンク",
+      "subAgents": "サブ"
+    }
   }
 }

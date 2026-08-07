@@ -334,5 +334,39 @@
     "vipUp": "Anda mencapai {{tier}}",
     "addressChanged": "Alamat penarikan Anda telah diubah",
     "promo": "{{text}}"
+  },
+  "agent": {
+    "title": "Pusat Agen",
+    "signInToSee": "Masuk untuk melihat Pusat Agen",
+    "totalCommission": "Total komisi",
+    "rateLine": "Tarif Anda: {{rate}}% dari rake",
+    "players": "Pemain",
+    "subAgents": "Sub-agen",
+    "earned": "diperoleh",
+    "roundsPlayed": "{{count}} ronde",
+    "noPlayers": "Belum ada pemain rujukan",
+    "noPlayersBlurb": "Bagikan tautan rujukan untuk memulai.",
+    "noBalancesNote": "Anda melihat apa yang pemain hasilkan untuk Anda, bukan saldo mereka. Saldo tidak dibagikan kepada agen.",
+    "noLinks": "Belum ada tautan rujukan",
+    "noLinksBlurb": "Buat satu per kanal untuk melihat mana yang berhasil.",
+    "registrations": "{{count}} bergabung",
+    "copyLink": "Salin tautan",
+    "linkCopied": "Tautan rujukan disalin",
+    "newLink": "Tautan baru",
+    "linkCreated": "Tautan dibuat",
+    "linkLabelPrompt": "Beri nama tautan ini (mis. Telegram, Twitter)",
+    "noSubAgents": "Belum ada sub-agen",
+    "noSubAgentsBlurb": "Sub-agen mendapat bagian yang Anda tetapkan dari tarif Anda.",
+    "becomeTitle": "Menjadi agen",
+    "becomeBlurb": "Agen memperoleh bagian dari rake pemain yang mereka bawa. Pengajuan melalui layanan pelanggan.",
+    "requirement": "Reputasi yang dibutuhkan",
+    "eligibleNote": "Anda memenuhi syarat. Hubungi layanan pelanggan untuk mendaftar.",
+    "notEligibleNote": "Terus bermain untuk membangun reputasi. Naik ke 700 setelah 100 ronde normal.",
+    "tab": {
+      "overview": "Ikhtisar",
+      "players": "Pemain",
+      "links": "Tautan",
+      "subAgents": "Sub-agen"
+    }
   }
 }

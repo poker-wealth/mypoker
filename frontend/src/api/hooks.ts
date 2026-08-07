@@ -5,6 +5,14 @@ import { fetchJackpot } from './jackpot';
 import { fetchVip } from './vip';
 import { fetchMyLeagues, fetchLeagues, createLeagueApi, joinLeagueApi } from './leagues';
 import { fetchNotifications, markNotificationsRead, type NotificationPage } from './notifications';
+import {
+  fetchAgent,
+  fetchAgentEligibility,
+  fetchAgentPlayers,
+  fetchAgentLinks,
+  fetchSubAgents,
+  createReferralLinkApi,
+} from './agent';
 import { fetchStats, fetchHistory, type HistoryPage, type StatsPeriod } from './stats';
 import { fetchLobbyGames, fetchTables, type TableFilter } from './lobby';
 import { useSession } from '@/store/session';
@@ -246,5 +254,47 @@ export function useMarkNotificationsRead() {
     mutationFn: (ids?: string[]) => markNotificationsRead(ids),
     // Refreshes both the list and the header badge.
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+}
+
+// ── Agent Center ────────────────────────────────────────────────────────────
+
+const agentQuery = <T,>(key: string, fn: () => Promise<T>, playerId?: string) => ({
+  queryKey: ['agent', key, playerId],
+  queryFn: fn,
+  enabled: Boolean(playerId),
+  staleTime: 30_000,
+});
+
+export function useAgent() {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery(agentQuery('summary', fetchAgent, playerId));
+}
+
+export function useAgentEligibility() {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery(agentQuery('eligibility', fetchAgentEligibility, playerId));
+}
+
+export function useAgentPlayers() {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery(agentQuery('players', fetchAgentPlayers, playerId));
+}
+
+export function useAgentLinks() {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery(agentQuery('links', fetchAgentLinks, playerId));
+}
+
+export function useAgentSubAgents() {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery(agentQuery('sub-agents', fetchSubAgents, playerId));
+}
+
+export function useCreateReferralLink() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createReferralLinkApi,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['agent'] }),
   });
 }

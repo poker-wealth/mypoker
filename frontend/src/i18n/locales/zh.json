@@ -334,5 +334,39 @@
     "vipUp": "您已达到 {{tier}}",
     "addressChanged": "您的提现地址已变更",
     "promo": "{{text}}"
+  },
+  "agent": {
+    "title": "代理中心",
+    "signInToSee": "登录以查看代理中心",
+    "totalCommission": "累计佣金",
+    "rateLine": "您的费率：抽水的 {{rate}}%",
+    "players": "玩家",
+    "subAgents": "下级代理",
+    "earned": "已赚取",
+    "roundsPlayed": "{{count}} 局",
+    "noPlayers": "暂无推荐玩家",
+    "noPlayersBlurb": "分享推荐链接即可开始。",
+    "noBalancesNote": "您只能看到玩家为您带来的收益，无法看到其余额。玩家余额不会向代理공开。",
+    "noLinks": "暂无推荐链接",
+    "noLinksBlurb": "为每个渠道创建一个，以便比较效果。",
+    "registrations": "{{count}} 人加入",
+    "copyLink": "复制链接",
+    "linkCopied": "推荐链接已复制",
+    "newLink": "新建链接",
+    "linkCreated": "链接已创建",
+    "linkLabelPrompt": "为该链接命名（例如：Telegram、Twitter）",
+    "noSubAgents": "暂无下级代理",
+    "noSubAgentsBlurb": "下级代理按您设定的比例从您的费率中分成。",
+    "becomeTitle": "成为代理",
+    "becomeBlurb": "代理可从其推荐玩家产生的抽水中获得分成。申请需通过客服办理。",
+    "requirement": "所需信誉",
+    "eligibleNote": "您已满足条件，请联系客服申请。",
+    "notEligibleNote": "继续游戏以提升信誉。100 局正常牌局后将升至 700。",
+    "tab": {
+      "overview": "总览",
+      "players": "玩家",
+      "links": "链接",
+      "subAgents": "下级"
+    }
   }
 }
