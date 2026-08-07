@@ -12,15 +12,9 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { useSession } from '@/store/session';
 import { useStats, useReputation } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
+import { moneyFromDecimal } from '@/lib/money';
 import { isTelegram } from '@/lib/telegram';
 import { LANGUAGES } from '@/i18n/languages';
-
-/** Trim financial-core's six-decimal strings to something a person reads. */
-function money(value: string): string {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return value;
-  return `₮${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-}
 
 export function Profile() {
   const navigate = useNavigate();
@@ -148,7 +142,7 @@ export function Profile() {
               />
               <StatTile
                 label={t('account.statBiggestWin')}
-                value={money(stats.data.biggestWin)}
+                value={moneyFromDecimal(stats.data.biggestWin)}
               />
             </div>
           )}

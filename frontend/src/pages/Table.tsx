@@ -7,6 +7,7 @@ import { ActionBar } from '@/components/poker/ActionBar';
 import { InsurancePrompt } from '@/components/poker/InsurancePrompt';
 import { JackpotBurst } from '@/components/poker/JackpotBurst';
 import { toast } from '@/lib/toast';
+import { chips } from '@/lib/money';
 import { useTranslation } from 'react-i18next';
 import { BuyInSheet } from '@/components/poker/BuyInSheet';
 import { TableDesignSheet } from '@/components/poker/TableDesignSheet';
@@ -75,8 +76,8 @@ function LiveTable({ tableId }: { tableId: string }) {
       <TopBar
         subtitle={
           snapshot
-            ? `${snapshot.name} · Hand ${view.handId} · Blinds ₮${snapshot.smallBlind}/${snapshot.bigBlind}`
-            : 'Connecting…'
+            ? `${snapshot.name} · Hand ${view.handId} · Blinds ${chips(snapshot.smallBlind)}/${chips(snapshot.bigBlind)}`
+            : t('table.connecting')
         }
         onBack={() => navigate(-1)}
         status={status}
@@ -145,7 +146,7 @@ function LiveTable({ tableId }: { tableId: string }) {
         ) : seated ? (
           <div className="flex items-center gap-2">
             <div className="flex-1 text-[0.8rem] text-dim">
-              {statusLine(snapshot?.phase, playersReady, mySeat?.status === 'sittingout')}
+              {statusLine(t, snapshot?.phase, playersReady, mySeat?.status === 'sittingout')}
             </div>
             {mySeat && mySeat.stack === 0 ? (
               <Button size="sm" onClick={() => setBuyInFor(null)}>
@@ -167,7 +168,7 @@ function LiveTable({ tableId }: { tableId: string }) {
         ) : status === 'error' || status === 'closed' ? (
           <div className="flex items-center gap-2 py-1">
             <div className="flex-1 text-[0.78rem] leading-tight text-danger">
-              {error ?? 'Lost the connection to the table.'}
+              {error ?? t('table.connectionLost')}
             </div>
             <Button size="sm" variant="secondary" onClick={() => window.location.reload()}>
               Retry
@@ -176,10 +177,10 @@ function LiveTable({ tableId }: { tableId: string }) {
         ) : (
           <div className="py-3 text-center text-sm text-dim">
             {status === 'ready'
-              ? 'Tap an open seat to join the table'
+              ? t('table.tapOpenSeat')
               : status === 'reconnecting'
-                ? 'Reconnecting to the table…'
-                : 'Connecting to the table…'}
+                ? t('table.reconnecting')
+                : t('table.connectingTable')}
           </div>
         )}
       </div>
@@ -204,12 +205,18 @@ function LiveTable({ tableId }: { tableId: string }) {
   );
 }
 
-function statusLine(phase: string | undefined, playersReady: number, sittingOut: boolean): string {
-  if (sittingOut) return 'You’re sitting out — sit in to be dealt the next hand.';
-  if (phase === 'DEALING') return 'Dealing…';
-  if (phase === 'SHOWDOWN') return 'Next hand starting…';
-  if (phase === 'IN_HAND') return 'Waiting for other players…';
-  return playersReady < 2 ? 'Waiting for another player to sit down…' : 'Next hand starting…';
+/** Takes `t` rather than calling a hook: this is module scope, outside React. */
+function statusLine(
+  t: (key: string) => string,
+  phase: string | undefined,
+  playersReady: number,
+  sittingOut: boolean,
+): string {
+  if (sittingOut) return t('table.sittingOut');
+  if (phase === 'DEALING') return t('table.dealing');
+  if (phase === 'SHOWDOWN') return t('table.nextHand');
+  if (phase === 'IN_HAND') return t('table.waitingPlayers');
+  return playersReady < 2 ? t('table.waitingOne') : t('table.nextHand');
 }
 
 /**
@@ -267,6 +274,7 @@ function TopBar({
   /** Opens the table-design picker. */
   onOpenDesigns?: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center justify-between px-4 py-3">
       <button
@@ -296,7 +304,7 @@ function TopBar({
         </button>
         <button
           onClick={onOpenDesigns}
-          title="Table design"
+          title={t('table.tableDesign')}
           className="grid size-9 place-items-center rounded-full border border-border bg-surface text-dim active:scale-95"
         >
           <Settings2 size={16} />
@@ -308,12 +316,13 @@ function TopBar({
 
 /** Sign-in is in flight. Brief, but on a cold open it's the first thing on screen. */
 function SigningIn({ onBack }: { onBack: () => void }) {
+  const { t } = useTranslation();
   return (
     <div
       className="flex min-h-full flex-col"
       style={{ background: 'radial-gradient(ellipse at top, #14142a 0%, var(--bg) 70%)' }}
     >
-      <TopBar subtitle="Live poker" onBack={onBack} />
+      <TopBar subtitle={t('table.livePoker')} onBack={onBack} />
       <div className="flex flex-1 items-center justify-center text-sm text-dim">Signing you in…</div>
     </div>
   );
@@ -325,13 +334,14 @@ function SigningIn({ onBack }: { onBack: () => void }) {
  * the way.
  */
 function SignedOut({ onBack }: { onBack: () => void }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   return (
     <div
       className="flex min-h-full flex-col"
       style={{ background: 'radial-gradient(ellipse at top, #14142a 0%, var(--bg) 70%)' }}
     >
-      <TopBar subtitle="Live poker" onBack={onBack} />
+      <TopBar subtitle={t('table.livePoker')} onBack={onBack} />
       <div className="mx-auto w-full max-w-sm flex-1 px-6 pt-16 text-center">
         <h2 className="text-lg font-bold">Sign in to take a seat</h2>
         <p className="mt-2 text-sm text-dim">
@@ -355,6 +365,7 @@ function SignedOut({ onBack }: { onBack: () => void }) {
 // ── The offline demo (?demo=1) ────────────────────────────────────────────────
 
 function DemoTable() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { id } = useParams();
   const game = GAMES.find((g) => g.id === id);
@@ -367,7 +378,11 @@ function DemoTable() {
       style={{ background: 'radial-gradient(ellipse at top, #14142a 0%, var(--bg) 70%)' }}
     >
       <TopBar
-        subtitle={`${game?.name ?? 'Texas Hold’em'} demo · Hand ${view.handId} · Blinds ₮10/20`}
+        subtitle={t('table.demoSubtitle', {
+          game: game ? t(`gameNames.${game.id}`, { defaultValue: game.name }) : t('gameNames.texas'),
+          hand: view.handId,
+          blinds: `${chips(10)}/${chips(20)}`,
+        })}
         onBack={() => navigate(-1)}
         onOpenDesigns={() => setDesignsOpen(true)}
       />
@@ -395,7 +410,7 @@ function DemoTable() {
           <ActionBar state={view} onAction={heroAct} />
         ) : (
           <div className="py-3 text-center text-sm text-dim">
-            {view.handOver ? 'Next hand starting…' : 'Waiting for other players…'}
+            {view.handOver ? t('table.nextHand') : t('table.waitingPlayers')}
           </div>
         )}
       </div>

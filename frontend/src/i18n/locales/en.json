@@ -173,7 +173,19 @@
     "pot": "Pot",
     "handLine": "Hand {{hand}} · Blinds {{blinds}}",
     "waiting": "Waiting for other players…",
-    "nextHand": "Next hand starting…"
+    "nextHand": "Next hand starting…",
+    "connecting": "Connecting…",
+    "connectingTable": "Connecting to the table…",
+    "reconnecting": "Reconnecting to the table…",
+    "connectionLost": "Lost the connection to the table.",
+    "tapOpenSeat": "Tap an open seat to join the table",
+    "sittingOut": "You’re sitting out — sit in to be dealt the next hand.",
+    "dealing": "Dealing…",
+    "waitingPlayers": "Waiting for other players…",
+    "waitingOne": "Waiting for another player to sit down…",
+    "livePoker": "Live poker",
+    "tableDesign": "Table design",
+    "demoSubtitle": "{{game}} demo · Hand {{hand}} · Blinds {{blinds}}"
   },
   "a11y": {
     "toggleTheme": "Toggle theme",

@@ -1,6 +1,7 @@
 import { Check } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Sheet } from '@/components/ui/Sheet';
+import { useTranslation } from 'react-i18next';
 import { TABLE_DESIGNS, type TableDesign } from '@/lib/tableDesigns';
 import { useTableDesign } from '@/store/tableDesign';
 import { cn } from '@/lib/cn';
@@ -13,11 +14,12 @@ import { cn } from '@/lib/cn';
  * chose is the one waiting next time you sit down.
  */
 export function TableDesignSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
   const current = useTableDesign((s) => s.id);
   const setDesign = useTableDesign((s) => s.setDesign);
 
   return (
-    <Sheet open={open} onClose={onClose} title="Table design">
+    <Sheet open={open} onClose={onClose} title={t('table.tableDesign')}>
       <div className="grid grid-cols-2 gap-3 px-4 pt-4">
         {TABLE_DESIGNS.map((design) => (
           <button

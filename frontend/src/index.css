@@ -108,6 +108,12 @@ body,
 
 body {
   margin: 0;
+  /* Nothing should ever scroll the page sideways (Phase E #4). A wide table or
+     a long unbroken string is a bug, not something to pan around — and on a
+     Mini App the horizontal gesture belongs to Telegram's own navigation, so an
+     overflowing page fights the host. Wide content scrolls inside its own
+     container instead. */
+  overflow-x: hidden;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
@@ -115,4 +121,58 @@ body {
   /* Respect the Telegram safe areas on notched devices. */
   padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
     env(safe-area-inset-left);
+}
+
+/* ─── Accessibility (Phase E #5) ────────────────────────────────────────────
+   Applied globally rather than per-component: the kit had focus styles on none
+   of its twelve components, and adding them one at a time guarantees the
+   thirteenth is forgotten. */
+
+/* A visible focus ring for keyboard users only — :focus-visible never fires on
+   a touch or mouse press, so this costs the phone experience nothing while
+   making the app navigable without one. Uses the brand token so it reads as
+   deliberate rather than as the browser default. */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* The tap-highlight reset above removes the only affordance some Android
+   browsers give; this puts a deliberate one back for actual activation. */
+button:active,
+[role='button']:active {
+  opacity: 0.85;
+}
+
+/* prefers-reduced-motion: honoured globally.
+   Individual components (JackpotBurst, Onboarding) already branch on the media
+   query for their bespoke animations. This catches everything else — page
+   transitions, the lobby shimmer, spring physics in the kit — without auditing
+   thirty call sites. Motion is not removed outright: 0.01ms keeps transitionend
+   and animationend firing, so anything that waits on them still completes.
+   (That exact behaviour is why the tabs went blank in Phase A.) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Screen-reader-only text: available to assistive tech, invisible on screen.
+   For icon-only controls whose meaning is carried entirely by the glyph. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }

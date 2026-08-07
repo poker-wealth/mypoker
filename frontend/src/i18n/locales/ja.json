@@ -173,7 +173,19 @@
     "pot": "ポット",
     "handLine": "ハンド {{hand}} · ブラインド {{blinds}}",
     "waiting": "他のプレイヤーを待っています…",
-    "nextHand": "次のハンドがまもなく開始します…"
+    "nextHand": "次のハンドを開始します…",
+    "connecting": "接続中…",
+    "connectingTable": "テーブルに接続中…",
+    "reconnecting": "テーブルに再接続中…",
+    "connectionLost": "テーブルとの接続が切れました。",
+    "tapOpenSeat": "空席をタップして参加",
+    "sittingOut": "現在は休憩中です。着席すると次のハンドから参加できます。",
+    "dealing": "配牌中…",
+    "waitingPlayers": "他のプレイヤーを待っています…",
+    "waitingOne": "もう一人の着席を待っています…",
+    "livePoker": "ライブポーカー",
+    "tableDesign": "テーブルデザイン",
+    "demoSubtitle": "{{game}} デモ · ハンド {{hand}} · ブラインド {{blinds}}"
   },
   "a11y": {
     "toggleTheme": "テーマを切り替え",

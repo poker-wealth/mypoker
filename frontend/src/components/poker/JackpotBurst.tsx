@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { Trophy } from 'lucide-react';
 import { haptic } from '@/lib/telegram';
+import { chips } from '@/lib/money';
 import type { JackpotTier } from '@/api/jackpot';
 
 /**
@@ -37,10 +38,6 @@ export interface JackpotWin {
   roundId: string;
 }
 
-// Table-currency chips — the live room's units, same as stacks and pots. An
-// earlier version assumed micro-USD and divided by 1e6, which would have shown
-// a 2,000-chip Grand as 0.00 at the very moment it most needed to be right.
-const chips = (amount: number): string => amount.toLocaleString();
 
 const prefersReducedMotion = (): boolean =>
   typeof window !== 'undefined' &&
@@ -107,7 +104,7 @@ export function JackpotBurst({ win, onDone }: { win: JackpotWin | null; onDone: 
             <div className={`mt-3 text-xs font-black uppercase tracking-[0.2em] ${style.text}`}>
               {t(`jackpot.tier.${win.tier}`)}
             </div>
-            <div className="mt-1 text-4xl font-black tabular-nums">₮{chips(win.amount)}</div>
+            <div className="mt-1 text-4xl font-black tabular-nums">{chips(win.amount)}</div>
             <div className="mt-2 text-xs text-dim">{t('jackpot.youWon')}</div>
             <div className="mt-4 text-[0.62rem] text-dim">{t('jackpot.tapToDismiss')}</div>
           </motion.div>

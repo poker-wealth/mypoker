@@ -8,6 +8,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Button } from '@/components/ui/Button';
 import { useStats, useHistory, useVip } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
+import { moneyFromDecimal } from '@/lib/money';
 import { useSession } from '@/store/session';
 import type { StatsPeriod } from '@/api/stats';
 import type { HistoryEntry } from '@/api/stats';
@@ -32,13 +33,6 @@ const PERIODS: { value: StatsPeriod; key: string }[] = [
   { value: 'all', key: 'data.periodAll' },
 ];
 
-/** Trim financial-core's six-decimal strings, keeping the sign. */
-function money(value: string, signed = false): string {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return value;
-  const sign = signed && n > 0 ? '+' : '';
-  return `${sign}₮${n.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-}
 
 export function Data() {
   const { t } = useTranslation();
@@ -96,7 +90,7 @@ export function Data() {
             />
             <Tile
               label={t('data.netProfit')}
-              value={money(stats.data.netProfit, true)}
+              value={moneyFromDecimal(stats.data.netProfit, { sign: true })}
               tone={Number(stats.data.netProfit) >= 0 ? 'success' : 'danger'}
             />
             {/* VPIP and PFR are not here on purpose. They need preflop ACTION
@@ -104,7 +98,7 @@ export function Data() {
                 and the ledger records only a round's net movement. The mockup
                 shows 23.1% and 38.7%; those are design-document numbers, and
                 printing them next to real figures makes all six look real. */}
-            <Tile label={t('account.statBiggestWin')} value={money(stats.data.biggestWin)} tone="accent" />
+            <Tile label={t('account.statBiggestWin')} value={moneyFromDecimal(stats.data.biggestWin)} tone="accent" />
           </div>
         )}
       </section>
@@ -224,7 +218,7 @@ function RoundRow({ round }: { round: HistoryEntry }) {
         </div>
       </div>
       <div className={`shrink-0 font-bold tabular-nums ${up ? 'text-success' : 'text-danger'}`}>
-        {money(round.net, true)}
+        {moneyFromDecimal(round.net, { sign: true })}
       </div>
     </li>
   );

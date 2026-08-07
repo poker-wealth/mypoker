@@ -173,7 +173,19 @@
     "pot": "팟",
     "handLine": "{{hand}}번째 핸드 · 블라인드 {{blinds}}",
     "waiting": "다른 플레이어를 기다리는 중…",
-    "nextHand": "곧 다음 핸드가 시작됩니다…"
+    "nextHand": "다음 핸드를 시작합니다…",
+    "connecting": "연결 중…",
+    "connectingTable": "테이블에 연결 중…",
+    "reconnecting": "테이블에 재연결 중…",
+    "connectionLost": "테이블 연결이 끊겼습니다.",
+    "tapOpenSeat": "빈 자리를 눌러 참여하세요",
+    "sittingOut": "현재 쉬는 중입니다. 착석하면 다음 핸드부터 참여합니다.",
+    "dealing": "카드 배분 중…",
+    "waitingPlayers": "다른 플레이어를 기다리는 중…",
+    "waitingOne": "다른 플레이어가 앉기를 기다리는 중…",
+    "livePoker": "라이브 포커",
+    "tableDesign": "테이블 디자인",
+    "demoSubtitle": "{{game}} 데모 · 핸드 {{hand}} · 블라인드 {{blinds}}"
   },
   "a11y": {
     "toggleTheme": "테마 전환",

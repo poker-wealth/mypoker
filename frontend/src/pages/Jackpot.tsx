@@ -7,6 +7,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { useJackpot } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
 import { cn } from '@/lib/cn';
+import { money } from '@/lib/money';
 import type { TierState } from '@/api/jackpot';
 
 /**
@@ -20,11 +21,6 @@ import type { TierState } from '@/api/jackpot';
  * looks claimable at any moment.
  */
 
-const usd = (micros: number): string =>
-  (micros / 1_000_000).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
 
 const TIER_STYLE: Record<string, { ring: string; text: string }> = {
   MINI: { ring: 'border-info/40', text: 'text-info' },
@@ -63,7 +59,7 @@ export function Jackpot() {
               {t('jackpot.totalPools')}
             </div>
             <div className="mt-1 text-3xl font-black tabular-nums text-jackpot">
-              ₮{usd(jackpot.data.total)}
+              {money(jackpot.data.total)}
             </div>
           </div>
 
@@ -109,7 +105,7 @@ function TierCard({ tier }: { tier: TierState }) {
           tier.armed ? style.text : 'text-dim',
         )}
       >
-        ₮{usd(tier.amount)}
+        {money(tier.amount)}
       </div>
 
       {/* A tier below its threshold cannot pay at all. Saying so is the whole
@@ -121,7 +117,7 @@ function TierCard({ tier }: { tier: TierState }) {
           </div>
           <div className="mt-1.5 flex items-center gap-1 text-[0.62rem] text-dim">
             <Lock size={11} />
-            {t('jackpot.needsMore', { amount: usd(tier.minThreshold - tier.amount) })}
+            {t('jackpot.needsMore', { amount: money(tier.minThreshold - tier.amount) })}
           </div>
         </>
       )}

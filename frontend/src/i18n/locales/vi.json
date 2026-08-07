@@ -173,7 +173,19 @@
     "pot": "Pot",
     "handLine": "Ván {{hand}} · Mù {{blinds}}",
     "waiting": "Đang chờ người chơi khác…",
-    "nextHand": "Ván tiếp theo sắp bắt đầu…"
+    "nextHand": "Ván tiếp theo sắp bắt đầu…",
+    "connecting": "Đang kết nối…",
+    "connectingTable": "Đang kết nối tới bàn…",
+    "reconnecting": "Đang kết nối lại tới bàn…",
+    "connectionLost": "Mất kết nối tới bàn.",
+    "tapOpenSeat": "Chạm vào ghế trống để vào bàn",
+    "sittingOut": "Bạn đang tạm nghỉ — ngồi vào để được chia ván tới.",
+    "dealing": "Đang chia bài…",
+    "waitingPlayers": "Đang chờ người chơi khác…",
+    "waitingOne": "Đang chờ thêm người chơi ngồi vào…",
+    "livePoker": "Poker trực tiếp",
+    "tableDesign": "Kiểu bàn",
+    "demoSubtitle": "{{game}} thử · Ván {{hand}} · Tiền mù {{blinds}}"
   },
   "a11y": {
     "toggleTheme": "Đổi giao diện",

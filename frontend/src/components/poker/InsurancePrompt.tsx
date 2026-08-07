@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { haptic } from '@/lib/telegram';
+import { chips } from '@/lib/money';
 
 /**
  * The all-in insurance prompt.
@@ -41,11 +42,6 @@ export interface InsuranceQuote {
   payoutOdds: number;
 }
 
-// Table-currency chips, NOT micro-USD. The live room's stakes are chip units
-// (blinds 10/20, buy-ins in the hundreds) and the quote is priced in the same —
-// an earlier version divided by 1e6 here and would have shown a 2,000-chip
-// coverage as 0.00.
-const chips = (amount: number): string => amount.toLocaleString();
 
 export function InsurancePrompt({
   quote,
@@ -112,7 +108,7 @@ export function InsurancePrompt({
                 <div className="text-[0.62rem] uppercase tracking-wide text-dim">
                   {t('insurance.payout')}
                 </div>
-                <div className="text-lg font-bold tabular-nums">₮{chips(quote.coverage)}</div>
+                <div className="text-lg font-bold tabular-nums">{chips(quote.coverage)}</div>
               </div>
             </div>
 

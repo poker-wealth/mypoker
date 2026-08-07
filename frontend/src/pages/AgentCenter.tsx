@@ -18,6 +18,7 @@ import { errorKey } from '@/api/errors';
 import { useSession } from '@/store/session';
 import { toast } from '@/lib/toast';
 import { haptic } from '@/lib/telegram';
+import { money } from '@/lib/money';
 
 /**
  * Agent Center — four tabs, per spec: overview, my players, promotion tools,
@@ -34,8 +35,6 @@ import { haptic } from '@/lib/telegram';
 
 type Tab = 'overview' | 'players' | 'links' | 'subAgents';
 
-const usd = (micros: number): string =>
-  (micros / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
 export function AgentCenter() {
   const { t } = useTranslation();
@@ -76,7 +75,7 @@ export function AgentCenter() {
           {t('agent.totalCommission')}
         </div>
         <div className="text-2xl font-black tabular-nums text-success">
-          ₮{usd(summary.totalCommission)}
+          {money(summary.totalCommission)}
         </div>
         <div className="mt-1 text-[0.66rem] text-dim">
           {t('agent.rateLine', { rate: summary.rateBps / 100 })}
@@ -154,7 +153,7 @@ function PlayersTab() {
             </div>
             <div className="shrink-0 text-right">
               <div className="text-sm font-bold tabular-nums text-success">
-                ₮{usd(p.commissionGenerated)}
+                {money(p.commissionGenerated)}
               </div>
               <div className="text-[0.6rem] text-dim">{t('agent.earned')}</div>
             </div>

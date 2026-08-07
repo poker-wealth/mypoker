@@ -8,6 +8,7 @@ import { useVip } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
 import { useSession } from '@/store/session';
 import { cn } from '@/lib/cn';
+import { money } from '@/lib/money';
 import type { VipTier } from '@/api/vip';
 
 /**
@@ -32,8 +33,6 @@ const TIER_STYLE: Record<VipTier, string> = {
   V5: 'text-accent',
 };
 
-const usd = (micros: number): string =>
-  (micros / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 0 });
 
 export function Vip() {
   const { t } = useTranslation();
@@ -87,7 +86,7 @@ export function Vip() {
               {t('vip.effectiveVolume')}
             </div>
             <div className="text-2xl font-black tabular-nums">
-              ₮{usd(vip.data.cumulativeEffective)}
+              {money(vip.data.cumulativeEffective)}
             </div>
 
             {vip.data.next ? (
@@ -105,7 +104,7 @@ export function Vip() {
                   <span>{vip.data.progressPct}%</span>
                   <span className="tabular-nums">
                     {t('vip.remaining', {
-                      amount: usd(vip.data.next.remaining),
+                      amount: money(vip.data.next.remaining),
                       tier: vip.data.next.tier,
                     })}
                   </span>
@@ -130,11 +129,11 @@ export function Vip() {
                         {t(`gameNames.${g.gameId}`, { defaultValue: g.gameId })}
                       </div>
                       <div className="truncate text-[0.66rem] text-dim tabular-nums">
-                        {t('vip.roundsStaked', { rounds: g.rounds, staked: usd(g.staked) })}
+                        {t('vip.roundsStaked', { rounds: g.rounds, staked: money(g.staked) })}
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
-                      <div className="text-sm font-bold tabular-nums">₮{usd(g.effective)}</div>
+                      <div className="text-sm font-bold tabular-nums">{money(g.effective)}</div>
                       <div className="text-[0.6rem] text-dim">{t('vip.counted')}</div>
                     </div>
                   </li>

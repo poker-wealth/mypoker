@@ -173,7 +173,19 @@
     "pot": "Pot",
     "handLine": "Ronde {{hand}} · Blind {{blinds}}",
     "waiting": "Menunggu pemain lain…",
-    "nextHand": "Ronde berikutnya segera dimulai…"
+    "nextHand": "Ronde berikutnya dimulai…",
+    "connecting": "Menghubungkan…",
+    "connectingTable": "Menghubungkan ke meja…",
+    "reconnecting": "Menyambung ulang ke meja…",
+    "connectionLost": "Koneksi ke meja terputus.",
+    "tapOpenSeat": "Ketuk kursi kosong untuk bergabung",
+    "sittingOut": "Anda sedang absen — duduk untuk ikut ronde berikutnya.",
+    "dealing": "Membagikan kartu…",
+    "waitingPlayers": "Menunggu pemain lain…",
+    "waitingOne": "Menunggu pemain lain duduk…",
+    "livePoker": "Poker langsung",
+    "tableDesign": "Desain meja",
+    "demoSubtitle": "Demo {{game}} · Ronde {{hand}} · Blind {{blinds}}"
   },
   "a11y": {
     "toggleTheme": "Ganti tema",
