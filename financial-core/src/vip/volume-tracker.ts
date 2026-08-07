@@ -28,19 +28,30 @@ import { Schema, model } from 'mongoose';
  * Counting raw volume would let a player grind Baccarat to V5 — priority
  * withdrawal, instant auto-transfer — at a third of the intended cost.
  */
-export const VOLUME_COEFFICIENT: Record<string, number> = {
-  texas: 1.0,
-  'short-deck': 1.0,
-  omaha: 1.0,
-  baccarat: 0.3,
-  'niu-niu': 0.5,
+export const VOLUME_COEFFICIENT_BPS: Record<string, number> = {
+  texas: 10_000, // x1.0
+  'short-deck': 10_000,
+  omaha: 10_000,
+  baccarat: 3_000, // x0.3
+  'niu-niu': 5_000, // x0.5
 };
 
-/** Everything not named above. */
-export const DEFAULT_COEFFICIENT = 0.4;
+/** Everything not named above: x0.4. */
+export const DEFAULT_COEFFICIENT_BPS = 4_000;
 
-export const coefficientFor = (gameId: string): number =>
-  VOLUME_COEFFICIENT[gameId] ?? DEFAULT_COEFFICIENT;
+/**
+ * In BASIS POINTS, not a decimal multiplier — iron rule 7 is "all amounts
+ * integer / Decimal128, no floats", and `staked * 0.3` is float arithmetic on
+ * money however well it happens to behave. (It was tested across 200k values
+ * and never drifted; the rule exists so that nobody has to run that test to
+ * trust the number.) Basis points keep the whole calculation in integers, and
+ * it is the same unit settlement already uses for rake and jackpot shares.
+ */
+export const coefficientBpsFor = (gameId: string): number =>
+  VOLUME_COEFFICIENT_BPS[gameId] ?? DEFAULT_COEFFICIENT_BPS;
+
+/** The decimal form, for display only — never for arithmetic on an amount. */
+export const coefficientFor = (gameId: string): number => coefficientBpsFor(gameId) / 10_000;
 
 interface VolumeDoc {
   /** `${playerId}:${gameId}:${month}` — month is YYYY-MM, so monthly retention
@@ -97,7 +108,7 @@ export async function recordVolume(input: {
   if (input.staked <= 0) return;
 
   const month = monthKey(input.at ?? new Date());
-  const effective = Math.floor(input.staked * coefficientFor(input.gameId));
+  const effective = Math.floor((input.staked * coefficientBpsFor(input.gameId)) / 10_000);
 
   await VolumeModel.updateOne(
     { _id: `${input.playerId}:${input.gameId}:${month}` },
