@@ -15,7 +15,7 @@ export function Lobby() {
   const [blinds, setBlinds] = useState('all');
 
   const { data: tablesData } = useTables({
-    gameId: variant === 'dezhou' ? 'texas' : variant,
+    gameId: variant === 'dezhou' ? 'texas' : variant === 'ausha' ? 'omaha' : variant,
   });
 
   // Null while loading rather than the mockup's placeholder figure. Showing
@@ -69,11 +69,13 @@ export function Lobby() {
       <Segmented
         value={variant}
         onChange={setVariant}
+        // XUZHOU and MACAU appeared in the mockup but in no document and no
+        // server catalog. Victor's ruling (Aug 8): follow the documentation —
+        // so the tabs are the games that exist.
         options={[
           { value: 'dezhou', label: 'DEZHOU' },
-          { value: 'xuzhou', label: 'XUZHOU' },
           { value: 'ausha', label: 'AUSHA' },
-          { value: 'macau', label: 'MACAU' },
+          { value: 'short-deck', label: 'SHORT DECK' },
           { value: 'others', label: 'OTHERS' },
         ]}
       />
