@@ -35,6 +35,12 @@
   to = "/.netlify/functions/lobby"
   status = 200
 
+# Jackpot pools — same static-seed caveat as the lobby above.
+[[redirects]]
+  from = "/jackpot"
+  to = "/.netlify/functions/jackpot"
+  status = 200
+
 # SPA fallback — every other route serves index.html (React Router handles it).
 [[redirects]]
   from = "/*"

@@ -19,6 +19,14 @@ export interface LobbyTable {
   players: number;
   /** This table's accumulated jackpot. */
   jackpot: number;
+  /**
+   * Minimum buy-in, expressed in big blinds.
+   *
+   * In big blinds rather than currency because that is how players compare
+   * tables — 40BB is the same depth whether the blinds are 1/2 or 100/200, and a
+   * cash figure would have to be re-read against the stakes column every time.
+   */
+  buyInBB: number;
 }
 
 export interface TableView extends LobbyTable {

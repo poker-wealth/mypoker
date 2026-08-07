@@ -3,10 +3,10 @@ import { GAME_CATALOG, GAME_IDS, provableGames, withVendor, gameSpec } from '../
 
 function lobby(): LobbyService {
   const l = new LobbyService();
-  l.addTable({ id: 't1', gameId: 'texas', stakes: 100, players: 5, jackpot: 5000 });
-  l.addTable({ id: 't2', gameId: 'texas', stakes: 1000, players: 2, jackpot: 20_000 });
-  l.addTable({ id: 't3', gameId: 'niu-niu', stakes: 100, players: 2, jackpot: 800 });
-  l.addTable({ id: 't4', gameId: 'dou-di-zhu', stakes: 50, players: 3, jackpot: 300 });
+  l.addTable({ id: 't1', gameId: 'texas', stakes: 100, players: 5, jackpot: 5000 , buyInBB: 40});
+  l.addTable({ id: 't2', gameId: 'texas', stakes: 1000, players: 2, jackpot: 20_000 , buyInBB: 40});
+  l.addTable({ id: 't3', gameId: 'niu-niu', stakes: 100, players: 2, jackpot: 800 , buyInBB: 40});
+  l.addTable({ id: 't4', gameId: 'dou-di-zhu', stakes: 50, players: 3, jackpot: 300 , buyInBB: 40});
   return l;
 }
 
@@ -59,7 +59,7 @@ describe('lobby — minimum players gate', () => {
 describe('lobby — vendor outage', () => {
   it('a game whose vendor is down shows UNAVAILABLE and will not start, and the rest keep running', () => {
     const l = lobby();
-    l.addTable({ id: 't5', gameId: 'slots', stakes: 10, players: 1, jackpot: 0 });
+    l.addTable({ id: 't5', gameId: 'slots', stakes: 10, players: 1, jackpot: 0 , buyInBB: 40});
     l.setAvailability('slots', false); // driven by the circuit breaker
 
     expect(l.getTable('t5')!.status).toBe('UNAVAILABLE');

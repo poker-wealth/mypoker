@@ -15,10 +15,13 @@ export function Lobby() {
   const [blinds, setBlinds] = useState('all');
 
   const { data: tablesData } = useTables({
-    gameId: variant === 'dezhou' ? 'texas' : variant,
+    gameId: variant === 'dezhou' ? 'texas' : variant === 'ausha' ? 'omaha' : variant,
   });
 
-  const jackpot = lobby.data ? `$ ${formatMicros(lobby.data.totalJackpot)}` : '$ 1,253,842.28';
+  // Null while loading rather than the mockup's placeholder figure. Showing
+  // $1,253,842.28 before the server answers presents a number from a design
+  // document as this platform's actual jackpot.
+  const jackpot = lobby.data ? `$ ${formatMicros(lobby.data.totalJackpot)}` : null;
 
   const tables = tablesData?.tables || [];
 
@@ -57,18 +60,22 @@ export function Lobby() {
               {jackpot}
             </div>
           )}
-          <div className="mt-1 text-xs font-bold text-success drop-shadow-sm">+ $322.16 / hr</div>
+          {/* The mockup's '+ $322.16 / hr' is removed rather than kept: nothing
+              computes an accrual rate, so it would be a financial figure invented
+              by a design document and shown to players as this pool's real growth. */}
         </div>
       </div>
 
       <Segmented
         value={variant}
         onChange={setVariant}
+        // XUZHOU and MACAU appeared in the mockup but in no document and no
+        // server catalog. Victor's ruling (Aug 8): follow the documentation —
+        // so the tabs are the games that exist.
         options={[
           { value: 'dezhou', label: 'DEZHOU' },
-          { value: 'xuzhou', label: 'XUZHOU' },
           { value: 'ausha', label: 'AUSHA' },
-          { value: 'macau', label: 'MACAU' },
+          { value: 'short-deck', label: 'SHORT DECK' },
           { value: 'others', label: 'OTHERS' },
         ]}
       />

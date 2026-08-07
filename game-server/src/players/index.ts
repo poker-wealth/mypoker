@@ -6,10 +6,14 @@ export {
   canChat,
   withdrawalGate,
   clampScore,
+  scoreFor,
+  VERY_POOR_CEILING,
   DEDUCTION,
   NEW_ACCOUNT_SCORE,
   GOOD_STANDING_SCORE,
+  NORMAL_ROUNDS_TO_GOOD,
   type ReputationTier,
+  type FindingReason,
 } from './reputation';
 export {
   VIP_TIERS,
@@ -17,10 +21,12 @@ export {
   reconcileVip,
   newVipState,
   vipSpec,
+  vipProgress,
   GRACE_PERIOD_DAYS,
   type VipTier,
   type VipTierSpec,
   type VipState,
+  type VipProgress,
 } from './vip';
 export {
   antiBotScore,

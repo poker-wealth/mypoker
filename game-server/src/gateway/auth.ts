@@ -99,14 +99,28 @@ export function buildAuthRouter(config: GatewayConfig): Router {
   });
 
   // ── Dev sign-in, for working in a plain browser ──────────────────────────────
-  r.post('/dev', (_req: Request, res: Response) => {
+  r.post('/dev', (req: Request, res: Response) => {
     if (!config.devAuthBypass) {
       res.status(404).json({ error: 'not found' });
       return;
     }
+    // An optional playerId, so local work can hold several identities at once.
+    // Anything involving two people — league isolation, a table with opponents,
+    // an agent and their referral — is untestable with a single fixed id, and
+    // the first attempt at verifying league isolation over HTTP passed
+    // vacuously because both 'players' were the same account.
+    //
+    // Dev-only by construction: this handler 404s unless devAuthBypass is set,
+    // which is false everywhere deployed.
+    const requested = (req.body as { playerId?: unknown } | undefined)?.playerId;
+    const playerId =
+      typeof requested === 'string' && /^[a-zA-Z0-9_-]{1,64}$/.test(requested)
+        ? requested
+        : 'tg-dev-1';
+
     const player: PlayerProfile = {
-      playerId: 'tg-dev-1',
-      displayName: 'Dev Player',
+      playerId,
+      displayName: playerId === 'tg-dev-1' ? 'Dev Player' : playerId,
       username: 'devplayer',
       photoUrl: null,
       telegramId: null,

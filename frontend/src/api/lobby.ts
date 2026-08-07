@@ -38,6 +38,8 @@ export interface TableView {
   players: number;
   /** micro-USD */
   jackpot: number;
+  /** Minimum buy-in in big blinds — comparable across stake levels, unlike cash. */
+  buyInBB: number;
   status: 'UNAVAILABLE' | 'WAITING' | 'OPEN' | 'FULL';
   minPlayers: number;
   maxPlayers: number;

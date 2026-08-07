@@ -21,7 +21,32 @@
     "jackpotBlurb": "MYPOKER에서 진행되는 모든 핸드마다 잭팟이 쌓입니다.",
     "provablyFair": "증명 가능한 공정성 · 온체인 검증",
     "hotNow": "인기 게임",
-    "moreGames": "더 많은 게임"
+    "moreGames": "더 많은 게임",
+    "grandJackpot": "그랜드 잭팟",
+    "fairSecure": "공정 · 안전",
+    "colTable": "테이블",
+    "colBlinds": "블라인드",
+    "colPlayers": "플레이어",
+    "colBuyIn": "바이인",
+    "colStatus": "상태",
+    "quickJoin": "빠른 참여",
+    "createPrivate": "프라이빗 테이블 만들기",
+    "noTables": "조건에 맞는 테이블이 없습니다",
+    "noTablesBlurb": "다른 스테이크를 선택해 보세요.",
+    "tabNotMapped": "아직 설정되지 않았습니다",
+    "tab": {
+      "dezhou": "텍사스",
+      "xuzhou": "쉬저우",
+      "ausha": "오마하",
+      "macau": "마카오",
+      "others": "기타"
+    },
+    "status": {
+      "open": "진행 중",
+      "waiting": "대기",
+      "full": "만석",
+      "unavailable": "이용 불가"
+    }
   },
   "games": {
     "searchPlaceholder": "게임 검색",
@@ -64,11 +89,21 @@
     "cowboy-beauty": "카우보이와 미녀"
   },
   "alliance": {
-    "joinAlliance": "얼라이언스 가입",
-    "recommended": "추천 얼라이언스",
-    "create": "얼라이언스 생성",
-    "ranking": "얼라이언스 랭킹",
-    "pendingEndpoints": "샘플 데이터 — 얼라이언스 API가 아직 연결되지 않았습니다."
+    "create": "얼라이언스 만들기",
+    "mine": "내 얼라이언스",
+    "discover": "둘러보기",
+    "signInToJoin": "로그인하면 얼라이언스에 참여할 수 있습니다",
+    "noneYet": "아직 참여한 얼라이언스가 없습니다",
+    "noneYetBlurb": "아래에서 참여하거나 직접 만들어 보세요.",
+    "nothingToJoin": "지금은 참여 가능한 얼라이언스가 없습니다",
+    "members": "멤버 {{count}}명",
+    "join": "참여",
+    "joined": "{{name}}에 참여했습니다",
+    "created": "{{name}}을(를) 만들었습니다",
+    "name": "얼라이언스 이름",
+    "namePlaceholder": "예: 드래곤 얼라이언스",
+    "inviteOnly": "초대 전용",
+    "inviteOnlyBlurb": "둘러보기에 표시되지 않습니다. 초대한 사람만 참여할 수 있습니다."
   },
   "data": {
     "periodToday": "오늘",
@@ -138,7 +173,21 @@
     "pot": "팟",
     "handLine": "{{hand}}번째 핸드 · 블라인드 {{blinds}}",
     "waiting": "다른 플레이어를 기다리는 중…",
-    "nextHand": "곧 다음 핸드가 시작됩니다…"
+    "nextHand": "다음 핸드를 시작합니다…",
+    "connecting": "연결 중…",
+    "connectingTable": "테이블에 연결 중…",
+    "reconnecting": "테이블에 재연결 중…",
+    "connectionLost": "테이블 연결이 끊겼습니다.",
+    "tapOpenSeat": "빈 자리를 눌러 참여하세요",
+    "sittingOut": "현재 쉬는 중입니다. 착석하면 다음 핸드부터 참여합니다.",
+    "dealing": "카드 배분 중…",
+    "waitingPlayers": "다른 플레이어를 기다리는 중…",
+    "waitingOne": "다른 플레이어가 앉기를 기다리는 중…",
+    "livePoker": "라이브 포커",
+    "tableDesign": "테이블 디자인",
+    "demoSubtitle": "{{game}} 데모 · 핸드 {{hand}} · 블라인드 {{blinds}}",
+    "signingIn": "로그인 중…",
+    "signInToSit": "로그인하고 착석하기"
   },
   "a11y": {
     "toggleTheme": "테마 전환",
@@ -203,6 +252,147 @@
     "step5": "라운드 내용이 변경되지 않았습니다",
     "step5Blurb": "일곱 개 필드가 기록된 라운드 해시와 일치합니다",
     "step6": "이 라운드는 온체인 기록에 포함되어 있습니다",
-    "step6Blurb": "그 증명이 공개된 머클 루트를 재구성하므로 삭제할 수 없습니다"
+    "step6Blurb": "그 증명이 공개된 머클 루트를 재구성하므로 삭제할 수 없습니다",
+    "gameFairness": "게임 공정성",
+    "provable": "검증 가능",
+    "provableBlurb": "규칙을 저희가 보유하며 모든 라운드를 검증할 수 있습니다",
+    "vendorAttested": "공급업체 보증",
+    "vendorBlurb": "외부 공급자가 규칙을 보유합니다. 각 결과는 서명되지만 배당표가 변경되지 않았음은 증명할 수 없습니다",
+    "ratesPending": "공시 지급률은 아직 표시하지 않습니다. 그 근거가 되는 규칙이 온체인에 커밋되고 버전 관리되어야만 지급률에 의미가 생깁니다. 그전까지는 저희가 스스로에 대해 주장하는 숫자일 뿐이며, 이 페이지는 바로 그것을 피하려고 존재합니다.",
+    "actualRate": "실제 환급률 {{rate}}% ({{count}} 라운드)",
+    "theoreticalRate": "명시 {{rate}}%"
+  },
+  "reputation": {
+    "title": "평판",
+    "scope": "평판은 참여 가능한 테이블과 채팅 이용에 영향을 줍니다. 입출금에는 전혀 영향을 주지 않습니다.",
+    "toAdvance": "{{count}}라운드 더 플레이하면 700에 도달합니다",
+    "band": {
+      "EXCELLENT": "매우 좋음",
+      "GOOD": "양호",
+      "AVERAGE": "보통",
+      "POOR": "낮음",
+      "VERY_POOR": "매우 낮음"
+    }
+  },
+  "jackpot": {
+    "totalPools": "총 적립금",
+    "paysOut": "{{pct}}% 지급",
+    "needsMore": "이 등급이 지급되려면 ₮{{amount}} 더 필요합니다",
+    "windowOpen": "그랜드 시간대 열림",
+    "windowClosed": "그랜드 시간대 종료",
+    "opensIn": "{{time}} 후 시작",
+    "closesIn": "{{time}} 후 종료",
+    "howItWorks": "적립금은 승자 이익의 0.5%에서 쌓입니다. 패한 플레이어는 전혀 부담하지 않습니다. 표시된 최소액을 넘어야 해당 등급이 지급될 수 있으며, 그랜드는 토요일 시간대에 착석한 플레이어가 있어야 합니다.",
+    "tier": {
+      "MINI": "미니",
+      "MINOR": "마이너",
+      "MAJOR": "메이저",
+      "GRAND": "그랜드"
+    },
+    "cadence": {
+      "ROUNDS": "몇 라운드마다",
+      "DAILY": "하루 한 번",
+      "WINDOW": "토요일에만"
+    },
+    "youWon": "잭팟 당첨",
+    "tapToDismiss": "아무 곳이나 탭하여 계속"
+  },
+  "onboarding": {
+    "skip": "건너뛰기",
+    "next": "다음",
+    "start": "테이블 찾기",
+    "welcome": {
+      "title": "MYPOKER에 오신 것을 환영합니다",
+      "body": "텍사스 홀덤, 오마하, 도우디주 등 실제 플레이어와 24시간 언제든지."
+    },
+    "fair": {
+      "title": "모든 핸드를 검증할 수 있습니다",
+      "body": "덱은 서버, 테이블의 모든 플레이어, 그리고 누구도 예측할 수 없는 블록체인 블록이 함께 결정합니다. 어떤 핸드든 직접 다시 계산할 수 있습니다."
+    },
+    "play": {
+      "title": "앉아서 시작하세요",
+      "body": "로비를 둘러보고 원하는 스테이크의 테이블을 골라 앉으세요. 입금은 언제든 하실 수 있습니다."
+    }
+  },
+  "vip": {
+    "signInToSee": "로그인하면 VIP 등급을 확인할 수 있습니다",
+    "effectiveVolume": "유효 볼륨",
+    "remaining": "{{tier}}까지 ₮{{amount}}",
+    "topTier": "최고 등급 달성",
+    "byGame": "게임별 내역",
+    "counted": "반영",
+    "roundsStaked": "{{rounds}} 라운드 · ₮{{staked}} 베팅",
+    "coefficientNote": "VIP 환산 비율은 게임마다 다릅니다. 텍사스 ×1.0, 뉴뉴 ×0.5, 바카라 ×0.3, 기타 ×0.4. 레이크가 낮은 게임이 승급의 지름길이 되지 않도록 하기 위함입니다.",
+    "tiers": "등급",
+    "title": {
+      "V1": "브론즈",
+      "V2": "실버",
+      "V3": "골드",
+      "V4": "다이아몬드",
+      "V5": "블랙 골드"
+    },
+    "perks": {
+      "V1": "기본 통계 패널. 표준 출금 한도 및 대기열.",
+      "V2": "자금 흐름 차트. 일일 출금 한도 상향. 프리미엄 이모지.",
+      "V3": "Pro Tracker HUD (VPIP, PFR, 포지션 통계). 전용 지원 채널.",
+      "V4": "우선 출금 대기열. 무제한 상대 태그. 1:1 컨시어지. 엘리트 테이블.",
+      "V5": "즉시 자동 송금. 실시간 상대 전적 분석. 블랙 골드 테이블. 전체화면 입장 연출."
+    }
+  },
+  "notifications": {
+    "title": "알림",
+    "signInToSee": "로그인하면 알림을 볼 수 있습니다",
+    "empty": "아직 알림이 없습니다",
+    "emptyBlurb": "게임 결과, 입금, 공지가 여기에 표시됩니다.",
+    "handWon": "₮{{amount}}을(를) 획득했습니다",
+    "handLost": "핸드 정산 — ₮{{amount}}",
+    "deposit": "₮{{amount}} 입금이 반영되었습니다",
+    "withdrawal": "₮{{amount}} 출금이 전송되었습니다",
+    "jackpot": "잭팟! ₮{{amount}} 획득",
+    "vipUp": "{{tier}}에 도달했습니다",
+    "addressChanged": "출금 주소가 변경되었습니다",
+    "promo": "{{text}}"
+  },
+  "agent": {
+    "title": "에이전트 센터",
+    "signInToSee": "로그인하면 에이전트 센터를 볼 수 있습니다",
+    "totalCommission": "누적 수수료",
+    "rateLine": "내 요율: 레이크의 {{rate}}%",
+    "players": "플레이어",
+    "subAgents": "하위 에이전트",
+    "earned": "획득",
+    "roundsPlayed": "{{count}} 라운드",
+    "noPlayers": "아직 추천한 플레이어가 없습니다",
+    "noPlayersBlurb": "추천 링크를 공유해 시작하세요.",
+    "noBalancesNote": "플레이어가 발생시킨 실적만 볼 수 있으며 잔액은 볼 수 없습니다. 잔액은 에이전트에게 공유되지 않습니다.",
+    "noLinks": "아직 추천 링크가 없습니다",
+    "noLinksBlurb": "채널별로 만들면 어디가 효과적인지 비교할 수 있습니다.",
+    "registrations": "{{count}}명 가입",
+    "copyLink": "링크 복사",
+    "linkCopied": "추천 링크를 복사했습니다",
+    "newLink": "새 링크",
+    "linkCreated": "링크를 만들었습니다",
+    "linkLabelPrompt": "이 링크의 이름 (예: Telegram, Twitter)",
+    "noSubAgents": "하위 에이전트가 없습니다",
+    "noSubAgentsBlurb": "하위 에이전트는 내 요율에서 내가 정한 몫을 받습니다.",
+    "becomeTitle": "에이전트 되기",
+    "becomeBlurb": "에이전트는 데려온 플레이어의 레이크에서 일정 몫을 받습니다. 신청은 고객센터를 통해 진행됩니다.",
+    "requirement": "필요 평판",
+    "eligibleNote": "조건을 충족했습니다. 고객센터로 신청하세요.",
+    "notEligibleNote": "계속 플레이해 평판을 쌓으세요. 정상 라운드 100회 후 700에 도달합니다.",
+    "tab": {
+      "overview": "개요",
+      "players": "플레이어",
+      "links": "링크",
+      "subAgents": "하위"
+    }
+  },
+  "insurance": {
+    "title": "보험 이용 가능",
+    "odds": "배당",
+    "payout": "최대 보장",
+    "decline": "괜찮습니다",
+    "accept": "₮{{premium}}에 가입",
+    "taken": "보험에 가입했습니다"
   }
 }

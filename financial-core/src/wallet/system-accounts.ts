@@ -55,3 +55,36 @@ export async function getOrCreateExternalAccount(): Promise<AccountDoc> {
     throw err;
   }
 }
+
+/**
+ * The four per-table jackpot pool accounts, created on demand.
+ *
+ * Per spec, jackpot pools are keyed by TABLE — "JACKPOT account owner_id =
+ * tableId (not gameType)" — so cross-game isolation holds by construction.
+ *
+ * Existence matters more than it looks: transfer() throws AccountNotFoundError
+ * for a missing account, so a settlement crediting a pool nobody created fails.
+ * The live room had been passing ids that were never created; every settlement
+ * path that touches jackpot accounts now ensures them first.
+ */
+const JACKPOT_TYPE: Record<string, AccountType> = {
+  mini: AccountType.JACKPOT_MINI,
+  minor: AccountType.JACKPOT_MINOR,
+  major: AccountType.JACKPOT_MAJOR,
+  grand: AccountType.JACKPOT_GRAND,
+};
+
+export async function ensureJackpotAccounts(
+  tableId: string,
+  ids: { mini: string; minor: string; major: string; grand: string },
+): Promise<void> {
+  await Promise.all(
+    (Object.keys(JACKPOT_TYPE) as (keyof typeof ids)[]).map((tier) =>
+      AccountModel.updateOne(
+        { _id: ids[tier] },
+        { $setOnInsert: { _id: ids[tier], accountType: JACKPOT_TYPE[tier], ownerId: tableId } },
+        { upsert: true },
+      ),
+    ),
+  );
+}

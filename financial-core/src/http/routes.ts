@@ -1,6 +1,8 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { Money } from '../domain/money';
+import { LedgerType } from '../domain/account-types';
+import { transfer } from '../wallet/transfer';
 import { TableType } from '../settlement/settlement-domain';
 import { settleRound } from '../settlement/settle-round';
 import { settleTableHand } from '../settlement/table-settlement';
@@ -12,9 +14,35 @@ import {
   broadcastWithdrawal,
   confirmWithdrawal,
 } from '../withdrawal/withdrawal-state-machine';
-import { getOrCreatePlayerAccount } from '../wallet/system-accounts';
+import { getOrCreatePlayerAccount, ensureJackpotAccounts } from '../wallet/system-accounts';
 import { getPlayerStats, getPlayerHistory } from '../stats/player-stats';
 import { getSettings, updateSettings } from '../settings/player-settings';
+import { getReputationFacts } from '../reputation/player-reputation';
+import {
+  createLeague,
+  getLeague,
+  joinLeague,
+  leaveLeague,
+  leaguesFor,
+  discoverLeagues,
+} from '../league/league-store';
+import {
+  createAgent,
+  getAgent,
+  createReferralLink,
+  linksFor,
+  bindReferral,
+  playersOf,
+  summaryFor,
+  subAgentsOf,
+} from '../agent/agent-store';
+import {
+  notify,
+  listNotifications,
+  markRead,
+} from '../notifications/notification-store';
+import { getVolumeFacts, recordVolume, getPublicRtp } from '../vip/volume-tracker';
+import { AccountModel } from '../wallet/account.model';
 import { WithdrawalModel } from '../withdrawal/withdrawal.model';
 import { asyncHandler, internalAuth, dataScopeMiddleware, ApiError } from './middleware';
 import { openApiSpec } from './openapi';
@@ -85,6 +113,393 @@ export function buildRouter(): Router {
           ...(window !== undefined ? { period: window } : {}),
         }),
       );
+    }),
+  );
+
+  // Reputation FACTS. The score is derived by the gateway from the canonical
+  // rules in game-server/src/players/reputation.ts — this service stores what
+  // happened and stays out of the scoring business. Still NOT money: nothing
+  // here is reachable from the withdrawal path.
+  r.get(
+    '/me/reputation',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json(await getReputationFacts(req.dataScope!.playerId));
+    }),
+  );
+
+  // ── Alliances (leagues) ──────────────────────────────────────────────────
+  // Membership is the isolation boundary: every league read below is scoped to
+  // the caller, so a player can never enumerate a league they do not belong to.
+  r.get(
+    '/me/leagues',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json({ leagues: await leaguesFor(req.dataScope!.playerId) });
+    }),
+  );
+
+  // Discovery lists only non-invite-only leagues, by definition of the store.
+  r.get(
+    '/leagues',
+    asyncHandler(async (_req: Request, res: Response) => {
+      res.json({ leagues: await discoverLeagues() });
+    }),
+  );
+
+  const createLeagueBody = z.object({
+    leagueId: z.string().min(3).max(40),
+    name: z.string().min(2).max(40),
+    description: z.string().max(200).optional(),
+    inviteOnly: z.boolean().optional(),
+  });
+  r.post(
+    '/leagues',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const body = createLeagueBody.parse(req.body);
+      const league = await createLeague({
+        leagueId: body.leagueId,
+        name: body.name,
+        // The creator is the owner, taken from the token — never from the body,
+        // which would let anyone found a league in someone else's name.
+        ownerId: req.dataScope!.playerId,
+        ...(body.description !== undefined ? { description: body.description } : {}),
+        ...(body.inviteOnly !== undefined ? { inviteOnly: body.inviteOnly } : {}),
+      });
+      res.status(201).json(league);
+    }),
+  );
+
+  r.get(
+    '/leagues/:leagueId',
+    asyncHandler(async (req: Request, res: Response) => {
+      const league = await getLeague(req.params.leagueId!);
+      if (!league) throw new ApiError(404, 'no such league');
+      res.json(league);
+    }),
+  );
+
+  r.post(
+    '/leagues/:leagueId/join',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      await joinLeague(req.params.leagueId!, req.dataScope!.playerId);
+      res.json(await getLeague(req.params.leagueId!));
+    }),
+  );
+
+  r.post(
+    '/leagues/:leagueId/leave',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      await leaveLeague(req.params.leagueId!, req.dataScope!.playerId);
+      res.status(204).end();
+    }),
+  );
+
+  // ── Agent Center ─────────────────────────────────────────────────────────
+  // Every route is scoped to the caller's own agency. There is deliberately no
+  // way to read another agent's players, and nothing here returns a balance —
+  // see src/agent/agent-store.ts for why that is structural rather than a
+  // filter someone could forget to apply.
+  r.get(
+    '/me/agent',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const summary = await summaryFor(req.dataScope!.playerId);
+      // Not an error: most players are not agents, and a 404 would make the
+      // client treat an ordinary account as a failure.
+      res.json({ agent: summary });
+    }),
+  );
+
+  r.get(
+    '/me/agent/players',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json({ players: await playersOf(req.dataScope!.playerId) });
+    }),
+  );
+
+  r.get(
+    '/me/agent/links',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json({ links: await linksFor(req.dataScope!.playerId) });
+    }),
+  );
+
+  const linkBody = z.object({ label: z.string().min(1).max(40).optional() });
+  r.post(
+    '/me/agent/links',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { label } = linkBody.parse(req.body);
+      const linkId = await createReferralLink(req.dataScope!.playerId, label);
+      res.status(201).json({ linkId, label: label ?? 'default' });
+    }),
+  );
+
+  r.get(
+    '/me/agent/sub-agents',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json({ subAgents: await subAgentsOf(req.dataScope!.playerId) });
+    }),
+  );
+
+  const subAgentBody = z.object({
+    playerId: z.string().min(1),
+    rateBps: z.number().int().nonnegative(),
+  });
+  r.post(
+    '/me/agent/sub-agents',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const body = subAgentBody.parse(req.body);
+      const parentId = req.dataScope!.playerId;
+      const parent = await getAgent(parentId);
+      if (!parent) throw new ApiError(403, 'not an agent');
+      // The rate bounds (5% to parent minus 5%) are enforced by the gateway,
+      // which owns the agent domain — see game-server/src/agents/commission.ts.
+      // financial-core stores what it is told; restating the rule here would
+      // give two answers to who keeps what, and they would drift.
+      res.status(201).json(
+        await createAgent({
+          agentId: body.playerId,
+          rateBps: body.rateBps,
+          parentAgentId: parentId,
+        }),
+      );
+    }),
+  );
+
+  // Facts for the gateway's eligibility derivation: rounds, findings, and
+  // whether this player is already an agent. The 700 threshold and the scoring
+  // that reaches it live gateway-side with the rest of the reputation rules.
+  r.get(
+    '/me/agent/eligibility',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const playerId = req.dataScope!.playerId;
+      const facts = await getReputationFacts(playerId);
+      res.json({ ...facts, alreadyAgent: (await getAgent(playerId)) !== null });
+    }),
+  );
+
+  // Enrolment is an OPS action, not self-service. The spec routes agent
+  // applications through customer service; a public endpoint would let anyone
+  // clearing the numeric bar start taking a cut of the rake.
+  const enrolBody = z.object({
+    playerId: z.string().min(1),
+    rateBps: z.number().int().nonnegative(),
+  });
+  r.post(
+    '/internal/agents',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const body = enrolBody.parse(req.body);
+      res.status(201).json(await createAgent({ agentId: body.playerId, rateBps: body.rateBps }));
+    }),
+  );
+
+  const bindBody = z.object({ linkId: z.string().min(1) });
+  r.post(
+    '/me/referral',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { linkId } = bindBody.parse(req.body);
+      // Permanent and set once — a second call is a no-op, not an update.
+      await bindReferral(req.dataScope!.playerId, linkId);
+      res.status(204).end();
+    }),
+  );
+
+  // Public payout rates — open like /health: the whole point is that anyone
+  // can read them, and the frontend reaches this through the gateway.
+  r.get(
+    '/fairness/rtp',
+    asyncHandler(async (_req: Request, res: Response) => {
+      res.json({ games: await getPublicRtp() });
+    }),
+  );
+
+  // ── Jackpot payout ───────────────────────────────────────────────────────
+  // The clearing rules have whitelisted JACKPOT_* -> PLAYER from the start;
+  // this is the first caller. transfer() runs the full guard set — whitelist,
+  // idempotency, overdraft — so a pool can never pay more than it holds, and a
+  // replayed trigger cannot pay twice.
+  const jackpotPayoutBody = z.object({
+    tableId: z.string().min(1),
+    tier: z.enum(['mini', 'minor', 'major', 'grand']),
+    jackpotAccountId: z.string().min(1),
+    playerId: z.string().min(1),
+    /** Decimal string, table currency. */
+    amount: z.string().min(1),
+    roundId: z.string().min(1),
+  });
+  r.post(
+    '/internal/jackpot-payouts',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const b = jackpotPayoutBody.parse(req.body);
+      await ensureJackpotAccounts(b.tableId, {
+        mini: b.tier === 'mini' ? b.jackpotAccountId : `jp:${b.tableId}:mini`,
+        minor: b.tier === 'minor' ? b.jackpotAccountId : `jp:${b.tableId}:minor`,
+        major: b.tier === 'major' ? b.jackpotAccountId : `jp:${b.tableId}:major`,
+        grand: b.tier === 'grand' ? b.jackpotAccountId : `jp:${b.tableId}:grand`,
+      });
+      const player = await getOrCreatePlayerAccount(b.playerId);
+      const result = await transfer({
+        fromAccountId: b.jackpotAccountId,
+        toAccountId: player._id,
+        amount: Money.fromDecimalString(b.amount),
+        type: LedgerType.JACKPOT_PAYOUT,
+        businessId: b.roundId,
+        idempotencyKey: `${b.roundId}:jackpot:${b.tier}`,
+      });
+      res.json({ applied: result.applied ?? true });
+    }),
+  );
+
+  // ── Notifications ────────────────────────────────────────────────────────
+  const notificationsQuery = z.object({
+    limit: z.coerce.number().int().positive().max(100).optional(),
+    cursor: z.string().min(1).optional(),
+  });
+  r.get(
+    '/me/notifications',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { limit, cursor } = notificationsQuery.parse(req.query);
+      res.json(
+        await listNotifications(req.dataScope!.playerId, {
+          ...(limit !== undefined ? { limit } : {}),
+          ...(cursor !== undefined ? { cursor } : {}),
+        }),
+      );
+    }),
+  );
+
+  const readBody = z.object({ ids: z.array(z.string().min(1)).optional() });
+  r.post(
+    '/me/notifications/read',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { ids } = readBody.parse(req.body ?? {});
+      const marked = await markRead(req.dataScope!.playerId, ids);
+      res.json({ marked });
+    }),
+  );
+
+  // Raised by services, never by a player: someone who could notify themselves
+  // could notify anyone, and a notification is a claim the platform is making.
+  // Accepts either identifier, for the same reason as /internal/volume:
+  // settlement holds account ids, and the lookup belongs here rather than in
+  // every caller.
+  const notifyBody = z
+    .object({
+      playerId: z.string().min(1).optional(),
+      playerAccountId: z.string().min(1).optional(),
+      kind: z.enum(['RESULT', 'DEPOSIT', 'PROMO', 'JACKPOT', 'SYSTEM']),
+      titleKey: z.string().min(1),
+      eventId: z.string().min(1),
+      params: z.record(z.union([z.string(), z.number()])).optional(),
+    })
+    .refine((b) => b.playerId !== undefined || b.playerAccountId !== undefined, {
+      message: 'one of playerId or playerAccountId is required',
+    });
+  r.post(
+    '/internal/notifications',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const body = notifyBody.parse(req.body);
+
+      let playerId = body.playerId;
+      if (playerId === undefined) {
+        const account = await AccountModel.findById(body.playerAccountId).lean();
+        // An unknown account means no notification, which is recoverable. Never
+        // worth failing a settled hand over.
+        if (!account) {
+          res.json({ stored: false, suppressed: false });
+          return;
+        }
+        playerId = account.ownerId;
+      }
+
+      const stored = await notify({
+        playerId,
+        kind: body.kind,
+        titleKey: body.titleKey,
+        eventId: body.eventId,
+        ...(body.params !== undefined ? { params: body.params } : {}),
+      });
+      // 'suppressed' is not a failure — the player asked not to be told, and the
+      // caller should be able to tell that apart from an error.
+      res.json({ stored, suppressed: !stored });
+    }),
+  );
+
+  // ── VIP ──────────────────────────────────────────────────────────────────
+  // Volume FACTS. The ladder (thresholds, titles, progress) is applied by the
+  // gateway from game-server/src/players/vip.ts.
+  r.get(
+    '/me/vip',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json(await getVolumeFacts(req.dataScope!.playerId));
+    }),
+  );
+
+  // The settlement hook. Called once per player per settled hand, by the game
+  // server — the only place that knows which game a round belonged to.
+  //
+  // Deliberately NOT part of the ledger write: this is a counter beside the
+  // money path, not on it. The spec describes it that way too ('VIP progress
+  // logs $3', 'cumulative volume tracking'), and it means adding VIP costs
+  // settlement one additive call rather than a schema change to money.
+  // Accepts either identifier. Settlement holds ACCOUNT ids, not player ids —
+  // requiring the latter would make every caller do a lookup financial-core can
+  // do itself, and a lookup done in four places is a lookup done differently in
+  // four places.
+  const volumeBody = z
+    .object({
+      playerId: z.string().min(1).optional(),
+      playerAccountId: z.string().min(1).optional(),
+      gameId: z.string().min(1),
+      staked: z.number().int().nonnegative(),
+      won: z.number().int().nonnegative(),
+    })
+    .refine((b) => b.playerId !== undefined || b.playerAccountId !== undefined, {
+      message: 'one of playerId or playerAccountId is required',
+    });
+  r.post(
+    '/internal/volume',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const body = volumeBody.parse(req.body);
+
+      let playerId = body.playerId;
+      if (playerId === undefined) {
+        const account = await AccountModel.findById(body.playerAccountId).lean();
+        // Not an error worth failing settlement over — an unknown account means
+        // no VIP progress for that player, which is recoverable. Throwing here
+        // would put a counter in the way of a settled hand.
+        if (!account) {
+          res.status(204).end();
+          return;
+        }
+        playerId = account.ownerId;
+      }
+
+      await recordVolume({
+        playerId,
+        gameId: body.gameId,
+        staked: body.staked,
+        won: body.won,
+      });
+      res.status(204).end();
     }),
   );
 
@@ -211,6 +626,14 @@ export function buildRouter(): Router {
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
       const b = tableSettleBody.parse(req.body);
+      // The pools must exist before the injection credits them — transfer()
+      // throws AccountNotFoundError otherwise, failing the whole settlement.
+      // The owning table is read from the pool id itself (`jp:<table>:mini`) —
+      // round ids use dashes, so splitting THEM on ':' yielded the whole round
+      // id as an owner. Unknown id shapes fall back to the round id, which is
+      // at least traceable.
+      const tableOwner = b.jackpotAccounts.mini.split(':')[1] || b.roundId;
+      await ensureJackpotAccounts(tableOwner, b.jackpotAccounts);
       const m = (s: string): Money => Money.fromDecimalString(s);
       const result = await settleTableHand({
         roundId: b.roundId,

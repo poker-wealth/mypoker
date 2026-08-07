@@ -3,6 +3,9 @@ import { FilterError } from '../lobby';
 import type { GatewayConfig } from './config';
 import { buildAuthRouter } from './auth';
 import { buildLobbyRouter } from './lobby-routes';
+import { buildJackpotRouter } from './jackpot-routes';
+import { buildLeagueRouter } from './league-routes';
+import { buildAgentRouter } from './agent-routes';
 import { buildMeRouter } from './me-routes';
 import type { LobbyService } from '../lobby';
 
@@ -27,9 +30,19 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
 
   app.use('/auth', buildAuthRouter(config));
   app.use('/me', buildMeRouter(config));
+  app.use('/leagues', buildLeagueRouter(config));
+  app.use('/agent', buildAgentRouter(config));
+  // Public payout rates — open by design; the numbers exist to be checked.
+  app.get('/fairness/rtp', (_req, res) => {
+    void fetch(`${config.financialCoreUrl}/api/v1/fairness/rtp`)
+      .then(async (r) => res.status(r.status).json(await r.json()))
+      .catch(() => res.status(502).json({ error: 'financial service unavailable' }));
+  });
   // Optional so auth-only deployments (and the auth tests) don't have to stand
   // up a lobby they never read.
   if (lobby) app.use('/lobby', buildLobbyRouter(lobby));
+  // Jackpot pools are derived from the same tables, so it shares the gate.
+  if (lobby) app.use('/jackpot', buildJackpotRouter(lobby));
 
   app.use((_req: Request, res: Response) => {
     res.status(404).json({ error: 'not found' });

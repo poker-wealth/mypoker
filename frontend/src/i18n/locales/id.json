@@ -21,7 +21,32 @@
     "jackpotBlurb": "Bertambah setiap kali satu ronde dimainkan di MYPOKER.",
     "provablyFair": "Terbukti adil · dapat diverifikasi on-chain",
     "hotNow": "Sedang populer",
-    "moreGames": "Game lainnya"
+    "moreGames": "Game lainnya",
+    "grandJackpot": "Jackpot utama",
+    "fairSecure": "Adil & aman",
+    "colTable": "Meja",
+    "colBlinds": "Blind",
+    "colPlayers": "Pemain",
+    "colBuyIn": "Buy-in",
+    "colStatus": "Status",
+    "quickJoin": "Gabung cepat",
+    "createPrivate": "Buat meja privat",
+    "noTables": "Tidak ada meja yang cocok",
+    "noTablesBlurb": "Coba level taruhan lain.",
+    "tabNotMapped": "Belum dikonfigurasi",
+    "tab": {
+      "dezhou": "Dezhou",
+      "xuzhou": "Xuzhou",
+      "ausha": "Omaha",
+      "macau": "Makau",
+      "others": "Lainnya"
+    },
+    "status": {
+      "open": "Terbuka",
+      "waiting": "Tunggu",
+      "full": "Penuh",
+      "unavailable": "Tutup"
+    }
   },
   "games": {
     "searchPlaceholder": "Cari game",
@@ -64,11 +89,21 @@
     "cowboy-beauty": "Koboi & Si Cantik"
   },
   "alliance": {
-    "joinAlliance": "Gabung Aliansi",
-    "recommended": "Aliansi yang disarankan",
-    "create": "Buat Aliansi",
-    "ranking": "Peringkat Aliansi",
-    "pendingEndpoints": "Data contoh — API aliansi belum terhubung."
+    "create": "Buat aliansi",
+    "mine": "Aliansi Anda",
+    "discover": "Jelajahi",
+    "signInToJoin": "Masuk untuk bergabung dengan aliansi",
+    "noneYet": "Belum tergabung dalam aliansi",
+    "noneYetBlurb": "Gabung di bawah, atau buat sendiri.",
+    "nothingToJoin": "Belum ada aliansi terbuka saat ini",
+    "members": "{{count}} anggota",
+    "join": "Gabung",
+    "joined": "Bergabung dengan {{name}}",
+    "created": "{{name}} dibuat",
+    "name": "Nama aliansi",
+    "namePlaceholder": "mis. Aliansi Naga",
+    "inviteOnly": "Hanya undangan",
+    "inviteOnlyBlurb": "Disembunyikan dari Jelajahi. Hanya yang Anda undang bisa bergabung."
   },
   "data": {
     "periodToday": "Hari ini",
@@ -138,7 +173,21 @@
     "pot": "Pot",
     "handLine": "Ronde {{hand}} · Blind {{blinds}}",
     "waiting": "Menunggu pemain lain…",
-    "nextHand": "Ronde berikutnya segera dimulai…"
+    "nextHand": "Ronde berikutnya dimulai…",
+    "connecting": "Menghubungkan…",
+    "connectingTable": "Menghubungkan ke meja…",
+    "reconnecting": "Menyambung ulang ke meja…",
+    "connectionLost": "Koneksi ke meja terputus.",
+    "tapOpenSeat": "Ketuk kursi kosong untuk bergabung",
+    "sittingOut": "Anda sedang absen — duduk untuk ikut ronde berikutnya.",
+    "dealing": "Membagikan kartu…",
+    "waitingPlayers": "Menunggu pemain lain…",
+    "waitingOne": "Menunggu pemain lain duduk…",
+    "livePoker": "Poker langsung",
+    "tableDesign": "Desain meja",
+    "demoSubtitle": "Demo {{game}} · Ronde {{hand}} · Blind {{blinds}}",
+    "signingIn": "Sedang masuk…",
+    "signInToSit": "Masuk untuk duduk"
   },
   "a11y": {
     "toggleTheme": "Ganti tema",
@@ -203,6 +252,147 @@
     "step5": "Tidak ada bagian ronde yang diubah",
     "step5Blurb": "Tujuh bidang di-hash menjadi hash ronde yang tercatat",
     "step6": "Ronde ini ada dalam catatan on-chain",
-    "step6Blurb": "Buktinya membangun ulang akar Merkle yang dipublikasikan, jadi tidak bisa dihapus"
+    "step6Blurb": "Buktinya membangun ulang akar Merkle yang dipublikasikan, jadi tidak bisa dihapus",
+    "gameFairness": "Keadilan permainan",
+    "provable": "Terbukti",
+    "provableBlurb": "Aturan milik kami, dan setiap ronde dapat diverifikasi",
+    "vendorAttested": "Disahkan vendor",
+    "vendorBlurb": "Pemasok luar memiliki aturannya; setiap hasil ditandatangani, tetapi tabel pembayaran mereka tidak dapat dibuktikan tidak berubah",
+    "ratesPending": "Tingkat pembayaran yang dipublikasikan belum ditampilkan. Sebuah tingkat baru bermakna setelah aturan di baliknya dikomit on-chain dan diberi versi — sebelum itu ia hanyalah angka yang kami klaim tentang diri sendiri, hal yang justru ingin dihindari halaman ini.",
+    "actualRate": "Pengembalian aktual {{rate}}% dari {{count}} ronde",
+    "theoreticalRate": "dinyatakan {{rate}}%"
+  },
+  "reputation": {
+    "title": "Reputasi",
+    "scope": "Reputasi memengaruhi meja yang bisa Anda ikuti dan akses obrolan. Ini tidak pernah memengaruhi setoran atau penarikan.",
+    "toAdvance": "{{count}} ronde lagi untuk mencapai 700",
+    "band": {
+      "EXCELLENT": "Sangat baik",
+      "GOOD": "Baik",
+      "AVERAGE": "Rata-rata",
+      "POOR": "Rendah",
+      "VERY_POOR": "Sangat rendah"
+    }
+  },
+  "jackpot": {
+    "totalPools": "Total dalam pool",
+    "paysOut": "membayar {{pct}}%",
+    "needsMore": "Perlu ₮{{amount}} lagi sebelum tingkat ini bisa membayar",
+    "windowOpen": "Jendela Grand terbuka",
+    "windowClosed": "Jendela Grand tertutup",
+    "opensIn": "Buka dalam {{time}}",
+    "closesIn": "Tutup dalam {{time}}",
+    "howItWorks": "Pool tumbuh dari 0,5% keuntungan setiap pemenang — pemain yang kalah tidak pernah menyumbang. Sebuah tingkat baru bisa membayar setelah poolnya melewati minimum yang ditampilkan, dan Grand juga memerlukan pemain yang duduk selama jendela Sabtu.",
+    "tier": {
+      "MINI": "Mini",
+      "MINOR": "Minor",
+      "MAJOR": "Major",
+      "GRAND": "Grand"
+    },
+    "cadence": {
+      "ROUNDS": "setiap beberapa ronde",
+      "DAILY": "sekali sehari",
+      "WINDOW": "hanya Sabtu"
+    },
+    "youWon": "Jackpot dimenangkan",
+    "tapToDismiss": "Ketuk di mana saja untuk lanjut"
+  },
+  "onboarding": {
+    "skip": "Lewati",
+    "next": "Lanjut",
+    "start": "Cari meja",
+    "welcome": {
+      "title": "Selamat datang di MYPOKER",
+      "body": "Texas Hold’em, Omaha, Dou Di Zhu, dan lainnya — dengan pemain sungguhan, sepanjang waktu."
+    },
+    "fair": {
+      "title": "Setiap ronde dapat diverifikasi",
+      "body": "Dek ditentukan oleh server, setiap pemain di meja, dan blok blockchain yang tak seorang pun bisa memprediksi. Anda dapat menghitung ulang ronde mana pun sendiri."
+    },
+    "play": {
+      "title": "Duduk dan mainkan",
+      "body": "Jelajahi lobi, pilih meja sesuai taruhan Anda, dan ambil tempat duduk. Anda bisa menambah dana kapan saja."
+    }
+  },
+  "vip": {
+    "signInToSee": "Masuk untuk melihat status VIP Anda",
+    "effectiveVolume": "Volume efektif",
+    "remaining": "₮{{amount}} lagi ke {{tier}}",
+    "topTier": "Tingkat tertinggi tercapai",
+    "byGame": "Asal volume",
+    "counted": "dihitung",
+    "roundsStaked": "{{rounds}} ronde · ₮{{staked}} dipertaruhkan",
+    "coefficientNote": "Setiap permainan dihitung berbeda untuk VIP: Texas ×1,0, Niu Niu ×0,5, Bakarat ×0,3, lainnya ×0,4. Ini mencegah permainan ber-rake rendah menjadi jalan pintas naik tingkat.",
+    "tiers": "Tingkatan",
+    "title": {
+      "V1": "Perunggu",
+      "V2": "Perak",
+      "V3": "Emas",
+      "V4": "Berlian",
+      "V5": "Emas Hitam"
+    },
+    "perks": {
+      "V1": "Panel statistik dasar. Batas dan antrean penarikan standar.",
+      "V2": "Grafik arus modal. Batas penarikan harian lebih tinggi. Emoji premium.",
+      "V3": "Pro Tracker HUD (VPIP, PFR, statistik posisi). Kanal dukungan khusus.",
+      "V4": "Antrean penarikan prioritas. Penandaan lawan tanpa batas. Concierge 1-on-1. Meja Elite.",
+      "V5": "Transfer otomatis instan. Profil head-to-head langsung. Meja Emas Hitam. Efek masuk layar penuh."
+    }
+  },
+  "notifications": {
+    "title": "Notifikasi",
+    "signInToSee": "Masuk untuk melihat notifikasi Anda",
+    "empty": "Belum ada apa pun",
+    "emptyBlurb": "Hasil, setoran, dan pengumuman akan muncul di sini.",
+    "handWon": "Anda memenangkan ₮{{amount}}",
+    "handLost": "Ronde diselesaikan — ₮{{amount}}",
+    "deposit": "Setoran ₮{{amount}} telah masuk",
+    "withdrawal": "Penarikan ₮{{amount}} telah dikirim",
+    "jackpot": "Jackpot! Anda menang ₮{{amount}}",
+    "vipUp": "Anda mencapai {{tier}}",
+    "addressChanged": "Alamat penarikan Anda telah diubah",
+    "promo": "{{text}}"
+  },
+  "agent": {
+    "title": "Pusat Agen",
+    "signInToSee": "Masuk untuk melihat Pusat Agen",
+    "totalCommission": "Total komisi",
+    "rateLine": "Tarif Anda: {{rate}}% dari rake",
+    "players": "Pemain",
+    "subAgents": "Sub-agen",
+    "earned": "diperoleh",
+    "roundsPlayed": "{{count}} ronde",
+    "noPlayers": "Belum ada pemain rujukan",
+    "noPlayersBlurb": "Bagikan tautan rujukan untuk memulai.",
+    "noBalancesNote": "Anda melihat apa yang pemain hasilkan untuk Anda, bukan saldo mereka. Saldo tidak dibagikan kepada agen.",
+    "noLinks": "Belum ada tautan rujukan",
+    "noLinksBlurb": "Buat satu per kanal untuk melihat mana yang berhasil.",
+    "registrations": "{{count}} bergabung",
+    "copyLink": "Salin tautan",
+    "linkCopied": "Tautan rujukan disalin",
+    "newLink": "Tautan baru",
+    "linkCreated": "Tautan dibuat",
+    "linkLabelPrompt": "Beri nama tautan ini (mis. Telegram, Twitter)",
+    "noSubAgents": "Belum ada sub-agen",
+    "noSubAgentsBlurb": "Sub-agen mendapat bagian yang Anda tetapkan dari tarif Anda.",
+    "becomeTitle": "Menjadi agen",
+    "becomeBlurb": "Agen memperoleh bagian dari rake pemain yang mereka bawa. Pengajuan melalui layanan pelanggan.",
+    "requirement": "Reputasi yang dibutuhkan",
+    "eligibleNote": "Anda memenuhi syarat. Hubungi layanan pelanggan untuk mendaftar.",
+    "notEligibleNote": "Terus bermain untuk membangun reputasi. Naik ke 700 setelah 100 ronde normal.",
+    "tab": {
+      "overview": "Ikhtisar",
+      "players": "Pemain",
+      "links": "Tautan",
+      "subAgents": "Sub-agen"
+    }
+  },
+  "insurance": {
+    "title": "Asuransi tersedia",
+    "odds": "Odds",
+    "payout": "Menanggung hingga",
+    "decline": "Tidak usah",
+    "accept": "Asuransikan ₮{{premium}}",
+    "taken": "Asuransi diambil"
   }
 }

@@ -42,6 +42,16 @@ export interface TableSettlementParty {
  */
 export interface TableSettlementRequest {
   roundId: string;
+  /**
+   * Which game settled. Optional so existing callers keep working unchanged.
+   *
+   * Supply it and the client records per-player play volume after the hand,
+   * which is what drives VIP progress, per-game RTP and play distribution. The
+   * VIP ladder weights volume per game (Texas x1.0, Niu Niu x0.5, Baccarat
+   * x0.3, others x0.4), so without this the hand simply is not counted — it is
+   * never counted wrongly.
+   */
+  gameId?: string;
   tableType: 'PLATFORM' | 'LEAGUE';
   leagueId?: string;
   losers: TableSettlementParty[];
@@ -60,6 +70,19 @@ export interface FinancialCoreClient {
   settleRound(req: SettleRoundRequest): Promise<SettlementReceipt>;
   /** Settle a full multi-party table hand (losers/winners/rake/jackpot). Idempotent on roundId. */
   settleTableHand(req: TableSettlementRequest): Promise<{ roundId: string; applied: boolean }>;
+  /** Pay a jackpot hit from a pool account to a player. Idempotent per round+tier.
+   *  Optional so demo/test fakes need not implement it. */
+  jackpotPayout?(req: JackpotPayoutRequest): Promise<{ applied: boolean }>;
+}
+
+export interface JackpotPayoutRequest {
+  tableId: string;
+  tier: 'mini' | 'minor' | 'major' | 'grand';
+  jackpotAccountId: string;
+  playerId: string;
+  /** Decimal string, table currency. */
+  amount: string;
+  roundId: string;
 }
 
 export class FinancialCoreError extends Error {
@@ -115,9 +138,109 @@ export class HttpFinancialCoreClient implements FinancialCoreClient {
     return this.post<SettlementReceipt>('/internal/settlements', req);
   }
 
+  async jackpotPayout(req: JackpotPayoutRequest): Promise<{ applied: boolean }> {
+    const result = await this.post<{ applied: boolean }>('/internal/jackpot-payouts', req);
+    // The win notification rides the payout, not the announcement: it exists
+    // only if the money moved, and a settlement retry (applied:false) does not
+    // repeat it — though the eventId would dedupe it anyway.
+    if (result.applied) {
+      try {
+        await this.post('/internal/notifications', {
+          playerId: req.playerId,
+          kind: 'JACKPOT',
+          titleKey: 'notifications.jackpot',
+          eventId: `${req.roundId}:jackpot:${req.tier}:notify`,
+          params: { amount: req.amount },
+        });
+      } catch (err) {
+        console.error('[fc-client] jackpot notification not raised:', err);
+      }
+    }
+    return result;
+  }
+
   async settleTableHand(
     req: TableSettlementRequest,
   ): Promise<{ roundId: string; applied: boolean }> {
-    return this.post('/internal/table-settlements', req);
+    const result = await this.post<{ roundId: string; applied: boolean }>(
+      '/internal/table-settlements',
+      req,
+    );
+
+    // Both AFTER the money has settled and only if it did. Recording volume or
+    // announcing a win for a hand that failed to settle would report something
+    // that did not happen.
+    if (result.applied) {
+      if (req.gameId !== undefined) await this.recordHandVolume(req, req.gameId);
+      await this.announceHand(req);
+    }
+    return result;
+  }
+
+  /**
+   * Tell each seat what happened to them.
+   *
+   * Sends a translation key and its parameters, never prose — the player's
+   * language is resolved when they read it, so a hand settled at 3am is
+   * described in whatever language they are reading in now.
+   *
+   * eventId is round-and-player scoped, so a settlement retry cannot announce
+   * one win twice. Failures are swallowed for the same reason as volume: a
+   * missing notification is a missing notification, whereas throwing would fail
+   * a hand whose ledger entries are already written.
+   */
+  private async announceHand(req: TableSettlementRequest): Promise<void> {
+    const seats = [
+      ...req.winners.map((p) => ({ party: p, kind: 'RESULT' as const, titleKey: 'notifications.handWon' })),
+      ...req.losers.map((p) => ({ party: p, kind: 'RESULT' as const, titleKey: 'notifications.handLost' })),
+    ];
+
+    await Promise.all(
+      seats.map(async ({ party, kind, titleKey }) => {
+        try {
+          await this.post('/internal/notifications', {
+            playerAccountId: party.playerAccountId,
+            kind,
+            titleKey,
+            eventId: `${req.roundId}:${party.playerAccountId}`,
+            params: { amount: party.amount },
+          });
+        } catch (err) {
+          console.error('[fc-client] notification not raised for', party.playerAccountId, err);
+        }
+      }),
+    );
+  }
+
+  /**
+   * Log each seat's volume for a settled hand.
+   *
+   * Deliberately swallows its own failures. This is a counter beside the money,
+   * not part of it: a dropped call costs one hand of VIP progress, whereas
+   * letting it throw would fail a hand that has already settled correctly and
+   * whose ledger entries are already written.
+   *
+   * Losers staked their amount and got nothing back. Winners are credited their
+   * net win, so their stake is not in the request — the effective figure is
+   * therefore conservative for winners, never inflated. Worth revisiting if the
+   * settlement shape ever carries gross stakes.
+   */
+  private async recordHandVolume(req: TableSettlementRequest, gameId: string): Promise<void> {
+    const micros = (decimal: string): number => Math.round(Number(decimal) * 1_000_000);
+
+    const seats = [
+      ...req.losers.map((p) => ({ playerAccountId: p.playerAccountId, staked: micros(p.amount), won: 0 })),
+      ...req.winners.map((p) => ({ playerAccountId: p.playerAccountId, staked: micros(p.amount), won: micros(p.amount) })),
+    ];
+
+    await Promise.all(
+      seats.map(async (seat) => {
+        try {
+          await this.post('/internal/volume', { ...seat, gameId });
+        } catch (err) {
+          console.error('[fc-client] volume not recorded for', seat.playerAccountId, err);
+        }
+      }),
+    );
   }
 }

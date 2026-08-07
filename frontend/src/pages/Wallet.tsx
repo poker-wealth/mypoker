@@ -3,7 +3,7 @@ import { ArrowDownLeft, ArrowUpRight, Gift, Info, Copy } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { ListRow } from '@/components/ui/ListRow';
-import { toast } from '@/store/toast';
+import { toast } from '@/lib/toast';
 
 const QUICK = ['10', '50', '100', '500'];
 

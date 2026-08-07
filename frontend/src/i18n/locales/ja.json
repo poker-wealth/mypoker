@@ -21,7 +21,32 @@
     "jackpotBlurb": "MYPOKER でプレイされるすべてのハンドで増えていきます。",
     "provablyFair": "証明可能な公正性 · オンチェーンで検証可能",
     "hotNow": "人気のゲーム",
-    "moreGames": "その他のゲーム"
+    "moreGames": "その他のゲーム",
+    "grandJackpot": "グランドジャックポット",
+    "fairSecure": "公正・安全",
+    "colTable": "テーブル",
+    "colBlinds": "ブラインド",
+    "colPlayers": "プレイヤー",
+    "colBuyIn": "バイイン",
+    "colStatus": "状態",
+    "quickJoin": "クイック参加",
+    "createPrivate": "プライベートテーブル作成",
+    "noTables": "条件に合うテーブルがありません",
+    "noTablesBlurb": "別のステークをお試しください。",
+    "tabNotMapped": "まだ設定されていません",
+    "tab": {
+      "dezhou": "テキサス",
+      "xuzhou": "シュウジョウ",
+      "ausha": "オマハ",
+      "macau": "マカオ",
+      "others": "その他"
+    },
+    "status": {
+      "open": "受付中",
+      "waiting": "待機",
+      "full": "満席",
+      "unavailable": "利用不可"
+    }
   },
   "games": {
     "searchPlaceholder": "ゲームを検索",
@@ -64,11 +89,21 @@
     "cowboy-beauty": "カウボーイ＆ビューティー"
   },
   "alliance": {
-    "joinAlliance": "同盟に参加",
-    "recommended": "おすすめの同盟",
     "create": "同盟を作成",
-    "ranking": "同盟ランキング",
-    "pendingEndpoints": "サンプルデータ — 同盟 API は未接続です。"
+    "mine": "参加中の同盟",
+    "discover": "さがす",
+    "signInToJoin": "ログインすると同盟に参加できます",
+    "noneYet": "まだ同盟に参加していません",
+    "noneYetBlurb": "下から参加するか、ご自身で作成してください。",
+    "nothingToJoin": "現在参加できる同盟はありません",
+    "members": "メンバー {{count}} 名",
+    "join": "参加",
+    "joined": "{{name}} に参加しました",
+    "created": "{{name}} を作成しました",
+    "name": "同盟名",
+    "namePlaceholder": "例：ドラゴン同盟",
+    "inviteOnly": "招待制",
+    "inviteOnlyBlurb": "「さがす」に表示されません。招待した方のみ参加できます。"
   },
   "data": {
     "periodToday": "今日",
@@ -138,7 +173,21 @@
     "pot": "ポット",
     "handLine": "ハンド {{hand}} · ブラインド {{blinds}}",
     "waiting": "他のプレイヤーを待っています…",
-    "nextHand": "次のハンドがまもなく開始します…"
+    "nextHand": "次のハンドを開始します…",
+    "connecting": "接続中…",
+    "connectingTable": "テーブルに接続中…",
+    "reconnecting": "テーブルに再接続中…",
+    "connectionLost": "テーブルとの接続が切れました。",
+    "tapOpenSeat": "空席をタップして参加",
+    "sittingOut": "現在は休憩中です。着席すると次のハンドから参加できます。",
+    "dealing": "配牌中…",
+    "waitingPlayers": "他のプレイヤーを待っています…",
+    "waitingOne": "もう一人の着席を待っています…",
+    "livePoker": "ライブポーカー",
+    "tableDesign": "テーブルデザイン",
+    "demoSubtitle": "{{game}} デモ · ハンド {{hand}} · ブラインド {{blinds}}",
+    "signingIn": "ログイン中…",
+    "signInToSit": "ログインして着席"
   },
   "a11y": {
     "toggleTheme": "テーマを切り替え",
@@ -203,6 +252,147 @@
     "step5": "ラウンドの内容は変更されていません",
     "step5Blurb": "7つのフィールドが記録されたラウンドハッシュに一致します",
     "step6": "このラウンドはオンチェーン記録に含まれています",
-    "step6Blurb": "その証明が公開マークルルートを再構成するため、削除できません"
+    "step6Blurb": "その証明が公開マークルルートを再構成するため、削除できません",
+    "gameFairness": "ゲームの公平性",
+    "provable": "検証可能",
+    "provableBlurb": "ルールは当社が保有し、全ラウンドを検証できます",
+    "vendorAttested": "ベンダー保証",
+    "vendorBlurb": "ルールは外部提供元が保有します。各結果には署名がありますが、配当表が変更されていないことは証明できません",
+    "ratesPending": "公開ペイアウト率はまだ表示していません。その根拠となるルールがオンチェーンにコミットされ、バージョン管理されて初めて率に意味が生まれます。それまでは当社が自らについて主張する数値にすぎず、本ページはまさにそれを避けるために存在します。",
+    "actualRate": "実績還元率 {{rate}}%（{{count}} ラウンド）",
+    "theoreticalRate": "公称 {{rate}}%"
+  },
+  "reputation": {
+    "title": "信頼度",
+    "scope": "信頼度は参加できるテーブルとチャットの利用に影響します。入出金には一切影響しません。",
+    "toAdvance": "あと {{count}} ラウンドで 700 に到達します",
+    "band": {
+      "EXCELLENT": "非常に良好",
+      "GOOD": "良好",
+      "AVERAGE": "標準",
+      "POOR": "やや低い",
+      "VERY_POOR": "低い"
+    }
+  },
+  "jackpot": {
+    "totalPools": "プール総額",
+    "paysOut": "{{pct}}% 払い出し",
+    "needsMore": "この階層が払い出すまであと ₮{{amount}}",
+    "windowOpen": "グランド時間帯 開放中",
+    "windowClosed": "グランド時間帯 終了",
+    "opensIn": "{{time}} 後に開放",
+    "closesIn": "{{time}} 後に終了",
+    "howItWorks": "プールは各勝者の利益の 0.5% から積み立てられます。負けたプレイヤーの拠出は一切ありません。表示された最低額を超えて初めて払い出しが可能になり、グランドはさらに土曜の時間帯に着席者がいることが条件です。",
+    "tier": {
+      "MINI": "ミニ",
+      "MINOR": "マイナー",
+      "MAJOR": "メジャー",
+      "GRAND": "グランド"
+    },
+    "cadence": {
+      "ROUNDS": "数ラウンドごと",
+      "DAILY": "1日1回",
+      "WINDOW": "土曜のみ"
+    },
+    "youWon": "ジャックポット獲得",
+    "tapToDismiss": "タップして続ける"
+  },
+  "onboarding": {
+    "skip": "スキップ",
+    "next": "次へ",
+    "start": "テーブルを探す",
+    "welcome": {
+      "title": "MYPOKER へようこそ",
+      "body": "テキサスホールデム、オマハ、闘地主など。実際のプレイヤーと、24時間いつでも。"
+    },
+    "fair": {
+      "title": "すべてのハンドを検証できます",
+      "body": "デッキはサーバー、テーブルの全プレイヤー、そして誰にも予測できないブロックチェーンのブロックによって決まります。どのハンドでもご自身で再計算できます。"
+    },
+    "play": {
+      "title": "席について始めましょう",
+      "body": "ロビーを見て、ご自身のステークに合うテーブルを選び、着席してください。入金はいつでも可能です。"
+    }
+  },
+  "vip": {
+    "signInToSee": "ログインすると VIP ステータスが表示されます",
+    "effectiveVolume": "有効ボリューム",
+    "remaining": "{{tier}} まで ₮{{amount}}",
+    "topTier": "最高ランク到達",
+    "byGame": "内訳",
+    "counted": "計上",
+    "roundsStaked": "{{rounds}} ラウンド · ₮{{staked}} 賭け",
+    "coefficientNote": "VIP への換算はゲームごとに異なります。テキサス ×1.0、牛牛 ×0.5、バカラ ×0.3、その他 ×0.4。低レーキのゲームが昇格の近道にならないようにするためです。",
+    "tiers": "ランク",
+    "title": {
+      "V1": "ブロンズ",
+      "V2": "シルバー",
+      "V3": "ゴールド",
+      "V4": "ダイヤモンド",
+      "V5": "ブラックゴールド"
+    },
+    "perks": {
+      "V1": "基本データパネル。標準の出金上限と順番待ち。",
+      "V2": "資金推移グラフ。1日の出金上限アップ。プレミアム絵文字。",
+      "V3": "Pro Tracker HUD（VPIP・PFR・ポジション統計）。専用サポート窓口。",
+      "V4": "出金優先キュー。対戦相手タグ無制限。1対1コンシェルジュ。エリートテーブル。",
+      "V5": "即時自動送金。対戦相手のH2Hライブ表示。ブラックゴールドテーブル。全画面入場演出。"
+    }
+  },
+  "notifications": {
+    "title": "通知",
+    "signInToSee": "ログインすると通知が表示されます",
+    "empty": "まだ通知はありません",
+    "emptyBlurb": "ゲーム結果、入金、お知らせがここに表示されます。",
+    "handWon": "₮{{amount}} を獲得しました",
+    "handLost": "ハンド精算 — ₮{{amount}}",
+    "deposit": "₮{{amount}} の入金が反映されました",
+    "withdrawal": "₮{{amount}} の出金を送信しました",
+    "jackpot": "ジャックポット！₮{{amount}} を獲得",
+    "vipUp": "{{tier}} に到達しました",
+    "addressChanged": "出金アドレスが変更されました",
+    "promo": "{{text}}"
+  },
+  "agent": {
+    "title": "エージェントセンター",
+    "signInToSee": "ログインするとエージェントセンターが表示されます",
+    "totalCommission": "累計コミッション",
+    "rateLine": "あなたのレート：レーキの {{rate}}%",
+    "players": "プレイヤー",
+    "subAgents": "サブエージェント",
+    "earned": "獲得",
+    "roundsPlayed": "{{count}} ラウンド",
+    "noPlayers": "紹介したプレイヤーはまだいません",
+    "noPlayersBlurb": "紹介リンクを共有して始めましょう。",
+    "noBalancesNote": "プレイヤーがあなたにもたらした実績のみ表示され、残高は表示されません。残高がエージェントに共有されることはありません。",
+    "noLinks": "紹介リンクがまだありません",
+    "noLinksBlurb": "チャネルごとに作成すると効果を比較できます。",
+    "registrations": "{{count}} 人登録",
+    "copyLink": "リンクをコピー",
+    "linkCopied": "紹介リンクをコピーしました",
+    "newLink": "新しいリンク",
+    "linkCreated": "リンクを作成しました",
+    "linkLabelPrompt": "このリンクの名前（例：Telegram、Twitter）",
+    "noSubAgents": "サブエージェントはいません",
+    "noSubAgentsBlurb": "サブエージェントはあなたのレートから、あなたが設定した割合を得ます。",
+    "becomeTitle": "エージェントになる",
+    "becomeBlurb": "エージェントは紹介したプレイヤーのレーキから分配を受け取ります。申請はカスタマーサービス経由です。",
+    "requirement": "必要な信頼度",
+    "eligibleNote": "条件を満たしています。カスタマーサービスへお申し込みください。",
+    "notEligibleNote": "プレイを続けて信頼度を上げましょう。通常の100ラウンドで700に到達します。",
+    "tab": {
+      "overview": "概要",
+      "players": "プレイヤー",
+      "links": "リンク",
+      "subAgents": "サブ"
+    }
+  },
+  "insurance": {
+    "title": "保険を利用できます",
+    "odds": "オッズ",
+    "payout": "最大補償",
+    "decline": "見送る",
+    "accept": "₮{{premium}} で加入",
+    "taken": "保険に加入しました"
   }
 }

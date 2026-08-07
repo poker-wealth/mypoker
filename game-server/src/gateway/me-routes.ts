@@ -1,6 +1,14 @@
 import { Router, type Request, type Response } from 'express';
 import type { GatewayConfig } from './config';
 import { requireAuth } from './auth';
+import {
+  scoreFor,
+  tierOf,
+  DEDUCTION,
+  NORMAL_ROUNDS_TO_GOOD,
+  vipProgress,
+  type FindingReason,
+} from '../players/index';
 
 /**
  * Player-scoped reads: stats and game history.
@@ -19,7 +27,7 @@ import { requireAuth } from './auth';
 /** Guard against a hung Financial Core turning into a hung Mini App. */
 const UPSTREAM_TIMEOUT_MS = 8000;
 
-async function forward(
+export async function forwardTo(
   config: GatewayConfig,
   req: Request,
   res: Response,
@@ -64,10 +72,94 @@ export function buildMeRouter(config: GatewayConfig): Router {
   const r = Router();
   r.use(requireAuth(config));
 
-  r.get('/stats', (req, res) => void forward(config, req, res, '/me/stats'));
-  r.get('/history', (req, res) => void forward(config, req, res, '/me/history'));
-  r.get('/settings', (req, res) => void forward(config, req, res, '/me/settings'));
-  r.patch('/settings', (req, res) => void forward(config, req, res, '/me/settings'));
+  r.get('/stats', (req, res) => void forwardTo(config, req, res, '/me/stats'));
+  r.get('/history', (req, res) => void forwardTo(config, req, res, '/me/history'));
+  // Reputation and VIP: financial-core returns FACTS (rounds, findings, volume)
+  // and the canonical rules in src/players/ turn them into a score, band, tier
+  // and progress HERE — one home for the rules, so a second copy cannot drift.
+  // A copy that grew in financial-core had already diverged (its VIP titles
+  // predated the owner's Jul 15 renaming) by the time it was found.
+  r.get('/reputation', requireAuth(config), (req: Request, res: Response) => {
+    void (async () => {
+      const facts = await upstreamJson<ReputationFactsShape>(config, req, '/me/reputation');
+      if (!facts.ok) return sendUpstreamError(res, facts);
+
+      const { roundsPlayed, findings } = facts.body;
+      const score = scoreFor(roundsPlayed, findings);
+      res.json({
+        score,
+        band: tierOf(score),
+        roundsPlayed,
+        roundsToAdvance: Math.max(0, NORMAL_ROUNDS_TO_GOOD - roundsPlayed),
+        deducted: findings.reduce((sum, f) => sum + DEDUCTION[f], 0),
+      });
+    })();
+  });
+
+  r.get('/vip', requireAuth(config), (req: Request, res: Response) => {
+    void (async () => {
+      const facts = await upstreamJson<VolumeFactsShape>(config, req, '/me/vip');
+      if (!facts.ok) return sendUpstreamError(res, facts);
+
+      const progress = vipProgress(facts.body.cumulativeEffective);
+      res.json({ ...progress, ...facts.body });
+    })();
+  });
+  r.get('/leagues', (req, res) => void forwardTo(config, req, res, '/me/leagues'));
+  r.get('/notifications', (req, res) => void forwardTo(config, req, res, '/me/notifications'));
+  r.post('/notifications/read', (req, res) => void forwardTo(config, req, res, '/me/notifications/read'));
+  r.post('/referral', (req, res) => void forwardTo(config, req, res, '/me/referral'));
+  r.get('/settings', (req, res) => void forwardTo(config, req, res, '/me/settings'));
+  r.patch('/settings', (req, res) => void forwardTo(config, req, res, '/me/settings'));
 
   return r;
+}
+
+// ── upstream helpers for the shaping routes ──────────────────────────────────
+
+interface ReputationFactsShape {
+  roundsPlayed: number;
+  findings: FindingReason[];
+}
+
+interface VolumeFactsShape {
+  cumulativeEffective: number;
+  monthlyEffective: number;
+  breakdown: unknown[];
+}
+
+type UpstreamResult<T> = { ok: true; body: T } | { ok: false; status: number; error: string };
+
+/**
+ * Fetch JSON from financial-core with the caller's token, for routes that shape
+ * the response rather than pipe it. Same timeout discipline as forwardTo.
+ */
+async function upstreamJson<T>(
+  config: GatewayConfig,
+  req: Request,
+  path: string,
+): Promise<UpstreamResult<T>> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+  try {
+    const upstream = await fetch(`${config.financialCoreUrl}/api/v1${path}`, {
+      headers: { authorization: req.headers.authorization ?? '' },
+      signal: controller.signal,
+    });
+    const body: unknown = await upstream.json().catch(() => null);
+    if (!upstream.ok || body === null) {
+      return { ok: false, status: upstream.status, error: 'financial service unavailable' };
+    }
+    return { ok: true, body: body as T };
+  } catch (err) {
+    const aborted = err instanceof Error && err.name === 'AbortError';
+    console.error('[gateway] financial-core unreachable:', err);
+    return { ok: false, status: aborted ? 504 : 502, error: 'financial service unavailable' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function sendUpstreamError(res: Response, failure: { status: number; error: string }): void {
+  res.status(failure.status).json({ error: failure.error });
 }

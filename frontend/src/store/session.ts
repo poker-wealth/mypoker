@@ -4,7 +4,7 @@ import { setAuthToken, setUnauthorizedHandler, ApiError } from '@/api/client';
 import { loginWithTelegram, loginAsDevPlayer, type Player } from '@/api/auth';
 import { initData } from '@/lib/telegram';
 import { DEV_AUTH_BYPASS } from '@/config';
-import { toast } from '@/store/toast';
+import { toast } from '@/lib/toast';
 
 /**
  * Who's signed in. The token is persisted so a reload inside Telegram doesn't

@@ -1,5 +1,19 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchSettings, patchSettings, type PlayerSettings, type SettingsPatch } from './settings';
+import { fetchReputation } from './reputation';
+import { fetchJackpot } from './jackpot';
+import { fetchVip } from './vip';
+import { fetchMyLeagues, fetchLeagues, createLeagueApi, joinLeagueApi } from './leagues';
+import { fetchNotifications, markNotificationsRead, type NotificationPage } from './notifications';
+import { fetchRtp } from './fairnessFeed';
+import {
+  fetchAgent,
+  fetchAgentEligibility,
+  fetchAgentPlayers,
+  fetchAgentLinks,
+  fetchSubAgents,
+  createReferralLinkApi,
+} from './agent';
 import { fetchStats, fetchHistory, type HistoryPage, type StatsPeriod } from './stats';
 import { fetchLobbyGames, fetchTables, type TableFilter } from './lobby';
 import { useSession } from '@/store/session';
@@ -122,4 +136,180 @@ export function useUpdateSettings() {
     },
     onSuccess: (settled) => queryClient.setQueryData(key, settled),
   });
+}
+
+/**
+ * Tables for the lobby list.
+ *
+ * Public, like the game rail, so no session is needed. Polled on an interval
+ * because seats fill and empty while the screen is open — a lobby that is stale
+ * sends players to a table that was full a minute ago.
+ */
+export function useLobbyTables(filter: TableFilter = {}) {
+  return useQuery({
+    // The filter is part of the key: switching stake bucket or game type must
+    // fetch, not re-slice a cached list that was fetched under other terms.
+    queryKey: ['lobby', 'tables', filter],
+    queryFn: () => fetchTables(filter),
+    staleTime: 10_000,
+    refetchInterval: 20_000,
+    retry: 1,
+  });
+}
+
+/** Reputation. Changes only on a settled round or an ops finding, so cached long. */
+export function useReputation() {
+  const playerId = useSession((s) => s.player?.playerId);
+
+  return useQuery({
+    queryKey: ['reputation', playerId],
+    queryFn: fetchReputation,
+    enabled: Boolean(playerId),
+    staleTime: 60_000,
+  });
+}
+
+/** Jackpot pools. Public, and polled — the headline figure should visibly move. */
+export function useJackpot() {
+  return useQuery({
+    queryKey: ['jackpot'],
+    queryFn: fetchJackpot,
+    staleTime: 10_000,
+    refetchInterval: 30_000,
+    retry: 1,
+  });
+}
+
+/** VIP standing. Moves only when a hand settles, so cached like reputation. */
+export function useVip() {
+  const playerId = useSession((s) => s.player?.playerId);
+
+  return useQuery({
+    queryKey: ['vip', playerId],
+    queryFn: fetchVip,
+    enabled: Boolean(playerId),
+    staleTime: 60_000,
+  });
+}
+
+// ── Alliances ───────────────────────────────────────────────────────────────
+
+export function useMyLeagues() {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery({
+    queryKey: ['leagues', 'mine', playerId],
+    queryFn: fetchMyLeagues,
+    enabled: Boolean(playerId),
+    staleTime: 30_000,
+  });
+}
+
+/** Public — browsing alliances should not need an account. */
+export function useDiscoverLeagues() {
+  return useQuery({ queryKey: ['leagues', 'discover'], queryFn: fetchLeagues, staleTime: 30_000 });
+}
+
+export function useCreateLeague() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createLeagueApi,
+    // Both lists change: the new league is mine, and it becomes discoverable.
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['leagues'] }),
+  });
+}
+
+export function useJoinLeague() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: joinLeagueApi,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['leagues'] }),
+  });
+}
+
+// ── Notifications ───────────────────────────────────────────────────────────
+
+export function useNotifications(pageSize = 20) {
+  const playerId = useSession((s) => s.player?.playerId);
+
+  return useInfiniteQuery<NotificationPage>({
+    queryKey: ['notifications', playerId, pageSize],
+    queryFn: ({ pageParam }) =>
+      fetchNotifications({
+        limit: pageSize,
+        ...(pageParam ? { cursor: String(pageParam) } : {}),
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    enabled: Boolean(playerId),
+    staleTime: 15_000,
+  });
+}
+
+/** Unread count alone, for the header badge — cheaper than holding the list. */
+export function useUnreadCount() {
+  const playerId = useSession((s) => s.player?.playerId);
+
+  return useQuery({
+    queryKey: ['notifications', 'unread', playerId],
+    queryFn: () => fetchNotifications({ limit: 1 }).then((p) => p.unread),
+    enabled: Boolean(playerId),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useMarkNotificationsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids?: string[]) => markNotificationsRead(ids),
+    // Refreshes both the list and the header badge.
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+}
+
+// ── Agent Center ────────────────────────────────────────────────────────────
+
+const agentQuery = <T,>(key: string, fn: () => Promise<T>, playerId?: string) => ({
+  queryKey: ['agent', key, playerId],
+  queryFn: fn,
+  enabled: Boolean(playerId),
+  staleTime: 30_000,
+});
+
+export function useAgent() {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery(agentQuery('summary', fetchAgent, playerId));
+}
+
+export function useAgentEligibility() {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery(agentQuery('eligibility', fetchAgentEligibility, playerId));
+}
+
+export function useAgentPlayers() {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery(agentQuery('players', fetchAgentPlayers, playerId));
+}
+
+export function useAgentLinks() {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery(agentQuery('links', fetchAgentLinks, playerId));
+}
+
+export function useAgentSubAgents() {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery(agentQuery('sub-agents', fetchSubAgents, playerId));
+}
+
+export function useCreateReferralLink() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createReferralLinkApi,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['agent'] }),
+  });
+}
+
+/** Public payout rates. No session — the point is anyone can read them. */
+export function useRtp() {
+  return useQuery({ queryKey: ['fairness', 'rtp'], queryFn: fetchRtp, staleTime: 60_000, retry: 1 });
 }

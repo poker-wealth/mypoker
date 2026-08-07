@@ -21,7 +21,32 @@
     "jackpotBlurb": "Tăng lên theo mỗi ván bài được chơi trên MYPOKER.",
     "provablyFair": "Công bằng minh bạch · xác minh trên chuỗi",
     "hotNow": "Đang hot",
-    "moreGames": "Trò chơi khác"
+    "moreGames": "Trò chơi khác",
+    "grandJackpot": "Jackpot lớn",
+    "fairSecure": "Công bằng & an toàn",
+    "colTable": "Bàn",
+    "colBlinds": "Tiền mù",
+    "colPlayers": "Người chơi",
+    "colBuyIn": "Tiền vào",
+    "colStatus": "Trạng thái",
+    "quickJoin": "Vào nhanh",
+    "createPrivate": "Tạo bàn riêng",
+    "noTables": "Không có bàn phù hợp",
+    "noTablesBlurb": "Thử mức cược khác.",
+    "tabNotMapped": "Chưa được cấu hình",
+    "tab": {
+      "dezhou": "Dezhou",
+      "xuzhou": "Từ Châu",
+      "ausha": "Omaha",
+      "macau": "Ma Cao",
+      "others": "Khác"
+    },
+    "status": {
+      "open": "Đang mở",
+      "waiting": "Chờ",
+      "full": "Đầy",
+      "unavailable": "Đóng"
+    }
   },
   "games": {
     "searchPlaceholder": "Tìm trò chơi",
@@ -64,11 +89,21 @@
     "cowboy-beauty": "Chàng cao bồi và Người đẹp"
   },
   "alliance": {
-    "joinAlliance": "Tham gia liên minh",
-    "recommended": "Liên minh đề xuất",
     "create": "Tạo liên minh",
-    "ranking": "Bảng xếp hạng liên minh",
-    "pendingEndpoints": "Dữ liệu mẫu — API liên minh chưa được kết nối."
+    "mine": "Liên minh của bạn",
+    "discover": "Khám phá",
+    "signInToJoin": "Đăng nhập để tham gia liên minh",
+    "noneYet": "Chưa tham gia liên minh nào",
+    "noneYetBlurb": "Tham gia bên dưới, hoặc tự tạo một liên minh.",
+    "nothingToJoin": "Hiện không có liên minh nào mở",
+    "members": "{{count}} thành viên",
+    "join": "Tham gia",
+    "joined": "Đã tham gia {{name}}",
+    "created": "Đã tạo {{name}}",
+    "name": "Tên liên minh",
+    "namePlaceholder": "ví dụ: Liên minh Rồng",
+    "inviteOnly": "Chỉ theo lời mời",
+    "inviteOnlyBlurb": "Ẩn khỏi mục Khám phá. Chỉ người bạn mời mới tham gia được."
   },
   "data": {
     "periodToday": "Hôm nay",
@@ -138,7 +173,21 @@
     "pot": "Pot",
     "handLine": "Ván {{hand}} · Mù {{blinds}}",
     "waiting": "Đang chờ người chơi khác…",
-    "nextHand": "Ván tiếp theo sắp bắt đầu…"
+    "nextHand": "Ván tiếp theo sắp bắt đầu…",
+    "connecting": "Đang kết nối…",
+    "connectingTable": "Đang kết nối tới bàn…",
+    "reconnecting": "Đang kết nối lại tới bàn…",
+    "connectionLost": "Mất kết nối tới bàn.",
+    "tapOpenSeat": "Chạm vào ghế trống để vào bàn",
+    "sittingOut": "Bạn đang tạm nghỉ — ngồi vào để được chia ván tới.",
+    "dealing": "Đang chia bài…",
+    "waitingPlayers": "Đang chờ người chơi khác…",
+    "waitingOne": "Đang chờ thêm người chơi ngồi vào…",
+    "livePoker": "Poker trực tiếp",
+    "tableDesign": "Kiểu bàn",
+    "demoSubtitle": "{{game}} thử · Ván {{hand}} · Tiền mù {{blinds}}",
+    "signingIn": "Đang đăng nhập…",
+    "signInToSit": "Đăng nhập để ngồi vào bàn"
   },
   "a11y": {
     "toggleTheme": "Đổi giao diện",
@@ -203,6 +252,147 @@
     "step5": "Không có gì trong ván bị thay đổi",
     "step5Blurb": "Bảy trường băm lại thành mã băm ván đã ghi",
     "step6": "Ván này nằm trong bản ghi on-chain",
-    "step6Blurb": "Bằng chứng của nó dựng lại gốc Merkle đã công bố nên không thể xóa"
+    "step6Blurb": "Bằng chứng của nó dựng lại gốc Merkle đã công bố nên không thể xóa",
+    "gameFairness": "Tính công bằng của trò chơi",
+    "provable": "Chứng minh được",
+    "provableBlurb": "Chúng tôi sở hữu luật chơi và mọi ván đều xác minh được",
+    "vendorAttested": "Nhà cung cấp xác nhận",
+    "vendorBlurb": "Nhà cung cấp bên ngoài sở hữu luật chơi; mỗi kết quả đều được ký, nhưng không thể chứng minh bảng trả thưởng không bị đổi",
+    "ratesPending": "Tỷ lệ chi trả công bố chưa được hiển thị. Một tỷ lệ chỉ có ý nghĩa khi luật chơi đằng sau nó được cam kết on-chain và đánh phiên bản — trước đó nó chỉ là con số chúng tôi tự khẳng định, đúng điều mà trang này tồn tại để tránh.",
+    "actualRate": "Tỷ lệ trả thực tế {{rate}}% ({{count}} ván)",
+    "theoreticalRate": "công bố {{rate}}%"
+  },
+  "reputation": {
+    "title": "Uy tín",
+    "scope": "Uy tín ảnh hưởng đến những bàn bạn có thể tham gia và quyền trò chuyện. Nó không bao giờ ảnh hưởng đến nạp hay rút tiền.",
+    "toAdvance": "Còn {{count}} ván nữa để đạt 700",
+    "band": {
+      "EXCELLENT": "Xuất sắc",
+      "GOOD": "Tốt",
+      "AVERAGE": "Trung bình",
+      "POOR": "Thấp",
+      "VERY_POOR": "Rất thấp"
+    }
+  },
+  "jackpot": {
+    "totalPools": "Tổng quỹ thưởng",
+    "paysOut": "trả {{pct}}%",
+    "needsMore": "Cần thêm ₮{{amount}} để hạng này có thể trả thưởng",
+    "windowOpen": "Khung giờ Grand đang mở",
+    "windowClosed": "Khung giờ Grand đã đóng",
+    "opensIn": "Mở sau {{time}}",
+    "closesIn": "Đóng sau {{time}}",
+    "howItWorks": "Quỹ thưởng tăng từ 0,5% lợi nhuận của mỗi người thắng — người thua không bao giờ đóng góp. Một hạng chỉ có thể trả thưởng khi quỹ vượt mức tối thiểu hiển thị, và Grand còn cần có người chơi ngồi bàn trong khung giờ thứ Bảy.",
+    "tier": {
+      "MINI": "Mini",
+      "MINOR": "Minor",
+      "MAJOR": "Major",
+      "GRAND": "Grand"
+    },
+    "cadence": {
+      "ROUNDS": "sau vài ván",
+      "DAILY": "mỗi ngày một lần",
+      "WINDOW": "chỉ thứ Bảy"
+    },
+    "youWon": "Trúng jackpot",
+    "tapToDismiss": "Chạm bất kỳ đâu để tiếp tục"
+  },
+  "onboarding": {
+    "skip": "Bỏ qua",
+    "next": "Tiếp",
+    "start": "Tìm bàn chơi",
+    "welcome": {
+      "title": "Chào mừng đến với MYPOKER",
+      "body": "Texas Hold’em, Omaha, Đấu Địa Chủ và nhiều hơn nữa — với người chơi thật, suốt ngày đêm."
+    },
+    "fair": {
+      "title": "Mọi ván đều xác minh được",
+      "body": "Bộ bài được quyết định bởi máy chủ, mọi người chơi tại bàn, và một khối blockchain không ai đoán trước được. Bạn có thể tự tính lại bất kỳ ván nào."
+    },
+    "play": {
+      "title": "Ngồi vào bàn và chơi",
+      "body": "Xem sảnh, chọn bàn theo mức cược của bạn và ngồi vào. Bạn có thể nạp tiền bất cứ lúc nào."
+    }
+  },
+  "vip": {
+    "signInToSee": "Đăng nhập để xem hạng VIP của bạn",
+    "effectiveVolume": "Doanh số hiệu quả",
+    "remaining": "Còn ₮{{amount}} đến {{tier}}",
+    "topTier": "Đã đạt hạng cao nhất",
+    "byGame": "Nguồn doanh số",
+    "counted": "được tính",
+    "roundsStaked": "{{rounds}} ván · đặt ₮{{staked}}",
+    "coefficientNote": "Mỗi trò tính vào VIP khác nhau: Texas ×1,0, Niu Niu ×0,5, Baccarat ×0,3, còn lại ×0,4. Điều này ngăn các trò rake thấp trở thành lối tắt lên hạng.",
+    "tiers": "Các hạng",
+    "title": {
+      "V1": "Đồng",
+      "V2": "Bạc",
+      "V3": "Vàng",
+      "V4": "Kim cương",
+      "V5": "Hắc Kim"
+    },
+    "perks": {
+      "V1": "Bảng thống kê cơ bản. Hạn mức và hàng đợi rút tiền tiêu chuẩn.",
+      "V2": "Biểu đồ dòng vốn. Hạn mức rút hằng ngày cao hơn. Emoji cao cấp.",
+      "V3": "Pro Tracker HUD (VPIP, PFR, thống kê vị trí). Kênh hỗ trợ riêng.",
+      "V4": "Hàng đợi rút tiền ưu tiên. Gắn thẻ đối thủ không giới hạn. Trợ lý riêng 1-1. Bàn Elite.",
+      "V5": "Tự động chuyển tiền tức thì. Phân tích đối đầu trực tiếp. Bàn Hắc Kim. Hiệu ứng vào bàn toàn màn hình."
+    }
+  },
+  "notifications": {
+    "title": "Thông báo",
+    "signInToSee": "Đăng nhập để xem thông báo",
+    "empty": "Chưa có gì",
+    "emptyBlurb": "Kết quả, nạp tiền và thông báo sẽ hiện ở đây.",
+    "handWon": "Bạn thắng ₮{{amount}}",
+    "handLost": "Ván đã kết toán — ₮{{amount}}",
+    "deposit": "Đã ghi có khoản nạp ₮{{amount}}",
+    "withdrawal": "Đã gửi khoản rút ₮{{amount}}",
+    "jackpot": "Jackpot! Bạn thắng ₮{{amount}}",
+    "vipUp": "Bạn đã đạt {{tier}}",
+    "addressChanged": "Địa chỉ rút tiền của bạn đã thay đổi",
+    "promo": "{{text}}"
+  },
+  "agent": {
+    "title": "Trung tâm Đại lý",
+    "signInToSee": "Đăng nhập để xem Trung tâm Đại lý",
+    "totalCommission": "Tổng hoa hồng",
+    "rateLine": "Tỷ lệ của bạn: {{rate}}% tiền xâu",
+    "players": "Người chơi",
+    "subAgents": "Đại lý cấp dưới",
+    "earned": "đã kiếm",
+    "roundsPlayed": "{{count}} ván",
+    "noPlayers": "Chưa có người chơi được giới thiệu",
+    "noPlayersBlurb": "Chia sẻ liên kết giới thiệu để bắt đầu.",
+    "noBalancesNote": "Bạn thấy những gì người chơi tạo ra cho bạn, không phải số dư của họ. Số dư không được chia sẻ với đại lý.",
+    "noLinks": "Chưa có liên kết giới thiệu",
+    "noLinksBlurb": "Tạo mỗi kênh một liên kết để so sánh hiệu quả.",
+    "registrations": "{{count}} đã tham gia",
+    "copyLink": "Sao chép liên kết",
+    "linkCopied": "Đã sao chép liên kết giới thiệu",
+    "newLink": "Liên kết mới",
+    "linkCreated": "Đã tạo liên kết",
+    "linkLabelPrompt": "Đặt tên liên kết (ví dụ: Telegram, Twitter)",
+    "noSubAgents": "Chưa có đại lý cấp dưới",
+    "noSubAgentsBlurb": "Đại lý cấp dưới hưởng phần bạn đặt, trích từ tỷ lệ của bạn.",
+    "becomeTitle": "Trở thành đại lý",
+    "becomeBlurb": "Đại lý hưởng một phần tiền xâu từ người chơi họ giới thiệu. Đăng ký qua bộ phận hỗ trợ.",
+    "requirement": "Uy tín yêu cầu",
+    "eligibleNote": "Bạn đã đủ điều kiện. Liên hệ hỗ trợ để đăng ký.",
+    "notEligibleNote": "Tiếp tục chơi để tăng uy tín. Sau 100 ván bình thường sẽ đạt 700.",
+    "tab": {
+      "overview": "Tổng quan",
+      "players": "Người chơi",
+      "links": "Liên kết",
+      "subAgents": "Cấp dưới"
+    }
+  },
+  "insurance": {
+    "title": "Có bảo hiểm",
+    "odds": "Tỷ lệ",
+    "payout": "Chi trả tối đa",
+    "decline": "Không, cảm ơn",
+    "accept": "Mua bảo hiểm ₮{{premium}}",
+    "taken": "Đã mua bảo hiểm"
   }
 }

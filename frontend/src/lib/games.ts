@@ -26,9 +26,7 @@ export type GameId =
   | 'red-packet'
   | 'cowboy-beauty'
   | 'lottery'
-  | 'slots'
-  | 'minesweeper'
-  | 'slot-jihe';
+  | 'slots';
 
 export interface GameDef {
   id: GameId;
@@ -54,13 +52,37 @@ export const GAMES: GameDef[] = [
   { id: 'san-zhang', name: 'Zha Jin Hua', category: 'card', image: '/brand/cards.png', glyph: '🃏', gradient: ['#3fd07a', '#00d4ff'], players: 1002, minBuy: '5' },
   { id: 'baccarat', name: 'Baccarat', category: 'card', image: '/brand/cards.png', glyph: '🎴', gradient: ['#bb5cf6', '#f85677'], players: 327, minBuy: '10' },
   
-  { id: 'red-packet', name: 'Red Packet', category: 'quick', image: '/brand/envelope.png', glyph: '🧧', gradient: ['#f85677', '#bb5cf6'], players: 1673, minBuy: '1', hot: true },
-  { id: 'minesweeper', name: 'Minesweeper', category: 'quick', image: '/brand/minesweepers.png', glyph: '💣', gradient: ['#00d4ff', '#3fd07a'], players: 2366, minBuy: '5' },
+  { id: 'red-packet', name: 'Red Packet', category: 'quick', image: '/brand/minesweepers.png', glyph: '🧧', gradient: ['#f85677', '#bb5cf6'], players: 1673, minBuy: '1', hot: true },
   { id: 'slots', name: 'Slot Machines', category: 'arcade', image: '/brand/slots.png', glyph: '🎰', gradient: ['#bb5cf6', '#3fd07a'], players: 2145, minBuy: '0.5' },
-  { id: 'slot-jihe', name: 'Slot Jihe', category: 'arcade', image: '/brand/slots.png', glyph: '💎', gradient: ['#6366f1', '#bb5cf6'], players: 843, minBuy: '1' },
   { id: 'cowboy-beauty', name: 'Cowboy & Beauty', category: 'quick', image: '/brand/envelope.png', glyph: '🤠', gradient: ['#f85677', '#6366f1'], players: 486, minBuy: '1' },
   { id: 'lottery', name: 'Lottery', category: 'quick', image: '/brand/envelope.png', glyph: '🎟', gradient: ['#00d4ff', '#6366f1'], players: 1120, minBuy: '0.2' },
 ];
+
+/**
+ * Games in the catalog that are not on sale yet — withheld on Victor's
+ * instruction (Aug 6) until their table screens are ready: a tile for a game
+ * nobody can play is worse than no tile.
+ *
+ * The mockup's separate "Minesweeper" and "Slot Jihe" tiles were confirmed by
+ * Victor (Aug 8) to BE red-packet ("Red Packet Minesweeper") and slots ("Slot
+ * Machines") — one game each, not four. The phantom ids are gone rather than
+ * hidden: a hidden id implies something real is waiting behind it.
+ *
+ * A launch gate, not a deletion: entries keep art and translations, so
+ * releasing one is deleting an id from this set.
+ */
+export const HIDDEN_GAMES: ReadonlySet<string> = new Set<GameId>([
+  'baccarat',
+  'cowboy-beauty',
+]);
+
+/** The catalog minus anything not yet on sale. Use for anything player-facing. */
+export const visibleGames = (): GameDef[] => GAMES.filter((g) => !HIDDEN_GAMES.has(g.id));
+
+export const gamesIn = (category: GameCategory): GameDef[] =>
+  visibleGames().filter((g) => g.category === category);
+
+export const CATEGORIES: GameCategory[] = ['poker', 'card', 'arcade', 'quick'];
 
 const BY_ID = new Map(GAMES.map((g) => [g.id, g]));
 
@@ -69,4 +91,6 @@ export function gameVisual(id: string): GameDef | undefined {
   return BY_ID.get(id as GameId);
 }
 
-export const totalPlayers = (): number => GAMES.reduce((sum, g) => sum + g.players, 0);
+/** Lobby headline — counts only games a player can actually join. */
+export const totalPlayers = (): number =>
+  visibleGames().reduce((sum, g) => sum + g.players, 0);

@@ -21,7 +21,32 @@
     "jackpotBlurb": "Grows with every hand played across MYPOKER.",
     "provablyFair": "Provably fair · verifiable on-chain",
     "hotNow": "Hot right now",
-    "moreGames": "More games"
+    "moreGames": "More games",
+    "grandJackpot": "Grand jackpot",
+    "fairSecure": "Fair & secure",
+    "colTable": "Table",
+    "colBlinds": "Blinds",
+    "colPlayers": "Players",
+    "colBuyIn": "Buy-in",
+    "colStatus": "Status",
+    "quickJoin": "Quick join",
+    "createPrivate": "Create private table",
+    "noTables": "No tables match",
+    "noTablesBlurb": "Try a different stake level.",
+    "tabNotMapped": "Not configured yet",
+    "tab": {
+      "dezhou": "Dezhou",
+      "xuzhou": "Xuzhou",
+      "ausha": "Ausha",
+      "macau": "Macau",
+      "others": "Others"
+    },
+    "status": {
+      "open": "Open",
+      "waiting": "Wait",
+      "full": "Full",
+      "unavailable": "Closed"
+    }
   },
   "games": {
     "searchPlaceholder": "Search games",
@@ -64,11 +89,21 @@
     "cowboy-beauty": "Cowboy & Beauty"
   },
   "alliance": {
-    "joinAlliance": "Join Alliance",
-    "recommended": "Recommended alliances",
-    "create": "Create Alliance",
-    "ranking": "Alliance Ranking",
-    "pendingEndpoints": "Sample data — awaiting the alliance/league endpoints."
+    "create": "Create an alliance",
+    "mine": "Your alliances",
+    "discover": "Discover",
+    "signInToJoin": "Sign in to join an alliance",
+    "noneYet": "Not in an alliance yet",
+    "noneYetBlurb": "Join one below, or start your own.",
+    "nothingToJoin": "No open alliances right now",
+    "members": "{{count}} members",
+    "join": "Join",
+    "joined": "Joined {{name}}",
+    "created": "{{name}} created",
+    "name": "Alliance name",
+    "namePlaceholder": "e.g. Dragon Alliance",
+    "inviteOnly": "Invite only",
+    "inviteOnlyBlurb": "Hidden from Discover. Only people you invite can join."
   },
   "data": {
     "periodToday": "Today",
@@ -138,7 +173,21 @@
     "pot": "Pot",
     "handLine": "Hand {{hand}} · Blinds {{blinds}}",
     "waiting": "Waiting for other players…",
-    "nextHand": "Next hand starting…"
+    "nextHand": "Next hand starting…",
+    "connecting": "Connecting…",
+    "connectingTable": "Connecting to the table…",
+    "reconnecting": "Reconnecting to the table…",
+    "connectionLost": "Lost the connection to the table.",
+    "tapOpenSeat": "Tap an open seat to join the table",
+    "sittingOut": "You’re sitting out — sit in to be dealt the next hand.",
+    "dealing": "Dealing…",
+    "waitingPlayers": "Waiting for other players…",
+    "waitingOne": "Waiting for another player to sit down…",
+    "livePoker": "Live poker",
+    "tableDesign": "Table design",
+    "demoSubtitle": "{{game}} demo · Hand {{hand}} · Blinds {{blinds}}",
+    "signingIn": "Signing you in…",
+    "signInToSit": "Sign in to take a seat"
   },
   "a11y": {
     "toggleTheme": "Toggle theme",
@@ -203,6 +252,147 @@
     "step5": "Nothing about the round was altered",
     "step5Blurb": "Seven fields hash together to the recorded round hash",
     "step6": "The round is in the on-chain record",
-    "step6Blurb": "Its proof rebuilds the published Merkle root, so it cannot be deleted"
+    "step6Blurb": "Its proof rebuilds the published Merkle root, so it cannot be deleted",
+    "gameFairness": "Game fairness",
+    "provable": "Provable",
+    "provableBlurb": "We own the rules, and every round is verifiable",
+    "vendorAttested": "Vendor-attested",
+    "vendorBlurb": "An outside supplier owns the rules; each result is signed, but their paytable cannot be proven unchanged",
+    "ratesPending": "Published payout rates are not shown yet. A rate is only meaningful once the rules behind it are committed on-chain and versioned — until then it would be a number we assert about ourselves, which is what this page exists to avoid.",
+    "actualRate": "Actual return {{rate}}% over {{count}} rounds",
+    "theoreticalRate": "stated {{rate}}%"
+  },
+  "reputation": {
+    "title": "Reputation",
+    "scope": "Reputation affects which tables you can join and chat access. It never affects deposits or withdrawals.",
+    "toAdvance": "{{count}} more rounds to reach 700",
+    "band": {
+      "EXCELLENT": "Excellent",
+      "GOOD": "Good",
+      "AVERAGE": "Average",
+      "POOR": "Poor",
+      "VERY_POOR": "Very poor"
+    }
+  },
+  "jackpot": {
+    "totalPools": "Total in pools",
+    "paysOut": "pays {{pct}}%",
+    "needsMore": "₮{{amount}} more before this tier can pay out",
+    "windowOpen": "Grand window is open",
+    "windowClosed": "Grand window closed",
+    "opensIn": "Opens in {{time}}",
+    "closesIn": "Closes in {{time}}",
+    "howItWorks": "Pools grow from 0.5% of each winner’s profit — losing players never contribute. A tier can only pay out once its pool passes the minimum shown, and Grand additionally requires players seated during the Saturday window.",
+    "tier": {
+      "MINI": "Mini",
+      "MINOR": "Minor",
+      "MAJOR": "Major",
+      "GRAND": "Grand"
+    },
+    "cadence": {
+      "ROUNDS": "every few rounds",
+      "DAILY": "once a day",
+      "WINDOW": "Saturdays only"
+    },
+    "youWon": "Jackpot won",
+    "tapToDismiss": "Tap anywhere to continue"
+  },
+  "onboarding": {
+    "skip": "Skip",
+    "next": "Next",
+    "start": "Find a table",
+    "welcome": {
+      "title": "Welcome to MYPOKER",
+      "body": "Texas Hold’em, Omaha, Dou Di Zhu and more — with real players, around the clock."
+    },
+    "fair": {
+      "title": "Every hand is verifiable",
+      "body": "The deck is decided by the server, every player at the table, and a blockchain block nobody can predict. You can recompute any hand yourself."
+    },
+    "play": {
+      "title": "Sit down and play",
+      "body": "Browse the lobby, pick a table at your stake, and take a seat. You can add funds whenever you’re ready."
+    }
+  },
+  "vip": {
+    "signInToSee": "Sign in to see your VIP standing",
+    "effectiveVolume": "Effective volume",
+    "remaining": "₮{{amount}} to {{tier}}",
+    "topTier": "Highest tier reached",
+    "byGame": "Where it came from",
+    "counted": "counted",
+    "roundsStaked": "{{rounds}} rounds · ₮{{staked}} staked",
+    "coefficientNote": "Games count differently toward VIP: Texas ×1.0, Niu Niu ×0.5, Baccarat ×0.3, others ×0.4. This keeps low-rake games from being a shortcut up the tiers.",
+    "tiers": "Tiers",
+    "title": {
+      "V1": "Bronze",
+      "V2": "Silver",
+      "V3": "Gold",
+      "V4": "Diamond",
+      "V5": "Black Gold"
+    },
+    "perks": {
+      "V1": "Basic stats panel. Standard withdrawal limits and queue.",
+      "V2": "Capital flow chart. Higher daily withdrawal limit. Premium emojis.",
+      "V3": "Pro Tracker HUD (VPIP, PFR, positional stats). Dedicated support channel.",
+      "V4": "Priority withdrawal queue. Unlimited opponent tagging. 1-on-1 concierge. Elite tables.",
+      "V5": "Instant auto-transfer. Live head-to-head profiling. Black Gold tables. Full-screen entry effect."
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "signInToSee": "Sign in to see your notifications",
+    "empty": "Nothing yet",
+    "emptyBlurb": "Results, deposits and announcements will appear here.",
+    "handWon": "You won ₮{{amount}}",
+    "handLost": "Hand settled — ₮{{amount}}",
+    "deposit": "Deposit of ₮{{amount}} credited",
+    "withdrawal": "Withdrawal of ₮{{amount}} sent",
+    "jackpot": "Jackpot! You won ₮{{amount}}",
+    "vipUp": "You reached {{tier}}",
+    "addressChanged": "Your withdrawal address was changed",
+    "promo": "{{text}}"
+  },
+  "agent": {
+    "title": "Agent Center",
+    "signInToSee": "Sign in to see the Agent Center",
+    "totalCommission": "Total commission",
+    "rateLine": "Your rate: {{rate}}% of rake",
+    "players": "Players",
+    "subAgents": "Sub-agents",
+    "earned": "earned",
+    "roundsPlayed": "{{count}} rounds",
+    "noPlayers": "No referred players yet",
+    "noPlayersBlurb": "Share a referral link to start.",
+    "noBalancesNote": "You can see what players generate for you, never what they hold. Balances are not shared with agents.",
+    "noLinks": "No referral links yet",
+    "noLinksBlurb": "Create one per channel to see which works.",
+    "registrations": "{{count}} joined",
+    "copyLink": "Copy link",
+    "linkCopied": "Referral link copied",
+    "newLink": "New link",
+    "linkCreated": "Link created",
+    "linkLabelPrompt": "Name this link (e.g. Telegram, Twitter)",
+    "noSubAgents": "No sub-agents",
+    "noSubAgentsBlurb": "Sub-agents earn a share you set, from your own rate.",
+    "becomeTitle": "Become an agent",
+    "becomeBlurb": "Agents earn a share of the rake from players they bring in. Applications go through customer service.",
+    "requirement": "Reputation required",
+    "eligibleNote": "You meet the requirement. Contact customer service to apply.",
+    "notEligibleNote": "Keep playing to build reputation. It rises to 700 after 100 clean rounds.",
+    "tab": {
+      "overview": "Overview",
+      "players": "Players",
+      "links": "Links",
+      "subAgents": "Sub-agents"
+    }
+  },
+  "insurance": {
+    "title": "Insurance available",
+    "odds": "Odds",
+    "payout": "Covers up to",
+    "decline": "No thanks",
+    "accept": "Insure ₮{{premium}}",
+    "taken": "Insurance taken"
   }
 }

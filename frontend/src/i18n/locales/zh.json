@@ -21,7 +21,32 @@
     "jackpotBlurb": "MYPOKER 每一手牌都会让彩池增长。",
     "provablyFair": "公平可验证 · 链上可查",
     "hotNow": "热门推荐",
-    "moreGames": "更多游戏"
+    "moreGames": "更多游戏",
+    "grandJackpot": "大奖池",
+    "fairSecure": "公平安全",
+    "colTable": "牌桌",
+    "colBlinds": "盲注",
+    "colPlayers": "玩家",
+    "colBuyIn": "买入",
+    "colStatus": "状态",
+    "quickJoin": "快速加入",
+    "createPrivate": "创建私人牌桌",
+    "noTables": "没有符合条件的牌桌",
+    "noTablesBlurb": "试试其他注额。",
+    "tabNotMapped": "尚未配置",
+    "tab": {
+      "dezhou": "德州",
+      "xuzhou": "徐州",
+      "ausha": "奥莎",
+      "macau": "澳门",
+      "others": "其他"
+    },
+    "status": {
+      "open": "进行中",
+      "waiting": "等待中",
+      "full": "已满",
+      "unavailable": "暂不可用"
+    }
   },
   "games": {
     "searchPlaceholder": "搜索游戏",
@@ -64,11 +89,21 @@
     "cowboy-beauty": "牛仔与美女"
   },
   "alliance": {
-    "joinAlliance": "加入联盟",
-    "recommended": "推荐联盟",
     "create": "创建联盟",
-    "ranking": "联盟排行",
-    "pendingEndpoints": "示例数据 — 联盟接口尚未接入。"
+    "mine": "我的联盟",
+    "discover": "发现",
+    "signInToJoin": "登录后加入联盟",
+    "noneYet": "尚未加入任何联盟",
+    "noneYetBlurb": "可在下方加入，或自行创建。",
+    "nothingToJoin": "暂时没有开放的联盟",
+    "members": "{{count}} 名成员",
+    "join": "加入",
+    "joined": "已加入 {{name}}",
+    "created": "{{name}} 已创建",
+    "name": "联盟名称",
+    "namePlaceholder": "例如：巨龙联盟",
+    "inviteOnly": "仅限邀请",
+    "inviteOnlyBlurb": "不在“发现”中显示，仅受邀者可加入。"
   },
   "data": {
     "periodToday": "今日",
@@ -138,7 +173,21 @@
     "pot": "底池",
     "handLine": "第 {{hand}} 手 · 盲注 {{blinds}}",
     "waiting": "等待其他玩家…",
-    "nextHand": "下一手即将开始…"
+    "nextHand": "下一局即将开始…",
+    "connecting": "连接中…",
+    "connectingTable": "正在连接牌桌…",
+    "reconnecting": "正在重新连接牌桌…",
+    "connectionLost": "与牌桌的连接已断开。",
+    "tapOpenSeat": "点击空位加入牌桌",
+    "sittingOut": "您正在旁观——入座即可参与下一局。",
+    "dealing": "发牌中…",
+    "waitingPlayers": "等待其他玩家…",
+    "waitingOne": "等待另一位玩家入座…",
+    "livePoker": "实时德州",
+    "tableDesign": "牌桌样式",
+    "demoSubtitle": "{{game}} 演示 · 第 {{hand}} 局 · 盲注 {{blinds}}",
+    "signingIn": "正在登录…",
+    "signInToSit": "登录后即可入座"
   },
   "a11y": {
     "toggleTheme": "切换主题",
@@ -203,6 +252,147 @@
     "step5": "牌局内容未被更改",
     "step5Blurb": "七项字段共同哈希得出记录的牌局哈希",
     "step6": "该牌局已记录于链上",
-    "step6Blurb": "其证明可重建已公布的默克尔根，因此无法被删除"
+    "step6Blurb": "其证明可重建已公布的默克尔根，因此无法被删除",
+    "gameFairness": "游戏公平性",
+    "provable": "可验证",
+    "provableBlurb": "规则由我们掌握，每一局均可验证",
+    "vendorAttested": "供应商背书",
+    "vendorBlurb": "规则由外部供应商掌握；每个结果均有签名，但无法证明其赔付表未被更改",
+    "ratesPending": "暂不显示已公布的赔付率。只有当其背后的规则在链上承诺并版本化后，赔付率才有意义——在此之前，它只是我们对自己的单方面声明，而这正是本页面要避免的。",
+    "actualRate": "实际返还率 {{rate}}%（{{count}} 局）",
+    "theoreticalRate": "标称 {{rate}}%"
+  },
+  "reputation": {
+    "title": "信誉",
+    "scope": "信誉影响您可加入的牌桌与聊天权限，不会影响充值或提现。",
+    "toAdvance": "再进行 {{count}} 局即可达到 700",
+    "band": {
+      "EXCELLENT": "极佳",
+      "GOOD": "良好",
+      "AVERAGE": "一般",
+      "POOR": "较低",
+      "VERY_POOR": "很低"
+    }
+  },
+  "jackpot": {
+    "totalPools": "奖池总额",
+    "paysOut": "派彩 {{pct}}%",
+    "needsMore": "还需 ₮{{amount}} 该等级才能派彩",
+    "windowOpen": "大奖时段开放中",
+    "windowClosed": "大奖时段已关闭",
+    "opensIn": "{{time}} 后开放",
+    "closesIn": "{{time}} 后关闭",
+    "howItWorks": "奖池来自每位赢家利润的 0.5%——输家不会有任何投入。只有当奖池超过所示最低额，该等级才能派彩；大奖还需在周六时段内有玩家在座。",
+    "tier": {
+      "MINI": "小奖",
+      "MINOR": "中奖",
+      "MAJOR": "大奖",
+      "GRAND": "超级大奖"
+    },
+    "cadence": {
+      "ROUNDS": "每隔数局",
+      "DAILY": "每日一次",
+      "WINDOW": "仅限周六"
+    },
+    "youWon": "恭喜中奖",
+    "tapToDismiss": "点击任意处继续"
+  },
+  "onboarding": {
+    "skip": "跳过",
+    "next": "下一步",
+    "start": "寻找牌桌",
+    "welcome": {
+      "title": "欢迎来到 MYPOKER",
+      "body": "德州扑克、奥马哈、斗地主等多种玩法，真人对战，全天候开放。"
+    },
+    "fair": {
+      "title": "每一局都可验证",
+      "body": "牌序由服务器、牌桌上每位玩家，以及无人能预测的区块链区块共同决定。您可以自行重新计算任意一局。"
+    },
+    "play": {
+      "title": "入座开局",
+      "body": "浏览大厅，选择适合您注额的牌桌并入座。您可以随时充值。"
+    }
+  },
+  "vip": {
+    "signInToSee": "登录以查看您的 VIP 等级",
+    "effectiveVolume": "有效流水",
+    "remaining": "距 {{tier}} 还差 ₮{{amount}}",
+    "topTier": "已达最高等级",
+    "byGame": "流水来源",
+    "counted": "计入",
+    "roundsStaked": "{{rounds}} 局 · 投注 ₮{{staked}}",
+    "coefficientNote": "VIP 计算权重因游戏而异：德州 ×1.0、牛牛 ×0.5、百家乐 ×0.3、其他 ×0.4，以防低抽水游戏成为升级捷径。",
+    "tiers": "等级",
+    "title": {
+      "V1": "青铜",
+      "V2": "白银",
+      "V3": "黄金",
+      "V4": "钻石",
+      "V5": "黑金"
+    },
+    "perks": {
+      "V1": "基础数据面板。标准提现额度与队列。",
+      "V2": "资金曲线图。更高每日提现额度。高级表情。",
+      "V3": "专业追踪 HUD（VPIP、PFR、位置数据）。专属客服通道。",
+      "V4": "优先提现队列。无限对手标记。一对一专属客服。精英牌桌。",
+      "V5": "即时自动出款。实时对手对战数据。黑金牌桌。全屏入场特效。"
+    }
+  },
+  "notifications": {
+    "title": "通知",
+    "signInToSee": "登录以查看通知",
+    "empty": "暂无通知",
+    "emptyBlurb": "牌局结果、充值与公告将显示在此处。",
+    "handWon": "您赢得 ₮{{amount}}",
+    "handLost": "牌局结算 — ₮{{amount}}",
+    "deposit": "充值 ₮{{amount}} 已到账",
+    "withdrawal": "提现 ₮{{amount}} 已发出",
+    "jackpot": "中奖！您赢得 ₮{{amount}}",
+    "vipUp": "您已达到 {{tier}}",
+    "addressChanged": "您的提现地址已变更",
+    "promo": "{{text}}"
+  },
+  "agent": {
+    "title": "代理中心",
+    "signInToSee": "登录以查看代理中心",
+    "totalCommission": "累计佣金",
+    "rateLine": "您的费率：抽水的 {{rate}}%",
+    "players": "玩家",
+    "subAgents": "下级代理",
+    "earned": "已赚取",
+    "roundsPlayed": "{{count}} 局",
+    "noPlayers": "暂无推荐玩家",
+    "noPlayersBlurb": "分享推荐链接即可开始。",
+    "noBalancesNote": "您只能看到玩家为您带来的收益，无法看到其余额。玩家余额不会向代理공开。",
+    "noLinks": "暂无推荐链接",
+    "noLinksBlurb": "为每个渠道创建一个，以便比较效果。",
+    "registrations": "{{count}} 人加入",
+    "copyLink": "复制链接",
+    "linkCopied": "推荐链接已复制",
+    "newLink": "新建链接",
+    "linkCreated": "链接已创建",
+    "linkLabelPrompt": "为该链接命名（例如：Telegram、Twitter）",
+    "noSubAgents": "暂无下级代理",
+    "noSubAgentsBlurb": "下级代理按您设定的比例从您的费率中分成。",
+    "becomeTitle": "成为代理",
+    "becomeBlurb": "代理可从其推荐玩家产生的抽水中获得分成。申请需通过客服办理。",
+    "requirement": "所需信誉",
+    "eligibleNote": "您已满足条件，请联系客服申请。",
+    "notEligibleNote": "继续游戏以提升信誉。100 局正常牌局后将升至 700。",
+    "tab": {
+      "overview": "总览",
+      "players": "玩家",
+      "links": "链接",
+      "subAgents": "下级"
+    }
+  },
+  "insurance": {
+    "title": "可购买保险",
+    "odds": "赔率",
+    "payout": "最高赔付",
+    "decline": "不用了",
+    "accept": "投保 ₮{{premium}}",
+    "taken": "已购买保险"
   }
 }

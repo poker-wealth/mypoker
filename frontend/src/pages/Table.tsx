@@ -4,6 +4,11 @@ import { ChevronLeft, Volume2, Settings2, Wifi, WifiOff } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { PokerTable } from '@/components/poker/PokerTable';
 import { ActionBar } from '@/components/poker/ActionBar';
+import { InsurancePrompt } from '@/components/poker/InsurancePrompt';
+import { JackpotBurst } from '@/components/poker/JackpotBurst';
+import { toast } from '@/lib/toast';
+import { chips } from '@/lib/money';
+import { useTranslation } from 'react-i18next';
 import { BuyInSheet } from '@/components/poker/BuyInSheet';
 import { TableDesignSheet } from '@/components/poker/TableDesignSheet';
 import { Button } from '@/components/ui/Button';
@@ -40,8 +45,15 @@ function LiveTable({ tableId }: { tableId: string }) {
   const { snapshot, view, status, error, signedIn, signingIn } = live;
 
   /** Buy-in sheet target: a seat index to sit in, `null` to top up, `false` when closed. */
+  const { t } = useTranslation();
   const [buyInFor, setBuyInFor] = useState<number | null | false>(false);
   const [designsOpen, setDesignsOpen] = useState(false);
+  // Cleared when the hand id changes, so declining one hand's offer does not
+  // suppress the next hand's.
+  const [insuranceDeclined, setInsuranceDeclined] = useState<string | null>(null);
+  // Which hit this viewer has already watched — so a snapshot refetch does not
+  // replay the celebration.
+  const [jackpotSeen, setJackpotSeen] = useState<string | null>(null);
 
   // Sign-in is attempted on arrival; only offer the prompt once it has actually failed.
   if (!signedIn) {
@@ -64,8 +76,8 @@ function LiveTable({ tableId }: { tableId: string }) {
       <TopBar
         subtitle={
           snapshot
-            ? `${snapshot.name} · Hand ${view.handId} · Blinds ₮${snapshot.smallBlind}/${snapshot.bigBlind}`
-            : 'Connecting…'
+            ? `${snapshot.name} · Hand ${view.handId} · Blinds ${chips(snapshot.smallBlind)}/${chips(snapshot.bigBlind)}`
+            : t('table.connecting')
         }
         onBack={() => navigate(-1)}
         status={status}
@@ -100,6 +112,33 @@ function LiveTable({ tableId }: { tableId: string }) {
         </div>
       )}
 
+      {/* Jackpot celebration — fires only for a hit the ledger has already
+          PAID (the room refuses to announce anything transfer() rejected). */}
+      <JackpotBurst
+        win={
+          jackpotSeen === snapshot?.jackpot?.roundId
+            ? null
+            : (snapshot?.jackpot ?? null)
+        }
+        onDone={() => setJackpotSeen(snapshot?.jackpot?.roundId ?? null)}
+      />
+
+      {/* Insurance. Rendered purely on the offer's presence: the server sends
+          one only to the two all-in players, so "3+ silently skips" needs no
+          rule here. Declining just clears it locally — the next snapshot will
+          not carry an offer once the street moves on. */}
+      <InsurancePrompt
+        quote={insuranceDeclined === snapshot?.handId ? null : (snapshot?.insurance ?? null)}
+        seconds={snapshot?.insurance?.expiresInSeconds ?? 10}
+        onAccept={() => {
+          // TODO: send a takeInsurance command once the room accepts one. The
+          // quote is server-issued, so the client sends intent, never a price.
+          setInsuranceDeclined(snapshot?.handId ?? null);
+          toast.success(t('insurance.taken'));
+        }}
+        onDecline={() => setInsuranceDeclined(snapshot?.handId ?? null)}
+      />
+
       {/* Action dock */}
       <div className="border-t border-border bg-surface/80 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 backdrop-blur">
         {live.heroToAct ? (
@@ -107,7 +146,7 @@ function LiveTable({ tableId }: { tableId: string }) {
         ) : seated ? (
           <div className="flex items-center gap-2">
             <div className="flex-1 text-[0.8rem] text-dim">
-              {statusLine(snapshot?.phase, playersReady, mySeat?.status === 'sittingout')}
+              {statusLine(t, snapshot?.phase, playersReady, mySeat?.status === 'sittingout')}
             </div>
             {mySeat && mySeat.stack === 0 ? (
               <Button size="sm" onClick={() => setBuyInFor(null)}>
@@ -129,7 +168,7 @@ function LiveTable({ tableId }: { tableId: string }) {
         ) : status === 'error' || status === 'closed' ? (
           <div className="flex items-center gap-2 py-1">
             <div className="flex-1 text-[0.78rem] leading-tight text-danger">
-              {error ?? 'Lost the connection to the table.'}
+              {error ?? t('table.connectionLost')}
             </div>
             <Button size="sm" variant="secondary" onClick={() => window.location.reload()}>
               Retry
@@ -138,10 +177,10 @@ function LiveTable({ tableId }: { tableId: string }) {
         ) : (
           <div className="py-3 text-center text-sm text-dim">
             {status === 'ready'
-              ? 'Tap an open seat to join the table'
+              ? t('table.tapOpenSeat')
               : status === 'reconnecting'
-                ? 'Reconnecting to the table…'
-                : 'Connecting to the table…'}
+                ? t('table.reconnecting')
+                : t('table.connectingTable')}
           </div>
         )}
       </div>
@@ -166,12 +205,18 @@ function LiveTable({ tableId }: { tableId: string }) {
   );
 }
 
-function statusLine(phase: string | undefined, playersReady: number, sittingOut: boolean): string {
-  if (sittingOut) return 'You’re sitting out — sit in to be dealt the next hand.';
-  if (phase === 'DEALING') return 'Dealing…';
-  if (phase === 'SHOWDOWN') return 'Next hand starting…';
-  if (phase === 'IN_HAND') return 'Waiting for other players…';
-  return playersReady < 2 ? 'Waiting for another player to sit down…' : 'Next hand starting…';
+/** Takes `t` rather than calling a hook: this is module scope, outside React. */
+function statusLine(
+  t: (key: string) => string,
+  phase: string | undefined,
+  playersReady: number,
+  sittingOut: boolean,
+): string {
+  if (sittingOut) return t('table.sittingOut');
+  if (phase === 'DEALING') return t('table.dealing');
+  if (phase === 'SHOWDOWN') return t('table.nextHand');
+  if (phase === 'IN_HAND') return t('table.waitingPlayers');
+  return playersReady < 2 ? t('table.waitingOne') : t('table.nextHand');
 }
 
 /**
@@ -229,6 +274,7 @@ function TopBar({
   /** Opens the table-design picker. */
   onOpenDesigns?: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center justify-between px-4 py-3">
       <button
@@ -258,7 +304,7 @@ function TopBar({
         </button>
         <button
           onClick={onOpenDesigns}
-          title="Table design"
+          title={t('table.tableDesign')}
           className="grid size-9 place-items-center rounded-full border border-border bg-surface text-dim active:scale-95"
         >
           <Settings2 size={16} />
@@ -270,13 +316,14 @@ function TopBar({
 
 /** Sign-in is in flight. Brief, but on a cold open it's the first thing on screen. */
 function SigningIn({ onBack }: { onBack: () => void }) {
+  const { t } = useTranslation();
   return (
     <div
       className="flex min-h-full flex-col"
       style={{ background: 'radial-gradient(ellipse at top, #14142a 0%, var(--bg) 70%)' }}
     >
-      <TopBar subtitle="Live poker" onBack={onBack} />
-      <div className="flex flex-1 items-center justify-center text-sm text-dim">Signing you in…</div>
+      <TopBar subtitle={t('table.livePoker')} onBack={onBack} />
+      <div className="flex flex-1 items-center justify-center text-sm text-dim">{t('table.signingIn')}</div>
     </div>
   );
 }
@@ -287,15 +334,16 @@ function SigningIn({ onBack }: { onBack: () => void }) {
  * the way.
  */
 function SignedOut({ onBack }: { onBack: () => void }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   return (
     <div
       className="flex min-h-full flex-col"
       style={{ background: 'radial-gradient(ellipse at top, #14142a 0%, var(--bg) 70%)' }}
     >
-      <TopBar subtitle="Live poker" onBack={onBack} />
+      <TopBar subtitle={t('table.livePoker')} onBack={onBack} />
       <div className="mx-auto w-full max-w-sm flex-1 px-6 pt-16 text-center">
-        <h2 className="text-lg font-bold">Sign in to take a seat</h2>
+        <h2 className="text-lg font-bold">{t('table.signInToSit')}</h2>
         <p className="mt-2 text-sm text-dim">
           Live tables seat real players, so the table needs to know who you are before it can deal
           you in.
@@ -317,6 +365,7 @@ function SignedOut({ onBack }: { onBack: () => void }) {
 // ── The offline demo (?demo=1) ────────────────────────────────────────────────
 
 function DemoTable() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { id } = useParams();
   const game = GAMES.find((g) => g.id === id);
@@ -329,7 +378,11 @@ function DemoTable() {
       style={{ background: 'radial-gradient(ellipse at top, #14142a 0%, var(--bg) 70%)' }}
     >
       <TopBar
-        subtitle={`${game?.name ?? 'Texas Hold’em'} demo · Hand ${view.handId} · Blinds ₮10/20`}
+        subtitle={t('table.demoSubtitle', {
+          game: game ? t(`gameNames.${game.id}`, { defaultValue: game.name }) : t('gameNames.texas'),
+          hand: view.handId,
+          blinds: `${chips(10)}/${chips(20)}`,
+        })}
         onBack={() => navigate(-1)}
         onOpenDesigns={() => setDesignsOpen(true)}
       />
@@ -357,7 +410,7 @@ function DemoTable() {
           <ActionBar state={view} onAction={heroAct} />
         ) : (
           <div className="py-3 text-center text-sm text-dim">
-            {view.handOver ? 'Next hand starting…' : 'Waiting for other players…'}
+            {view.handOver ? t('table.nextHand') : t('table.waitingPlayers')}
           </div>
         )}
       </div>
