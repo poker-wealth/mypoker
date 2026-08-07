@@ -1,6 +1,8 @@
-import { Moon, Sun } from 'lucide-react';
+import { Moon, Sun, Bell } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { useTheme } from '@/store/theme';
+import { useUnreadCount } from '@/api/hooks';
 
 /**
  * Global brand header: the spade-M mark + MYPOKER wordmark (both auto-trimmed from
@@ -11,6 +13,8 @@ import { useTheme } from '@/store/theme';
 export function Header() {
   const { t } = useTranslation();
   const { resolved, toggle } = useTheme();
+  const navigate = useNavigate();
+  const unread = useUnreadCount();
   return (
     <header className="sticky top-0 z-20 -mx-4 mb-1 border-b border-border/60 bg-bg/80 px-4 py-3 backdrop-blur-md">
       <div className="flex items-center justify-between">
@@ -23,6 +27,21 @@ export function Header() {
           />
           <img src="/brand/logo-wordmark.png" alt="MYPOKER" className="h-[26px] w-auto" />
         </div>
+        <div className="flex items-center gap-2">
+        {/* Only once there is something to see. A permanently empty bell is a
+            button that has never rewarded a tap. */}
+        {(unread.data ?? 0) > 0 && (
+          <button
+            onClick={() => navigate('/notifications')}
+            aria-label={t('notifications.title')}
+            className="relative grid size-9 place-items-center rounded-full border border-border bg-surface text-dim transition-colors active:scale-95"
+          >
+            <Bell size={17} />
+            <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-danger px-1 text-[0.55rem] font-bold text-white">
+              {unread.data! > 9 ? '9+' : unread.data}
+            </span>
+          </button>
+        )}
         <button
           onClick={toggle}
           aria-label={t('a11y.toggleTheme')}
@@ -30,6 +49,7 @@ export function Header() {
         >
           {resolved === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
         </button>
+        </div>
       </div>
     </header>
   );

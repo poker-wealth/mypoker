@@ -320,5 +320,19 @@
       "V4": "우선 출금 대기열. 무제한 상대 태그. 1:1 컨시어지. 엘리트 테이블.",
       "V5": "즉시 자동 송금. 실시간 상대 전적 분석. 블랙 골드 테이블. 전체화면 입장 연출."
     }
+  },
+  "notifications": {
+    "title": "알림",
+    "signInToSee": "로그인하면 알림을 볼 수 있습니다",
+    "empty": "아직 알림이 없습니다",
+    "emptyBlurb": "게임 결과, 입금, 공지가 여기에 표시됩니다.",
+    "handWon": "₮{{amount}}을(를) 획득했습니다",
+    "handLost": "핸드 정산 — ₮{{amount}}",
+    "deposit": "₮{{amount}} 입금이 반영되었습니다",
+    "withdrawal": "₮{{amount}} 출금이 전송되었습니다",
+    "jackpot": "잭팟! ₮{{amount}} 획득",
+    "vipUp": "{{tier}}에 도달했습니다",
+    "addressChanged": "출금 주소가 변경되었습니다",
+    "promo": "{{text}}"
   }
 }

@@ -320,5 +320,19 @@
       "V4": "Priority withdrawal queue. Unlimited opponent tagging. 1-on-1 concierge. Elite tables.",
       "V5": "Instant auto-transfer. Live head-to-head profiling. Black Gold tables. Full-screen entry effect."
     }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "signInToSee": "Sign in to see your notifications",
+    "empty": "Nothing yet",
+    "emptyBlurb": "Results, deposits and announcements will appear here.",
+    "handWon": "You won ₮{{amount}}",
+    "handLost": "Hand settled — ₮{{amount}}",
+    "deposit": "Deposit of ₮{{amount}} credited",
+    "withdrawal": "Withdrawal of ₮{{amount}} sent",
+    "jackpot": "Jackpot! You won ₮{{amount}}",
+    "vipUp": "You reached {{tier}}",
+    "addressChanged": "Your withdrawal address was changed",
+    "promo": "{{text}}"
   }
 }

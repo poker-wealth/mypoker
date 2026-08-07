@@ -4,6 +4,7 @@ import { fetchReputation } from './reputation';
 import { fetchJackpot } from './jackpot';
 import { fetchVip } from './vip';
 import { fetchMyLeagues, fetchLeagues, createLeagueApi, joinLeagueApi } from './leagues';
+import { fetchNotifications, markNotificationsRead, type NotificationPage } from './notifications';
 import { fetchStats, fetchHistory, type HistoryPage, type StatsPeriod } from './stats';
 import { fetchLobbyGames, fetchTables, type TableFilter } from './lobby';
 import { useSession } from '@/store/session';
@@ -204,5 +205,46 @@ export function useJoinLeague() {
   return useMutation({
     mutationFn: joinLeagueApi,
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['leagues'] }),
+  });
+}
+
+// ── Notifications ───────────────────────────────────────────────────────────
+
+export function useNotifications(pageSize = 20) {
+  const playerId = useSession((s) => s.player?.playerId);
+
+  return useInfiniteQuery<NotificationPage>({
+    queryKey: ['notifications', playerId, pageSize],
+    queryFn: ({ pageParam }) =>
+      fetchNotifications({
+        limit: pageSize,
+        ...(pageParam ? { cursor: String(pageParam) } : {}),
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    enabled: Boolean(playerId),
+    staleTime: 15_000,
+  });
+}
+
+/** Unread count alone, for the header badge — cheaper than holding the list. */
+export function useUnreadCount() {
+  const playerId = useSession((s) => s.player?.playerId);
+
+  return useQuery({
+    queryKey: ['notifications', 'unread', playerId],
+    queryFn: () => fetchNotifications({ limit: 1 }).then((p) => p.unread),
+    enabled: Boolean(playerId),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useMarkNotificationsRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids?: string[]) => markNotificationsRead(ids),
+    // Refreshes both the list and the header badge.
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['notifications'] }),
   });
 }

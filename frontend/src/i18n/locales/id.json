@@ -320,5 +320,19 @@
       "V4": "Antrean penarikan prioritas. Penandaan lawan tanpa batas. Concierge 1-on-1. Meja Elite.",
       "V5": "Transfer otomatis instan. Profil head-to-head langsung. Meja Emas Hitam. Efek masuk layar penuh."
     }
+  },
+  "notifications": {
+    "title": "Notifikasi",
+    "signInToSee": "Masuk untuk melihat notifikasi Anda",
+    "empty": "Belum ada apa pun",
+    "emptyBlurb": "Hasil, setoran, dan pengumuman akan muncul di sini.",
+    "handWon": "Anda memenangkan ₮{{amount}}",
+    "handLost": "Ronde diselesaikan — ₮{{amount}}",
+    "deposit": "Setoran ₮{{amount}} telah masuk",
+    "withdrawal": "Penarikan ₮{{amount}} telah dikirim",
+    "jackpot": "Jackpot! Anda menang ₮{{amount}}",
+    "vipUp": "Anda mencapai {{tier}}",
+    "addressChanged": "Alamat penarikan Anda telah diubah",
+    "promo": "{{text}}"
   }
 }

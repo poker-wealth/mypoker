@@ -10,6 +10,7 @@ import { Settings } from '@/pages/Settings';
 import { Fairness } from '@/pages/Fairness';
 import { Jackpot } from '@/pages/Jackpot';
 import { Vip } from '@/pages/Vip';
+import { Notifications } from '@/pages/Notifications';
 import { Table } from '@/pages/Table';
 
 export const router = createBrowserRouter([
@@ -29,6 +30,7 @@ export const router = createBrowserRouter([
       { path: 'fairness', element: <Fairness /> },
       { path: 'jackpot', element: <Jackpot /> },
       { path: 'vip', element: <Vip /> },
+      { path: 'notifications', element: <Notifications /> },
     ],
   },
   // Full-screen game table (no bottom nav / shell chrome).

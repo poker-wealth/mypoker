@@ -320,5 +320,19 @@
       "V4": "优先提现队列。无限对手标记。一对一专属客服。精英牌桌。",
       "V5": "即时自动出款。实时对手对战数据。黑金牌桌。全屏入场特效。"
     }
+  },
+  "notifications": {
+    "title": "通知",
+    "signInToSee": "登录以查看通知",
+    "empty": "暂无通知",
+    "emptyBlurb": "牌局结果、充值与公告将显示在此处。",
+    "handWon": "您赢得 ₮{{amount}}",
+    "handLost": "牌局结算 — ₮{{amount}}",
+    "deposit": "充值 ₮{{amount}} 已到账",
+    "withdrawal": "提现 ₮{{amount}} 已发出",
+    "jackpot": "中奖！您赢得 ₮{{amount}}",
+    "vipUp": "您已达到 {{tier}}",
+    "addressChanged": "您的提现地址已变更",
+    "promo": "{{text}}"
   }
 }
