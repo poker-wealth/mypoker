@@ -1,5 +1,6 @@
 import type {
   FinancialCoreClient,
+  JackpotPayoutRequest,
   SettleRoundRequest,
   SettlementReceipt,
   TableSettlementRequest,
@@ -62,6 +63,29 @@ export class ChipBank implements FinancialCoreClient {
       accounts: { winner: req.winnerAccountId },
       hash: '',
     };
+  }
+
+  /**
+   * Pay a jackpot hit from its pool sink to the winner's stack.
+   *
+   * The same conservation as settlement: chips leave the sink and land on a
+   * player, so ledger.totalChips() + sinkTotal() is unchanged. A pool that
+   * cannot cover the hit refuses — mirroring the real ledger's overdraft
+   * guard — and the room then declines to announce, same as production.
+   */
+  async jackpotPayout(req: JackpotPayoutRequest): Promise<{ applied: boolean }> {
+    const key = `${req.roundId}:jackpot:${req.tier}`;
+    if (this.settled.has(key)) return { applied: false };
+
+    const amount = toChips(req.amount);
+    const pool = this.sinks.get(req.jackpotAccountId) ?? 0;
+    if (amount <= 0 || pool < amount) {
+      throw new Error(`jackpot pool ${req.jackpotAccountId} holds ${pool}, cannot pay ${amount}`);
+    }
+    this.sinks.set(req.jackpotAccountId, pool - amount);
+    this.ledger.adjustLocked(req.playerId, amount);
+    this.settled.add(key);
+    return { applied: true };
   }
 
   /** What the house has taken: rake plus each jackpot pool. */

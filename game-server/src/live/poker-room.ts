@@ -612,8 +612,21 @@ export class PokerRoom {
    * live room — the weights module is wired, its inputs are not yet.
    */
   private async evaluateJackpots(req: TableSettlementRequest): Promise<void> {
+    // No payer, no party. The optional method exists so demo fakes need not
+    // implement money — but a hit that cannot be PAID must never be announced,
+    // and optional chaining alone would have skipped the payment and then
+    // celebrated anyway. (Found in review: the live server's ChipBank lacked
+    // the method entirely. It has one now; this guard covers any future fake.)
+    if (!this.fc.jackpotPayout) return;
+
+    // ── UNITS ── The table speaks chips (1 chip = 1 currency unit in every
+    // settlement decimal string); the JackpotEngine speaks micro-USD — its
+    // thresholds are usd(10)…usd(1000). The first wiring injected raw chips,
+    // so a pool could NEVER reach a 10,000,000-micro threshold and no jackpot
+    // would ever have fired. Convert at this boundary, both directions.
+    const CHIPS_TO_MICROS = 1_000_000;
     const winnerProfit = req.winners.reduce((sum, w) => sum + Number(w.amount), 0);
-    if (winnerProfit > 0) this.jackpot().inject(winnerProfit);
+    if (winnerProfit > 0) this.jackpot().inject(Math.round(winnerProfit * CHIPS_TO_MICROS));
 
     const seatIds = [...req.winners, ...req.losers].map((p) => p.playerAccountId);
     const hits = this.jackpot().onRoundSettled({
@@ -631,30 +644,31 @@ export class PokerRoom {
     const pools = this.jackpotAccountIds();
     for (const hit of hits) {
       const tierKey = hit.tier.toLowerCase() as 'mini' | 'minor' | 'major' | 'grand';
+      const amountChips = hit.amount / CHIPS_TO_MICROS; // micros → table currency
       try {
-        await this.fc.jackpotPayout?.({
+        await this.fc.jackpotPayout({
           tableId: this.config.id,
           tier: tierKey,
           jackpotAccountId: pools[tierKey],
           playerId: hit.playerId,
-          amount: String(hit.amount),
+          amount: amountChips.toFixed(6),
           roundId: req.roundId,
         });
       } catch (err) {
         console.error('[room] jackpot payout refused by ledger — hit not shown:', err);
         continue;
       }
-      this.announceJackpot(hit);
+      this.announceJackpot(hit, amountChips);
     }
   }
 
-  private announceJackpot(hit: JackpotHit): void {
+  private announceJackpot(hit: JackpotHit, amountChips: number): void {
     const seat = this.occupied().find((s) => s.playerId === hit.playerId);
     this.lastJackpot = {
       tier: hit.tier,
       playerId: hit.playerId,
       playerName: seat?.name ?? hit.playerId,
-      amount: hit.amount,
+      amount: amountChips,
       animationMs: TIER_CONFIG[hit.tier].animationMs,
       roundId: hit.roundId,
     };

@@ -139,7 +139,24 @@ export class HttpFinancialCoreClient implements FinancialCoreClient {
   }
 
   async jackpotPayout(req: JackpotPayoutRequest): Promise<{ applied: boolean }> {
-    return this.post('/internal/jackpot-payouts', req);
+    const result = await this.post<{ applied: boolean }>('/internal/jackpot-payouts', req);
+    // The win notification rides the payout, not the announcement: it exists
+    // only if the money moved, and a settlement retry (applied:false) does not
+    // repeat it — though the eventId would dedupe it anyway.
+    if (result.applied) {
+      try {
+        await this.post('/internal/notifications', {
+          playerId: req.playerId,
+          kind: 'JACKPOT',
+          titleKey: 'notifications.jackpot',
+          eventId: `${req.roundId}:jackpot:${req.tier}:notify`,
+          params: { amount: req.amount },
+        });
+      } catch (err) {
+        console.error('[fc-client] jackpot notification not raised:', err);
+      }
+    }
+    return result;
   }
 
   async settleTableHand(

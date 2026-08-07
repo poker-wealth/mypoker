@@ -628,7 +628,12 @@ export function buildRouter(): Router {
       const b = tableSettleBody.parse(req.body);
       // The pools must exist before the injection credits them — transfer()
       // throws AccountNotFoundError otherwise, failing the whole settlement.
-      await ensureJackpotAccounts(b.roundId.split(':')[0] ?? 'table', b.jackpotAccounts);
+      // The owning table is read from the pool id itself (`jp:<table>:mini`) —
+      // round ids use dashes, so splitting THEM on ':' yielded the whole round
+      // id as an owner. Unknown id shapes fall back to the round id, which is
+      // at least traceable.
+      const tableOwner = b.jackpotAccounts.mini.split(':')[1] || b.roundId;
+      await ensureJackpotAccounts(tableOwner, b.jackpotAccounts);
       const m = (s: string): Money => Money.fromDecimalString(s);
       const result = await settleTableHand({
         roundId: b.roundId,
