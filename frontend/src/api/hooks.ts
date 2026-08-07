@@ -2,6 +2,7 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tansta
 import { fetchSettings, patchSettings, type PlayerSettings, type SettingsPatch } from './settings';
 import { fetchReputation } from './reputation';
 import { fetchJackpot } from './jackpot';
+import { fetchVip } from './vip';
 import { fetchStats, fetchHistory, type HistoryPage, type StatsPeriod } from './stats';
 import { fetchLobbyGames, fetchTables, type TableFilter } from './lobby';
 import { useSession } from '@/store/session';
@@ -156,5 +157,17 @@ export function useJackpot() {
     staleTime: 10_000,
     refetchInterval: 30_000,
     retry: 1,
+  });
+}
+
+/** VIP standing. Moves only when a hand settles, so cached like reputation. */
+export function useVip() {
+  const playerId = useSession((s) => s.player?.playerId);
+
+  return useQuery({
+    queryKey: ['vip', playerId],
+    queryFn: fetchVip,
+    enabled: Boolean(playerId),
+    staleTime: 60_000,
   });
 }

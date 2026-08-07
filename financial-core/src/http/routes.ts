@@ -40,6 +40,7 @@ import {
   listNotifications,
   markRead,
 } from '../notifications/notification-store';
+import { getVipStanding, recordVolume } from '../vip/volume-tracker';
 import { WithdrawalModel } from '../withdrawal/withdrawal.model';
 import { asyncHandler, internalAuth, dataScopeMiddleware, ApiError } from './middleware';
 import { openApiSpec } from './openapi';
@@ -371,6 +372,38 @@ export function buildRouter(): Router {
       // 'suppressed' is not a failure — the player asked not to be told, and the
       // caller should be able to tell that apart from an error.
       res.json({ stored, suppressed: !stored });
+    }),
+  );
+
+  // ── VIP ──────────────────────────────────────────────────────────────────
+  r.get(
+    '/me/vip',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json(await getVipStanding(req.dataScope!.playerId));
+    }),
+  );
+
+  // The settlement hook. Called once per player per settled hand, by the game
+  // server — the only place that knows which game a round belonged to.
+  //
+  // Deliberately NOT part of the ledger write: this is a counter beside the
+  // money path, not on it. The spec describes it that way too ('VIP progress
+  // logs $3', 'cumulative volume tracking'), and it means adding VIP costs
+  // settlement one additive call rather than a schema change to money.
+  const volumeBody = z.object({
+    playerId: z.string().min(1),
+    gameId: z.string().min(1),
+    staked: z.number().int().nonnegative(),
+    won: z.number().int().nonnegative(),
+  });
+  r.post(
+    '/internal/volume',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const body = volumeBody.parse(req.body);
+      await recordVolume(body);
+      res.status(204).end();
     }),
   );
 

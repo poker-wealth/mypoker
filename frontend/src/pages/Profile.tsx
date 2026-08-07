@@ -64,7 +64,9 @@ export function Profile() {
               : t('account.notSignedIn')}
           </div>
         </div>
-        <Badge tone="brand">{t('account.vip', { tier: signedIn ? player.vipTier : 0 })}</Badge>
+        <button onClick={() => signedIn && navigate('/vip')} disabled={!signedIn}>
+          <Badge tone="brand">{t('account.vip', { tier: signedIn ? player.vipTier : 0 })}</Badge>
+        </button>
       </div>
 
       {/* Sign-in CTA — hidden once signed in */}

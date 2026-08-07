@@ -285,5 +285,30 @@
       "title": "Duduk dan mainkan",
       "body": "Jelajahi lobi, pilih meja sesuai taruhan Anda, dan ambil tempat duduk. Anda bisa menambah dana kapan saja."
     }
+  },
+  "vip": {
+    "signInToSee": "Masuk untuk melihat status VIP Anda",
+    "effectiveVolume": "Volume efektif",
+    "remaining": "₮{{amount}} lagi ke {{tier}}",
+    "topTier": "Tingkat tertinggi tercapai",
+    "byGame": "Asal volume",
+    "counted": "dihitung",
+    "roundsStaked": "{{rounds}} ronde · ₮{{staked}} dipertaruhkan",
+    "coefficientNote": "Setiap permainan dihitung berbeda untuk VIP: Texas ×1,0, Niu Niu ×0,5, Bakarat ×0,3, lainnya ×0,4. Ini mencegah permainan ber-rake rendah menjadi jalan pintas naik tingkat.",
+    "tiers": "Tingkatan",
+    "title": {
+      "V1": "Pengembara",
+      "V2": "Bintang Baru",
+      "V3": "Emas",
+      "V4": "Platinum",
+      "V5": "Emas Hitam"
+    },
+    "perks": {
+      "V1": "Panel statistik dasar. Batas dan antrean penarikan standar.",
+      "V2": "Grafik arus modal. Batas penarikan harian lebih tinggi. Emoji premium.",
+      "V3": "Pro Tracker HUD (VPIP, PFR, statistik posisi). Kanal dukungan khusus.",
+      "V4": "Antrean penarikan prioritas. Penandaan lawan tanpa batas. Concierge 1-on-1. Meja Elite.",
+      "V5": "Transfer otomatis instan. Profil head-to-head langsung. Meja Emas Hitam. Efek masuk layar penuh."
+    }
   }
 }

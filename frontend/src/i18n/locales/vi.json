@@ -285,5 +285,30 @@
       "title": "Ngồi vào bàn và chơi",
       "body": "Xem sảnh, chọn bàn theo mức cược của bạn và ngồi vào. Bạn có thể nạp tiền bất cứ lúc nào."
     }
+  },
+  "vip": {
+    "signInToSee": "Đăng nhập để xem hạng VIP của bạn",
+    "effectiveVolume": "Doanh số hiệu quả",
+    "remaining": "Còn ₮{{amount}} đến {{tier}}",
+    "topTier": "Đã đạt hạng cao nhất",
+    "byGame": "Nguồn doanh số",
+    "counted": "được tính",
+    "roundsStaked": "{{rounds}} ván · đặt ₮{{staked}}",
+    "coefficientNote": "Mỗi trò tính vào VIP khác nhau: Texas ×1,0, Niu Niu ×0,5, Baccarat ×0,3, còn lại ×0,4. Điều này ngăn các trò rake thấp trở thành lối tắt lên hạng.",
+    "tiers": "Các hạng",
+    "title": {
+      "V1": "Lữ khách",
+      "V2": "Ngôi sao mới",
+      "V3": "Vàng",
+      "V4": "Bạch kim",
+      "V5": "Hắc Kim"
+    },
+    "perks": {
+      "V1": "Bảng thống kê cơ bản. Hạn mức và hàng đợi rút tiền tiêu chuẩn.",
+      "V2": "Biểu đồ dòng vốn. Hạn mức rút hằng ngày cao hơn. Emoji cao cấp.",
+      "V3": "Pro Tracker HUD (VPIP, PFR, thống kê vị trí). Kênh hỗ trợ riêng.",
+      "V4": "Hàng đợi rút tiền ưu tiên. Gắn thẻ đối thủ không giới hạn. Trợ lý riêng 1-1. Bàn Elite.",
+      "V5": "Tự động chuyển tiền tức thì. Phân tích đối đầu trực tiếp. Bàn Hắc Kim. Hiệu ứng vào bàn toàn màn hình."
+    }
   }
 }

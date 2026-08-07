@@ -285,5 +285,30 @@
       "title": "Sit down and play",
       "body": "Browse the lobby, pick a table at your stake, and take a seat. You can add funds whenever you’re ready."
     }
+  },
+  "vip": {
+    "signInToSee": "Sign in to see your VIP standing",
+    "effectiveVolume": "Effective volume",
+    "remaining": "₮{{amount}} to {{tier}}",
+    "topTier": "Highest tier reached",
+    "byGame": "Where it came from",
+    "counted": "counted",
+    "roundsStaked": "{{rounds}} rounds · ₮{{staked}} staked",
+    "coefficientNote": "Games count differently toward VIP: Texas ×1.0, Niu Niu ×0.5, Baccarat ×0.3, others ×0.4. This keeps low-rake games from being a shortcut up the tiers.",
+    "tiers": "Tiers",
+    "title": {
+      "V1": "Wanderer",
+      "V2": "Rising Star",
+      "V3": "Gold",
+      "V4": "Platinum",
+      "V5": "Black Gold"
+    },
+    "perks": {
+      "V1": "Basic stats panel. Standard withdrawal limits and queue.",
+      "V2": "Capital flow chart. Higher daily withdrawal limit. Premium emojis.",
+      "V3": "Pro Tracker HUD (VPIP, PFR, positional stats). Dedicated support channel.",
+      "V4": "Priority withdrawal queue. Unlimited opponent tagging. 1-on-1 concierge. Elite tables.",
+      "V5": "Instant auto-transfer. Live head-to-head profiling. Black Gold tables. Full-screen entry effect."
+    }
   }
 }
