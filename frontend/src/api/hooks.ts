@@ -5,6 +5,7 @@ import { fetchJackpot } from './jackpot';
 import { fetchVip } from './vip';
 import { fetchMyLeagues, fetchLeagues, createLeagueApi, joinLeagueApi } from './leagues';
 import { fetchNotifications, markNotificationsRead, type NotificationPage } from './notifications';
+import { fetchRtp } from './fairnessFeed';
 import {
   fetchAgent,
   fetchAgentEligibility,
@@ -306,4 +307,9 @@ export function useCreateReferralLink() {
     mutationFn: createReferralLinkApi,
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['agent'] }),
   });
+}
+
+/** Public payout rates. No session — the point is anyone can read them. */
+export function useRtp() {
+  return useQuery({ queryKey: ['fairness', 'rtp'], queryFn: fetchRtp, staleTime: 60_000, retry: 1 });
 }

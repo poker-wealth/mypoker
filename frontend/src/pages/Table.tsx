@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { PokerTable } from '@/components/poker/PokerTable';
 import { ActionBar } from '@/components/poker/ActionBar';
 import { InsurancePrompt } from '@/components/poker/InsurancePrompt';
+import { JackpotBurst } from '@/components/poker/JackpotBurst';
 import { toast } from '@/lib/toast';
 import { useTranslation } from 'react-i18next';
 import { BuyInSheet } from '@/components/poker/BuyInSheet';
@@ -49,6 +50,9 @@ function LiveTable({ tableId }: { tableId: string }) {
   // Cleared when the hand id changes, so declining one hand's offer does not
   // suppress the next hand's.
   const [insuranceDeclined, setInsuranceDeclined] = useState<string | null>(null);
+  // Which hit this viewer has already watched — so a snapshot refetch does not
+  // replay the celebration.
+  const [jackpotSeen, setJackpotSeen] = useState<string | null>(null);
 
   // Sign-in is attempted on arrival; only offer the prompt once it has actually failed.
   if (!signedIn) {
@@ -106,6 +110,17 @@ function LiveTable({ tableId }: { tableId: string }) {
           {error}
         </div>
       )}
+
+      {/* Jackpot celebration — fires only for a hit the ledger has already
+          PAID (the room refuses to announce anything transfer() rejected). */}
+      <JackpotBurst
+        win={
+          jackpotSeen === snapshot?.jackpot?.roundId
+            ? null
+            : (snapshot?.jackpot ?? null)
+        }
+        onDone={() => setJackpotSeen(snapshot?.jackpot?.roundId ?? null)}
+      />
 
       {/* Insurance. Rendered purely on the offer's presence: the server sends
           one only to the two all-in players, so "3+ silently skips" needs no

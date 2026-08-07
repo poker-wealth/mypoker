@@ -70,6 +70,19 @@ export interface FinancialCoreClient {
   settleRound(req: SettleRoundRequest): Promise<SettlementReceipt>;
   /** Settle a full multi-party table hand (losers/winners/rake/jackpot). Idempotent on roundId. */
   settleTableHand(req: TableSettlementRequest): Promise<{ roundId: string; applied: boolean }>;
+  /** Pay a jackpot hit from a pool account to a player. Idempotent per round+tier.
+   *  Optional so demo/test fakes need not implement it. */
+  jackpotPayout?(req: JackpotPayoutRequest): Promise<{ applied: boolean }>;
+}
+
+export interface JackpotPayoutRequest {
+  tableId: string;
+  tier: 'mini' | 'minor' | 'major' | 'grand';
+  jackpotAccountId: string;
+  playerId: string;
+  /** Decimal string, table currency. */
+  amount: string;
+  roundId: string;
 }
 
 export class FinancialCoreError extends Error {
@@ -123,6 +136,10 @@ export class HttpFinancialCoreClient implements FinancialCoreClient {
 
   async settleRound(req: SettleRoundRequest): Promise<SettlementReceipt> {
     return this.post<SettlementReceipt>('/internal/settlements', req);
+  }
+
+  async jackpotPayout(req: JackpotPayoutRequest): Promise<{ applied: boolean }> {
+    return this.post('/internal/jackpot-payouts', req);
   }
 
   async settleTableHand(

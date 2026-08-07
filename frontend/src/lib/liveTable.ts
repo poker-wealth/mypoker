@@ -76,6 +76,17 @@ export interface TableSnapshot {
    *
    * Odds only. Mirrors InsuranceOffer in game-server/src/live/room-state.ts.
    */
+  /** A jackpot hit this hand, shown to every viewer. Mirrors JackpotWinSnapshot. */
+  jackpot: {
+    tier: 'MINI' | 'MINOR' | 'MAJOR' | 'GRAND';
+    playerId: string;
+    playerName: string;
+    /** Table currency (chips). */
+    amount: number;
+    animationMs: number;
+    roundId: string;
+  } | null;
+
   insurance: {
     premium: number;
     coverage: number;

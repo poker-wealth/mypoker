@@ -62,6 +62,16 @@ export interface InsuranceOffer {
   expiresInSeconds: number;
 }
 
+export interface JackpotWinSnapshot {
+  tier: 'MINI' | 'MINOR' | 'MAJOR' | 'GRAND';
+  playerId: string;
+  playerName: string;
+  /** Table currency (chips). */
+  amount: number;
+  animationMs: number;
+  roundId: string;
+}
+
 export interface TableSnapshot {
   tableId: string;
   name: string;
@@ -94,6 +104,13 @@ export interface TableSnapshot {
    * game-server/src/games/texas/underwriting.ts.
    */
   insurance: InsuranceOffer | null;
+
+  /**
+   * A jackpot hit this hand, or null. Shown to EVERY viewer — a jackpot firing
+   * is table news, not a private message — and cleared when the next hand
+   * starts, so the animation's own duration governs how long it plays.
+   */
+  jackpot: JackpotWinSnapshot | null;
 
   /** Your seat index, or null if you're watching. */
   yourSeat: number | null;

@@ -1,6 +1,8 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { Money } from '../domain/money';
+import { LedgerType } from '../domain/account-types';
+import { transfer } from '../wallet/transfer';
 import { TableType } from '../settlement/settlement-domain';
 import { settleRound } from '../settlement/settle-round';
 import { settleTableHand } from '../settlement/table-settlement';
@@ -12,7 +14,7 @@ import {
   broadcastWithdrawal,
   confirmWithdrawal,
 } from '../withdrawal/withdrawal-state-machine';
-import { getOrCreatePlayerAccount } from '../wallet/system-accounts';
+import { getOrCreatePlayerAccount, ensureJackpotAccounts } from '../wallet/system-accounts';
 import { getPlayerStats, getPlayerHistory } from '../stats/player-stats';
 import { getSettings, updateSettings } from '../settings/player-settings';
 import { getReputationFacts } from '../reputation/player-reputation';
@@ -39,7 +41,7 @@ import {
   listNotifications,
   markRead,
 } from '../notifications/notification-store';
-import { getVolumeFacts, recordVolume } from '../vip/volume-tracker';
+import { getVolumeFacts, recordVolume, getPublicRtp } from '../vip/volume-tracker';
 import { AccountModel } from '../wallet/account.model';
 import { WithdrawalModel } from '../withdrawal/withdrawal.model';
 import { asyncHandler, internalAuth, dataScopeMiddleware, ApiError } from './middleware';
@@ -314,6 +316,53 @@ export function buildRouter(): Router {
     }),
   );
 
+  // Public payout rates — open like /health: the whole point is that anyone
+  // can read them, and the frontend reaches this through the gateway.
+  r.get(
+    '/fairness/rtp',
+    asyncHandler(async (_req: Request, res: Response) => {
+      res.json({ games: await getPublicRtp() });
+    }),
+  );
+
+  // ── Jackpot payout ───────────────────────────────────────────────────────
+  // The clearing rules have whitelisted JACKPOT_* -> PLAYER from the start;
+  // this is the first caller. transfer() runs the full guard set — whitelist,
+  // idempotency, overdraft — so a pool can never pay more than it holds, and a
+  // replayed trigger cannot pay twice.
+  const jackpotPayoutBody = z.object({
+    tableId: z.string().min(1),
+    tier: z.enum(['mini', 'minor', 'major', 'grand']),
+    jackpotAccountId: z.string().min(1),
+    playerId: z.string().min(1),
+    /** Decimal string, table currency. */
+    amount: z.string().min(1),
+    roundId: z.string().min(1),
+  });
+  r.post(
+    '/internal/jackpot-payouts',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const b = jackpotPayoutBody.parse(req.body);
+      await ensureJackpotAccounts(b.tableId, {
+        mini: b.tier === 'mini' ? b.jackpotAccountId : `jp:${b.tableId}:mini`,
+        minor: b.tier === 'minor' ? b.jackpotAccountId : `jp:${b.tableId}:minor`,
+        major: b.tier === 'major' ? b.jackpotAccountId : `jp:${b.tableId}:major`,
+        grand: b.tier === 'grand' ? b.jackpotAccountId : `jp:${b.tableId}:grand`,
+      });
+      const player = await getOrCreatePlayerAccount(b.playerId);
+      const result = await transfer({
+        fromAccountId: b.jackpotAccountId,
+        toAccountId: player._id,
+        amount: Money.fromDecimalString(b.amount),
+        type: LedgerType.JACKPOT_PAYOUT,
+        businessId: b.roundId,
+        idempotencyKey: `${b.roundId}:jackpot:${b.tier}`,
+      });
+      res.json({ applied: result.applied ?? true });
+    }),
+  );
+
   // ── Notifications ────────────────────────────────────────────────────────
   const notificationsQuery = z.object({
     limit: z.coerce.number().int().positive().max(100).optional(),
@@ -577,6 +626,9 @@ export function buildRouter(): Router {
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
       const b = tableSettleBody.parse(req.body);
+      // The pools must exist before the injection credits them — transfer()
+      // throws AccountNotFoundError otherwise, failing the whole settlement.
+      await ensureJackpotAccounts(b.roundId.split(':')[0] ?? 'table', b.jackpotAccounts);
       const m = (s: string): Money => Money.fromDecimalString(s);
       const result = await settleTableHand({
         roundId: b.roundId,

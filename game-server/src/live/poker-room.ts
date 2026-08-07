@@ -6,6 +6,9 @@ import { TexasGame } from '../games/texas/texas-game';
 import { variant, type PokerVariant } from '../games/texas/variants';
 import type { Action, SeatPublic, Street } from '../games/texas/betting';
 import { isInsuranceEligible, underwrite } from '../games/texas/underwriting';
+import { JackpotEngine, TIER_CONFIG } from '../jackpot/index';
+import type { JackpotHit } from '../jackpot/index';
+import type { TableSettlementRequest } from '../core/financial-core-client';
 import type { ReserveState } from '../games/texas/underwriting';
 import type { RakeConfig } from '../games/texas/settlement';
 
@@ -35,6 +38,7 @@ import type {
   TableCommand,
   TableSnapshot,
   InsuranceOffer,
+  JackpotWinSnapshot,
   TableSummary,
 } from './room-state';
 
@@ -159,6 +163,22 @@ export class PokerRoom {
   private buttonSeat = -1;
   private actionDeadline: number | null = null;
   private winners: number[] = [];
+  /**
+   * Trigger logic for this table's four pools (spec: pools are PER TABLE —
+   * "owner_id = tableId, not gameType"). The engine's in-memory pools mirror
+   * the ledger's from this boot onward; the LEDGER stays authoritative because
+   * the payout goes through transfer(), whose overdraft guard makes a pool
+   * unable to pay more than it truly holds however optimistic the mirror is.
+   */
+  private jackpotEngine: JackpotEngine | null = null;
+  private lastJackpot: JackpotWinSnapshot | null = null;
+
+  private jackpot(): JackpotEngine {
+    // Lazy: `config` is a constructor parameter property, not available at
+    // field-initialiser time.
+    this.jackpotEngine ??= new JackpotEngine(this.config.id);
+    return this.jackpotEngine;
+  }
   private message: string | undefined;
   private readonly revealed = new Map<string, string[]>();
 
@@ -185,8 +205,13 @@ export class PokerRoom {
       buyIn: async (): Promise<void> => {},
       release: async (): Promise<void> => {},
       settleRound: (req): ReturnType<FinancialCoreClient['settleRound']> => this.fc.settleRound(req),
-      settleTableHand: (req): ReturnType<FinancialCoreClient['settleTableHand']> =>
-        this.fc.settleTableHand(req),
+      settleTableHand: async (req): ReturnType<FinancialCoreClient['settleTableHand']> => {
+        const result = await this.fc.settleTableHand(req);
+        // Trigger evaluation rides the settlement: this is the one moment the
+        // winner's profit is known and the money has actually moved.
+        if (result.applied) await this.evaluateJackpots(req);
+        return result;
+      },
     };
   }
 
@@ -422,7 +447,10 @@ export class PokerRoom {
         bigBlind: this.config.bigBlind,
         tableType: 'PLATFORM',
         accountOf: (playerId): string => playerId,
-        jackpotAccounts: { mini: 'jp:mini', minor: 'jp:minor', major: 'jp:major', grand: 'jp:grand' },
+        // Per-table ids, per spec. The previous shared 'jp:mini' strings were
+        // never created as accounts at all — transfer() throws on a missing
+        // account — so injections could not have been landing.
+        jackpotAccounts: this.jackpotAccountIds(),
         rake: this.config.rake,
         ...(this.config.variantId !== 'texas' ? { variant: this.spec } : {}),
       },
@@ -433,6 +461,7 @@ export class PokerRoom {
 
     this.game = game;
     this.winners = [];
+    this.lastJackpot = null; // the previous hand's celebration ends here
     this.message = undefined;
     this.revealed.clear();
     for (const seat of this.occupied()) {
@@ -564,6 +593,74 @@ export class PokerRoom {
    * money: this must read the live pools before insurance is enabled for real
    * funds, or the platform can underwrite more than it holds.
    */
+  private jackpotAccountIds(): { mini: string; minor: string; major: string; grand: string } {
+    const id = this.config.id;
+    return { mini: `jp:${id}:mini`, minor: `jp:${id}:minor`, major: `jp:${id}:major`, grand: `jp:${id}:grand` };
+  }
+
+  /**
+   * Mirror the injection, ask the engine for hits, and PAY them through the
+   * ledger before announcing anything.
+   *
+   * Order matters: the payout transfer is the money truth. Only a hit the
+   * ledger accepted reaches the snapshot — an animation for a win that did not
+   * credit is the exact failure this feature was held back to avoid. A payout
+   * the ledger refuses (overdrawn mirror, pool drift) is logged and the hit is
+   * NOT shown; the player has lost nothing they ever had.
+   *
+   * Candidates default to CLEAN behaviour until the anti-bot pipeline feeds the
+   * live room — the weights module is wired, its inputs are not yet.
+   */
+  private async evaluateJackpots(req: TableSettlementRequest): Promise<void> {
+    const winnerProfit = req.winners.reduce((sum, w) => sum + Number(w.amount), 0);
+    if (winnerProfit > 0) this.jackpot().inject(winnerProfit);
+
+    const seatIds = [...req.winners, ...req.losers].map((p) => p.playerAccountId);
+    const hits = this.jackpot().onRoundSettled({
+      roundId: req.roundId,
+      seed: this.game?.roundInfo()?.finalSeed ?? req.roundId,
+      now: Date.now(),
+      candidates: seatIds.map((playerId) => ({
+        playerId,
+        baseWeight: 1,
+        behavior: 'NORMAL' as const,
+        associated: false,
+      })),
+    });
+
+    const pools = this.jackpotAccountIds();
+    for (const hit of hits) {
+      const tierKey = hit.tier.toLowerCase() as 'mini' | 'minor' | 'major' | 'grand';
+      try {
+        await this.fc.jackpotPayout?.({
+          tableId: this.config.id,
+          tier: tierKey,
+          jackpotAccountId: pools[tierKey],
+          playerId: hit.playerId,
+          amount: String(hit.amount),
+          roundId: req.roundId,
+        });
+      } catch (err) {
+        console.error('[room] jackpot payout refused by ledger — hit not shown:', err);
+        continue;
+      }
+      this.announceJackpot(hit);
+    }
+  }
+
+  private announceJackpot(hit: JackpotHit): void {
+    const seat = this.occupied().find((s) => s.playerId === hit.playerId);
+    this.lastJackpot = {
+      tier: hit.tier,
+      playerId: hit.playerId,
+      playerName: seat?.name ?? hit.playerId,
+      amount: hit.amount,
+      animationMs: TIER_CONFIG[hit.tier].animationMs,
+      roundId: hit.roundId,
+    };
+    this.push();
+  }
+
   private insuranceFor(playerId: string, engine: EnginePublicState | null): InsuranceOffer | null {
     if (!engine || this.phase !== 'IN_HAND') return null;
 
@@ -658,6 +755,7 @@ export class PokerRoom {
       board: engine ? engine.community : [],
       seats,
       insurance: this.insuranceFor(playerId, engine),
+      jackpot: this.lastJackpot,
 
       yourSeat: mySeat ? mySeat.index : null,
       you: me ? { playerId: me.id, name: me.displayName, available: me.available } : null,

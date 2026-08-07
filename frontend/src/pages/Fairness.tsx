@@ -4,7 +4,7 @@ import { Check, X, ShieldCheck, ChevronDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { verifyRound, type RoundVerificationData, type VerificationResult, type StepId } from '@/lib/fairness';
 import { cn } from '@/lib/cn';
-import { useLobbyGames } from '@/api/hooks';
+import { useLobbyGames, useRtp } from '@/api/hooks';
 import { HIDDEN_GAMES, visibleGames } from '@/lib/games';
 import sampleRound from '@/lib/__fixtures__/round-vector.json';
 
@@ -245,6 +245,11 @@ function Value({ label, value, tone }: { label: string; value: string; tone: 'ok
 function GameFairnessList() {
   const { t } = useTranslation();
   const lobby = useLobbyGames();
+  // Lifetime-actual rates with sample sizes, from the same per-game volume rows
+  // settlement writes — the published half of the RTP feed. The on-chain
+  // rule-version stamp is W11 chain work and still honestly absent.
+  const rtp = useRtp();
+  const rtpByGame = new Map((rtp.data?.games ?? []).map((g) => [g.gameId, g]));
 
   // Server tiers when reachable; otherwise the catalog's own, which is the same
   // data shipped at build time rather than a guess.
@@ -273,6 +278,7 @@ function GameFairnessList() {
                 <div className="truncate text-[0.66rem] text-dim">
                   {provable ? t('fairness.provableBlurb') : t('fairness.vendorBlurb', { vendor: g.vendor ?? '' })}
                 </div>
+                <RtpLine rtp={rtpByGame.get(g.id)} />
               </div>
               <span
                 className={cn(
@@ -290,5 +296,22 @@ function GameFairnessList() {
         {t('fairness.ratesPending')}
       </p>
     </section>
+  );
+}
+
+
+/**
+ * One game's published rate: lifetime-actual with its sample size, and the
+ * vendor's theoretical where one is documented. Absent entirely before any
+ * play — a rate with no sample behind it is a guess wearing a percent sign.
+ */
+function RtpLine({ rtp }: { rtp?: { actualRtp: string | null; sampleRounds: number; theoreticalRtp: string | null } }) {
+  const { t } = useTranslation();
+  if (!rtp || rtp.actualRtp === null) return null;
+  return (
+    <div className="truncate text-[0.62rem] text-dim tabular-nums">
+      {t('fairness.actualRate', { rate: rtp.actualRtp, count: rtp.sampleRounds })}
+      {rtp.theoreticalRtp ? ` · ${t('fairness.theoreticalRate', { rate: rtp.theoreticalRtp })}` : ''}
+    </div>
   );
 }

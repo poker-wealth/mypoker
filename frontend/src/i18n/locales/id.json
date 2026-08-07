@@ -244,7 +244,9 @@
     "provableBlurb": "Aturan milik kami, dan setiap ronde dapat diverifikasi",
     "vendorAttested": "Disahkan vendor",
     "vendorBlurb": "Pemasok luar memiliki aturannya; setiap hasil ditandatangani, tetapi tabel pembayaran mereka tidak dapat dibuktikan tidak berubah",
-    "ratesPending": "Tingkat pembayaran yang dipublikasikan belum ditampilkan. Sebuah tingkat baru bermakna setelah aturan di baliknya dikomit on-chain dan diberi versi — sebelum itu ia hanyalah angka yang kami klaim tentang diri sendiri, hal yang justru ingin dihindari halaman ini."
+    "ratesPending": "Tingkat pembayaran yang dipublikasikan belum ditampilkan. Sebuah tingkat baru bermakna setelah aturan di baliknya dikomit on-chain dan diberi versi — sebelum itu ia hanyalah angka yang kami klaim tentang diri sendiri, hal yang justru ingin dihindari halaman ini.",
+    "actualRate": "Pengembalian aktual {{rate}}% dari {{count}} ronde",
+    "theoreticalRate": "dinyatakan {{rate}}%"
   },
   "reputation": {
     "title": "Reputasi",

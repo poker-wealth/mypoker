@@ -173,3 +173,50 @@ export async function getVolumeFacts(playerId: string, at: Date = new Date()): P
     breakdown: [...byGame.values()].sort((a, b) => b.effective - a.effective),
   };
 }
+
+/**
+ * Platform-wide payout rates, per game (feature queue #12).
+ *
+ * PROJECT_PLAN line 47 splits this feature: the RATES are "published theoretical
+ * + lifetime-actual rate with sample size", read from the server — this. The
+ * on-chain RULE-COMMITMENT and per-round rule-version stamp are W11 chain work
+ * and are not pretended at here.
+ *
+ * Actual = Σ won / Σ staked across every player, per game — the same rows the
+ * VIP tracker writes at settlement, so the public rate and a player's own
+ * breakdown can never come from different books. Sample size is rounds, so a
+ * reader can judge how much the rate means.
+ */
+export interface GameRtp {
+  gameId: string;
+  /** Lifetime actual return, percent to 2dp, or null before any play. */
+  actualRtp: string | null;
+  /** Rounds behind the figure — the honesty qualifier. */
+  sampleRounds: number;
+  /** Documented theoretical rate, where a vendor has published one. */
+  theoreticalRtp: string | null;
+}
+
+/** Vendor-documented theoretical rates. Slots' 96.8% is from the provider's
+ *  paytable (game-server/src/games/slots/slots-provider.ts). P2P card games
+ *  have no house RTP — the pot returns to players minus rake — so null. */
+const THEORETICAL_RTP: Record<string, string> = { slots: '96.80' };
+
+export async function getPublicRtp(): Promise<GameRtp[]> {
+  const rows = await VolumeModel.aggregate<{
+    _id: string;
+    staked: number;
+    won: number;
+    rounds: number;
+  }>([
+    { $group: { _id: '$gameId', staked: { $sum: '$staked' }, won: { $sum: '$won' }, rounds: { $sum: '$rounds' } } },
+    { $sort: { rounds: -1 } },
+  ]);
+
+  return rows.map((r) => ({
+    gameId: r._id,
+    actualRtp: r.staked > 0 ? ((r.won / r.staked) * 100).toFixed(2) : null,
+    sampleRounds: r.rounds,
+    theoreticalRtp: THEORETICAL_RTP[r._id] ?? null,
+  }));
+}

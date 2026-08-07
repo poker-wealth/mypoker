@@ -244,7 +244,9 @@
     "provableBlurb": "We own the rules, and every round is verifiable",
     "vendorAttested": "Vendor-attested",
     "vendorBlurb": "An outside supplier owns the rules; each result is signed, but their paytable cannot be proven unchanged",
-    "ratesPending": "Published payout rates are not shown yet. A rate is only meaningful once the rules behind it are committed on-chain and versioned — until then it would be a number we assert about ourselves, which is what this page exists to avoid."
+    "ratesPending": "Published payout rates are not shown yet. A rate is only meaningful once the rules behind it are committed on-chain and versioned — until then it would be a number we assert about ourselves, which is what this page exists to avoid.",
+    "actualRate": "Actual return {{rate}}% over {{count}} rounds",
+    "theoreticalRate": "stated {{rate}}%"
   },
   "reputation": {
     "title": "Reputation",

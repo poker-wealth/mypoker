@@ -32,6 +32,12 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
   app.use('/me', buildMeRouter(config));
   app.use('/leagues', buildLeagueRouter(config));
   app.use('/agent', buildAgentRouter(config));
+  // Public payout rates — open by design; the numbers exist to be checked.
+  app.get('/fairness/rtp', (_req, res) => {
+    void fetch(`${config.financialCoreUrl}/api/v1/fairness/rtp`)
+      .then(async (r) => res.status(r.status).json(await r.json()))
+      .catch(() => res.status(502).json({ error: 'financial service unavailable' }));
+  });
   // Optional so auth-only deployments (and the auth tests) don't have to stand
   // up a lobby they never read.
   if (lobby) app.use('/lobby', buildLobbyRouter(lobby));
