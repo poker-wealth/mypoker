@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac, createHash, timingSafeEqual } from 'node:crypto';
 
 /**
  * Verification of the Telegram Mini App `initData` launch payload.
@@ -89,6 +89,73 @@ export function verifyInitData(
   if (typeof user.id !== 'number' || !Number.isFinite(user.id)) {
     return { ok: false, reason: 'initData user has no numeric id' };
   }
+
+  return { ok: true, user, authDate };
+}
+
+export interface WidgetUser {
+  id: number;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date: number;
+  hash: string;
+}
+
+/**
+ * Verify a payload from the Telegram Login Widget (used for web users).
+ * The algorithm is slightly different from initData:
+ * secret_key = SHA256(botToken)
+ * hash = HMAC_SHA256(secret_key, data_check_string)
+ */
+export function verifyWidgetData(
+  widgetData: WidgetUser,
+  botToken: string,
+  options: VerifyOptions,
+): InitDataResult {
+  if (!botToken) return { ok: false, reason: 'server has no bot token configured' };
+
+  if (typeof widgetData !== 'object' || !widgetData || !widgetData.hash) {
+    return { ok: false, reason: 'widget data is missing hash' };
+  }
+
+  const { hash, ...dataFields } = widgetData;
+
+  const dataCheckString = Object.entries(dataFields)
+    .filter(([_, v]) => v !== undefined && v !== null)
+    .map(([k, v]) => `${k}=${v}`)
+    .sort() // Alphabetical sort
+    .join('\n');
+
+  const secretKey = createHash('sha256').update(botToken).digest();
+  const expected = createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
+
+  if (!timingSafeEqualHex(expected, hash)) {
+    return { ok: false, reason: 'signature does not match' };
+  }
+
+  const authDate = Number(dataFields.auth_date);
+  if (!Number.isFinite(authDate) || authDate <= 0) {
+    return { ok: false, reason: 'widget data has no usable auth_date' };
+  }
+
+  const now = options.nowSeconds ?? Math.floor(Date.now() / 1000);
+  if (now - authDate > options.maxAgeSeconds) {
+    return { ok: false, reason: 'widget data has expired' };
+  }
+
+  if (typeof dataFields.id !== 'number' || !Number.isFinite(dataFields.id)) {
+    return { ok: false, reason: 'widget user has no numeric id' };
+  }
+
+  const user: TelegramUser = {
+    id: dataFields.id,
+    ...(dataFields.first_name !== undefined ? { first_name: dataFields.first_name } : {}),
+    ...(dataFields.last_name !== undefined ? { last_name: dataFields.last_name } : {}),
+    ...(dataFields.username !== undefined ? { username: dataFields.username } : {}),
+    ...(dataFields.photo_url !== undefined ? { photo_url: dataFields.photo_url } : {}),
+  };
 
   return { ok: true, user, authDate };
 }

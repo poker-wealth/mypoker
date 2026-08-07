@@ -1,5 +1,6 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchSettings, patchSettings, type PlayerSettings, type SettingsPatch } from './settings';
+import { fetchBalance } from './wallet';
 import { fetchStats, fetchHistory, type HistoryPage, type StatsPeriod } from './stats';
 import { fetchLobbyGames, fetchTables, type TableFilter } from './lobby';
 import { useSession } from '@/store/session';
@@ -121,5 +122,18 @@ export function useUpdateSettings() {
       if (context?.previous) queryClient.setQueryData(key, context.previous);
     },
     onSuccess: (settled) => queryClient.setQueryData(key, settled),
+  });
+}
+
+export function useBalance() {
+  const { status } = useSession();
+  const signedIn = status === 'authenticated';
+  
+  return useQuery({
+    queryKey: ['balance'],
+    queryFn: fetchBalance,
+    enabled: signedIn,
+    staleTime: 10 * 1000,
+    retry: false,
   });
 }

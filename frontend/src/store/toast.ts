@@ -40,6 +40,9 @@ export const useToastStore = create<ToastState>((set, get) => ({
   toasts: [],
 
   show: (tone, message) => {
+    const existing = get().toasts.find((t) => t.message === message && t.tone === tone);
+    if (existing) return existing.id;
+
     const id = nextId++;
     set((s) => ({ toasts: [...s.toasts, { id, tone, message }].slice(-MAX_VISIBLE) }));
 

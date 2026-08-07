@@ -91,6 +91,7 @@
     "notSignedIn": "Not signed in",
     "signInTitle": "Sign in to save your progress",
     "signInBlurb": "Connect Telegram to sync balance, history & VIP rewards.",
+    "signInBlurbGoogle": "Sign in with Google to sync balance, history & VIP rewards.",
     "openInTelegramTitle": "Open in Telegram to sign in",
     "openInTelegramBlurb": "This app signs you in automatically when it runs inside Telegram.",
     "continueWithTelegram": "Continue with Telegram",
@@ -175,6 +176,7 @@
     "notifyDeposits": "Deposits & withdrawals",
     "notifyPromos": "Promotions",
     "about": "About",
+    "account": "Account",
     "signInToSync": "Sign in to sync your preferences"
   },
   "fairness": {

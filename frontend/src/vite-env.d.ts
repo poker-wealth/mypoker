@@ -12,6 +12,12 @@ interface ImportMetaEnv {
   readonly VITE_TABLES_URL?: string;
   /** Override only if the game socket isn't at `${VITE_TABLES_URL}/ws`. */
   readonly VITE_TABLES_WS_URL?: string;
+  /**
+   * Bot username (without @) for the Telegram Login Widget, shown when the app
+   * is opened in a plain browser. Unset hides the widget. The widget only works
+   * on domains registered with the bot via BotFather's /setdomain.
+   */
+  readonly VITE_TELEGRAM_BOT_NAME?: string;
 }
 
 interface ImportMeta {

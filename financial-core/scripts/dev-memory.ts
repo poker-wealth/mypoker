@@ -14,8 +14,11 @@ import { AccountModel } from '../src/wallet/account.model';
 import { AccountType } from '../src/domain/account-types';
 import { OFFICIAL_USDT_TRC20_CONTRACT } from '../src/deposit/trc20';
 
-const INTERNAL = 'dev-internal-secret';
-const JWT = 'dev-jwt-secret';
+import { config } from 'dotenv';
+config();
+
+const INTERNAL = process.env.INTERNAL_API_SECRET || 'dev-internal-secret';
+const JWT = process.env.JWT_SECRET || 'dev-jwt-secret';
 const PORT = Number(process.env.PORT ?? 4001);
 
 async function main(): Promise<void> {

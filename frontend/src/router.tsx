@@ -9,6 +9,7 @@ import { Profile } from '@/pages/Profile';
 import { Settings } from '@/pages/Settings';
 import { Fairness } from '@/pages/Fairness';
 import { Table } from '@/pages/Table';
+import { Login } from '@/pages/Login';
 
 export const router = createBrowserRouter([
   {
@@ -27,6 +28,8 @@ export const router = createBrowserRouter([
       { path: 'fairness', element: <Fairness /> },
     ],
   },
+  // The login gate for non-Telegram web users
+  { path: '/login', element: <Login /> },
   // Full-screen game table (no bottom nav / shell chrome).
   { path: '/table/:id', element: <Table /> },
 ]);

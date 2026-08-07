@@ -2,7 +2,7 @@
   "name": "fairplay",
   "private": true,
   "version": "0.1.0",
-  "description": "FairPlay \u2014 provably-fair multi-game platform (Financial Core + Game Server)",
+  "description": "FairPlay — provably-fair multi-game platform (Financial Core + Game Server)",
   "scripts": {
     "install:all": "npm --prefix financial-core install && npm --prefix game-server install && npm --prefix frontend install",
     "test": "npm run test:fc && npm run test:gs",
@@ -18,5 +18,8 @@
     "app": "npm --prefix game-server run app",
     "dev": "npm --prefix frontend run dev",
     "ui:build": "npm --prefix frontend run build"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2"
   }
 }

@@ -12,7 +12,9 @@ export function Header() {
   let rightElement = null;
   let showBack = false;
 
-  switch (location.pathname) {
+  const path = location.pathname.replace(/\/$/, '').toLowerCase() || '/';
+
+  switch (path) {
     case '/alliance':
       title = 'ALLIANCE';
       rightElement = <HelpCircle size={18} className="text-dim" />;

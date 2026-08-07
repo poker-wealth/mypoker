@@ -125,6 +125,12 @@ export const tableCommandSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('sitIn') }),
   /** Top up / rebuy an occupied seat between hands. */
   z.object({ kind: z.literal('buyIn'), amount: z.number().int().positive() }),
+  /** Send a chat message to the room. */
+  z.object({ kind: z.literal('chat'), message: z.string().max(200) }),
+  /** Challenge a peer. */
+  z.object({ kind: z.literal('challenge'), targetId: z.string() }),
+  /** Answer a challenge. */
+  z.object({ kind: z.literal('answer_challenge'), passed: z.boolean(), responseMs: z.number().nonnegative() }),
 ]);
 
 export type TableCommand = z.infer<typeof tableCommandSchema>;

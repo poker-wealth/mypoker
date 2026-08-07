@@ -87,8 +87,9 @@ export class TableHub {
     switch (msg.type) {
       case 'join': {
         this.unsubscribe(ctx, msg.roomId); // re-joining resyncs rather than double-subscribing
-        const stop = room.join(playerId, (snapshot) => {
-          ctx.send({ type: 'state', roomId: msg.roomId, state: snapshot });
+        const stop = room.join(playerId, {
+          sendSnapshot: (snapshot) => ctx.send({ type: 'state', roomId: msg.roomId, state: snapshot }),
+          sendEvent: (event, data) => ctx.send({ type: 'event', roomId: msg.roomId, event, data }),
         });
         let byRoom = this.subscriptions.get(ctx);
         if (!byRoom) {

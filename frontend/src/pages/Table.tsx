@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, Volume2, Settings2, Wifi, WifiOff } from 'lucide-react';
+import { ChevronLeft, Volume2, Settings2, Wifi, WifiOff, MessageSquare } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { PokerTable } from '@/components/poker/PokerTable';
 import { ActionBar } from '@/components/poker/ActionBar';
@@ -11,6 +11,9 @@ import { GAMES } from '@/lib/games';
 import { LIVE_TABLE_IDS } from '@/config';
 import { useDemoHand } from '@/hooks/useDemoHand';
 import { useLiveTable } from '@/hooks/useLiveTable';
+import { ChatBox } from '@/components/poker/ChatBox';
+import { useTableChat } from '@/hooks/useTableChat';
+import { ChallengeModal } from '@/components/poker/ChallengeModal';
 
 /**
  * The table screen.
@@ -42,6 +45,26 @@ function LiveTable({ tableId }: { tableId: string }) {
   /** Buy-in sheet target: a seat index to sit in, `null` to top up, `false` when closed. */
   const [buyInFor, setBuyInFor] = useState<number | null | false>(false);
   const [designsOpen, setDesignsOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [challengePrompt, setChallengePrompt] = useState<string | null>(null);
+  
+  const { messages, sendChat } = useTableChat(live.socket);
+
+  // Hook into socket events to show challenge modal
+  useEffect(() => {
+    const socket = live.socket;
+    if (!socket) return;
+    
+    const handleEvent = (data: any) => {
+      setChallengePrompt(data.challengerId);
+    };
+
+    socket.on('prompt_challenge', handleEvent);
+    
+    return () => {
+      socket.off('prompt_challenge', handleEvent);
+    };
+  }, [live.socket]);
 
   // Sign-in is attempted on arrival; only offer the prompt once it has actually failed.
   if (!signedIn) {
@@ -72,11 +95,53 @@ function LiveTable({ tableId }: { tableId: string }) {
         onOpenDesigns={() => setDesignsOpen(true)}
       />
 
-      <div className="flex flex-1 items-center px-3">
+      <div className="flex flex-1 items-center px-3 relative">
         <PokerTable
           state={view}
           {...(seated ? {} : { onSit: (seatIndex: number): void => setBuyInFor(seatIndex) })}
+          onChallenge={(playerId) => live.challenge(playerId)}
         />
+        
+        {/* Floating Chat Toggle Button */}
+        <button
+          onClick={() => setChatOpen((o) => !o)}
+          className={`absolute bottom-[4.5rem] right-4 grid size-12 place-items-center rounded-full shadow-2xl border border-border transition-colors z-50 ${
+            chatOpen ? 'bg-brand text-brand-fg' : 'bg-surface text-dim hover:text-text'
+          }`}
+        >
+          <MessageSquare size={20} />
+        </button>
+
+        {/* Chat Drawer Overlay */}
+        <AnimatePresence>
+          {chatOpen && (
+            <>
+              {/* Click-away backdrop */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setChatOpen(false)}
+                className="absolute inset-0 z-30 bg-black/20"
+              />
+              {/* Drawer */}
+              <motion.div
+                initial={{ x: '100%', opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: '100%', opacity: 0 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="absolute top-0 right-0 bottom-0 w-72 z-40 shadow-2xl overflow-hidden border-l border-border bg-surface/95 backdrop-blur-md"
+              >
+                <ChatBox 
+                  messages={messages} 
+                  onSend={sendChat} 
+                  disabled={status !== 'ready' || live.watching}
+                  placeholder={live.watching ? "Spectators cannot chat" : "Say something..."}
+                />
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Result banner */}
@@ -158,6 +223,15 @@ function LiveTable({ tableId }: { tableId: string }) {
           if (typeof buyInFor === 'number') live.sit(buyInFor, amount);
           else live.topUp(amount);
           setBuyInFor(false);
+        }}
+      />
+
+      <ChallengeModal 
+        open={!!challengePrompt} 
+        challengerId={challengePrompt ?? ''}
+        onAnswer={(passed, ms) => {
+          live.answerChallenge(passed, ms);
+          setChallengePrompt(null);
         }}
       />
 
@@ -253,6 +327,7 @@ function TopBar({
             )}
           </div>
         )}
+
         <button className="grid size-9 place-items-center rounded-full border border-border bg-surface text-dim active:scale-95">
           <Volume2 size={16} />
         </button>

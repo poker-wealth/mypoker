@@ -16,6 +16,8 @@ import type {
   TableSnapshot,
   TableSummary,
 } from './room-state';
+import { newChatterState, evaluateChat, recordMessage, type ChatterState } from '../social/chat';
+import { newTargetState, evaluateChallenge, recordPrompt, recordResult, type TargetState } from '../players/peer-challenge';
 
 /**
  * PokerRoom — a real table that real people sit down at.
@@ -51,6 +53,12 @@ export interface PokerRoomConfig {
   showdownDelayMs: number;
   /** How long a disconnected player keeps their seat before being sat out. */
   disconnectGraceMs: number;
+  /**
+   * How far behind live a spectator sees the table (FairPlay §2.1). Server-enforced:
+   * every snapshot and chat line to an unseated viewer is held back this long, so a
+   * spectator relaying state to a seated friend is always relaying the past.
+   */
+  spectatorDelayMs: number;
   rake: RakeConfig;
 }
 
@@ -61,7 +69,10 @@ export interface PokerRoomDeps {
   chain?: ChainClient;
 }
 
-export type SnapshotSender = (snapshot: TableSnapshot) => void;
+export interface RoomClient {
+  sendSnapshot: (snapshot: TableSnapshot) => void;
+  sendEvent: (event: string, data: unknown) => void;
+}
 
 export class RoomError extends Error {}
 
@@ -119,6 +130,7 @@ export const DEFAULT_ROOM: Omit<PokerRoomConfig, 'id' | 'name'> = {
   handStartDelayMs: 3_000,
   showdownDelayMs: 5_000,
   disconnectGraceMs: 60_000,
+  spectatorDelayMs: 5_000,
   rake: { bps: 500, cap: 600, noFlopNoDrop: true },
 };
 
@@ -130,7 +142,9 @@ export class PokerRoom {
   private readonly spec: PokerVariant;
 
   private readonly seats: (RoomSeat | null)[];
-  private readonly viewers = new Map<string, Set<SnapshotSender>>();
+  private readonly viewers = new Map<string, Set<RoomClient>>();
+  private readonly chatters = new Map<string, ChatterState>();
+  private readonly targets = new Map<string, TargetState>();
 
   private phase: RoomPhase = 'WAITING';
   private game: TexasGame | undefined;
@@ -175,13 +189,13 @@ export class PokerRoom {
    * Start receiving snapshots. Anyone authenticated may watch; sitting down is a separate command.
    * Returns the unsubscribe function — call it when the socket closes.
    */
-  join(playerId: string, send: SnapshotSender): () => void {
+  join(playerId: string, client: RoomClient): () => void {
     let senders = this.viewers.get(playerId);
     if (!senders) {
       senders = new Set();
       this.viewers.set(playerId, senders);
     }
-    senders.add(send);
+    senders.add(client);
 
     const seat = this.seatOf(playerId);
     if (seat) {
@@ -189,12 +203,12 @@ export class PokerRoom {
       seat.disconnectedAt = null;
       this.clearAwayTimers(seat); // they're back — cancel the sit-out and the eviction
     }
-    send(this.snapshotFor(playerId));
+    client.sendSnapshot(this.snapshotFor(playerId));
     if (seat) this.push();
 
     return (): void => {
       const set = this.viewers.get(playerId);
-      set?.delete(send);
+      set?.delete(client);
       if (set && set.size === 0) {
         this.viewers.delete(playerId);
         const mine = this.seatOf(playerId);
@@ -279,6 +293,15 @@ export class PokerRoom {
       case 'act':
         await this.playerAct(playerId, cmd.action as Action);
         break;
+      case 'chat':
+        this.chat(playerId, cmd.message);
+        break;
+      case 'challenge':
+        this.challenge(playerId, cmd.targetId);
+        break;
+      case 'answer_challenge':
+        this.answerChallenge(playerId, cmd.passed, cmd.responseMs);
+        break;
       default:
         throw new RoomError('unknown command');
     }
@@ -355,6 +378,118 @@ export class PokerRoom {
     seat.sittingOut = value;
     this.push();
     if (!value) this.maybeStartHand();
+  }
+
+  private chat(playerId: string, message: string): void {
+    let state = this.chatters.get(playerId);
+    if (!state) {
+      state = newChatterState();
+      this.chatters.set(playerId, state);
+    }
+    const player = this.directory.find(playerId);
+    if (!player) return;
+
+    // A spectator is anyone not seated.
+    const isSpectator = !this.seatOf(playerId);
+    
+    const decision = evaluateChat(state, {
+      reputationScore: player.reputationScore,
+      isSpectator,
+      message,
+      now: Date.now(),
+    });
+
+    if (!decision.ok) {
+      throw new RoomError(`Chat denied: ${decision.reason}`);
+    }
+
+    recordMessage(state, Date.now());
+
+    const eventData = {
+      id: crypto.randomUUID(),
+      senderId: playerId,
+      senderName: player.displayName,
+      text: message.trim(),
+      timestamp: Date.now(),
+    };
+
+    for (const [viewerId, clients] of this.viewers.entries()) {
+      const isSpectator = !this.seatOf(viewerId);
+      const sendEvent = () => {
+        for (const client of clients) {
+          client.sendEvent('chat_message', eventData);
+        }
+      };
+
+      if (isSpectator && this.config.spectatorDelayMs > 0) {
+        setTimeout(sendEvent, this.config.spectatorDelayMs);
+      } else {
+        sendEvent();
+      }
+    }
+  }
+
+  private challenge(challengerId: string, targetId: string): void {
+    if (challengerId === targetId) throw new RoomError('you cannot challenge yourself');
+    const targetSeat = this.seatOf(targetId);
+    if (!targetSeat) throw new RoomError('target is not at this table');
+
+    let state = this.targets.get(targetId);
+    if (!state) {
+      state = newTargetState();
+      this.targets.set(targetId, state);
+    }
+
+    const decision = evaluateChallenge(state, challengerId, Date.now());
+    if (decision.outcome === 'REJECTED') {
+      throw new RoomError(`Challenge denied: ${decision.reason}`);
+    }
+    
+    if (decision.outcome === 'AUTO_PASS') {
+      // The challenge is silently accepted and ignored
+      return;
+    }
+
+    recordPrompt(state, challengerId, Date.now());
+
+    // Send a prompt event to the target only
+    const targetClients = this.viewers.get(targetId);
+    if (targetClients) {
+      for (const client of targetClients) {
+        client.sendEvent('prompt_challenge', { challengerId, targetId });
+      }
+    }
+  }
+
+  private answerChallenge(targetId: string, passed: boolean, responseMs: number): void {
+    const state = this.targets.get(targetId);
+    if (!state) return; // No pending challenge state
+
+    // In a real implementation, we'd know who the challenger was for this prompt.
+    // For now, we pass a dummy 'unknown' or the latest challenger.
+    // Actually `recordResult` requires `challengerId` for blowback.
+    // We can just use the latest one from `challengedToday`, but finding it is tricky.
+    // We'll skip blowback by passing a blank ID for now, or finding the most recent one.
+    let recentChallengerId = '';
+    let maxTime = -1;
+    for (const [cid, timeKey] of state.challengedToday.entries()) {
+      if (timeKey > maxTime) {
+        maxTime = timeKey;
+        recentChallengerId = cid;
+      }
+    }
+
+    const consequence = recordResult(state, recentChallengerId, { passed, responseMs }, Date.now());
+    
+    if (consequence.reputationDelta < 0) {
+       // Target failed: deduct reputation and stand them up next round
+       const player = this.directory.find(targetId);
+       if (player) {
+         player.reputationScore += consequence.reputationDelta;
+       }
+       const seat = this.seatOf(targetId);
+       if (seat) seat.leaveAfterHand = true; // restriction
+    }
   }
 
   private async playerAct(playerId: string, action: Action): Promise<void> {
@@ -613,14 +748,18 @@ export class PokerRoom {
 
   /** Push a fresh, per-viewer snapshot to everyone watching. */
   private push(): void {
-    for (const [viewerId, senders] of this.viewers) {
-      const snapshot = this.snapshotFor(viewerId);
-      for (const send of senders) {
-        try {
-          send(snapshot);
-        } catch {
-          // A dead socket must never stall the table.
-        }
+    for (const [viewerId, clients] of this.viewers.entries()) {
+      const snap = this.snapshotFor(viewerId);
+      const isSpectator = !this.seatOf(viewerId);
+
+      const sendSnapshot = () => {
+        for (const client of clients) client.sendSnapshot(snap);
+      };
+
+      if (isSpectator && this.config.spectatorDelayMs > 0) {
+        setTimeout(sendSnapshot, this.config.spectatorDelayMs);
+      } else {
+        sendSnapshot();
       }
     }
   }

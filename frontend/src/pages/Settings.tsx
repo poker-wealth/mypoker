@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Volume2, Vibrate, Trophy, Wallet, Megaphone, Languages, ShieldCheck, LifeBuoy, Sun, Moon } from 'lucide-react';
+import { Volume2, Vibrate, Trophy, Wallet, Megaphone, Languages, ShieldCheck, LifeBuoy, Sun, Moon, User, LogOut } from 'lucide-react';
 import { ListRow } from '@/components/ui/ListRow';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -12,6 +12,7 @@ import { useSettings, useUpdateSettings } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
 import { useSession } from '@/store/session';
 import { useTheme } from '@/store/theme';
+import { SUPPORT_URL } from '@/config';
 import { LANGUAGES } from '@/i18n/languages';
 import { toast } from '@/store/toast';
 import type { PlayerSettings } from '@/api/settings';
@@ -30,6 +31,8 @@ export function Settings() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const signedIn = useSession((s) => s.status === 'authenticated');
+  const player = useSession((s) => s.player);
+  const signOut = useSession((s) => s.signOut);
   const { resolved: theme, toggle: toggleTheme } = useTheme();
   const [languageOpen, setLanguageOpen] = useState(false);
 
@@ -151,6 +154,30 @@ export function Settings() {
         </>
       )}
 
+      {signedIn && player && (
+        <Section title={t('settings.account')}>
+          <ListRow
+            title={player.displayName}
+            leading={
+              player.photoUrl ? (
+                <img src={player.photoUrl} alt="" className="size-[18px] rounded-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <User size={18} className="text-brand" />
+              )
+            }
+            value={player.username ? `@${player.username}` : `ID: ${player.playerId.slice(0, 14)}…`}
+          />
+          <ListRow
+            title={t('account.signOut')}
+            leading={<LogOut size={18} className="text-danger" />}
+            onClick={() => {
+              signOut();
+              navigate('/');
+            }}
+          />
+        </Section>
+      )}
+
       <Section title={t('settings.about')}>
         <ListRow
           title={t('account.fairness')}
@@ -160,7 +187,13 @@ export function Settings() {
         <ListRow
           title={t('account.support')}
           leading={<LifeBuoy size={18} className="text-dim" />}
-          onClick={() => toast.info(t('account.supportConnecting', { defaultValue: 'Connecting to support...' }))}
+          onClick={() => {
+            if (SUPPORT_URL) {
+              window.open(SUPPORT_URL, '_blank', 'noopener');
+            } else {
+              toast.info(t('account.supportConnecting', { defaultValue: 'Connecting to support...' }));
+            }
+          }}
         />
       </Section>
 

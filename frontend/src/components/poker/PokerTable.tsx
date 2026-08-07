@@ -23,11 +23,12 @@ interface PokerTableProps {
   state: TableState;
   /** Live tables: tapping an open chair sits you down (called with the SERVER seat index). */
   onSit?: (seatIndex: number) => void;
+  onChallenge?: (playerId: string) => void;
   /** Override the player's chosen design — used by the design picker's previews. */
   design?: TableDesign;
 }
 
-export function PokerTable({ state, onSit, design: override }: PokerTableProps) {
+export function PokerTable({ state, onSit, onChallenge, design: override }: PokerTableProps) {
   const chosen = useTableDesign((s) => s.design);
   const design = override ?? chosen;
   const positions = ringFor(design, Math.max(2, state.seats.length));
@@ -97,6 +98,11 @@ export function PokerTable({ state, onSit, design: override }: PokerTableProps) 
                 seat={seat}
                 align={pos.align}
                 accent={design.accent}
+                onClick={() => {
+                  if (seat.status !== 'empty' && onChallenge && seat.playerId && !seat.isHero) {
+                    onChallenge(seat.playerId);
+                  }
+                }}
                 {...(onSit ? { onSit: (): void => onSit(seat.id) } : {})}
               />
             </div>

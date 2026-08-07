@@ -18,6 +18,7 @@ import { getSettings, updateSettings } from '../settings/player-settings';
 import { WithdrawalModel } from '../withdrawal/withdrawal.model';
 import { asyncHandler, internalAuth, dataScopeMiddleware, ApiError } from './middleware';
 import { openApiSpec } from './openapi';
+import { buildAuthRouter } from '../auth/auth.routes';
 
 const money = z.string().min(1);
 const accountId = z.string().min(1);
@@ -132,6 +133,9 @@ export function buildRouter(): Router {
       res.status(201).json({ withdrawalId, state: 'REQUESTED' });
     }),
   );
+
+  // ── Internal Auth endpoints (shared secret) ───────────────────────────────
+  r.use('/internal/auth', internalAuth, buildAuthRouter());
 
   // ── Internal service endpoints (shared secret) ───────────────────────────
   const depositBody = z.object({

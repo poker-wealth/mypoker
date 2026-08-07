@@ -22,6 +22,7 @@ export interface TablePlayer {
   avatarUrl?: string;
   /** Chips they can still buy in with (not already locked at a table). */
   available: number;
+  reputationScore: number;
 }
 
 export interface PlayerDirectory {
@@ -51,12 +52,15 @@ export interface ChipLedger {
 
 export class PlayerError extends Error {}
 
-interface DevPlayerRecord {
+export interface DevPlayerRecord {
   id: string;
   displayName: string;
+  username?: string;
   avatarUrl?: string;
+  vipTier: number;
   available: number;
   locked: number;
+  reputationScore: number;
 }
 
 export interface DevPlayersOptions {
@@ -93,6 +97,8 @@ export class DevPlayers implements PlayerDirectory, ChipLedger {
         ...(profile.avatarUrl ? { avatarUrl: profile.avatarUrl } : {}),
         available: this.startingChips,
         locked: 0,
+        vipTier: 0,
+        reputationScore: 1000,
       };
       this.players.set(playerId, record);
       this.save();
@@ -189,6 +195,7 @@ function toTablePlayer(record: DevPlayerRecord): TablePlayer {
     displayName: record.displayName,
     ...(record.avatarUrl ? { avatarUrl: record.avatarUrl } : {}),
     available: record.available,
+    reputationScore: record.reputationScore,
   };
 }
 
