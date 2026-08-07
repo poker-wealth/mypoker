@@ -374,6 +374,7 @@
     "odds": "Odds",
     "payout": "Covers up to",
     "decline": "No thanks",
-    "accept": "Insure ₮{{premium}}"
+    "accept": "Insure ₮{{premium}}",
+    "taken": "Insurance taken"
   }
 }

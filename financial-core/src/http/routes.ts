@@ -351,20 +351,41 @@ export function buildRouter(): Router {
 
   // Raised by services, never by a player: someone who could notify themselves
   // could notify anyone, and a notification is a claim the platform is making.
-  const notifyBody = z.object({
-    playerId: z.string().min(1),
-    kind: z.enum(['RESULT', 'DEPOSIT', 'PROMO', 'JACKPOT', 'SYSTEM']),
-    titleKey: z.string().min(1),
-    eventId: z.string().min(1),
-    params: z.record(z.union([z.string(), z.number()])).optional(),
-  });
+  // Accepts either identifier, for the same reason as /internal/volume:
+  // settlement holds account ids, and the lookup belongs here rather than in
+  // every caller.
+  const notifyBody = z
+    .object({
+      playerId: z.string().min(1).optional(),
+      playerAccountId: z.string().min(1).optional(),
+      kind: z.enum(['RESULT', 'DEPOSIT', 'PROMO', 'JACKPOT', 'SYSTEM']),
+      titleKey: z.string().min(1),
+      eventId: z.string().min(1),
+      params: z.record(z.union([z.string(), z.number()])).optional(),
+    })
+    .refine((b) => b.playerId !== undefined || b.playerAccountId !== undefined, {
+      message: 'one of playerId or playerAccountId is required',
+    });
   r.post(
     '/internal/notifications',
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
       const body = notifyBody.parse(req.body);
+
+      let playerId = body.playerId;
+      if (playerId === undefined) {
+        const account = await AccountModel.findById(body.playerAccountId).lean();
+        // An unknown account means no notification, which is recoverable. Never
+        // worth failing a settled hand over.
+        if (!account) {
+          res.json({ stored: false, suppressed: false });
+          return;
+        }
+        playerId = account.ownerId;
+      }
+
       const stored = await notify({
-        playerId: body.playerId,
+        playerId,
         kind: body.kind,
         titleKey: body.titleKey,
         eventId: body.eventId,

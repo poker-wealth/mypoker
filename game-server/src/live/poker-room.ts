@@ -5,7 +5,27 @@ import type { ChainClient } from '../fairness';
 import { TexasGame } from '../games/texas/texas-game';
 import { variant, type PokerVariant } from '../games/texas/variants';
 import type { Action, SeatPublic, Street } from '../games/texas/betting';
+import { isInsuranceEligible, underwrite } from '../games/texas/underwriting';
+import type { ReserveState } from '../games/texas/underwriting';
 import type { RakeConfig } from '../games/texas/settlement';
+
+/**
+ * PLACEHOLDER reserve state for insurance quoting.
+ *
+ * These are fixed figures, not the live INSURANCE and REINSURANCE account
+ * balances in financial-core. Quoting against an invented reserve is acceptable
+ * on a testnet staging build and is NOT acceptable against real money — the
+ * platform could underwrite more than it actually holds.
+ *
+ * Must be replaced with a read of the real pools before insurance is enabled for
+ * real funds. Left obvious rather than buried in a config file so it is hard to
+ * ship past by accident.
+ */
+const INSURANCE_RESERVE_PLACEHOLDER: ReserveState = {
+  reserveBalance: 50_000,
+  dailyBudget: 7_500,
+  reservedExposure: 0,
+};
 import type { HandResult } from '../games/texas/texas-hand';
 import type { PlayerDirectory } from './players';
 import type {
@@ -14,6 +34,7 @@ import type {
   SeatSnapshot,
   TableCommand,
   TableSnapshot,
+  InsuranceOffer,
   TableSummary,
 } from './room-state';
 
@@ -526,6 +547,60 @@ export class PokerRoom {
   // ── Snapshots ───────────────────────────────────────────────────────────────
 
   /** The table as `playerId` is allowed to see it. Their hole cards; nobody else's. */
+  /**
+   * The insurance offer for one viewer, or null.
+   *
+   * Eligibility is the engine's rule (exactly two all-in, board of 3 or 4), and
+   * it is asked rather than re-derived here — a second definition of "when
+   * insurance applies" would drift from the one the underwriter uses.
+   *
+   * Returns null for everyone except the two all-in players. A spectator or a
+   * folded seat seeing an offer would leak that two people are all-in before the
+   * table shows it.
+   *
+   * PLACEHOLDER RESERVE. The pool balances below are fixed figures, not the real
+   * INSURANCE and REINSURANCE accounts in financial-core. Quoting against a made
+   * up reserve is fine on a testnet staging build and NOT fine against real
+   * money: this must read the live pools before insurance is enabled for real
+   * funds, or the platform can underwrite more than it holds.
+   */
+  private insuranceFor(playerId: string, engine: EnginePublicState | null): InsuranceOffer | null {
+    if (!engine || this.phase !== 'IN_HAND') return null;
+
+    const handSeats = this.game ? this.game.handSeats() : [];
+    const allIn = handSeats.filter((s) => s.status === 'allin');
+    if (!isInsuranceEligible(allIn.length, engine.community)) return null;
+
+    // Only the players actually at risk are offered anything.
+    const mine = allIn.find((s) => s.id === playerId);
+    const other = allIn.find((s) => s.id !== playerId);
+    if (!mine || !other) return null;
+
+    // Both hands, read server-side. getPublicState returns only the requested
+    // player's own cards, which is the rule that keeps clients honest — asking
+    // it twice here is the room using its own engine, not a client seeing
+    // another player's hand. Neither set of cards reaches the snapshot: only the
+    // resulting odds do.
+    const myCards = (this.game?.getPublicState(playerId) as EnginePublicState | undefined)?.you.hole;
+    const theirCards = (this.game?.getPublicState(other.id) as EnginePublicState | undefined)?.you
+      .hole;
+    if (!myCards || !theirCards || myCards.length < 2 || theirCards.length < 2) return null;
+
+    const result = underwrite(
+      {
+        insured: [myCards[0]!, myCards[1]!],
+        opponent: [theirCards[0]!, theirCards[1]!],
+        board: [...engine.community],
+        pot: engine.pot,
+        requestedCoverage: mine.streetContributed,
+      },
+      INSURANCE_RESERVE_PLACEHOLDER,
+    );
+    if (!result.offered) return null;
+
+    return { ...result.quote, expiresInSeconds: 10 };
+  }
+
   snapshotFor(playerId: string): TableSnapshot {
     const live = this.phase === 'IN_HAND' || this.phase === 'SHOWDOWN';
     const engine = live && this.game ? (this.game.getPublicState(playerId) as EnginePublicState) : null;
@@ -582,6 +657,7 @@ export class PokerRoom {
       pot: Math.max(0, pot),
       board: engine ? engine.community : [],
       seats,
+      insurance: this.insuranceFor(playerId, engine),
 
       yourSeat: mySeat ? mySeat.index : null,
       you: me ? { playerId: me.id, name: me.displayName, available: me.available } : null,

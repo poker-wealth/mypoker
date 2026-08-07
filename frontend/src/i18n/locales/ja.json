@@ -374,6 +374,7 @@
     "odds": "オッズ",
     "payout": "最大補償",
     "decline": "見送る",
-    "accept": "₮{{premium}} で加入"
+    "accept": "₮{{premium}} で加入",
+    "taken": "保険に加入しました"
   }
 }

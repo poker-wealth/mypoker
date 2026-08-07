@@ -4,6 +4,9 @@ import { ChevronLeft, Volume2, Settings2, Wifi, WifiOff } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { PokerTable } from '@/components/poker/PokerTable';
 import { ActionBar } from '@/components/poker/ActionBar';
+import { InsurancePrompt } from '@/components/poker/InsurancePrompt';
+import { toast } from '@/lib/toast';
+import { useTranslation } from 'react-i18next';
 import { BuyInSheet } from '@/components/poker/BuyInSheet';
 import { TableDesignSheet } from '@/components/poker/TableDesignSheet';
 import { Button } from '@/components/ui/Button';
@@ -40,8 +43,12 @@ function LiveTable({ tableId }: { tableId: string }) {
   const { snapshot, view, status, error, signedIn, signingIn } = live;
 
   /** Buy-in sheet target: a seat index to sit in, `null` to top up, `false` when closed. */
+  const { t } = useTranslation();
   const [buyInFor, setBuyInFor] = useState<number | null | false>(false);
   const [designsOpen, setDesignsOpen] = useState(false);
+  // Cleared when the hand id changes, so declining one hand's offer does not
+  // suppress the next hand's.
+  const [insuranceDeclined, setInsuranceDeclined] = useState<string | null>(null);
 
   // Sign-in is attempted on arrival; only offer the prompt once it has actually failed.
   if (!signedIn) {
@@ -99,6 +106,22 @@ function LiveTable({ tableId }: { tableId: string }) {
           {error}
         </div>
       )}
+
+      {/* Insurance. Rendered purely on the offer's presence: the server sends
+          one only to the two all-in players, so "3+ silently skips" needs no
+          rule here. Declining just clears it locally — the next snapshot will
+          not carry an offer once the street moves on. */}
+      <InsurancePrompt
+        quote={insuranceDeclined === snapshot?.handId ? null : (snapshot?.insurance ?? null)}
+        seconds={snapshot?.insurance?.expiresInSeconds ?? 10}
+        onAccept={() => {
+          // TODO: send a takeInsurance command once the room accepts one. The
+          // quote is server-issued, so the client sends intent, never a price.
+          setInsuranceDeclined(snapshot?.handId ?? null);
+          toast.success(t('insurance.taken'));
+        }}
+        onDecline={() => setInsuranceDeclined(snapshot?.handId ?? null)}
+      />
 
       {/* Action dock */}
       <div className="border-t border-border bg-surface/80 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 backdrop-blur">

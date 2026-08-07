@@ -66,6 +66,23 @@ export interface TableSnapshot {
   board: Card[];
   seats: LiveSeat[];
 
+  /**
+   * An insurance offer for THIS viewer, or null.
+   *
+   * Per-viewer by construction: the server only puts one here for the two
+   * all-in players. Null means every case where no prompt should appear —
+   * not eligible, not at risk, three or more all-in — so the client renders on
+   * presence alone and never has to know the spec's show/skip rule.
+   *
+   * Odds only. Mirrors InsuranceOffer in game-server/src/live/room-state.ts.
+   */
+  insurance: {
+    premium: number;
+    coverage: number;
+    payoutOdds: number;
+    expiresInSeconds: number;
+  } | null;
+
   yourSeat: number | null;
   you: { playerId: string; name: string; available: number } | null;
   toActSeat: number | null;

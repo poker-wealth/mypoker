@@ -374,6 +374,7 @@
     "odds": "Tỷ lệ",
     "payout": "Chi trả tối đa",
     "decline": "Không, cảm ơn",
-    "accept": "Mua bảo hiểm ₮{{premium}}"
+    "accept": "Mua bảo hiểm ₮{{premium}}",
+    "taken": "Đã mua bảo hiểm"
   }
 }

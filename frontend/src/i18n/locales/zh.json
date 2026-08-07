@@ -374,6 +374,7 @@
     "odds": "赔率",
     "payout": "最高赔付",
     "decline": "不用了",
-    "accept": "投保 ₮{{premium}}"
+    "accept": "投保 ₮{{premium}}",
+    "taken": "已购买保险"
   }
 }

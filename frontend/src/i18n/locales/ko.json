@@ -374,6 +374,7 @@
     "odds": "배당",
     "payout": "최대 보장",
     "decline": "괜찮습니다",
-    "accept": "₮{{premium}}에 가입"
+    "accept": "₮{{premium}}에 가입",
+    "taken": "보험에 가입했습니다"
   }
 }

@@ -133,13 +133,49 @@ export class HttpFinancialCoreClient implements FinancialCoreClient {
       req,
     );
 
-    // Play volume, AFTER the money has settled and only if it did. Recording
-    // volume for a hand that failed to settle would inflate VIP progress for a
-    // hand nobody played.
-    if (req.gameId !== undefined && result.applied) {
-      await this.recordHandVolume(req, req.gameId);
+    // Both AFTER the money has settled and only if it did. Recording volume or
+    // announcing a win for a hand that failed to settle would report something
+    // that did not happen.
+    if (result.applied) {
+      if (req.gameId !== undefined) await this.recordHandVolume(req, req.gameId);
+      await this.announceHand(req);
     }
     return result;
+  }
+
+  /**
+   * Tell each seat what happened to them.
+   *
+   * Sends a translation key and its parameters, never prose — the player's
+   * language is resolved when they read it, so a hand settled at 3am is
+   * described in whatever language they are reading in now.
+   *
+   * eventId is round-and-player scoped, so a settlement retry cannot announce
+   * one win twice. Failures are swallowed for the same reason as volume: a
+   * missing notification is a missing notification, whereas throwing would fail
+   * a hand whose ledger entries are already written.
+   */
+  private async announceHand(req: TableSettlementRequest): Promise<void> {
+    const seats = [
+      ...req.winners.map((p) => ({ party: p, kind: 'RESULT' as const, titleKey: 'notifications.handWon' })),
+      ...req.losers.map((p) => ({ party: p, kind: 'RESULT' as const, titleKey: 'notifications.handLost' })),
+    ];
+
+    await Promise.all(
+      seats.map(async ({ party, kind, titleKey }) => {
+        try {
+          await this.post('/internal/notifications', {
+            playerAccountId: party.playerAccountId,
+            kind,
+            titleKey,
+            eventId: `${req.roundId}:${party.playerAccountId}`,
+            params: { amount: party.amount },
+          });
+        } catch (err) {
+          console.error('[fc-client] notification not raised for', party.playerAccountId, err);
+        }
+      }),
+    );
   }
 
   /**

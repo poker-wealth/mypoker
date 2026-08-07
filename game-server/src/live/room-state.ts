@@ -50,6 +50,18 @@ export interface FairnessSnapshot {
   finalSeed?: string;
 }
 
+/** What a player is offered at an all-in. Odds only — no calculation details. */
+export interface InsuranceOffer {
+  /** micro-USD the player pays. */
+  premium: number;
+  /** micro-USD they receive if the hand goes against them. */
+  coverage: number;
+  /** coverage / premium. The only derived figure shown. */
+  payoutOdds: number;
+  /** Seconds the offer stands. */
+  expiresInSeconds: number;
+}
+
 export interface TableSnapshot {
   tableId: string;
   name: string;
@@ -68,6 +80,20 @@ export interface TableSnapshot {
   pot: number;
   board: string[];
   seats: SeatSnapshot[];
+
+  /**
+   * An insurance offer for THIS viewer, or null.
+   *
+   * Per-viewer, not per-table: only the two all-in players are offered anything,
+   * and a spectator or a folded seat must not see one. Null covers both "not
+   * eligible" and "declined" — the client renders the prompt only when a quote
+   * is present, which is what makes the spec's "3+ silently skips" free rather
+   * than a rule the UI has to remember.
+   *
+   * Carries the quote and nothing else. RiskFactor is never on it; see
+   * game-server/src/games/texas/underwriting.ts.
+   */
+  insurance: InsuranceOffer | null;
 
   /** Your seat index, or null if you're watching. */
   yourSeat: number | null;
