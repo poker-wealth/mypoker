@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { PlayerSeat } from './PlayerSeat';
 import { PlayingCard } from './PlayingCard';
+import { ChipsToPot } from './ChipsToPot';
+import { PotToWinner } from './PotToWinner';
+import { chips } from '@/lib/money';
 import { ChipStack } from './ChipStack';
 import type { TableState } from '@/lib/table';
 import { ringFor, type TableDesign } from '@/lib/tableDesigns';
@@ -64,7 +67,7 @@ export function PokerTable({ state, onSit, design: override }: PokerTableProps) 
                 className="rounded-full border border-white/15 bg-black/55 px-3 py-0.5 text-[0.65rem] font-bold tracking-widest backdrop-blur-sm"
                 style={{ color: design.accent }}
               >
-                POT ₮{state.pot.toLocaleString()}
+                POT {chips(state.pot)}
               </div>
             )}
             <ChipStack amount={state.pot} hideLabel />
@@ -83,6 +86,28 @@ export function PokerTable({ state, onSit, design: override }: PokerTableProps) 
             ))}
           </div>
         </div>
+
+        {/* Chips sweeping into the pot when a street ends. Inside the felt box
+            so its percentage coordinates resolve against the same container the
+            seats use — mounted outside, every chip would fly to the wrong
+            place. */}
+        <ChipsToPot
+          street={state.street}
+          bets={state.seats.map((seat, i) => ({
+            seatIndex: i,
+            amount: seat.bet,
+            from: positions[i] ?? positions[0]!,
+          }))}
+        />
+
+        {/* The pot travelling back out to whoever won it. */}
+        <PotToWinner
+          handId={state.handId}
+          amount={state.pot}
+          winners={state.seats
+            .map((seat, i) => (seat.isWinner ? (positions[i] ?? positions[0]!) : null))
+            .filter((p): p is NonNullable<typeof p> => p !== null)}
+        />
 
         {/* Seats */}
         {state.seats.map((seat, i) => {
