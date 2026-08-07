@@ -368,5 +368,12 @@
       "links": "リンク",
       "subAgents": "サブ"
     }
+  },
+  "insurance": {
+    "title": "保険を利用できます",
+    "odds": "オッズ",
+    "payout": "最大補償",
+    "decline": "見送る",
+    "accept": "₮{{premium}} で加入"
   }
 }

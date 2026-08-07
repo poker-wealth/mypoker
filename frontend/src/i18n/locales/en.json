@@ -368,5 +368,12 @@
       "links": "Links",
       "subAgents": "Sub-agents"
     }
+  },
+  "insurance": {
+    "title": "Insurance available",
+    "odds": "Odds",
+    "payout": "Covers up to",
+    "decline": "No thanks",
+    "accept": "Insure ₮{{premium}}"
   }
 }

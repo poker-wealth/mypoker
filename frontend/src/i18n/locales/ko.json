@@ -368,5 +368,12 @@
       "links": "링크",
       "subAgents": "하위"
     }
+  },
+  "insurance": {
+    "title": "보험 이용 가능",
+    "odds": "배당",
+    "payout": "최대 보장",
+    "decline": "괜찮습니다",
+    "accept": "₮{{premium}}에 가입"
   }
 }

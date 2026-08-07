@@ -368,5 +368,12 @@
       "links": "Liên kết",
       "subAgents": "Cấp dưới"
     }
+  },
+  "insurance": {
+    "title": "Có bảo hiểm",
+    "odds": "Tỷ lệ",
+    "payout": "Chi trả tối đa",
+    "decline": "Không, cảm ơn",
+    "accept": "Mua bảo hiểm ₮{{premium}}"
   }
 }

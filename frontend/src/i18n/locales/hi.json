@@ -368,5 +368,12 @@
       "links": "लिंक",
       "subAgents": "उप-एजेंट"
     }
+  },
+  "insurance": {
+    "title": "बीमा उपलब्ध",
+    "odds": "ऑड्स",
+    "payout": "अधिकतम कवर",
+    "decline": "नहीं चाहिए",
+    "accept": "₮{{premium}} में बीमा करें"
   }
 }

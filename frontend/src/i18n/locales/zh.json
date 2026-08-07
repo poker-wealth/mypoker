@@ -368,5 +368,12 @@
       "links": "链接",
       "subAgents": "下级"
     }
+  },
+  "insurance": {
+    "title": "可购买保险",
+    "odds": "赔率",
+    "payout": "最高赔付",
+    "decline": "不用了",
+    "accept": "投保 ₮{{premium}}"
   }
 }

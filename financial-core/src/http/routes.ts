@@ -41,6 +41,7 @@ import {
   markRead,
 } from '../notifications/notification-store';
 import { getVipStanding, recordVolume } from '../vip/volume-tracker';
+import { AccountModel } from '../wallet/account.model';
 import { WithdrawalModel } from '../withdrawal/withdrawal.model';
 import { asyncHandler, internalAuth, dataScopeMiddleware, ApiError } from './middleware';
 import { openApiSpec } from './openapi';
@@ -391,18 +392,46 @@ export function buildRouter(): Router {
   // money path, not on it. The spec describes it that way too ('VIP progress
   // logs $3', 'cumulative volume tracking'), and it means adding VIP costs
   // settlement one additive call rather than a schema change to money.
-  const volumeBody = z.object({
-    playerId: z.string().min(1),
-    gameId: z.string().min(1),
-    staked: z.number().int().nonnegative(),
-    won: z.number().int().nonnegative(),
-  });
+  // Accepts either identifier. Settlement holds ACCOUNT ids, not player ids —
+  // requiring the latter would make every caller do a lookup financial-core can
+  // do itself, and a lookup done in four places is a lookup done differently in
+  // four places.
+  const volumeBody = z
+    .object({
+      playerId: z.string().min(1).optional(),
+      playerAccountId: z.string().min(1).optional(),
+      gameId: z.string().min(1),
+      staked: z.number().int().nonnegative(),
+      won: z.number().int().nonnegative(),
+    })
+    .refine((b) => b.playerId !== undefined || b.playerAccountId !== undefined, {
+      message: 'one of playerId or playerAccountId is required',
+    });
   r.post(
     '/internal/volume',
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
       const body = volumeBody.parse(req.body);
-      await recordVolume(body);
+
+      let playerId = body.playerId;
+      if (playerId === undefined) {
+        const account = await AccountModel.findById(body.playerAccountId).lean();
+        // Not an error worth failing settlement over — an unknown account means
+        // no VIP progress for that player, which is recoverable. Throwing here
+        // would put a counter in the way of a settled hand.
+        if (!account) {
+          res.status(204).end();
+          return;
+        }
+        playerId = account.ownerId;
+      }
+
+      await recordVolume({
+        playerId,
+        gameId: body.gameId,
+        staked: body.staked,
+        won: body.won,
+      });
       res.status(204).end();
     }),
   );

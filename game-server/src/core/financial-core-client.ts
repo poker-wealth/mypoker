@@ -42,6 +42,16 @@ export interface TableSettlementParty {
  */
 export interface TableSettlementRequest {
   roundId: string;
+  /**
+   * Which game settled. Optional so existing callers keep working unchanged.
+   *
+   * Supply it and the client records per-player play volume after the hand,
+   * which is what drives VIP progress, per-game RTP and play distribution. The
+   * VIP ladder weights volume per game (Texas x1.0, Niu Niu x0.5, Baccarat
+   * x0.3, others x0.4), so without this the hand simply is not counted — it is
+   * never counted wrongly.
+   */
+  gameId?: string;
   tableType: 'PLATFORM' | 'LEAGUE';
   leagueId?: string;
   losers: TableSettlementParty[];
@@ -118,6 +128,49 @@ export class HttpFinancialCoreClient implements FinancialCoreClient {
   async settleTableHand(
     req: TableSettlementRequest,
   ): Promise<{ roundId: string; applied: boolean }> {
-    return this.post('/internal/table-settlements', req);
+    const result = await this.post<{ roundId: string; applied: boolean }>(
+      '/internal/table-settlements',
+      req,
+    );
+
+    // Play volume, AFTER the money has settled and only if it did. Recording
+    // volume for a hand that failed to settle would inflate VIP progress for a
+    // hand nobody played.
+    if (req.gameId !== undefined && result.applied) {
+      await this.recordHandVolume(req, req.gameId);
+    }
+    return result;
+  }
+
+  /**
+   * Log each seat's volume for a settled hand.
+   *
+   * Deliberately swallows its own failures. This is a counter beside the money,
+   * not part of it: a dropped call costs one hand of VIP progress, whereas
+   * letting it throw would fail a hand that has already settled correctly and
+   * whose ledger entries are already written.
+   *
+   * Losers staked their amount and got nothing back. Winners are credited their
+   * net win, so their stake is not in the request — the effective figure is
+   * therefore conservative for winners, never inflated. Worth revisiting if the
+   * settlement shape ever carries gross stakes.
+   */
+  private async recordHandVolume(req: TableSettlementRequest, gameId: string): Promise<void> {
+    const micros = (decimal: string): number => Math.round(Number(decimal) * 1_000_000);
+
+    const seats = [
+      ...req.losers.map((p) => ({ playerAccountId: p.playerAccountId, staked: micros(p.amount), won: 0 })),
+      ...req.winners.map((p) => ({ playerAccountId: p.playerAccountId, staked: micros(p.amount), won: micros(p.amount) })),
+    ];
+
+    await Promise.all(
+      seats.map(async (seat) => {
+        try {
+          await this.post('/internal/volume', { ...seat, gameId });
+        } catch (err) {
+          console.error('[fc-client] volume not recorded for', seat.playerAccountId, err);
+        }
+      }),
+    );
   }
 }
