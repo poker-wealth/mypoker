@@ -16,6 +16,7 @@ import {
   confirmWithdrawal,
 } from '../withdrawal/withdrawal-state-machine';
 import { getOrCreatePlayerAccount, ensureJackpotAccounts } from '../wallet/system-accounts';
+import { getInsuranceReserve } from '../wallet/insurance-reserve';
 import { getPlayerStats, getPlayerHistory } from '../stats/player-stats';
 import { getSettings, updateSettings } from '../settings/player-settings';
 import { getReputationFacts } from '../reputation/player-reputation';
@@ -489,6 +490,29 @@ export function buildRouter(): Router {
           amount: r.amount.toString(),
         })),
       });
+    }),
+  );
+
+  /**
+   * Insurance reserve FACTS for one system — `PLATFORM` or a leagueId.
+   *
+   * Returns balances and today's paid-out total; the RULES (§4: reserve
+   * threshold $10k/$1k, single payout ≤ 5% of reserve, daily ≤ 15%) live with
+   * the underwriting engine in the gateway, which is the only caller. Same
+   * facts/rules split as reputation and VIP — restating the caps here would
+   * give two answers to how much the pool may risk.
+   *
+   * This endpoint is what retires INSURANCE_RESERVE_PLACEHOLDER: quotes are
+   * now arithmetic on what the pool actually holds, so the auto-disable rule
+   * ("reserve < threshold → insurance entry hidden") fires on real numbers.
+   */
+  const reserveQuery = z.object({ ownerId: z.string().min(1) });
+  r.get(
+    '/internal/insurance/reserve',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { ownerId } = reserveQuery.parse(req.query);
+      res.json(await getInsuranceReserve(ownerId));
     }),
   );
 

@@ -4,6 +4,7 @@ import { ChipBank } from './chip-bank';
 import { DevPlayers } from './players';
 import { DEFAULT_ROOM, type PokerRoomConfig } from './poker-room';
 import { TableHub, type TokenVerifier } from './table-hub';
+import { chainClientFromEnv } from '../fairness/chain-from-env';
 import { verifyToken } from '../gateway/tokens';
 
 /**
@@ -71,7 +72,9 @@ export function createTableServer(config: TableServerConfig): TableServer {
   const bank = new ChipBank(players);
 
   const hub = new TableHub(
-    { directory: players, fc: bank },
+    // The chain notary is decided by env once, here: real Solana when
+    // configured, the deterministic fake otherwise. See chain-from-env.ts.
+    { directory: players, fc: bank, chain: chainClientFromEnv() },
     verifyPlayerToken,
     config.logSockets === false
       ? undefined

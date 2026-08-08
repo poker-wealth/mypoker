@@ -27,3 +27,16 @@ export {
   type MerkleStore,
 } from './merkle-aggregator';
 export { verifyRound, type RoundVerificationData, type VerificationResult } from './verification';
+export { chainClientFromEnv } from './chain-from-env';
+export {
+  SolanaChainClient,
+  keypairFromJson,
+  addressOf,
+  base58Encode,
+  base58Decode,
+  compactU16,
+  buildMemoMessage,
+  buildSignedTransaction,
+  memoFor,
+  MEMO_PROGRAM_ID,
+} from './solana-client';

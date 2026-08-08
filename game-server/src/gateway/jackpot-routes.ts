@@ -42,8 +42,8 @@ export function buildJackpotRouter(lobby: LobbyService, config?: GatewayConfig):
    * gateway has nothing to add — no rule applies to a list of things that
    * already happened — so this forwards rather than deriving.
    */
-  r.get('/history', (req: Request, res: Response) => {
-    void (async () => {
+  r.get('/history', (req: Request, res: Response): void => {
+    void (async (): Promise<void> => {
       if (!config) {
         res.status(503).json({ error: 'history unavailable' });
         return;

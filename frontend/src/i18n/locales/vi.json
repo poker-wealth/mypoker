@@ -261,7 +261,9 @@
     "ratesPending": "Tỷ lệ chi trả công bố chưa được hiển thị. Một tỷ lệ chỉ có ý nghĩa khi luật chơi đằng sau nó được cam kết on-chain và đánh phiên bản — trước đó nó chỉ là con số chúng tôi tự khẳng định, đúng điều mà trang này tồn tại để tránh.",
     "actualRate": "Tỷ lệ trả thực tế {{rate}}% ({{count}} ván)",
     "theoreticalRate": "công bố {{rate}}%",
-    "ownSeedUnchecked": "Dữ liệu ván này không chứa seed của bạn, nên bước này chỉ kiểm tra tính nhất quán của danh sách seed, chưa xác minh seed của bạn có trong đó tại đúng vị trí ngồi hay không."
+    "ownSeedUnchecked": "Dữ liệu ván này không chứa seed của bạn, nên bước này chỉ kiểm tra tính nhất quán của danh sách seed, chưa xác minh seed của bạn có trong đó tại đúng vị trí ngồi hay không.",
+    "notAnchored": "Root của lô này chưa được ghi lên chuỗi. 6a (bằng chứng) đã xác minh cục bộ; 6b (bản ghi vĩnh viễn) sẽ kiểm tra được sau khi công chứng.",
+    "viewOnChain": "Kiểm tra root trên Solana Explorer (6b)"
   },
   "reputation": {
     "title": "Uy tín",

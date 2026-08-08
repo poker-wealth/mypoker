@@ -26,8 +26,8 @@ export function buildAgentRouter(config: GatewayConfig): Router {
   // Eligibility is derived HERE from financial-core's facts, with the same
   // canonical scoring the reputation route uses — the 700 bar is
   // GOOD_STANDING_SCORE, not a second constant that could drift from it.
-  r.get('/eligibility', (req: Request, res: Response) => {
-    void (async () => {
+  r.get('/eligibility', (req: Request, res: Response): void => {
+    void (async (): Promise<void> => {
       const facts = await upstreamEligibility(config, req);
       if (!facts.ok) {
         res.status(facts.status).json({ error: facts.error });
@@ -55,8 +55,8 @@ export function buildAgentRouter(config: GatewayConfig): Router {
   // they last played. The VIP tier and the activity colour are DERIVED here,
   // from the same ladder the VIP page uses and the same 7/30-day boundaries
   // §13.4 fixes, so an agent and the player never see different tiers.
-  r.get('/players', (req: Request, res: Response) => {
-    void (async () => {
+  r.get('/players', (req: Request, res: Response): void => {
+    void (async (): Promise<void> => {
       const upstream = await forwardJson<{ players: ReferredPlayerFacts[] }>(
         config,
         req,
@@ -83,7 +83,7 @@ export function buildAgentRouter(config: GatewayConfig): Router {
   });
 
   // Tab 1 and Tab 4 take a named range; the gateway resolves what it means.
-  const withWindow = (path: string) => (req: Request, res: Response) => {
+  const withWindow = (path: string) => (req: Request, res: Response): void => {
     const range = req.query.range ?? 'today';
     if (!isAgentRange(range)) {
       res.status(400).json({ error: `range must be one of ${AGENT_RANGES.join(', ')}` });
@@ -104,7 +104,7 @@ export function buildAgentRouter(config: GatewayConfig): Router {
   r.post('/links', (req, res) => void forwardTo(config, req, res, '/me/agent/links'));
   r.get('/sub-agents', (req, res) => void forwardTo(config, req, res, '/me/agent/sub-agents'));
 
-  r.post('/sub-agents', (req: Request, res: Response) => {
+  r.post('/sub-agents', (req: Request, res: Response): void => {
     const rateBps = (req.body as { rateBps?: unknown } | undefined)?.rateBps;
     if (typeof rateBps !== 'number' || !Number.isInteger(rateBps)) {
       res.status(400).json({ error: 'rateBps must be an integer number of basis points' });
@@ -123,7 +123,7 @@ export function buildAgentRouter(config: GatewayConfig): Router {
 
   // Tab 3's [Edit Rate]. Same bounds as creation — a rate that is illegal to
   // set at creation must not become legal by editing afterwards.
-  r.patch('/sub-agents/:subAgentId', (req: Request, res: Response) => {
+  r.patch('/sub-agents/:subAgentId', (req: Request, res: Response): void => {
     const rateBps = (req.body as { rateBps?: unknown } | undefined)?.rateBps;
     if (typeof rateBps !== 'number' || !Number.isInteger(rateBps)) {
       res.status(400).json({ error: 'rateBps must be an integer number of basis points' });

@@ -55,6 +55,30 @@ export interface RoundVerificationData {
    * could and could not establish rather than passing silently.
    */
   mine?: SeatedClientSeed;
+  /**
+   * Where this batch's Merkle root was anchored, when it has been (step 6b).
+   *
+   * 6a — the proof rebuilds the root — is computed locally. 6b — "the on-chain
+   * root matches" — is a chain query the player makes themselves via the
+   * explorer link; handing them the transaction is the tool's whole part in
+   * it. Absent (or carrying a dev/local token) the page says the root is not
+   * yet anchored rather than pretending a permanence that isn't there.
+   */
+  notarization?: { chain: 'solana' | 'polygon' | 'rfc3161'; tx: string };
+}
+
+/**
+ * The explorer URL for a notarization, or null when there is nothing real to
+ * link — dev fakes (`fake-tx-…`) and local RFC 3161 tokens (`rfc3161-…`) are
+ * not on any chain, and a link that 404s reads as tampering to the one player
+ * who actually clicks it.
+ */
+export function explorerUrl(n: { chain: string; tx: string } | undefined): string | null {
+  if (!n || n.tx.startsWith('fake-tx-') || n.tx.startsWith('rfc3161-')) return null;
+  // Devnet now, mainnet at launch (W3 plan) — the cluster param goes then.
+  if (n.chain === 'solana') return `https://explorer.solana.com/tx/${n.tx}?cluster=devnet`;
+  if (n.chain === 'polygon') return `https://polygonscan.com/tx/${n.tx}`;
+  return null;
 }
 
 export type StepId = 1 | 2 | 3 | 4 | 5 | 6;

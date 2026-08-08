@@ -88,3 +88,42 @@ export async function ensureJackpotAccounts(
     ),
   );
 }
+
+/**
+ * The insurance and reinsurance pool for one system, created on demand.
+ *
+ * Per spec §3.1 the pools are owned by `PLATFORM` or a `leagueId` — the two
+ * insurance systems are completely separate, with independent reinsurance and
+ * no cross-subsidy. One pair of accounts per owner enforces that by
+ * construction: a league's quotes are underwritten by the league's own pool
+ * because that is the only pool its owner id reaches.
+ */
+export const insuranceAccountId = (ownerId: string): string => `ins:${ownerId}`;
+export const reinsuranceAccountId = (ownerId: string): string => `reins:${ownerId}`;
+
+export async function ensureInsuranceAccounts(ownerId: string): Promise<void> {
+  await Promise.all([
+    AccountModel.updateOne(
+      { _id: insuranceAccountId(ownerId) },
+      {
+        $setOnInsert: {
+          _id: insuranceAccountId(ownerId),
+          accountType: AccountType.INSURANCE,
+          ownerId,
+        },
+      },
+      { upsert: true },
+    ),
+    AccountModel.updateOne(
+      { _id: reinsuranceAccountId(ownerId) },
+      {
+        $setOnInsert: {
+          _id: reinsuranceAccountId(ownerId),
+          accountType: AccountType.REINSURANCE,
+          ownerId,
+        },
+      },
+      { upsert: true },
+    ),
+  ]);
+}

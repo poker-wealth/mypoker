@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, X, ShieldCheck, ChevronDown, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { verifyRound, type RoundVerificationData, type VerificationResult, type StepId } from '@/lib/fairness';
+import { verifyRound,
+  explorerUrl, type RoundVerificationData, type VerificationResult, type StepId } from '@/lib/fairness';
 import { cn } from '@/lib/cn';
 import { useLobbyGames, useRtp } from '@/api/hooks';
 import { HIDDEN_GAMES, visibleGames } from '@/lib/games';
@@ -33,6 +34,9 @@ export function Fairness() {
   const { t } = useTranslation();
   const [input, setInput] = useState('');
   const [result, setResult] = useState<VerificationResult | null>(null);
+  // Step 6b: the chain anchor of the round just verified, kept beside the
+  // result because the steps themselves are pure local computation.
+  const [anchor, setAnchor] = useState<RoundVerificationData['notarization']>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -42,6 +46,7 @@ export function Fairness() {
     setResult(null);
     try {
       const parsed = JSON.parse(raw) as RoundVerificationData;
+      setAnchor(parsed.notarization);
       setResult(await verifyRound(parsed));
     } catch (err) {
       // Includes malformed JSON and malformed hex. A corrupt input is NOT a
@@ -146,7 +151,18 @@ export function Fairness() {
                 expected={s.expected}
                 computedLabel={t('fairness.computed')}
                 expectedLabel={t('fairness.expected')}
-                caveat={s.note === 'OWN_SEED_NOT_CHECKED' ? t('fairness.ownSeedUnchecked') : null}
+                caveat={
+                  s.note === 'OWN_SEED_NOT_CHECKED'
+                    ? t('fairness.ownSeedUnchecked')
+                    : s.step === 6 && !explorerUrl(anchor)
+                      ? t('fairness.notAnchored')
+                      : null
+                }
+                link={
+                  s.step === 6 && explorerUrl(anchor)
+                    ? { href: explorerUrl(anchor)!, label: t('fairness.viewOnChain') }
+                    : null
+                }
               />
             ))}
           </ul>
@@ -166,6 +182,7 @@ function StepRow({
   computedLabel,
   expectedLabel,
   caveat,
+  link,
 }: {
   index: number;
   pass: boolean;
@@ -177,6 +194,8 @@ function StepRow({
   expectedLabel: string;
   /** Set when the step passed in a weaker form than its full one. */
   caveat?: string | null;
+  /** Step 6b: the explorer link that lets the player check the chain themselves. */
+  link?: { href: string; label: string } | null;
 }) {
   // A failed step opens by default — the evidence is the reason to be here.
   const [open, setOpen] = useState(!pass);
@@ -222,6 +241,16 @@ function StepRow({
           )}
           <Value label={computedLabel} value={computed} tone={pass ? 'ok' : 'bad'} />
           <Value label={expectedLabel} value={expected} tone="neutral" />
+          {link && (
+            <a
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-[0.66rem] font-semibold text-brand underline underline-offset-2"
+            >
+              {link.label}
+            </a>
+          )}
         </div>
       )}
     </li>
