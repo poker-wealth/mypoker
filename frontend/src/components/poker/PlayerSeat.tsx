@@ -19,13 +19,15 @@ interface PlayerSeatProps {
   align?: 'bottom' | 'top' | 'left' | 'right';
   /** Live tables: sit down in this chair. Absent on the demo table (its seats are never open). */
   onSit?: () => void;
+  /** Triggered when tapping an occupied seat */
+  onClick?: () => void;
   /** The current table design's accent, so open chairs and the clock read against its felt. */
   accent?: string;
 }
 
 const AVATAR = 'size-[56px] sm:size-[62px]';
 
-export function PlayerSeat({ seat, align = 'bottom', onSit, accent = 'var(--accent)' }: PlayerSeatProps) {
+export function PlayerSeat({ seat, align = 'bottom', onSit, onClick, accent = 'var(--accent)' }: PlayerSeatProps) {
   if (seat.status === 'empty') {
     // On a live table an open chair is the invitation to play — make it obviously tappable.
     if (onSit) {
@@ -72,7 +74,9 @@ export function PlayerSeat({ seat, align = 'bottom', onSit, accent = 'var(--acce
         'relative flex flex-col items-center',
         folded && 'opacity-45 grayscale',
         'transition-all duration-300',
+        onClick && 'cursor-pointer',
       )}
+      onClick={onClick}
     >
       {/* Hole cards, fanned out behind the avatar */}
       {!folded && seat.cards.length > 0 && (

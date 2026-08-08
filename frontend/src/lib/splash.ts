@@ -6,8 +6,11 @@
  * drawn something worth showing.
  */
 
-/** Below this, the splash reads as a flicker rather than a boot screen. */
-const MINIMUM_VISIBLE_MS = 450;
+/**
+ * Long enough for the mark's coin-spin (3.4s per turn, see index.html) to read
+ * as intentional — roughly two-thirds of a revolution before the fade starts.
+ */
+const MINIMUM_VISIBLE_MS = 2200;
 
 /** Matches the CSS transition on #splash. */
 const FADE_MS = 320;

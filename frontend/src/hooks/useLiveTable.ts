@@ -36,6 +36,9 @@ export interface LiveTable {
   sitOut: () => void;
   sitIn: () => void;
   topUp: (amount: number) => void;
+  challenge: (targetId: string) => void;
+  answerChallenge: (passed: boolean, responseMs: number) => void;
+  socket: TableSocket | null;
 }
 
 const EMPTY_VIEW: TableState = {
@@ -165,6 +168,9 @@ export function useLiveTable(tableId: string): LiveTable {
     sitOut: useCallback(() => send({ kind: 'sitOut' }), [send]),
     sitIn: useCallback(() => send({ kind: 'sitIn' }), [send]),
     topUp: useCallback((amount: number) => send({ kind: 'buyIn', amount }), [send]),
+    challenge: useCallback((targetId: string) => send({ kind: 'challenge', targetId }), [send]),
+    answerChallenge: useCallback((passed: boolean, responseMs: number) => send({ kind: 'answer_challenge', passed, responseMs }), [send]),
+    socket: socketRef.current,
   };
 }
 
@@ -223,6 +229,7 @@ function toSeat(live: LiveSeat, snapshot: TableSnapshot): Seat {
 
   return {
     id: live.index,
+    playerId: live.playerId,
     name: live.name,
     ...(live.avatarUrl ? { avatar: live.avatarUrl } : {}),
     stack: live.stack,

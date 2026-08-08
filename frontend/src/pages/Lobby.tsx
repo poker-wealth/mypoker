@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { Filter, Zap } from 'lucide-react';
 import { Segmented } from '@/components/ui/Segmented';
-import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useLobbyGames, useTables } from '@/api/hooks';
 import { formatMicros } from '@/api/lobby';
@@ -14,8 +12,19 @@ export function Lobby() {
   const [variant, setVariant] = useState('dezhou');
   const [blinds, setBlinds] = useState('all');
 
+  const stakesMap: Record<string, number | undefined> = {
+    'all': undefined,
+    '1/2': 2_000_000,
+    '5/10': 10_000_000,
+    '25/50': 50_000_000,
+    '100/200': 200_000_000,
+  };
+  const targetStakes = stakesMap[blinds];
+
   const { data: tablesData } = useTables({
-    gameId: variant === 'dezhou' ? 'texas' : variant === 'ausha' ? 'omaha' : variant,
+    gameId: variant === 'dezhou' ? 'texas' : variant === 'ausha' ? 'omaha' : variant === 'all' ? undefined : variant,
+    minStakes: targetStakes,
+    maxStakes: targetStakes,
   });
 
   // Null while loading rather than the mockup's placeholder figure. Showing
@@ -94,9 +103,6 @@ export function Lobby() {
             ]}
           />
         </div>
-        <button className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface text-dim transition-colors hover:text-text">
-          <Filter size={16} />
-        </button>
       </div>
 
       {/* Table list */}
@@ -107,7 +113,6 @@ export function Lobby() {
               <th className="px-3 py-2.5 font-medium">Table</th>
               <th className="px-3 py-2.5 font-medium">Blinds</th>
               <th className="px-3 py-2.5 font-medium">Players</th>
-              <th className="px-3 py-2.5 font-medium">Buy-in</th>
               <th className="px-3 py-2.5 text-right font-medium">Status</th>
             </tr>
           </thead>
@@ -130,7 +135,6 @@ export function Lobby() {
                     {formatMicros(t.stakes / 2, 0)}/{formatMicros(t.stakes, 0)}
                   </td>
                   <td className="px-3 py-3 tabular-nums">{t.players}/{t.maxPlayers}</td>
-                  <td className="px-3 py-3 tabular-nums text-dim">100 BB</td>
                   <td className="px-3 py-3 text-right">
                     <span
                       className={`font-semibold ${t.status === 'OPEN' || t.status === 'WAITING' ? 'text-success' : 'text-dim'
@@ -144,16 +148,6 @@ export function Lobby() {
             )}
           </tbody>
         </table>
-      </div>
-
-      {/* Action buttons */}
-      <div className="grid grid-cols-2 gap-3 pt-2">
-        <Button className="bg-success text-success-fg hover:bg-success/90">
-          <Zap size={16} className="mr-1.5" /> QUICK JOIN
-        </Button>
-        <Button variant="secondary" className="border-border bg-surface text-dim">
-          CREATE PRIVATE TABLE
-        </Button>
       </div>
     </div>
   );

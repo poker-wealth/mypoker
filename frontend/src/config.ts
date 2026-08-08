@@ -38,6 +38,17 @@ export const TABLES_WS_URL =
   import.meta.env.VITE_TABLES_WS_URL ??
   `${(TABLES_URL || window.location.origin).replace(/^http/, 'ws')}/ws`;
 
+/** Bot username (no @) — used only to derive the default Support chat link. */
+export const TELEGRAM_BOT_NAME = import.meta.env.VITE_TELEGRAM_BOT_NAME ?? '';
+
+/**
+ * Where "Support" links to — a Telegram chat, help desk, or mailto. Falls back
+ * to the bot's chat when only the bot is configured; empty means the Settings
+ * row shows a "connecting" toast instead of navigating nowhere.
+ */
+export const SUPPORT_URL =
+  import.meta.env.VITE_SUPPORT_URL ?? (TELEGRAM_BOT_NAME ? `https://t.me/${TELEGRAM_BOT_NAME}` : '');
+
 /** The table opened when a game id isn't itself a table id (see the table server's room list). */
 export const DEFAULT_TABLE_ID = 'texas';
 export const LIVE_TABLE_IDS = new Set(['texas', 'texas-high']);
