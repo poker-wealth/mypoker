@@ -38,11 +38,7 @@ export const TABLES_WS_URL =
   import.meta.env.VITE_TABLES_WS_URL ??
   `${(TABLES_URL || window.location.origin).replace(/^http/, 'ws')}/ws`;
 
-/**
- * Bot username (no @) for the Telegram Login Widget — the sign-in path for a
- * plain browser, where there is no Mini App `initData`. Unset means the widget
- * simply isn't offered; inside Telegram it is never shown regardless.
- */
+/** Bot username (no @) — used only to derive the default Support chat link. */
 export const TELEGRAM_BOT_NAME = import.meta.env.VITE_TELEGRAM_BOT_NAME ?? '';
 
 /**
