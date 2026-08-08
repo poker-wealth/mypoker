@@ -67,8 +67,8 @@ function LiveTable({ tableId }: { tableId: string }) {
     const socket = live.socket;
     if (!socket) return;
 
-    const handleEvent = (data: any) => {
-      setChallengePrompt(data.challengerId);
+    const handleEvent = (data: unknown) => {
+      setChallengePrompt((data as { challengerId: string }).challengerId);
     };
 
     socket.on('prompt_challenge', handleEvent);

@@ -16,8 +16,8 @@ export function useTableChat(socket: TableSocket | null) {
   useEffect(() => {
     if (!socket) return;
     
-    const handleEvent = (data: any) => {
-      setMessages(prev => [...prev, data].slice(-100)); // Keep last 100 messages
+    const handleEvent = (data: unknown) => {
+      setMessages(prev => [...prev, data as ChatMessage].slice(-100)); // Keep last 100 messages
     };
 
     socket.on('chat_message', handleEvent);
@@ -29,7 +29,7 @@ export function useTableChat(socket: TableSocket | null) {
 
   const sendChat = useCallback((text: string) => {
     if (!socket || !text.trim()) return;
-    socket.send({ kind: 'chat', message: text.trim() } as any);
+    socket.send({ kind: 'chat', message: text.trim() });
   }, [socket]);
 
   return { messages, sendChat };

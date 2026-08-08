@@ -1,11 +1,10 @@
 import { useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 
 import { Header } from './Header';
 import { BottomNav } from './BottomNav';
 import { useTelegramBackButton } from '@/lib/useTelegramBackButton';
-import { isTelegram } from '@/lib/telegram';
 import { useSession } from '@/store/session';
 import { useTranslation } from 'react-i18next';
 import { useSettings } from '@/api/hooks';
@@ -38,13 +37,10 @@ export function AppShell() {
     if (status === 'idle') void signIn();
   }, [status, signIn]);
 
-  // If outside of Telegram and not signed in, enforce the login gate.
-  const navigate = useNavigate();
-  useEffect(() => {
-    if (status === 'anonymous' && !isTelegram() && location.pathname !== '/login') {
-      navigate('/login', { replace: true });
-    }
-  }, [status, location.pathname, navigate]);
+  // Outside Telegram the app stays browsable while anonymous — the Profile and
+  // table screens surface an "open in Telegram to sign in" prompt where it's
+  // actually needed. (No /login page exists; a redirect here only blanked the
+  // app in a browser.)
 
   useAccountLanguage();
 

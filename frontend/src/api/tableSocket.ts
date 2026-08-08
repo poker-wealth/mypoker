@@ -65,7 +65,7 @@ export class TableSocket {
    * stamp "closed" over the live one's status.
    */
   private dead = false;
-  private eventListeners: Map<string, Set<(data: any) => void>> = new Map();
+  private eventListeners: Map<string, Set<(data: unknown) => void>> = new Map();
 
   constructor(
     private readonly url: string,
@@ -130,18 +130,18 @@ export class TableSocket {
   }
 
   /** Send a table command. Silently ignored until the handshake completes. */
-  send(command: TableCommand | any): void {
+  send(command: TableCommand): void {
     void this.sendInner({ type: 'action', roomId: this.tableId, action: command });
   }
 
-  on(event: string, callback: (data: any) => void): void {
+  on(event: string, callback: (data: unknown) => void): void {
     if (!this.eventListeners.has(event)) {
       this.eventListeners.set(event, new Set());
     }
     this.eventListeners.get(event)!.add(callback);
   }
 
-  off(event: string, callback: (data: any) => void): void {
+  off(event: string, callback: (data: unknown) => void): void {
     this.eventListeners.get(event)?.delete(callback);
   }
 

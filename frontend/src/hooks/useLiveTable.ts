@@ -168,8 +168,8 @@ export function useLiveTable(tableId: string): LiveTable {
     sitOut: useCallback(() => send({ kind: 'sitOut' }), [send]),
     sitIn: useCallback(() => send({ kind: 'sitIn' }), [send]),
     topUp: useCallback((amount: number) => send({ kind: 'buyIn', amount }), [send]),
-    challenge: useCallback((targetId: string) => send({ kind: 'challenge', targetId } as any), [send]),
-    answerChallenge: useCallback((passed: boolean, responseMs: number) => send({ kind: 'answer_challenge', passed, responseMs } as any), [send]),
+    challenge: useCallback((targetId: string) => send({ kind: 'challenge', targetId }), [send]),
+    answerChallenge: useCallback((passed: boolean, responseMs: number) => send({ kind: 'answer_challenge', passed, responseMs }), [send]),
     socket: socketRef.current,
   };
 }
