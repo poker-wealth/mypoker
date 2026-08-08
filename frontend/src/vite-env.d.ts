@@ -12,6 +12,8 @@ interface ImportMetaEnv {
   readonly VITE_TABLES_URL?: string;
   /** Override only if the game socket isn't at `${VITE_TABLES_URL}/ws`. */
   readonly VITE_TABLES_WS_URL?: string;
+  /** Bot username (without @) — used only to derive the default Support chat link. */
+  readonly VITE_TELEGRAM_BOT_NAME?: string;
 }
 
 interface ImportMeta {

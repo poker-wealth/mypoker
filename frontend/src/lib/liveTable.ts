@@ -124,4 +124,7 @@ export type TableCommand =
   | { kind: 'act'; action: { type: 'fold' | 'check' | 'call' | 'raise'; amount?: number } }
   | { kind: 'sitOut' }
   | { kind: 'sitIn' }
-  | { kind: 'buyIn'; amount: number };
+  | { kind: 'buyIn'; amount: number }
+  | { kind: 'chat'; message: string }
+  | { kind: 'challenge'; targetId: string }
+  | { kind: 'answer_challenge'; passed: boolean; responseMs: number };

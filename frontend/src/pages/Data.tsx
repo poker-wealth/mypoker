@@ -6,6 +6,18 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { Button } from '@/components/ui/Button';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Filler,
+  Tooltip as ChartTooltip,
+  type Plugin,
+  type ScriptableContext,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
 import { useStats, useHistory, useVip } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
 import { moneyFromDecimal } from '@/lib/money';
@@ -224,58 +236,198 @@ function RoundRow({ round }: { round: HistoryEntry }) {
   );
 }
 
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Filler, ChartTooltip);
+
+/** Dashed vertical guide through the hovered point, drawn behind the tooltip. */
+const crosshairPlugin: Plugin<'line'> = {
+  id: 'trendCrosshair',
+  afterDatasetsDraw(chart) {
+    const active = chart.tooltip?.getActiveElements();
+    if (!active || active.length === 0) return;
+    const { top, bottom } = chart.chartArea;
+    const { ctx } = chart;
+    ctx.save();
+    ctx.setLineDash([4, 4]);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(148, 148, 180, 0.35)';
+    ctx.beginPath();
+    ctx.moveTo(active[0].element.x, top);
+    ctx.lineTo(active[0].element.x, bottom);
+    ctx.stroke();
+    ctx.restore();
+  },
+};
+
 /**
  * Cumulative profit across the loaded rounds.
  *
  * History arrives newest-first, so it is reversed to run left-to-right in time.
  * The line is the running total, not per-round values — a player wants to see
- * whether they are up, not the shape of individual hands.
+ * whether they are up, not the shape of individual hands. Profit is a polarity,
+ * so the encoding follows the sign everywhere: the line and its fill are green
+ * above zero and red below, switching exactly at the baseline rather than
+ * painting the whole series by the final value.
  */
 function TrendChart({ rounds }: { rounds: HistoryEntry[] }) {
+  const ordered = [...rounds].reverse();
+
+  // Burst data lands on one day, where repeating the same date says nothing —
+  // label by time within a day, by date across days.
+  const sameDay = new Set(ordered.map((r) => new Date(r.at).toDateString())).size <= 1;
+  const formatLabel = (ts: number | string) => {
+    const d = new Date(ts);
+    if (sameDay) {
+      return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+    }
+    return `${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+  };
+
+  const labels: string[] = [];
   const values: number[] = [];
   let running = 0;
-  for (const r of [...rounds].reverse()) {
+  for (const r of ordered) {
     running += Number(r.net) || 0;
+    labels.push(formatLabel(r.at));
     values.push(running);
   }
 
-  const W = 100;
-  const H = 40;
-  const PAD = 3;
-  const min = Math.min(...values, 0);
-  const max = Math.max(...values, 0);
-  const span = max - min || 1;
-  const up = (values[values.length - 1] ?? 0) >= 0;
-  const stroke = up ? 'var(--success)' : 'var(--danger)';
+  const lastIndex = values.length - 1;
 
-  const points = values.map((v, i): [number, number] => [
-    (i / Math.max(values.length - 1, 1)) * W,
-    H - PAD - ((v - min) / span) * (H - PAD * 2),
-  ]);
-  const line = points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x} ${y}`).join(' ');
-  const area = `${line} L${W} ${H} L0 ${H} Z`;
-  const last = points[points.length - 1]!;
+  // Chart.js paints to canvas, which can't resolve CSS variables — read the
+  // theme's concrete values off :root instead of hardcoding a second palette.
+  const rootStyle = getComputedStyle(document.documentElement);
+  const gain = rootStyle.getPropertyValue('--success').trim() || '#3fd07a';
+  const loss = rootStyle.getPropertyValue('--danger').trim() || '#f85677';
+  const surface = rootStyle.getPropertyValue('--surface').trim() || '#17172b';
+  const tick = { color: 'rgba(148, 148, 180, 0.8)', font: { size: 10 } };
+  const endColor = (values[lastIndex] ?? 0) >= 0 ? gain : loss;
+
+  const signedMoney = (v: number) =>
+    (v >= 0 ? '+' : '') + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  /** 0..1 position of the zero line inside the plot, for gradient stops. */
+  const zeroStop = (chart: ChartJS): number | null => {
+    const { chartArea, scales } = chart;
+    if (!chartArea || !scales.y) return null;
+    const zero = scales.y.getPixelForValue(0);
+    return Math.min(1, Math.max(0, (zero - chartArea.top) / (chartArea.bottom - chartArea.top)));
+  };
+
+  const lineGradient = ({ chart }: ScriptableContext<'line'>) => {
+    const t = zeroStop(chart);
+    if (t === null) return gain;
+    const { chartArea, ctx } = chart;
+    const g = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+    g.addColorStop(0, gain);
+    g.addColorStop(t, gain);
+    g.addColorStop(Math.min(1, t + 0.0001), loss);
+    g.addColorStop(1, loss);
+    return g;
+  };
+
+  const fillGradient = ({ chart }: ScriptableContext<'line'>) => {
+    const t = zeroStop(chart);
+    if (t === null) return 'transparent';
+    const { chartArea, ctx } = chart;
+    const g = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+    g.addColorStop(0, `${gain}59`);
+    g.addColorStop(t, `${gain}00`);
+    g.addColorStop(Math.min(1, t + 0.0001), `${loss}00`);
+    g.addColorStop(1, `${loss}59`);
+    return g;
+  };
+
+  // The endpoint is the number the card is about — give it a dot and a label.
+  const endpointLabel: Plugin<'line'> = {
+    id: 'trendEndpointLabel',
+    afterDatasetsDraw(chart) {
+      const meta = chart.getDatasetMeta(0);
+      const point = meta?.data?.[lastIndex];
+      if (!point) return;
+      const { ctx, chartArea } = chart;
+      ctx.save();
+      ctx.font = '700 11px system-ui, sans-serif';
+      ctx.fillStyle = endColor;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'bottom';
+      const y = Math.max(chartArea.top + 12, point.y - 10);
+      ctx.fillText(signedMoney(values[lastIndex] ?? 0), point.x - 6, y);
+      ctx.restore();
+    },
+  };
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-28 w-full" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="trend-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={stroke} stopOpacity="0.28" />
-          <stop offset="100%" stopColor={stroke} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={area} fill="url(#trend-fill)" />
-      <path
-        d={line}
-        fill="none"
-        stroke={stroke}
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
+    <div className="h-40 w-full">
+      <Line
+        data={{
+          labels,
+          datasets: [
+            {
+              data: values,
+              borderColor: lineGradient,
+              borderWidth: 2,
+              // Monotone keeps the curve smooth without overshooting past the
+              // real cumulative values at the turns.
+              cubicInterpolationMode: 'monotone',
+              fill: 'origin',
+              backgroundColor: fillGradient,
+              pointRadius: values.map((_, i) => (i === lastIndex ? 4 : 0)),
+              pointHoverRadius: 5,
+              pointBackgroundColor: endColor,
+              pointBorderColor: surface,
+              pointBorderWidth: 2,
+              pointHoverBackgroundColor: ({ parsed }: ScriptableContext<'line'>) =>
+                (parsed?.y ?? 0) >= 0 ? gain : loss,
+              pointHoverBorderColor: surface,
+              pointHoverBorderWidth: 2,
+            },
+          ],
+        }}
+        options={{
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          layout: { padding: { top: 12, right: 8 } },
+          scales: {
+            x: {
+              grid: { display: false },
+              border: { display: false },
+              ticks: { ...tick, maxRotation: 0, autoSkip: true, maxTicksLimit: 6 },
+            },
+            y: {
+              // The zero baseline is the reading anchor — keep it visible while
+              // the other gridlines stay recessive.
+              grid: {
+                color: (ctx) => (ctx.tick.value === 0 ? 'rgba(148, 148, 180, 0.45)' : 'rgba(148, 148, 180, 0.1)'),
+              },
+              border: { display: false },
+              ticks: {
+                ...tick,
+                maxTicksLimit: 5,
+                callback: (v) => (Math.abs(Number(v)) >= 1000 ? `${Number(v) / 1000}K` : `${v}`),
+              },
+            },
+          },
+          plugins: {
+            tooltip: {
+              displayColors: false,
+              backgroundColor: '#20203a',
+              titleColor: 'rgba(255, 255, 255, 0.55)',
+              titleFont: { size: 10, weight: 'normal' },
+              bodyFont: { size: 12, weight: 'bold' },
+              padding: { x: 10, y: 6 },
+              cornerRadius: 10,
+              caretSize: 4,
+              callbacks: {
+                label: (ctx) => signedMoney(ctx.parsed.y ?? 0),
+                labelTextColor: (ctx) => ((ctx.parsed.y ?? 0) >= 0 ? gain : loss),
+              },
+            },
+          },
+        }}
+        plugins={[crosshairPlugin, endpointLabel]}
       />
-      <circle cx={last[0]} cy={last[1]} r="1.8" fill={stroke} vectorEffect="non-scaling-stroke" />
-    </svg>
+    </div>
   );
 }
 

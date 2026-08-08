@@ -16,6 +16,8 @@ const FAST: Omit<PokerRoomConfig, 'id' | 'name'> = {
   showdownDelayMs: 10,
   actionTimeoutMs: 80,
   disconnectGraceMs: 20,
+  // Tests watch through unseated viewers; a real spectator lag would just slow them down.
+  spectatorDelayMs: 0,
 };
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -177,7 +179,7 @@ describe('PokerRoom — a table real people sit at', () => {
 
   it('returns an abandoned player’s chips instead of locking them forever', async () => {
     const h = harness({ disconnectGraceMs: 5 });
-    const stopWatching = h.room.join(h.alice, () => {});
+    const stopWatching = h.room.join(h.alice, { sendSnapshot: () => {}, sendEvent: () => {} });
     await seatBoth(h, 0, 1);
 
     stopWatching(); // Alice's phone drops off mid-hand
@@ -215,7 +217,7 @@ describe('PokerRoom — a table real people sit at', () => {
   it('pushes a snapshot to every watcher when the table changes', async () => {
     const h = harness();
     const seen: TableSnapshot[] = [];
-    const stop = h.room.join(h.bob, (snapshot) => seen.push(snapshot));
+    const stop = h.room.join(h.bob, { sendSnapshot: (snapshot: any) => { seen.push(snapshot); }, sendEvent: () => {} });
 
     await h.room.command(h.alice, { kind: 'sit', seat: 0, buyIn: 2_000 });
     expect(seen.length).toBeGreaterThanOrEqual(2); // initial + the sit

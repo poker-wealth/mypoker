@@ -89,8 +89,11 @@ export class TableHub {
         this.unsubscribe(ctx, msg.roomId); // re-joining resyncs rather than double-subscribing
         let stop: () => void;
         try {
-          stop = room.join(playerId, (snapshot) => {
-            ctx.send({ type: 'state', roomId: msg.roomId, state: snapshot });
+          stop = room.join(playerId, {
+            sendSnapshot: (snapshot) =>
+              ctx.send({ type: 'state', roomId: msg.roomId, state: snapshot }),
+            sendEvent: (event, data) =>
+              ctx.send({ type: 'event', roomId: msg.roomId, event, data }),
           });
         } catch (err) {
           // The spectator cap. A refused watcher gets told why, not a silent

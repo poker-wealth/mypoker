@@ -37,6 +37,11 @@ export function AppShell() {
     if (status === 'idle') void signIn();
   }, [status, signIn]);
 
+  // Outside Telegram the app stays browsable while anonymous — the Profile and
+  // table screens surface an "open in Telegram to sign in" prompt where it's
+  // actually needed. (No /login page exists; a redirect here only blanked the
+  // app in a browser.)
+
   useAccountLanguage();
 
   return (

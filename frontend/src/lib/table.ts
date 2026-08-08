@@ -9,6 +9,7 @@ export type SeatStatus = 'active' | 'folded' | 'allin' | 'empty' | 'toact';
 
 export interface Seat {
   id: number;
+  playerId?: string;
   name: string;
   avatar?: string;
   stack: number;
