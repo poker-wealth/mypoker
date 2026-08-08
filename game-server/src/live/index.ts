@@ -5,7 +5,7 @@
  * `chip-bank` are the two swappable seams to identity and money.
  */
 export { PokerRoom, DEFAULT_ROOM, RoomError } from './poker-room';
-export type { PokerRoomConfig, PokerRoomDeps, SnapshotSender } from './poker-room';
+export type { PokerRoomConfig, PokerRoomDeps, RoomClient } from './poker-room';
 export { TableHub } from './table-hub';
 export type { TokenVerifier } from './table-hub';
 export { createTableServer, startFromEnv, defaultTables } from './server';

@@ -224,7 +224,8 @@
     "notifyDeposits": "入出金",
     "notifyPromos": "プロモーション",
     "about": "情報",
-    "signInToSync": "ログインすると設定が同期されます"
+    "signInToSync": "ログインすると設定が同期されます",
+    "account": "アカウント"
   },
   "fairness": {
     "title": "公平性の検証",

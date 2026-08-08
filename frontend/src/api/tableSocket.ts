@@ -65,6 +65,7 @@ export class TableSocket {
    * stamp "closed" over the live one's status.
    */
   private dead = false;
+  private eventListeners: Map<string, Set<(data: any) => void>> = new Map();
 
   constructor(
     private readonly url: string,
@@ -129,8 +130,19 @@ export class TableSocket {
   }
 
   /** Send a table command. Silently ignored until the handshake completes. */
-  send(command: TableCommand): void {
+  send(command: TableCommand | any): void {
     void this.sendInner({ type: 'action', roomId: this.tableId, action: command });
+  }
+
+  on(event: string, callback: (data: any) => void): void {
+    if (!this.eventListeners.has(event)) {
+      this.eventListeners.set(event, new Set());
+    }
+    this.eventListeners.get(event)!.add(callback);
+  }
+
+  off(event: string, callback: (data: any) => void): void {
+    this.eventListeners.get(event)?.delete(callback);
   }
 
   close(): void {
@@ -187,6 +199,12 @@ export class TableSocket {
       | { type: 'error'; message: string };
 
     if (message.type === 'state') this.emit.snapshot(message.state);
+    else if (message.type === 'event') {
+      const listeners = this.eventListeners.get(message.event);
+      if (listeners) {
+        for (const cb of listeners) cb(message.data);
+      }
+    }
     else if (message.type === 'error') this.emit.error(message.message);
   }
 
@@ -204,7 +222,7 @@ export class TableSocket {
 
     const serverKey = await crypto.subtle.importKey(
       'spki',
-      fromBase64(serverPublicKeyB64),
+      fromBase64(serverPublicKeyB64).buffer as ArrayBuffer,
       { name: 'X25519' },
       false,
       [],

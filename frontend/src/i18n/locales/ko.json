@@ -224,7 +224,8 @@
     "notifyDeposits": "입출금",
     "notifyPromos": "프로모션",
     "about": "정보",
-    "signInToSync": "로그인하면 설정이 동기화됩니다"
+    "signInToSync": "로그인하면 설정이 동기화됩니다",
+    "account": "계정"
   },
   "fairness": {
     "title": "공정성 검증",

@@ -224,7 +224,8 @@
     "notifyDeposits": "充值与提现",
     "notifyPromos": "优惠活动",
     "about": "关于",
-    "signInToSync": "登录以同步您的偏好设置"
+    "signInToSync": "登录以同步您的偏好设置",
+    "account": "账户"
   },
   "fairness": {
     "title": "公平性验证",
