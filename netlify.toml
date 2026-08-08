@@ -5,40 +5,32 @@
 # packages, so a base of "frontend" would cut the function off from it.
 
 [build]
-  # Only the frontend is installed. The functions import from game-server/src,
-  # but every module they reach is dependency-free (node builtins only), so
-  # there is nothing to resolve. Keep it that way: Netlify leaves bare imports
-  # external, so a third-party package anywhere in a function's import graph
-  # fails at runtime with module-not-found, not at build time.
+  # Only the frontend is installed. The auth function imports from
+  # game-server/src, but every module it reaches is dependency-free (node
+  # builtins only), so there is nothing to resolve. Keep it that way: Netlify
+  # leaves bare imports external, so a third-party package anywhere in a
+  # function's import graph fails at runtime with module-not-found, not at
+  # build time.
   command = "npm --prefix frontend install && npm --prefix frontend run build"
   publish = "frontend/dist"
   functions = "netlify/functions"
 
-# Serverless API. These MUST come before the SPA fallback below — redirect rules
-# are evaluated top-down, and the catch-all would otherwise swallow them and
-# serve index.html instead of running the function.
+# Serverless API. This MUST come before the SPA fallback below — redirect rules
+# are evaluated top-down, and the catch-all would otherwise swallow it and serve
+# index.html instead of running the function.
+#
+# Auth is the ONLY route that belongs here. It verifies a Telegram initData HMAC
+# and signs a token: self-contained, no database, correct as a function.
+#
+# /lobby and /jackpot used to be served here too, from `seedLobby()` — invented
+# development figures presented to players as the platform's real tables and real
+# jackpot pools. Removed rather than relabelled: a serverless function cannot
+# hold live lobby state anyway (it is rebuilt per request), so those routes
+# belong to the running gateway, and until it is deployed they should fail
+# honestly rather than answer with fiction.
 [[redirects]]
   from = "/auth/*"
   to = "/.netlify/functions/auth-:splat"
-  status = 200
-
-# The lobby is a static seed today, so it runs serverless. When the game loop
-# owns live lobby state this has to move to the running gateway — state cannot
-# be rebuilt per request.
-[[redirects]]
-  from = "/lobby/*"
-  to = "/.netlify/functions/lobby/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/lobby"
-  to = "/.netlify/functions/lobby"
-  status = 200
-
-# Jackpot pools — same static-seed caveat as the lobby above.
-[[redirects]]
-  from = "/jackpot"
-  to = "/.netlify/functions/jackpot"
   status = 200
 
 # SPA fallback — every other route serves index.html (React Router handles it).
