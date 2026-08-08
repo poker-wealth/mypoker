@@ -109,6 +109,46 @@ describe('6-step provably-fair verification', () => {
     expect(r.step6_merkle).toBe(false);
     expect(r.allPass).toBe(false);
   });
+
+  it("detects a substituted seed even though every hash reconciles (step 3, own seed)", async () => {
+    // The merge check alone cannot catch this: the platform swaps a player's
+    // seed for one it chose and re-merges honestly, so the aggregate really is
+    // the hash of the published list and the deck really does follow from it.
+    // Only the player, holding the seed they sent, can detect the swap — which
+    // is why v6.0 made "verify own ClientSeed at correct seat position" a step.
+    const data = await buildRound('round-6');
+    const seats = data.seatedClientSeeds;
+    const r = verifyRound({
+      ...data,
+      mine: { seatOrder: seats[0]!.seatOrder, clientSeed: seats[1]!.clientSeed },
+    });
+
+    expect(r.step3_clientSeeds).toBe(false);
+    expect(r.step3_ownSeedChecked).toBe(true);
+    expect(r.allPass).toBe(false);
+    // Everything else still reconciles — that is the point.
+    expect(r.step2_finalSeed).toBe(true);
+    expect(r.step5_roundHash).toBe(true);
+  });
+
+  it('passes with the own-seed half when the seat and seed both match', async () => {
+    const data = await buildRound('round-7');
+    const r = verifyRound({ ...data, mine: data.seatedClientSeeds[0]! });
+
+    expect(r.step3_clientSeeds).toBe(true);
+    expect(r.step3_ownSeedChecked).toBe(true);
+    expect(r.allPass).toBe(true);
+  });
+
+  it('reports that the own-seed half was skipped for a third-party round', async () => {
+    // Any historical round is publicly verifiable, but the claim is weaker and
+    // callers must be able to tell.
+    const data = await buildRound('round-8');
+    const r = verifyRound(data);
+
+    expect(r.allPass).toBe(true);
+    expect(r.step3_ownSeedChecked).toBe(false);
+  });
 });
 
 describe('variant decks — step 4 checks the deck that was ACTUALLY dealt', () => {

@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'motion/react';
 import { Trophy, Lock, Clock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { useJackpot } from '@/api/hooks';
+import { useJackpot, useJackpotHistory } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
 import { cn } from '@/lib/cn';
-import { money } from '@/lib/money';
+import { money, moneyFromDecimal } from '@/lib/money';
 import type { TierState } from '@/api/jackpot';
 
 /**
@@ -71,10 +71,101 @@ export function Jackpot() {
             ))}
           </div>
 
+          <History />
+
           <p className="px-1 text-[0.66rem] leading-relaxed text-dim">{t('jackpot.howItWorks')}</p>
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Past hits (§5: "No time limit. Player UI default: last 30 days + full
+ * date-range query.").
+ *
+ * Thirty days by default with an explicit control to widen it, rather than an
+ * infinite scroll: the default answers "is this thing actually paying out?",
+ * which is the question a player looking at a locked tier is really asking.
+ *
+ * Read from the ledger, so it is the record of hits that were PAID. A trigger
+ * the ledger refused never appears here — which is the correct behaviour, and
+ * the reason this reads from money rather than from the trigger engine.
+ */
+function History() {
+  const { t } = useTranslation();
+  const [days, setDays] = useState<30 | 90 | null>(30);
+
+  const range = useMemo(() => {
+    if (days === null) return undefined; // all time
+    const from = new Date(Date.now() - days * 86_400_000).toISOString();
+    return { from };
+  }, [days]);
+
+  const history = useJackpotHistory(range);
+
+  return (
+    <section>
+      <div className="mb-2 flex items-center justify-between gap-2 px-1">
+        <h2 className="text-xs font-bold uppercase tracking-wide text-dim">
+          {t('jackpot.history')}
+        </h2>
+        <div className="flex gap-1">
+          {([30, 90, null] as const).map((d) => (
+            <button
+              key={d ?? 'all'}
+              onClick={() => setDays(d)}
+              className={cn(
+                'rounded-full px-2 py-0.5 text-[0.62rem] font-semibold',
+                days === d ? 'bg-brand text-white' : 'bg-surface-2 text-dim',
+              )}
+            >
+              {d === null ? t('jackpot.allTime') : t('jackpot.lastDays', { count: d })}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {history.isPending && <Skeleton className="h-20 w-full rounded-(--radius-app)" />}
+
+      {history.isSuccess && history.data.hits.length === 0 && (
+        <div className="rounded-(--radius-app) border border-border bg-surface px-4 py-6 text-center text-[0.7rem] text-dim">
+          {t('jackpot.noHits')}
+        </div>
+      )}
+
+      {history.isSuccess && history.data.hits.length > 0 && (
+        <ul className="divide-y divide-border overflow-hidden rounded-(--radius-app) border border-border bg-surface">
+          {history.data.hits.map((h) => (
+            <li key={`${h.roundId}-${h.tier}`} className="flex items-center gap-3 px-4 py-2.5">
+              <span
+                className={cn(
+                  'shrink-0 rounded px-1.5 py-0.5 text-[0.55rem] font-black uppercase',
+                  TIER_STYLE[h.tier.toUpperCase()]?.text ?? 'text-dim',
+                )}
+              >
+                {t(`jackpot.tier.${h.tier.toUpperCase()}`, { defaultValue: h.tier })}
+              </span>
+              <div className="min-w-0 flex-1">
+                {/* An account id, not a nickname: the ledger knows accounts, and
+                    inventing a display name here would mean guessing. */}
+                <div className="truncate font-mono text-[0.62rem] text-dim">
+                  {h.accountId.length > 14
+                    ? `${h.accountId.slice(0, 6)}…${h.accountId.slice(-4)}`
+                    : h.accountId}
+                </div>
+                <div className="text-[0.6rem] text-dim">
+                  {new Date(h.at).toLocaleDateString()}
+                </div>
+              </div>
+              <span className="shrink-0 text-sm font-bold tabular-nums text-success">
+                {moneyFromDecimal(h.amount)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

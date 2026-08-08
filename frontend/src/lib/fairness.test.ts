@@ -118,6 +118,51 @@ describe('tamper detection', () => {
   }
 });
 
+describe("step 3 — the player's own seed (v6.0 §6)", () => {
+  const seat1 = round.seatedClientSeeds[0]!;
+  const seat2 = round.seatedClientSeeds[1]!;
+  const step3Of = async (d: RoundVerificationData) =>
+    (await verifyRound(d)).steps.find((s) => s.step === 3)!;
+
+  it('passes unqualified when the seed sits at the seat claimed', async () => {
+    const step3 = await step3Of({ ...round, mine: seat1 });
+
+    expect(step3.pass).toBe(true);
+    expect(step3.note).toBeUndefined();
+  });
+
+  it('FAILS when a seed was substituted, though every hash still reconciles', async () => {
+    // The attack this step exists to stop: the platform replaces a player's
+    // seed with one of its own and merges the result honestly. Every other
+    // step in the round still passes — the aggregate really is the hash of the
+    // list it published, the deck really does follow from it. Only the player,
+    // holding the seed they actually sent, can see the swap.
+    const step3 = await step3Of({ ...round, mine: { seatOrder: 1, clientSeed: seat2.clientSeed } });
+    const others = (await verifyRound({ ...round, mine: { seatOrder: 1, clientSeed: seat2.clientSeed } }))
+      .steps.filter((s) => s.step !== 3);
+
+    expect(step3.pass).toBe(false);
+    expect(others.every((s) => s.pass)).toBe(true);
+  });
+
+  it('fails when the seed is right but the seat is wrong', async () => {
+    // Seat order sets the concatenation order, so the same seed at another seat
+    // deals a different board. "Present somewhere" is not the check.
+    const step3 = await step3Of({ ...round, mine: { seatOrder: 2, clientSeed: seat1.clientSeed } });
+
+    expect(step3.pass).toBe(false);
+  });
+
+  it('passes WITH a caveat for a round the viewer did not play', async () => {
+    // Anyone may verify any historical round, but that proves strictly less,
+    // and a bare green tick would overstate it.
+    const step3 = await step3Of(round);
+
+    expect(step3.pass).toBe(true);
+    expect(step3.note).toBe('OWN_SEED_NOT_CHECKED');
+  });
+});
+
 describe('failure reporting', () => {
   it('shows what was computed alongside what was claimed', async () => {
     const result = await verifyRound({ ...round, serverCommit: 'a'.repeat(64) });

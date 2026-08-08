@@ -1,7 +1,8 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { Money } from '../domain/money';
-import { LedgerType } from '../domain/account-types';
+import { LedgerType, LedgerDirection } from '../domain/account-types';
+import { LedgerModel } from '../wallet/ledger.model';
 import { transfer } from '../wallet/transfer';
 import { TableType } from '../settlement/settlement-domain';
 import { settleRound } from '../settlement/settle-round';
@@ -15,6 +16,7 @@ import {
   confirmWithdrawal,
 } from '../withdrawal/withdrawal-state-machine';
 import { getOrCreatePlayerAccount, ensureJackpotAccounts } from '../wallet/system-accounts';
+import { getInsuranceReserve } from '../wallet/insurance-reserve';
 import { getPlayerStats, getPlayerHistory } from '../stats/player-stats';
 import { getSettings, updateSettings } from '../settings/player-settings';
 import { getReputationFacts } from '../reputation/player-reputation';
@@ -35,6 +37,10 @@ import {
   playersOf,
   summaryFor,
   subAgentsOf,
+  commissionBreakdown,
+  commissionSeries,
+  settlementRecords,
+  setSubAgentRate,
 } from '../agent/agent-store';
 import {
   notify,
@@ -222,6 +228,56 @@ export function buildRouter(): Router {
     }),
   );
 
+  // The dashboard reads take an explicit window rather than a named range like
+  // "this week". Naming periods is a rule — which day a week starts on, which
+  // timezone "today" means — and rules live in the gateway. This layer answers
+  // for the dates it is given.
+  const windowQuery = z.object({
+    from: z.string().datetime(),
+    to: z.string().datetime(),
+  });
+
+  const parseWindow = (req: Request): { from: Date; to: Date } => {
+    const { from, to } = windowQuery.parse(req.query);
+    return { from: new Date(from), to: new Date(to) };
+  };
+
+  r.get(
+    '/me/agent/breakdown',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json(await commissionBreakdown(req.dataScope!.playerId, parseWindow(req)));
+    }),
+  );
+
+  r.get(
+    '/me/agent/series',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json({ points: await commissionSeries(req.dataScope!.playerId, parseWindow(req)) });
+    }),
+  );
+
+  const settlementQuery = windowQuery.extend({
+    source: z.enum(['DIRECT', 'OVERRIDE']).optional(),
+    limit: z.coerce.number().int().positive().max(1000).optional(),
+  });
+  r.get(
+    '/me/agent/settlements',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const q = settlementQuery.parse(req.query);
+      res.json(
+        await settlementRecords(req.dataScope!.playerId, {
+          from: new Date(q.from),
+          to: new Date(q.to),
+          ...(q.source ? { source: q.source } : {}),
+          ...(q.limit ? { limit: q.limit } : {}),
+        }),
+      );
+    }),
+  );
+
   r.get(
     '/me/agent/links',
     dataScopeMiddleware,
@@ -272,6 +328,19 @@ export function buildRouter(): Router {
           parentAgentId: parentId,
         }),
       );
+    }),
+  );
+
+  const rateBody = z.object({ rateBps: z.number().int().nonnegative() });
+  r.patch(
+    '/me/agent/sub-agents/:subAgentId',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { rateBps } = rateBody.parse(req.body);
+      // Bounds are the gateway's, same as creation above. This stores what it
+      // is told, scoped to the caller's own sub-agents.
+      await setSubAgentRate(req.dataScope!.playerId, String(req.params.subAgentId), rateBps);
+      res.json({ ok: true });
     }),
   );
 
@@ -358,8 +427,92 @@ export function buildRouter(): Router {
         type: LedgerType.JACKPOT_PAYOUT,
         businessId: b.roundId,
         idempotencyKey: `${b.roundId}:jackpot:${b.tier}`,
+        // Which tier and table this was. The idempotency key happens to contain
+        // the tier, but parsing a dedup guard to recover domain data makes the
+        // key's format load-bearing for a feature that has nothing to do with
+        // deduplication. History reads these fields instead.
+        metadata: { tier: b.tier, tableId: b.tableId },
       });
       res.json({ applied: result.applied ?? true });
+    }),
+  );
+
+  /**
+   * Jackpot history (spec §5: "No time limit. Player UI default: last 30 days
+   * + full date-range query.").
+   *
+   * Read from the LEDGER, not from the jackpot engines. The engines hold their
+   * hits in memory per table, so their history dies with the process and is
+   * gone on the next deploy — "no time limit" cannot be served from something
+   * that forgets. Every paid hit left a JACKPOT_PAYOUT credit, which is
+   * permanent by construction.
+   *
+   * Public, like the pools themselves: recent winners are the reason anyone
+   * looks at this page. Only the winning ACCOUNT id is exposed, never a balance
+   * and never the rest of that player's ledger.
+   */
+  const jackpotHistoryQuery = z.object({
+    from: z.string().datetime().optional(),
+    to: z.string().datetime().optional(),
+    tier: z.enum(['mini', 'minor', 'major', 'grand']).optional(),
+    limit: z.coerce.number().int().positive().max(200).optional(),
+  });
+  r.get(
+    '/jackpot/history',
+    asyncHandler(async (req: Request, res: Response) => {
+      const q = jackpotHistoryQuery.parse(req.query);
+      const query: Record<string, unknown> = {
+        type: LedgerType.JACKPOT_PAYOUT,
+        // The credit side only: the debit is the pool paying, and listing both
+        // would show every win twice.
+        direction: LedgerDirection.CREDIT,
+      };
+      if (q.tier) query['metadata.tier'] = q.tier;
+      if (q.from || q.to) {
+        query.createdAt = {
+          ...(q.from ? { $gte: new Date(q.from) } : {}),
+          ...(q.to ? { $lte: new Date(q.to) } : {}),
+        };
+      }
+
+      const rows = await LedgerModel.find(query)
+        .sort({ createdAt: -1 })
+        .limit(q.limit ?? 50)
+        .lean();
+
+      res.json({
+        hits: rows.map((r) => ({
+          at: r.createdAt.toISOString(),
+          tier: (r.metadata?.tier as string) ?? 'unknown',
+          tableId: (r.metadata?.tableId as string) ?? null,
+          roundId: r.businessId ?? null,
+          accountId: r.accountId,
+          amount: r.amount.toString(),
+        })),
+      });
+    }),
+  );
+
+  /**
+   * Insurance reserve FACTS for one system — `PLATFORM` or a leagueId.
+   *
+   * Returns balances and today's paid-out total; the RULES (§4: reserve
+   * threshold $10k/$1k, single payout ≤ 5% of reserve, daily ≤ 15%) live with
+   * the underwriting engine in the gateway, which is the only caller. Same
+   * facts/rules split as reputation and VIP — restating the caps here would
+   * give two answers to how much the pool may risk.
+   *
+   * This endpoint is what retires INSURANCE_RESERVE_PLACEHOLDER: quotes are
+   * now arithmetic on what the pool actually holds, so the auto-disable rule
+   * ("reserve < threshold → insurance entry hidden") fires on real numbers.
+   */
+  const reserveQuery = z.object({ ownerId: z.string().min(1) });
+  r.get(
+    '/internal/insurance/reserve',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { ownerId } = reserveQuery.parse(req.query);
+      res.json(await getInsuranceReserve(ownerId));
     }),
   );
 

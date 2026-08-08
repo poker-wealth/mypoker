@@ -24,6 +24,8 @@ export function seedLobby(): LobbyService {
     players: number;
     jackpot: number;
     buyInBB: number;
+    tableType?: 'PLATFORM' | 'LEAGUE';
+    leagueId?: string;
   }[] = [
     // buyInBB varies per table on purpose: a lobby where every row reads 40BB
     // tells a player nothing, and the column exists precisely so deep tables can
@@ -44,6 +46,29 @@ export function seedLobby(): LobbyService {
     // find and the buy-in column has a genuine range.
     { id: 'tx-4', gameId: 'texas', stakes: $(50), players: 6, jackpot: $(890.2), buyInBB: 240 },
     { id: 'tx-5', gameId: 'texas', stakes: $(200), players: 9, jackpot: $(2140.75), buyInBB: 512 },
+    // League private rooms. These must NOT appear in the public lobby — seeding
+    // them is what makes that testable by hand rather than only in a unit test,
+    // and an empty set was how the isolation went unverified for so long.
+    {
+      id: 'lg-macau-1',
+      gameId: 'texas',
+      stakes: $(10),
+      players: 5,
+      jackpot: $(340.5),
+      buyInBB: 100,
+      tableType: 'LEAGUE',
+      leagueId: 'league-macau',
+    },
+    {
+      id: 'lg-xuzhou-1',
+      gameId: 'short-deck',
+      stakes: $(25),
+      players: 4,
+      jackpot: $(112.8),
+      buyInBB: 120,
+      tableType: 'LEAGUE',
+      leagueId: 'league-xuzhou',
+    },
   ];
 
   for (const table of tables) lobby.addTable(table);

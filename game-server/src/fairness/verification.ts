@@ -36,6 +36,18 @@ export interface RoundVerificationData {
   /** Every seated player's seed, in seat order — needed to verify step 3. */
   seatedClientSeeds: SeatedClientSeed[];
   /**
+   * The seed and seat of the player asking. Step 3 exists so a player can
+   * confirm their OWN contribution survived into the aggregate (v6.0 §6,
+   * "verify own ClientSeed at correct seat position") — without it, swapping a
+   * player's seed for one the platform chose and re-merging honestly passes
+   * every check in this file.
+   *
+   * Optional because any historical round may be verified by anyone; when it
+   * is absent step 3 proves only that the aggregate is well-formed, and
+   * `step3_ownSeedChecked` reports that it did.
+   */
+  mine?: SeatedClientSeed;
+  /**
    * How THIS game's deck is derived from the final seed. Defaults to the standard 52-card shuffle.
    *
    * Variants deal from a different deck — Short Deck strips the 2s–5s, so its 36-card order would
@@ -53,6 +65,12 @@ export interface VerificationResult {
   step5_roundHash: boolean;
   step6_merkle: boolean;
   allPass: boolean;
+  /**
+   * Whether step 3 included the own-seed half. False means `mine` was not
+   * supplied, so a pass is the weaker claim. Callers presenting this to a
+   * player must not render it as an unqualified tick.
+   */
+  step3_ownSeedChecked: boolean;
 }
 
 export function verifyRound(d: RoundVerificationData): VerificationResult {
@@ -61,7 +79,16 @@ export function verifyRound(d: RoundVerificationData): VerificationResult {
   const step2 =
     computeFinalSeed(d.serverSeed, d.allClientSeeds, d.futureBlockHash, d.roundId) === d.finalSeed;
 
-  const step3 = mergeClientSeeds(d.seatedClientSeeds) === d.allClientSeeds;
+  // Two claims: the aggregate is well-formed, and the asker's own seed sits in
+  // it at the seat they occupied. Seat position is part of the check because
+  // the seeds are concatenated in seat order — the same seed at a different
+  // seat produces a different deck.
+  const step3_merge = mergeClientSeeds(d.seatedClientSeeds) === d.allClientSeeds;
+  const step3_own = d.mine
+    ? d.seatedClientSeeds.find((s) => s.seatOrder === d.mine!.seatOrder)?.clientSeed ===
+      d.mine.clientSeed
+    : null;
+  const step3 = step3_merge && step3_own !== false;
 
   const buildDeck = d.deckFor ?? shuffledDeck;
   const step4 = JSON.stringify(buildDeck(d.finalSeed)) === JSON.stringify(d.cards);
@@ -87,5 +114,6 @@ export function verifyRound(d: RoundVerificationData): VerificationResult {
     step5_roundHash: step5,
     step6_merkle: step6,
     allPass: step1 && step2 && step3 && step4 && step5 && step6,
+    step3_ownSeedChecked: step3_own !== null,
   };
 }

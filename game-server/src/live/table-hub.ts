@@ -87,10 +87,22 @@ export class TableHub {
     switch (msg.type) {
       case 'join': {
         this.unsubscribe(ctx, msg.roomId); // re-joining resyncs rather than double-subscribing
-        const stop = room.join(playerId, {
-          sendSnapshot: (snapshot) => ctx.send({ type: 'state', roomId: msg.roomId, state: snapshot }),
-          sendEvent: (event, data) => ctx.send({ type: 'event', roomId: msg.roomId, event, data }),
-        });
+        let stop: () => void;
+        try {
+          stop = room.join(playerId, {
+            sendSnapshot: (snapshot) =>
+              ctx.send({ type: 'state', roomId: msg.roomId, state: snapshot }),
+            sendEvent: (event, data) =>
+              ctx.send({ type: 'event', roomId: msg.roomId, event, data }),
+          });
+        } catch (err) {
+          // The spectator cap. A refused watcher gets told why, not a silent
+          // socket with no snapshots.
+          return ctx.send({
+            type: 'error',
+            message: err instanceof Error ? err.message : 'cannot watch this table',
+          });
+        }
         let byRoom = this.subscriptions.get(ctx);
         if (!byRoom) {
           byRoom = new Map();
@@ -106,6 +118,22 @@ export class TableHub {
         const parsed = tableCommandSchema.safeParse(msg.action);
         if (!parsed.success) {
           return ctx.send({ type: 'error', message: 'bad table command' });
+        }
+        // §8.1 — one account, one table. Enforced HERE because the hub is the
+        // only party that can see every room; a room can only vouch for its
+        // own seats. Watching other tables stays allowed — the rule is about
+        // playing several at once, which is the classic multi-boxing tell the
+        // anti-bot section exists to prevent.
+        if (parsed.data.kind === 'sit') {
+          const seatedElsewhere = [...this.rooms.values()].some(
+            (r) => r !== room && r.hasSeated(playerId),
+          );
+          if (seatedElsewhere) {
+            return ctx.send({
+              type: 'error',
+              message: 'one table at a time — stand up at your other table first',
+            });
+          }
         }
         try {
           await room.command(playerId, parsed.data);

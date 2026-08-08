@@ -7,6 +7,8 @@ import {
   DEDUCTION,
   NORMAL_ROUNDS_TO_GOOD,
   vipProgress,
+  estimateDaysToNextTier,
+  daysElapsedThisMonth,
   type FindingReason,
 } from '../players/index';
 
@@ -79,8 +81,8 @@ export function buildMeRouter(config: GatewayConfig): Router {
   // and progress HERE — one home for the rules, so a second copy cannot drift.
   // A copy that grew in financial-core had already diverged (its VIP titles
   // predated the owner's Jul 15 renaming) by the time it was found.
-  r.get('/reputation', requireAuth(config), (req: Request, res: Response) => {
-    void (async () => {
+  r.get('/reputation', requireAuth(config), (req: Request, res: Response): void => {
+    void (async (): Promise<void> => {
       const facts = await upstreamJson<ReputationFactsShape>(config, req, '/me/reputation');
       if (!facts.ok) return sendUpstreamError(res, facts);
 
@@ -96,13 +98,22 @@ export function buildMeRouter(config: GatewayConfig): Router {
     })();
   });
 
-  r.get('/vip', requireAuth(config), (req: Request, res: Response) => {
-    void (async () => {
+  r.get('/vip', requireAuth(config), (req: Request, res: Response): void => {
+    void (async (): Promise<void> => {
       const facts = await upstreamJson<VolumeFactsShape>(config, req, '/me/vip');
       if (!facts.ok) return sendUpstreamError(res, facts);
 
       const progress = vipProgress(facts.body.cumulativeEffective);
-      res.json({ ...progress, ...facts.body });
+      const now = new Date();
+      const estimatedDaysToNextTier = progress.next
+        ? estimateDaysToNextTier({
+            remaining: progress.next.remaining,
+            monthlyEffective: facts.body.monthlyEffective,
+            daysElapsed: daysElapsedThisMonth(now),
+          })
+        : null;
+
+      res.json({ ...progress, ...facts.body, estimatedDaysToNextTier });
     })();
   });
   r.get('/leagues', (req, res) => void forwardTo(config, req, res, '/me/leagues'));

@@ -109,6 +109,15 @@ export function Vip() {
                     })}
                   </span>
                 </div>
+
+                {/* Estimated upgrade time (§10.2). Absent rather than guessed
+                    when this month is too young to project from — a confident
+                    wrong date is worse than no date. */}
+                {vip.data.estimatedDaysToNextTier !== null && (
+                  <div className="mt-1 text-[0.62rem] text-dim">
+                    {t('vip.estimatedUpgrade', { count: vip.data.estimatedDaysToNextTier })}
+                  </div>
+                )}
               </>
             ) : (
               <div className="mt-3 text-xs font-semibold text-accent">{t('vip.topTier')}</div>

@@ -261,7 +261,10 @@
     "vendorBlurb": "规则由外部供应商掌握；每个结果均有签名，但无法证明其赔付表未被更改",
     "ratesPending": "暂不显示已公布的赔付率。只有当其背后的规则在链上承诺并版本化后，赔付率才有意义——在此之前，它只是我们对自己的单方面声明，而这正是本页面要避免的。",
     "actualRate": "实际返还率 {{rate}}%（{{count}} 局）",
-    "theoreticalRate": "标称 {{rate}}%"
+    "theoreticalRate": "标称 {{rate}}%",
+    "ownSeedUnchecked": "本局数据未包含你的种子，因此本步骤仅验证了种子列表的一致性，未验证你本人的种子是否在其中、且位于你的座位。",
+    "notAnchored": "该批次的根尚未上链存证。6a（证明路径）已在本地验证；6b（链上永久记录）待存证完成后可查。",
+    "viewOnChain": "在 Solana Explorer 查验根哈希（6b）"
   },
   "reputation": {
     "title": "信誉",
@@ -296,7 +299,11 @@
       "WINDOW": "仅限周六"
     },
     "youWon": "恭喜中奖",
-    "tapToDismiss": "点击任意处继续"
+    "tapToDismiss": "点击任意处继续",
+    "history": "近期中奖",
+    "allTime": "全部",
+    "lastDays": "{{count}}天",
+    "noHits": "此时间段内暂无奖池派彩。"
   },
   "onboarding": {
     "skip": "跳过",
@@ -326,19 +333,20 @@
     "coefficientNote": "VIP 计算权重因游戏而异：德州 ×1.0、牛牛 ×0.5、百家乐 ×0.3、其他 ×0.4，以防低抽水游戏成为升级捷径。",
     "tiers": "等级",
     "title": {
-      "V1": "青铜",
-      "V2": "白银",
+      "V1": "漫游者",
+      "V2": "新星",
       "V3": "黄金",
-      "V4": "钻石",
+      "V4": "白金",
       "V5": "黑金"
     },
     "perks": {
       "V1": "基础数据面板。标准提现额度与队列。",
       "V2": "资金曲线图。更高每日提现额度。高级表情。",
-      "V3": "专业追踪 HUD（VPIP、PFR、位置数据）。专属客服通道。",
+      "V3": "专业追踪 HUD（VPIP、PFR、位置数据）—— 即将推出。专属客服通道。",
       "V4": "优先提现队列。无限对手标记。一对一专属客服。精英牌桌。",
       "V5": "即时自动出款。实时对手对战数据。黑金牌桌。全屏入场特效。"
-    }
+    },
+    "estimatedUpgrade": "按本月速度约需 {{count}} 天"
   },
   "notifications": {
     "title": "通知",
@@ -382,11 +390,64 @@
     "eligibleNote": "您已满足条件，请联系客服申请。",
     "notEligibleNote": "继续游戏以提升信誉。100 局正常牌局后将升至 700。",
     "tab": {
-      "overview": "总览",
+      "overview": "概览",
       "players": "玩家",
-      "links": "链接",
-      "subAgents": "下级"
-    }
+      "promotion": "推广",
+      "settlements": "记录"
+    },
+    "range": {
+      "today": "今日",
+      "week": "本周",
+      "30d": "30天",
+      "all": "全部"
+    },
+    "sort": {
+      "volume": "按流水",
+      "vip": "按VIP",
+      "activity": "按活跃"
+    },
+    "source": {
+      "all": "全部",
+      "DIRECT": "直属",
+      "OVERRIDE": "下级"
+    },
+    "badgeAgent": "代理",
+    "badgeSub": "下级代理",
+    "todayCommission": "今日佣金",
+    "todayCommissionShort": "今日",
+    "playersUnderManagement": "管理 {{count}} 名玩家",
+    "directCommission": "直属玩家",
+    "overrideCommission": "下级代理上缴",
+    "trend": "每日佣金",
+    "vipLinkage": "VIP 联动奖励",
+    "vipLinkageBlurb": "你有 {{count}} 名玩家达到 V4 或 V5。只要他们保持等级，你每月都能获得额外佣金加成。",
+    "bySource": "本月佣金来源",
+    "subAgentBlock": "下级代理",
+    "subAgentPlayers": "{{count}} 名玩家",
+    "upstreamThisMonth": "本月上缴",
+    "volumeToday": "今日 {{amount}}",
+    "volumeMonth": "本月 {{amount}}",
+    "thisMonth": "本月",
+    "lifetimeVolume": "累计流水",
+    "lifetimeCommission": "累计佣金",
+    "lastActive": "最近活跃",
+    "never": "从未游戏",
+    "sourceLink": "注册来源",
+    "joined": "加入时间",
+    "primaryLink": "主推广链接",
+    "shareToTg": "分享",
+    "subAgentManagement": "下级代理佣金比例",
+    "editRate": "修改比例",
+    "editRatePrompt": "该下级代理的佣金比例（5–25）：",
+    "rateInvalid": "请输入数字。",
+    "rateUpdated": "已更新，从下一手结算开始生效。",
+    "rateChangeNote": "比例调整从下一手结算开始生效，已结算的牌局不会重新计算。",
+    "exportCsv": "导出 CSV",
+    "truncated": "仅显示最近的记录。如需完整数据请导出 CSV。",
+    "noRecords": "该时段暂无记录",
+    "noRecordsBlurb": "每手牌结算后佣金即时到账，无需等待或审核。",
+    "viaSubAgent": "经由 {{id}}",
+    "rakeWas": "抽水 {{amount}}"
   },
   "insurance": {
     "title": "可购买保险",
@@ -395,5 +456,12 @@
     "decline": "不用了",
     "accept": "投保 ₮{{premium}}",
     "taken": "已购买保险"
+  },
+  "context": {
+    "enter": "进入",
+    "exit": "退出",
+    "inLeague": "当前：{{name}}",
+    "isolationNote": "仅显示联盟牌桌与钱包，平台牌桌已隐藏。",
+    "backToPlatform": "返回平台大厅"
   }
 }

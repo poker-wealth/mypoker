@@ -30,10 +30,13 @@ import { Schema, model } from 'mongoose';
  */
 export const VOLUME_COEFFICIENT_BPS: Record<string, number> = {
   texas: 10_000, // x1.0
-  'short-deck': 10_000,
-  omaha: 10_000,
   baccarat: 3_000, // x0.3
   'niu-niu': 5_000, // x0.5
+  // Short Deck and Omaha are NOT listed by the spec, which names only Texas at
+  // x1.0. They sat at x1.0 here on the reasoning that they are hold'em-family
+  // and carry comparable rake — but the spec enumerates its exceptions and puts
+  // everything else at x0.4, so they fall to "Others" per Victor's instruction
+  // to follow the spec. This makes the ladder 2.5x slower on those two games.
 };
 
 /** Everything not named above: x0.4. */
@@ -85,10 +88,50 @@ const schema = new Schema<VolumeDoc>(
 
 export const VolumeModel = model<VolumeDoc>('PlayerGameVolume', schema);
 
+/**
+ * The same volume, rolled up by DAY across all games.
+ *
+ * The monthly rows above are keyed by month because that is the granularity VIP
+ * retention grades on. The agent dashboard needs "today's volume" per player
+ * (§13.4 Tab 2), which a monthly row cannot answer and which must not be faked
+ * by dividing one.
+ *
+ * A separate daily row rather than a finer key on the rows above: VIP reads the
+ * monthly documents on every tier check, and lengthening their key would make
+ * every one of those reads an aggregation. This costs one extra upsert per
+ * settled round and leaves the hot path alone.
+ */
+interface DailyVolumeDoc {
+  /** `${playerId}:${date}` — date is YYYY-MM-DD, UTC. */
+  _id: string;
+  playerId: string;
+  date: string;
+  rounds: number;
+  staked: number;
+  effective: number;
+}
+
+const dailySchema = new Schema<DailyVolumeDoc>(
+  {
+    _id: { type: String, required: true },
+    playerId: { type: String, required: true, index: true },
+    date: { type: String, required: true, index: true },
+    rounds: { type: Number, default: 0 },
+    staked: { type: Number, default: 0 },
+    effective: { type: Number, default: 0 },
+  },
+  { collection: 'player_daily_volume' },
+);
+
+export const DailyVolumeModel = model<DailyVolumeDoc>('PlayerDailyVolume', dailySchema);
+
 /** YYYY-MM in UTC. Same reasoning as the stats period: a boundary that shifts
  *  per request is worse than one that is consistently explainable. */
 export const monthKey = (at: Date): string =>
   `${at.getUTCFullYear()}-${String(at.getUTCMonth() + 1).padStart(2, '0')}`;
+
+/** YYYY-MM-DD in UTC, for the daily rollup. */
+export const dayKey = (at: Date): string => at.toISOString().slice(0, 10);
 
 /**
  * Record a settled round's volume for one player.
@@ -118,6 +161,82 @@ export async function recordVolume(input: {
     },
     { upsert: true },
   );
+
+  const date = dayKey(input.at ?? new Date());
+  await DailyVolumeModel.updateOne(
+    { _id: `${input.playerId}:${date}` },
+    {
+      $setOnInsert: { playerId: input.playerId, date },
+      $inc: { rounds: 1, staked: input.staked, effective },
+    },
+    { upsert: true },
+  );
+}
+
+export interface PlayerVolumeWindow {
+  playerId: string;
+  staked: number;
+  effective: number;
+  rounds: number;
+}
+
+/**
+ * Volume for a set of players over a date window, inclusive of both ends.
+ *
+ * Batched across players because the agent dashboard asks about a whole downline
+ * at once, and a query per player turns one screen into hundreds of round trips.
+ */
+export async function volumeBetween(
+  playerIds: readonly string[],
+  fromDate: string,
+  toDate: string,
+): Promise<Map<string, PlayerVolumeWindow>> {
+  if (playerIds.length === 0) return new Map();
+
+  const rows = await DailyVolumeModel.aggregate<{
+    _id: string;
+    staked: number;
+    effective: number;
+    rounds: number;
+  }>([
+    { $match: { playerId: { $in: [...playerIds] }, date: { $gte: fromDate, $lte: toDate } } },
+    {
+      $group: {
+        _id: '$playerId',
+        staked: { $sum: '$staked' },
+        effective: { $sum: '$effective' },
+        rounds: { $sum: '$rounds' },
+      },
+    },
+  ]);
+
+  return new Map(
+    rows.map((r) => [
+      r._id,
+      { playerId: r._id, staked: r.staked, effective: r.effective, rounds: r.rounds },
+    ]),
+  );
+}
+
+/**
+ * Lifetime effective volume for a set of players, batched.
+ *
+ * Read from the monthly rows rather than the daily ones: cumulative volume is
+ * "permanent, never resets" (§10.2) and the monthly collection is the one that
+ * has always existed, so it is the complete record. The daily rollup only
+ * starts from the day it shipped.
+ */
+export async function lifetimeEffectiveFor(
+  playerIds: readonly string[],
+): Promise<Map<string, number>> {
+  if (playerIds.length === 0) return new Map();
+
+  const rows = await VolumeModel.aggregate<{ _id: string; effective: number }>([
+    { $match: { playerId: { $in: [...playerIds] } } },
+    { $group: { _id: '$playerId', effective: { $sum: '$effective' } } },
+  ]);
+
+  return new Map(rows.map((r) => [r._id, r.effective]));
 }
 
 export interface GameBreakdown {

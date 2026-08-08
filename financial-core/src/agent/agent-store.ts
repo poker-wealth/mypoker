@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { Schema, model } from 'mongoose';
+import { volumeBetween, lifetimeEffectiveFor, dayKey, monthKey } from '../vip/volume-tracker';
 
 /**
  * Agents and referral bindings.
@@ -72,6 +73,12 @@ interface CommissionDoc {
   amount: number;
   /** DIRECT when the agent referred the player; OVERRIDE when via a sub-agent. */
   kind: 'DIRECT' | 'OVERRIDE';
+  /** Which game the hand was — §13.4 Tab 4 lists it per record. */
+  gameId: string;
+  /** The hand's rake, micro-USD. The figure this commission was a cut OF. */
+  rakeAmount: number;
+  /** For OVERRIDE rows, the sub-agent the commission came up through. */
+  viaAgentId: string | null;
   createdAt: Date;
 }
 
@@ -112,9 +119,18 @@ const commissionSchema = new Schema<CommissionDoc>(
     roundId: { type: String, required: true },
     amount: { type: Number, required: true },
     kind: { type: String, required: true },
+    // Defaulted rather than required: rows written before these fields existed
+    // are still readable, and a settlement record that cannot say which game it
+    // came from is better than one that refuses to load.
+    gameId: { type: String, default: 'unknown' },
+    rakeAmount: { type: Number, default: 0 },
+    viaAgentId: { type: String, default: null },
   },
   { timestamps: { createdAt: true, updatedAt: false }, collection: 'agent_commissions' },
 );
+
+// Tab 4 pages by recency within a date window, per agent.
+commissionSchema.index({ agentId: 1, createdAt: -1 });
 
 export const AgentModel = model<AgentDoc>('Agent', agentSchema);
 export const ReferralBindingModel = model<ReferralBindingDoc>('ReferralBinding', bindingSchema);
@@ -245,12 +261,23 @@ export async function recordCommission(input: {
   roundId: string;
   amount: number;
   kind: 'DIRECT' | 'OVERRIDE';
+  gameId?: string;
+  rakeAmount?: number;
+  viaAgentId?: string | null;
 }): Promise<void> {
   if (input.amount <= 0) return;
   const id = `${input.roundId}:${input.agentId}`;
   await AgentCommissionModel.updateOne(
     { _id: id },
-    { $setOnInsert: { _id: id, ...input } },
+    {
+      $setOnInsert: {
+        _id: id,
+        ...input,
+        gameId: input.gameId ?? 'unknown',
+        rakeAmount: input.rakeAmount ?? 0,
+        viaAgentId: input.viaAgentId ?? null,
+      },
+    },
     { upsert: true },
   );
 }
@@ -263,39 +290,103 @@ export async function recordCommission(input: {
  */
 export interface ReferredPlayer {
   playerId: string;
-  /** Commission this player has generated for this agent, micro-USD. */
+  /** Commission this player has generated for this agent, micro-USD, all time. */
   commissionGenerated: number;
   rounds: number;
   boundAt: string;
   lastActiveAt: string | null;
+  /** The link they registered through — §13.4 Tab 2's "registration source". */
+  linkId: string;
+  /** Set when this player sits under a sub-agent rather than directly. */
+  viaAgentId: string | null;
+  /** micro-USD staked, today (UTC). */
+  todayVolume: number;
+  /** micro-USD staked, this calendar month (UTC). */
+  monthVolume: number;
+  /** micro-USD of commission this agent earned from them today. */
+  todayCommission: number;
+  monthCommission: number;
+  /**
+   * Cumulative effective volume, micro-USD. The gateway turns this into a VIP
+   * tier — the ladder is a rule and lives with the other rules.
+   */
+  lifetimeEffective: number;
 }
 
-export async function playersOf(agentId: string): Promise<ReferredPlayer[]> {
+/**
+ * The agent's downline, with the figures §13.4 Tab 2 lists.
+ *
+ * Note what is still absent: a balance, and any field that could carry one.
+ * §13.6 draws that line — an agent may see what a player generated for them,
+ * never what that player holds — and the way to keep a line like that is to
+ * have nowhere to put the number.
+ *
+ * Volume and commission are fetched in two batched queries rather than per
+ * player; a downline of a few hundred was otherwise a few hundred round trips.
+ */
+export async function playersOf(agentId: string, now = new Date()): Promise<ReferredPlayer[]> {
   const bindings = await ReferralBindingModel.find({
     $or: [{ directAgentId: agentId }, { parentAgentId: agentId }],
   }).lean();
+  if (bindings.length === 0) return [];
 
-  return Promise.all(
-    bindings.map(async (b) => {
-      const rows = await AgentCommissionModel.find({ agentId, playerId: b._id }).lean();
-      const commissionGenerated = rows.reduce((sum, r) => sum + r.amount, 0);
-      const lastActive = rows.reduce<Date | null>(
-        (latest, r) => (latest === null || r.createdAt > latest ? r.createdAt : latest),
-        null,
-      );
-      return {
-        playerId: b._id,
-        commissionGenerated,
-        rounds: rows.length,
-        boundAt: b.createdAt.toISOString(),
-        lastActiveAt: lastActive ? lastActive.toISOString() : null,
-      };
-    }),
-  );
+  const playerIds = bindings.map((b) => b._id);
+  const today = dayKey(now);
+  const monthStart = `${monthKey(now)}-01`;
+
+  const [rows, todayVol, monthVol, lifetime] = await Promise.all([
+    AgentCommissionModel.find({ agentId, playerId: { $in: playerIds } }).lean(),
+    volumeBetween(playerIds, today, today),
+    volumeBetween(playerIds, monthStart, today),
+    lifetimeEffectiveFor(playerIds),
+  ]);
+
+  const startOfToday = new Date(`${today}T00:00:00.000Z`);
+  const startOfMonth = new Date(`${monthStart}T00:00:00.000Z`);
+
+  const byPlayer = new Map<string, typeof rows>();
+  for (const r of rows) {
+    const list = byPlayer.get(r.playerId) ?? [];
+    list.push(r);
+    byPlayer.set(r.playerId, list);
+  }
+
+  return bindings.map((b) => {
+    const mine = byPlayer.get(b._id) ?? [];
+    const sum = (since: Date): number =>
+      mine.reduce((total, r) => (r.createdAt >= since ? total + r.amount : total), 0);
+    const lastActive = mine.reduce<Date | null>(
+      (latest, r) => (latest === null || r.createdAt > latest ? r.createdAt : latest),
+      null,
+    );
+
+    return {
+      playerId: b._id,
+      commissionGenerated: mine.reduce((total, r) => total + r.amount, 0),
+      rounds: mine.length,
+      boundAt: b.createdAt.toISOString(),
+      lastActiveAt: lastActive ? lastActive.toISOString() : null,
+      linkId: b.linkId,
+      viaAgentId: b.parentAgentId === agentId ? b.directAgentId : null,
+      todayVolume: todayVol.get(b._id)?.staked ?? 0,
+      monthVolume: monthVol.get(b._id)?.staked ?? 0,
+      todayCommission: sum(startOfToday),
+      monthCommission: sum(startOfMonth),
+      lifetimeEffective: lifetime.get(b._id) ?? 0,
+    };
+  });
 }
 
 export interface AgentSummary {
   agentId: string;
+  /**
+   * Null for a top-level agent, set for a sub-agent.
+   *
+   * §13.4's entry card carries an "agent tier badge", and this is what
+   * distinguishes the two tiers. It cannot be inferred from subAgentCount — a
+   * newly approved top-level agent has no sub-agents either.
+   */
+  parentAgentId: string | null;
   rateBps: number;
   status: AgentStatus;
   /** micro-USD, all time. */
@@ -311,6 +402,7 @@ export async function summaryFor(agentId: string): Promise<AgentSummary | null> 
   const rows = await AgentCommissionModel.find({ agentId }).lean();
   return {
     agentId,
+    parentAgentId: agent.parentAgentId,
     rateBps: agent.rateBps,
     status: agent.status,
     totalCommission: rows.reduce((sum, r) => sum + r.amount, 0),
@@ -330,5 +422,136 @@ export async function subAgentsOf(agentId: string): Promise<Agent[]> {
     status: d.status,
     createdAt: d.createdAt.toISOString(),
   }));
+}
+
+// ─── §13.4 dashboard reads ───────────────────────────────────────────────────
+//
+// Everything below returns FACTS — sums, rows, dates. No tier is named, no
+// activity colour is chosen, no rate ceiling is judged. Those are rules, and
+// rules live in the gateway (game-server/src/players, /agents) so there is one
+// home for each. This module is the ledger of what happened.
+
+/** The three rows §13.4 Tab 1 shows for a period. */
+export interface CommissionBreakdown {
+  /** micro-USD */
+  total: number;
+  /** From players this agent referred directly. */
+  direct: number;
+  /** Upstream cut from sub-agents' players. */
+  override: number;
+}
+
+export async function commissionBreakdown(
+  agentId: string,
+  window: { from: Date; to: Date },
+): Promise<CommissionBreakdown> {
+  const rows = await AgentCommissionModel.aggregate<{ _id: string; amount: number }>([
+    { $match: { agentId, createdAt: { $gte: window.from, $lte: window.to } } },
+    { $group: { _id: '$kind', amount: { $sum: '$amount' } } },
+  ]);
+
+  const direct = rows.find((r) => r._id === 'DIRECT')?.amount ?? 0;
+  const override = rows.find((r) => r._id === 'OVERRIDE')?.amount ?? 0;
+  return { total: direct + override, direct, override };
+}
+
+/** One point per day for Tab 1's trend chart. Days with no commission are absent. */
+export async function commissionSeries(
+  agentId: string,
+  window: { from: Date; to: Date },
+): Promise<{ date: string; amount: number }[]> {
+  const rows = await AgentCommissionModel.aggregate<{ _id: string; amount: number }>([
+    { $match: { agentId, createdAt: { $gte: window.from, $lte: window.to } } },
+    {
+      $group: {
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        amount: { $sum: '$amount' },
+      },
+    },
+    { $sort: { _id: 1 } },
+  ]);
+
+  return rows.map((r) => ({ date: r._id, amount: r.amount }));
+}
+
+/** One row of Tab 4. */
+export interface SettlementRecord {
+  recordId: string;
+  at: string;
+  playerId: string;
+  /** Set when the commission came up through a sub-agent. */
+  viaAgentId: string | null;
+  kind: 'DIRECT' | 'OVERRIDE';
+  gameId: string;
+  roundId: string;
+  /** micro-USD */
+  rakeAmount: number;
+  /** micro-USD */
+  amount: number;
+}
+
+/**
+ * Settlement records for a window, newest first.
+ *
+ * Capped, and the cap is reported rather than silently applied — an agent
+ * reconciling against their own figures needs to know the list was truncated,
+ * or they will conclude the platform is short-paying them.
+ */
+export async function settlementRecords(
+  agentId: string,
+  opts: { from: Date; to: Date; source?: 'DIRECT' | 'OVERRIDE'; limit?: number },
+): Promise<{ records: SettlementRecord[]; truncated: boolean }> {
+  const limit = Math.min(opts.limit ?? 200, 1000);
+  const query: Record<string, unknown> = {
+    agentId,
+    createdAt: { $gte: opts.from, $lte: opts.to },
+  };
+  if (opts.source) query.kind = opts.source;
+
+  const docs = await AgentCommissionModel.find(query)
+    .sort({ createdAt: -1 })
+    .limit(limit + 1)
+    .lean();
+
+  const truncated = docs.length > limit;
+  return {
+    truncated,
+    records: docs.slice(0, limit).map((d) => ({
+      recordId: d._id,
+      at: d.createdAt.toISOString(),
+      playerId: d.playerId,
+      viaAgentId: d.viaAgentId ?? null,
+      kind: d.kind,
+      gameId: d.gameId ?? 'unknown',
+      roundId: d.roundId,
+      rakeAmount: d.rakeAmount ?? 0,
+      amount: d.amount,
+    })),
+  };
+}
+
+/**
+ * Set a sub-agent's commission rate (§13.1).
+ *
+ * The 5%–25% range and the "A must retain 5%" ceiling are NOT checked here.
+ * They live in the gateway — `assertValidSubAgentRate` in
+ * game-server/src/agents/commission.ts — alongside the split arithmetic that
+ * has to agree with them. Restating them would give two answers to who keeps
+ * what, and the copies would drift.
+ *
+ * What this does enforce is ownership: the update is scoped to the caller's own
+ * sub-agents, because §13.1 makes B's rate "set and owned by A". Another agent
+ * asking finds nothing rather than being told the sub-agent exists.
+ */
+export async function setSubAgentRate(
+  parentAgentId: string,
+  subAgentId: string,
+  rateBps: number,
+): Promise<void> {
+  const result = await AgentModel.updateOne(
+    { _id: subAgentId, parentAgentId },
+    { $set: { rateBps } },
+  );
+  if (result.matchedCount === 0) throw new AgentError('sub-agent not found');
 }
 

@@ -25,13 +25,17 @@ export interface VipTierSpec {
 
 const USD = 1_000_000;
 
-// Display titles (owner branding, Jul 15): clean ladder with an exclusive top tier. Internal ids
-// stay V1–V5; only the labels changed — no thresholds or privileges moved.
+// Titles and thresholds per FairPlay v5.9 §10.2.
+//
+// These carried owner-branding labels (Bronze/Silver/Gold/Diamond/Black Gold) attributed to a
+// Jul 15 renaming, but no document in the repo records that decision, and the spec is the only
+// written source. Restored to spec on Victor's instruction. Internal ids stay V1–V5, so nothing
+// downstream keys off the label.
 export const VIP_TIERS: readonly VipTierSpec[] = [
-  { tier: 'V1', title: 'Bronze', volumeRequired: 0, withdrawalPriority: 0, instantAutoTransfer: false, proTrackerHud: false },
-  { tier: 'V2', title: 'Silver', volumeRequired: 10_000 * USD, withdrawalPriority: 1, instantAutoTransfer: false, proTrackerHud: false },
+  { tier: 'V1', title: 'Wanderer', volumeRequired: 0, withdrawalPriority: 0, instantAutoTransfer: false, proTrackerHud: false },
+  { tier: 'V2', title: 'Rising Star', volumeRequired: 10_000 * USD, withdrawalPriority: 1, instantAutoTransfer: false, proTrackerHud: false },
   { tier: 'V3', title: 'Gold', volumeRequired: 100_000 * USD, withdrawalPriority: 2, instantAutoTransfer: false, proTrackerHud: true },
-  { tier: 'V4', title: 'Diamond', volumeRequired: 500_000 * USD, withdrawalPriority: 3, instantAutoTransfer: false, proTrackerHud: true },
+  { tier: 'V4', title: 'Platinum', volumeRequired: 500_000 * USD, withdrawalPriority: 3, instantAutoTransfer: false, proTrackerHud: true },
   { tier: 'V5', title: 'Black Gold', volumeRequired: 2_000_000 * USD, withdrawalPriority: 4, instantAutoTransfer: true, proTrackerHud: true },
 ];
 
@@ -102,6 +106,45 @@ export interface VipProgress {
 
 /** Tier + progress for a cumulative effective volume (micro-USD). One home for
  *  this arithmetic, beside the ladder it measures. */
+/**
+ * Estimated time to the next tier (§10.2: "'My VIP' page: real-time progress
+ * bar + $X remaining to next tier + estimated upgrade time").
+ *
+ * Projected from THIS MONTH's effective volume, which is the only pace signal
+ * that is already stored. Two guards, both there to avoid publishing a number
+ * that is really noise:
+ *
+ *   - nothing is shown in the first few days of a month, when one good session
+ *     projects to an absurd date;
+ *   - nothing is shown at zero pace, because "never" is not an estimate.
+ *
+ * Returning null is a normal outcome, not a failure. A missing estimate is far
+ * better than a confident wrong one — a player told they are eleven days from
+ * Platinum will remember it, and will be right to be annoyed when it slips.
+ */
+export const MIN_DAYS_FOR_ESTIMATE = 5;
+
+export function estimateDaysToNextTier(input: {
+  /** micro-USD still needed for the next tier. */
+  remaining: number;
+  /** micro-USD of effective volume so far this calendar month. */
+  monthlyEffective: number;
+  /** How many days of this month have elapsed, including today. */
+  daysElapsed: number;
+}): number | null {
+  if (input.remaining <= 0) return null;
+  if (input.daysElapsed < MIN_DAYS_FOR_ESTIMATE) return null;
+  if (input.monthlyEffective <= 0) return null;
+
+  const perDay = input.monthlyEffective / input.daysElapsed;
+  if (perDay <= 0) return null;
+
+  return Math.ceil(input.remaining / perDay);
+}
+
+/** Days elapsed in the current UTC calendar month, including today. */
+export const daysElapsedThisMonth = (at: Date): number => at.getUTCDate();
+
 export function vipProgress(cumulativeVolume: number): VipProgress {
   const current = tierForVolume(cumulativeVolume);
   const nextSpec = VIP_TIERS[indexOf(current.tier) + 1] ?? null;

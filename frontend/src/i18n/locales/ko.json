@@ -261,7 +261,10 @@
     "vendorBlurb": "외부 공급자가 규칙을 보유합니다. 각 결과는 서명되지만 배당표가 변경되지 않았음은 증명할 수 없습니다",
     "ratesPending": "공시 지급률은 아직 표시하지 않습니다. 그 근거가 되는 규칙이 온체인에 커밋되고 버전 관리되어야만 지급률에 의미가 생깁니다. 그전까지는 저희가 스스로에 대해 주장하는 숫자일 뿐이며, 이 페이지는 바로 그것을 피하려고 존재합니다.",
     "actualRate": "실제 환급률 {{rate}}% ({{count}} 라운드)",
-    "theoreticalRate": "명시 {{rate}}%"
+    "theoreticalRate": "명시 {{rate}}%",
+    "ownSeedUnchecked": "이 라운드 데이터에 회원님의 시드가 없어 이 단계에서는 시드 목록의 일관성만 확인했습니다. 본인 시드가 본인 자리에 포함되었는지는 확인되지 않았습니다.",
+    "notAnchored": "이 배치의 루트는 아직 체인에 기록되지 않았습니다. 6a(증명)는 로컬에서 검증되었고, 6b(영구 기록)는 공증 후 확인할 수 있습니다.",
+    "viewOnChain": "Solana Explorer에서 루트 확인(6b)"
   },
   "reputation": {
     "title": "평판",
@@ -296,7 +299,11 @@
       "WINDOW": "토요일에만"
     },
     "youWon": "잭팟 당첨",
-    "tapToDismiss": "아무 곳이나 탭하여 계속"
+    "tapToDismiss": "아무 곳이나 탭하여 계속",
+    "history": "최근 당첨",
+    "allTime": "전체",
+    "lastDays": "{{count}}일",
+    "noHits": "이 기간에 잭팟 당첨이 없습니다."
   },
   "onboarding": {
     "skip": "건너뛰기",
@@ -326,19 +333,20 @@
     "coefficientNote": "VIP 환산 비율은 게임마다 다릅니다. 텍사스 ×1.0, 뉴뉴 ×0.5, 바카라 ×0.3, 기타 ×0.4. 레이크가 낮은 게임이 승급의 지름길이 되지 않도록 하기 위함입니다.",
     "tiers": "등급",
     "title": {
-      "V1": "브론즈",
-      "V2": "실버",
+      "V1": "방랑자",
+      "V2": "라이징 스타",
       "V3": "골드",
-      "V4": "다이아몬드",
+      "V4": "플래티넘",
       "V5": "블랙 골드"
     },
     "perks": {
       "V1": "기본 통계 패널. 표준 출금 한도 및 대기열.",
       "V2": "자금 흐름 차트. 일일 출금 한도 상향. 프리미엄 이모지.",
-      "V3": "Pro Tracker HUD (VPIP, PFR, 포지션 통계). 전용 지원 채널.",
+      "V3": "Pro Tracker HUD (VPIP, PFR, 포지션 통계) — 출시 예정. 전용 지원 채널.",
       "V4": "우선 출금 대기열. 무제한 상대 태그. 1:1 컨시어지. 엘리트 테이블.",
       "V5": "즉시 자동 송금. 실시간 상대 전적 분석. 블랙 골드 테이블. 전체화면 입장 연출."
-    }
+    },
+    "estimatedUpgrade": "이번 달 속도로 약 {{count}}일"
   },
   "notifications": {
     "title": "알림",
@@ -384,9 +392,62 @@
     "tab": {
       "overview": "개요",
       "players": "플레이어",
-      "links": "링크",
-      "subAgents": "하위"
-    }
+      "promotion": "홍보",
+      "settlements": "기록"
+    },
+    "range": {
+      "today": "오늘",
+      "week": "이번 주",
+      "30d": "30일",
+      "all": "전체"
+    },
+    "sort": {
+      "volume": "볼륨순",
+      "vip": "VIP순",
+      "activity": "활동순"
+    },
+    "source": {
+      "all": "전체",
+      "DIRECT": "직속",
+      "OVERRIDE": "하위"
+    },
+    "badgeAgent": "에이전트",
+    "badgeSub": "하위 에이전트",
+    "todayCommission": "오늘 커미션",
+    "todayCommissionShort": "오늘",
+    "playersUnderManagement": "관리 플레이어 {{count}}명",
+    "directCommission": "직속 플레이어",
+    "overrideCommission": "하위 에이전트 상납",
+    "trend": "일별 커미션",
+    "vipLinkage": "VIP 연동 보너스",
+    "vipLinkageBlurb": "{{count}}명이 V4 또는 V5입니다. 등급을 유지하는 동안 매월 추가 커미션이 지급됩니다.",
+    "bySource": "이번 달 발생 출처",
+    "subAgentBlock": "하위 에이전트",
+    "subAgentPlayers": "{{count}}명",
+    "upstreamThisMonth": "이번 달 상납",
+    "volumeToday": "오늘 {{amount}}",
+    "volumeMonth": "이번 달 {{amount}}",
+    "thisMonth": "이번 달",
+    "lifetimeVolume": "누적 볼륨",
+    "lifetimeCommission": "누적 커미션",
+    "lastActive": "최근 활동",
+    "never": "플레이 기록 없음",
+    "sourceLink": "가입 경로",
+    "joined": "가입일",
+    "primaryLink": "기본 링크",
+    "shareToTg": "공유",
+    "subAgentManagement": "하위 에이전트 요율",
+    "editRate": "요율 수정",
+    "editRatePrompt": "이 하위 에이전트의 요율(5~25):",
+    "rateInvalid": "숫자를 입력하세요.",
+    "rateUpdated": "변경되었습니다. 다음 정산 핸드부터 적용됩니다.",
+    "rateChangeNote": "요율 변경은 다음 정산 핸드부터 적용되며 이미 정산된 핸드는 재계산되지 않습니다.",
+    "exportCsv": "CSV 내보내기",
+    "truncated": "최근 기록만 표시됩니다. 전체 기간은 CSV로 내보내세요.",
+    "noRecords": "해당 기간 기록 없음",
+    "noRecordsBlurb": "커미션은 핸드 정산 즉시 지급됩니다. 대기나 승인 절차가 없습니다.",
+    "viaSubAgent": "{{id}} 경유",
+    "rakeWas": "레이크 {{amount}}"
   },
   "insurance": {
     "title": "보험 이용 가능",
@@ -395,5 +456,12 @@
     "decline": "괜찮습니다",
     "accept": "₮{{premium}}에 가입",
     "taken": "보험에 가입했습니다"
+  },
+  "context": {
+    "enter": "입장",
+    "exit": "나가기",
+    "inLeague": "{{name}} 내부",
+    "isolationNote": "리그 테이블과 지갑만 표시됩니다. 플랫폼 테이블은 숨겨집니다.",
+    "backToPlatform": "플랫폼 로비로 돌아가기"
   }
 }

@@ -1,7 +1,7 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchSettings, patchSettings, type PlayerSettings, type SettingsPatch } from './settings';
 import { fetchReputation } from './reputation';
-import { fetchJackpot } from './jackpot';
+import { fetchJackpot, fetchJackpotHistory } from './jackpot';
 import { fetchVip } from './vip';
 import { fetchMyLeagues, fetchLeagues, createLeagueApi, joinLeagueApi } from './leagues';
 import { fetchNotifications, markNotificationsRead, type NotificationPage } from './notifications';
@@ -12,11 +12,17 @@ import {
   fetchAgentPlayers,
   fetchAgentLinks,
   fetchSubAgents,
+  fetchCommissionBreakdown,
+  fetchCommissionSeries,
+  fetchSettlements,
+  setSubAgentRateApi,
+  type AgentRange,
   createReferralLinkApi,
 } from './agent';
 import { fetchStats, fetchHistory, type HistoryPage, type StatsPeriod } from './stats';
 import { fetchLobbyGames, fetchTables, type TableFilter } from './lobby';
 import { useSession } from '@/store/session';
+import { useContextStore } from '@/store/context';
 
 /**
  * Server-data hooks.
@@ -40,9 +46,13 @@ import { useSession } from '@/store/session';
  * static fallback on a single flaky request.
  */
 export function useLobbyGames() {
+  // The context is part of the key, not just the request. Without it, switching
+  // into a league would serve the cached PLATFORM rail — the isolation would
+  // hold on the server and break in the cache.
+  const leagueId = useContextStore((s) => s.leagueId);
   return useQuery({
-    queryKey: ['lobby', 'games'],
-    queryFn: fetchLobbyGames,
+    queryKey: ['lobby', 'games', leagueId],
+    queryFn: () => fetchLobbyGames(leagueId),
     staleTime: 15_000,
     refetchInterval: 30_000,
     retry: 1,
@@ -50,9 +60,10 @@ export function useLobbyGames() {
 }
 
 export function useTables(filter: TableFilter = {}) {
+  const leagueId = useContextStore((s) => s.leagueId);
   return useQuery({
-    queryKey: ['lobby', 'tables', filter],
-    queryFn: () => fetchTables(filter),
+    queryKey: ['lobby', 'tables', filter, leagueId],
+    queryFn: () => fetchTables(filter, leagueId),
     staleTime: 5_000,
     refetchInterval: 10_000,
   });
@@ -146,11 +157,12 @@ export function useUpdateSettings() {
  * sends players to a table that was full a minute ago.
  */
 export function useLobbyTables(filter: TableFilter = {}) {
+  const leagueId = useContextStore((s) => s.leagueId);
   return useQuery({
-    // The filter is part of the key: switching stake bucket or game type must
-    // fetch, not re-slice a cached list that was fetched under other terms.
-    queryKey: ['lobby', 'tables', filter],
-    queryFn: () => fetchTables(filter),
+    // Filter AND context are part of the key: switching stake bucket, game type
+    // or alliance must fetch, not re-slice a list fetched under other terms.
+    queryKey: ['lobby', 'tables', filter, leagueId],
+    queryFn: () => fetchTables(filter, leagueId),
     staleTime: 10_000,
     refetchInterval: 20_000,
     retry: 1,
@@ -176,6 +188,21 @@ export function useJackpot() {
     queryFn: fetchJackpot,
     staleTime: 10_000,
     refetchInterval: 30_000,
+    retry: 1,
+  });
+}
+
+/**
+ * Past jackpot hits. Defaults to the last 30 days, per §5.
+ *
+ * Cached longer than the pools: a hit that already happened does not change,
+ * and re-polling settled history every 30 seconds would be pure noise.
+ */
+export function useJackpotHistory(range?: { from?: string; to?: string; tier?: string }) {
+  return useQuery({
+    queryKey: ['jackpot', 'history', range ?? null],
+    queryFn: () => fetchJackpotHistory(range),
+    staleTime: 60_000,
     retry: 1,
   });
 }
@@ -305,6 +332,38 @@ export function useCreateReferralLink() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: createReferralLinkApi,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['agent'] }),
+  });
+}
+
+// Range-scoped reads. The range is part of the query key so switching period
+// serves a cached answer instead of refetching, which is what §13.4's "switches
+// without page reload" is asking for.
+
+export function useCommissionBreakdown(range: AgentRange) {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery(
+    agentQuery(`breakdown:${range}`, () => fetchCommissionBreakdown(range), playerId),
+  );
+}
+
+export function useCommissionSeries(range: AgentRange) {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery(agentQuery(`series:${range}`, () => fetchCommissionSeries(range), playerId));
+}
+
+export function useSettlements(range: AgentRange, source?: 'DIRECT' | 'OVERRIDE') {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery(
+    agentQuery(`settlements:${range}:${source ?? 'all'}`, () => fetchSettlements(range, source), playerId),
+  );
+}
+
+export function useSetSubAgentRate() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ subAgentId, rateBps }: { subAgentId: string; rateBps: number }) =>
+      setSubAgentRateApi(subAgentId, rateBps),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['agent'] }),
   });
 }

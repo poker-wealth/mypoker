@@ -73,6 +73,17 @@ export interface FinancialCoreClient {
   /** Pay a jackpot hit from a pool account to a player. Idempotent per round+tier.
    *  Optional so demo/test fakes need not implement it. */
   jackpotPayout?(req: JackpotPayoutRequest): Promise<{ applied: boolean }>;
+  /** Insurance reserve facts for one system (PLATFORM or a leagueId).
+   *  Optional for the same reason; a room without it offers no insurance. */
+  insuranceReserve?(ownerId: string): Promise<InsuranceReserveFacts>;
+}
+
+export interface InsuranceReserveFacts {
+  ownerId: string;
+  /** Decimal strings, USD — the FC wire format. */
+  insuranceBalance: string;
+  reinsuranceBalance: string;
+  todayPaidOut: string;
 }
 
 export interface JackpotPayoutRequest {
@@ -136,6 +147,18 @@ export class HttpFinancialCoreClient implements FinancialCoreClient {
 
   async settleRound(req: SettleRoundRequest): Promise<SettlementReceipt> {
     return this.post<SettlementReceipt>('/internal/settlements', req);
+  }
+
+  async insuranceReserve(ownerId: string): Promise<InsuranceReserveFacts> {
+    const res = await this.doFetch(
+      `${this.baseUrl}/internal/insurance/reserve?ownerId=${encodeURIComponent(ownerId)}`,
+      { headers: { 'x-internal-secret': this.secret } },
+    );
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new FinancialCoreError(res.status, detail);
+    }
+    return (await res.json()) as InsuranceReserveFacts;
   }
 
   async jackpotPayout(req: JackpotPayoutRequest): Promise<{ applied: boolean }> {

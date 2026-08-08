@@ -261,7 +261,10 @@
     "vendorBlurb": "Pemasok luar memiliki aturannya; setiap hasil ditandatangani, tetapi tabel pembayaran mereka tidak dapat dibuktikan tidak berubah",
     "ratesPending": "Tingkat pembayaran yang dipublikasikan belum ditampilkan. Sebuah tingkat baru bermakna setelah aturan di baliknya dikomit on-chain dan diberi versi — sebelum itu ia hanyalah angka yang kami klaim tentang diri sendiri, hal yang justru ingin dihindari halaman ini.",
     "actualRate": "Pengembalian aktual {{rate}}% dari {{count}} ronde",
-    "theoreticalRate": "dinyatakan {{rate}}%"
+    "theoreticalRate": "dinyatakan {{rate}}%",
+    "ownSeedUnchecked": "Data ronde ini tidak memuat seed Anda, jadi langkah ini hanya memeriksa konsistensi daftar seed — bukan apakah seed Anda ada di dalamnya pada kursi Anda.",
+    "notAnchored": "Root batch ini belum ditautkan ke chain. 6a (bukti) diverifikasi lokal; 6b (catatan permanen) dapat diperiksa setelah notarisasi berjalan.",
+    "viewOnChain": "Periksa root di Solana Explorer (6b)"
   },
   "reputation": {
     "title": "Reputasi",
@@ -296,7 +299,11 @@
       "WINDOW": "hanya Sabtu"
     },
     "youWon": "Jackpot dimenangkan",
-    "tapToDismiss": "Ketuk di mana saja untuk lanjut"
+    "tapToDismiss": "Ketuk di mana saja untuk lanjut",
+    "history": "Kemenangan terbaru",
+    "allTime": "Semua",
+    "lastDays": "{{count}} hr",
+    "noHits": "Belum ada jackpot yang jatuh pada periode ini."
   },
   "onboarding": {
     "skip": "Lewati",
@@ -326,19 +333,20 @@
     "coefficientNote": "Setiap permainan dihitung berbeda untuk VIP: Texas ×1,0, Niu Niu ×0,5, Bakarat ×0,3, lainnya ×0,4. Ini mencegah permainan ber-rake rendah menjadi jalan pintas naik tingkat.",
     "tiers": "Tingkatan",
     "title": {
-      "V1": "Perunggu",
-      "V2": "Perak",
+      "V1": "Pengembara",
+      "V2": "Bintang Baru",
       "V3": "Emas",
-      "V4": "Berlian",
+      "V4": "Platinum",
       "V5": "Emas Hitam"
     },
     "perks": {
       "V1": "Panel statistik dasar. Batas dan antrean penarikan standar.",
       "V2": "Grafik arus modal. Batas penarikan harian lebih tinggi. Emoji premium.",
-      "V3": "Pro Tracker HUD (VPIP, PFR, statistik posisi). Kanal dukungan khusus.",
+      "V3": "Pro Tracker HUD (VPIP, PFR, statistik posisi) — segera hadir. Kanal dukungan khusus.",
       "V4": "Antrean penarikan prioritas. Penandaan lawan tanpa batas. Concierge 1-on-1. Meja Elite.",
       "V5": "Transfer otomatis instan. Profil head-to-head langsung. Meja Emas Hitam. Efek masuk layar penuh."
-    }
+    },
+    "estimatedUpgrade": "Sekitar {{count}} hari pada laju bulan ini"
   },
   "notifications": {
     "title": "Notifikasi",
@@ -382,11 +390,64 @@
     "eligibleNote": "Anda memenuhi syarat. Hubungi layanan pelanggan untuk mendaftar.",
     "notEligibleNote": "Terus bermain untuk membangun reputasi. Naik ke 700 setelah 100 ronde normal.",
     "tab": {
-      "overview": "Ikhtisar",
+      "overview": "Ringkasan",
       "players": "Pemain",
-      "links": "Tautan",
-      "subAgents": "Sub-agen"
-    }
+      "promotion": "Promosi",
+      "settlements": "Catatan"
+    },
+    "range": {
+      "today": "Hari ini",
+      "week": "Minggu ini",
+      "30d": "30 Hari",
+      "all": "Semua"
+    },
+    "sort": {
+      "volume": "Per volume",
+      "vip": "Per VIP",
+      "activity": "Per aktivitas"
+    },
+    "source": {
+      "all": "Semua",
+      "DIRECT": "Langsung",
+      "OVERRIDE": "Sub-agen"
+    },
+    "badgeAgent": "Agen",
+    "badgeSub": "Sub-agen",
+    "todayCommission": "Komisi hari ini",
+    "todayCommissionShort": "Hari ini",
+    "playersUnderManagement": "Mengelola {{count}} pemain",
+    "directCommission": "Pemain langsung",
+    "overrideCommission": "Dari sub-agen",
+    "trend": "Komisi harian",
+    "vipLinkage": "Bonus keterkaitan VIP",
+    "vipLinkageBlurb": "{{count}} pemain Anda di V4 atau V5. Anda dapat tambahan setiap bulan selama mereka bertahan.",
+    "bySource": "Sumber bulan ini",
+    "subAgentBlock": "Sub-agen",
+    "subAgentPlayers": "{{count}} pemain",
+    "upstreamThisMonth": "Setoran bulan ini",
+    "volumeToday": "Hari ini {{amount}}",
+    "volumeMonth": "Bulan {{amount}}",
+    "thisMonth": "Bulan ini",
+    "lifetimeVolume": "Volume total",
+    "lifetimeCommission": "Komisi total",
+    "lastActive": "Terakhir aktif",
+    "never": "Belum pernah main",
+    "sourceLink": "Daftar via",
+    "joined": "Bergabung",
+    "primaryLink": "Tautan utama",
+    "shareToTg": "Bagikan",
+    "subAgentManagement": "Tarif sub-agen",
+    "editRate": "Ubah tarif",
+    "editRatePrompt": "Tarif komisi sub-agen ini (5–25):",
+    "rateInvalid": "Masukkan angka.",
+    "rateUpdated": "Diperbarui, berlaku mulai hand berikutnya.",
+    "rateChangeNote": "Perubahan tarif berlaku dari hand berikutnya. Hand yang sudah selesai tidak dihitung ulang.",
+    "exportCsv": "Ekspor CSV",
+    "truncated": "Hanya catatan terbaru yang ditampilkan. Ekspor CSV untuk periode penuh.",
+    "noRecords": "Tidak ada catatan pada periode ini",
+    "noRecordsBlurb": "Komisi masuk begitu hand selesai — tanpa menunggu, tanpa persetujuan.",
+    "viaSubAgent": "via {{id}}",
+    "rakeWas": "rake {{amount}}"
   },
   "insurance": {
     "title": "Asuransi tersedia",
@@ -395,5 +456,12 @@
     "decline": "Tidak usah",
     "accept": "Asuransikan ₮{{premium}}",
     "taken": "Asuransi diambil"
+  },
+  "context": {
+    "enter": "Masuk",
+    "exit": "Keluar",
+    "inLeague": "Di dalam {{name}}",
+    "isolationNote": "Hanya meja dan dompet liga. Meja platform disembunyikan.",
+    "backToPlatform": "Kembali ke lobi platform"
   }
 }

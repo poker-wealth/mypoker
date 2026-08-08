@@ -13,21 +13,32 @@ import type { ReserveState } from '../games/texas/underwriting';
 import type { RakeConfig } from '../games/texas/settlement';
 
 /**
- * PLACEHOLDER reserve state for insurance quoting.
+ * Live insurance reserve, read from financial-core (§4).
  *
- * These are fixed figures, not the live INSURANCE and REINSURANCE account
- * balances in financial-core. Quoting against an invented reserve is acceptable
- * on a testnet staging build and is NOT acceptable against real money — the
- * platform could underwrite more than it actually holds.
+ * The reserve is cached briefly and refreshed in the background: quotes are
+ * pre-computed as streets are dealt (spec: flop animation covers the compute),
+ * so the health check may be a few seconds old but never invented. The three
+ * figures the underwriter needs map to the pool like so:
  *
- * Must be replaced with a read of the real pools before insurance is enabled for
- * real funds. Left obvious rather than buried in a config file so it is hard to
- * ship past by accident.
+ *   reserveBalance    = INSURANCE account balance
+ *   dailyBudget       = reserve × 15%   (§4 "Max Daily Payout", integer math)
+ *   reservedExposure  = today's INSURANCE_PAYOUT total, from the ledger
+ *
+ * FAIL CLOSED: until a real read has succeeded, and once the last read is too
+ * old to trust, there is no reserve — and no reserve means no offer, which is
+ * exactly the spec's auto-disable rule ("reserve < threshold → insurance entry
+ * hidden from player UI automatically"). An unreachable financial-core reads
+ * as a pool that cannot prove its health, not as one assumed healthy.
  */
-const INSURANCE_RESERVE_PLACEHOLDER: ReserveState = {
-  reserveBalance: 50_000,
-  dailyBudget: 7_500,
-  reservedExposure: 0,
+const RESERVE_REFRESH_MS = 15_000;
+const RESERVE_TRUST_MS = 60_000;
+const DAILY_BUDGET_PCT = 15; // §4 — of the reserve, per day
+
+/** Whole-USD part of a decimal string, as integer chips (1 chip = $1). */
+const chipsFromUsd = (decimal: string): number => {
+  const whole = decimal.split('.')[0] ?? '0';
+  const n = Number(whole);
+  return Number.isSafeInteger(n) ? n : 0;
 };
 import type { HandResult } from '../games/texas/texas-hand';
 import type { PlayerDirectory } from './players';
@@ -144,6 +155,9 @@ const CATEGORY = [
  */
 const ABANDON_MULTIPLIER = 5;
 
+/** Spec (W8 social): "max 20 spectators per table". Seated players never count. */
+const MAX_SPECTATORS = 20;
+
 export const DEFAULT_ROOM: Omit<PokerRoomConfig, 'id' | 'name'> = {
   variantId: 'texas',
   smallBlind: 10,
@@ -154,7 +168,11 @@ export const DEFAULT_ROOM: Omit<PokerRoomConfig, 'id' | 'name'> = {
   actionTimeoutMs: 20_000,
   handStartDelayMs: 3_000,
   showdownDelayMs: 5_000,
-  disconnectGraceMs: 60_000,
+  // §6.4: "Grace Period: 20-second reconnect window". Was 60s — a tripled
+  // window is not a kindness, it is 40 extra seconds the rest of the table
+  // waits per drop. The spec's timer-pause, 10s auto-check and the per-hand /
+  // per-hour caps are P1 table-flow work and are tracked there.
+  disconnectGraceMs: 20_000,
   spectatorDelayMs: 5_000,
   rake: { bps: 500, cap: 600, noFlopNoDrop: true },
 };
@@ -170,6 +188,12 @@ export class PokerRoom {
   private readonly viewers = new Map<string, Set<RoomClient>>();
   private readonly chatters = new Map<string, ChatterState>();
   private readonly targets = new Map<string, TargetState>();
+
+  // The last reserve read that succeeded, and when. Null until the first one
+  // does — see the fail-closed note on the constants above.
+  private reserve: ReserveState | null = null;
+  private reserveFetchedAt = 0;
+  private reserveRefreshing = false;
 
   private phase: RoomPhase = 'WAITING';
   private game: TexasGame | undefined;
@@ -236,6 +260,21 @@ export class PokerRoom {
    * Returns the unsubscribe function — call it when the socket closes.
    */
   join(playerId: string, client: RoomClient): () => void {
+    // Spec: max 20 spectators per table. A seated player (or one reconnecting
+    // to their seat) is never refused — the cap is on watchers, because an
+    // unbounded audience is a snapshot-fanout cost every action pays and, past
+    // a point, a scraping surface. First-come, like a rail at a casino.
+    //
+    // Complements the 5-second spectator delay rather than duplicating it: the
+    // delay decides WHAT a watcher sees, this decides HOW MANY there can be.
+    const isSpectator = !this.seatOf(playerId);
+    if (isSpectator && !this.viewers.has(playerId)) {
+      const watching = [...this.viewers.keys()].filter((id) => !this.seatOf(id)).length;
+      if (watching >= MAX_SPECTATORS) {
+        throw new Error('table is full of spectators — try another table');
+      }
+    }
+
     let senders = this.viewers.get(playerId);
     if (!senders) {
       senders = new Set();
@@ -310,6 +349,11 @@ export class PokerRoom {
   }
 
   // ── Commands ────────────────────────────────────────────────────────────────
+
+  /** Whether this player currently holds a seat here. Watching does not count. */
+  hasSeated(playerId: string): boolean {
+    return this.occupied().some((seat) => seat.playerId === playerId);
+  }
 
   /** Apply a client command. Rejects (with a readable message) if it isn't legal right now. */
   command(playerId: string, cmd: TableCommand): Promise<void> {
@@ -810,8 +854,52 @@ export class PokerRoom {
     this.push();
   }
 
+  /**
+   * Kick a background refresh of the reserve when the cache is due. Fire and
+   * forget: quoting reads whatever the last successful fetch produced, and a
+   * failed fetch simply lets the cached state age out to "no offer".
+   */
+  private refreshReserve(): void {
+    if (!this.fc.insuranceReserve) return;
+    if (this.reserveRefreshing || Date.now() - this.reserveFetchedAt < RESERVE_REFRESH_MS) return;
+
+    this.reserveRefreshing = true;
+    // Platform system: live rooms are platform tables. A league room passes its
+    // leagueId here, which reaches the league's own pool and nobody else's.
+    this.fc
+      .insuranceReserve('PLATFORM')
+      .then((facts) => {
+        const reserveBalance = chipsFromUsd(facts.insuranceBalance);
+        this.reserve = {
+          reserveBalance,
+          dailyBudget: Math.floor((reserveBalance * DAILY_BUDGET_PCT) / 100),
+          reservedExposure: chipsFromUsd(facts.todayPaidOut),
+        };
+        this.reserveFetchedAt = Date.now();
+      })
+      .catch((err) => {
+        console.error('[room] insurance reserve unreadable — offers will close:', err);
+      })
+      .finally(() => {
+        this.reserveRefreshing = false;
+      });
+  }
+
+  /** The reserve to quote against right now, or null when there is none to trust. */
+  private currentReserve(): ReserveState | null {
+    if (!this.reserve) return null;
+    if (Date.now() - this.reserveFetchedAt > RESERVE_TRUST_MS) return null;
+    return this.reserve;
+  }
+
   private insuranceFor(playerId: string, engine: EnginePublicState | null): InsuranceOffer | null {
     if (!engine || this.phase !== 'IN_HAND') return null;
+
+    // Refresh on every ask, so a hand that reaches an all-in has a recent
+    // health check waiting; the fetch itself never blocks a snapshot.
+    this.refreshReserve();
+    const reserve = this.currentReserve();
+    if (!reserve) return null;
 
     const handSeats = this.game ? this.game.handSeats() : [];
     const allIn = handSeats.filter((s) => s.status === 'allin');
@@ -840,7 +928,7 @@ export class PokerRoom {
         pot: engine.pot,
         requestedCoverage: mine.streetContributed,
       },
-      INSURANCE_RESERVE_PLACEHOLDER,
+      reserve,
     );
     if (!result.offered) return null;
 

@@ -77,6 +77,14 @@ const vector = {
   merkleProof: tree.getProof(0),
   merkleRoot: tree.root,
   seatedClientSeeds,
+  // Step 6b: where this batch's root was anchored. The sample vector carries a
+  // dev token, which the page renders as "not yet anchored" rather than as a
+  // link — exactly what a fake deserves. A round notarized by the real Solana
+  // client carries its transaction signature here instead.
+  notarization: {
+    chain: 'solana' as const,
+    tx: `fake-tx-${createHash('sha256').update(tree.root).digest('hex').slice(0, 16)}`,
+  },
 };
 
 // The server's own verifier must accept it before it is worth comparing against.

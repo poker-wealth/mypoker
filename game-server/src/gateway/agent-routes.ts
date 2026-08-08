@@ -1,8 +1,9 @@
 import { Router, type Request, type Response } from 'express';
 import { requireAuth } from './auth';
-import { scoreFor, GOOD_STANDING_SCORE, type FindingReason } from '../players/index';
+import { scoreFor, GOOD_STANDING_SCORE, tierForVolume, type FindingReason } from '../players/index';
 import { forwardTo } from './me-routes';
 import { assertValidSubAgentRate } from '../agents/commission';
+import { AGENT_RANGES, isAgentRange, windowFor, activityFor } from '../agents/dashboard';
 import type { GatewayConfig } from './config';
 
 /**
@@ -25,8 +26,8 @@ export function buildAgentRouter(config: GatewayConfig): Router {
   // Eligibility is derived HERE from financial-core's facts, with the same
   // canonical scoring the reputation route uses — the 700 bar is
   // GOOD_STANDING_SCORE, not a second constant that could drift from it.
-  r.get('/eligibility', (req: Request, res: Response) => {
-    void (async () => {
+  r.get('/eligibility', (req: Request, res: Response): void => {
+    void (async (): Promise<void> => {
       const facts = await upstreamEligibility(config, req);
       if (!facts.ok) {
         res.status(facts.status).json({ error: facts.error });
@@ -50,12 +51,60 @@ export function buildAgentRouter(config: GatewayConfig): Router {
       });
     })();
   });
-  r.get('/players', (req, res) => void forwardTo(config, req, res, '/me/agent/players'));
+  // Tab 2. financial-core returns facts per player — volumes, commissions, when
+  // they last played. The VIP tier and the activity colour are DERIVED here,
+  // from the same ladder the VIP page uses and the same 7/30-day boundaries
+  // §13.4 fixes, so an agent and the player never see different tiers.
+  r.get('/players', (req: Request, res: Response): void => {
+    void (async (): Promise<void> => {
+      const upstream = await forwardJson<{ players: ReferredPlayerFacts[] }>(
+        config,
+        req,
+        '/me/agent/players',
+      );
+      if (!upstream.ok) {
+        res.status(upstream.status).json({ error: upstream.error });
+        return;
+      }
+
+      const now = new Date();
+      res.json({
+        players: upstream.body.players.map((p) => {
+          const tier = tierForVolume(p.lifetimeEffective);
+          return {
+            ...p,
+            vipTier: tier.tier,
+            vipTitle: tier.title,
+            activity: activityFor(p.lastActiveAt, now),
+          };
+        }),
+      });
+    })();
+  });
+
+  // Tab 1 and Tab 4 take a named range; the gateway resolves what it means.
+  const withWindow = (path: string) => (req: Request, res: Response): void => {
+    const range = req.query.range ?? 'today';
+    if (!isAgentRange(range)) {
+      res.status(400).json({ error: `range must be one of ${AGENT_RANGES.join(', ')}` });
+      return;
+    }
+    const { from, to } = windowFor(range);
+    const query = new URLSearchParams({ from: from.toISOString(), to: to.toISOString() });
+    const source = req.query.source;
+    if (source === 'DIRECT' || source === 'OVERRIDE') query.set('source', source);
+    void forwardTo(config, req, res, `${path}?${query.toString()}`);
+  };
+
+  r.get('/breakdown', withWindow('/me/agent/breakdown'));
+  r.get('/series', withWindow('/me/agent/series'));
+  r.get('/settlements', withWindow('/me/agent/settlements'));
+
   r.get('/links', (req, res) => void forwardTo(config, req, res, '/me/agent/links'));
   r.post('/links', (req, res) => void forwardTo(config, req, res, '/me/agent/links'));
   r.get('/sub-agents', (req, res) => void forwardTo(config, req, res, '/me/agent/sub-agents'));
 
-  r.post('/sub-agents', (req: Request, res: Response) => {
+  r.post('/sub-agents', (req: Request, res: Response): void => {
     const rateBps = (req.body as { rateBps?: unknown } | undefined)?.rateBps;
     if (typeof rateBps !== 'number' || !Number.isInteger(rateBps)) {
       res.status(400).json({ error: 'rateBps must be an integer number of basis points' });
@@ -72,7 +121,36 @@ export function buildAgentRouter(config: GatewayConfig): Router {
     void forwardTo(config, req, res, '/me/agent/sub-agents');
   });
 
+  // Tab 3's [Edit Rate]. Same bounds as creation — a rate that is illegal to
+  // set at creation must not become legal by editing afterwards.
+  r.patch('/sub-agents/:subAgentId', (req: Request, res: Response): void => {
+    const rateBps = (req.body as { rateBps?: unknown } | undefined)?.rateBps;
+    if (typeof rateBps !== 'number' || !Number.isInteger(rateBps)) {
+      res.status(400).json({ error: 'rateBps must be an integer number of basis points' });
+      return;
+    }
+    try {
+      assertValidSubAgentRate(rateBps);
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : 'invalid rate' });
+      return;
+    }
+    void forwardTo(
+      config,
+      req,
+      res,
+      `/me/agent/sub-agents/${encodeURIComponent(String(req.params.subAgentId))}`,
+    );
+  });
+
   return r;
+}
+
+/** The per-player facts financial-core returns, before this layer derives from them. */
+interface ReferredPlayerFacts {
+  playerId: string;
+  lastActiveAt: string | null;
+  lifetimeEffective: number;
 }
 
 
@@ -82,20 +160,36 @@ interface EligibilityFacts {
   alreadyAgent: boolean;
 }
 
-type Upstream = { ok: true; body: EligibilityFacts } | { ok: false; status: number; error: string };
+type Upstream<T> = { ok: true; body: T } | { ok: false; status: number; error: string };
 
-async function upstreamEligibility(config: GatewayConfig, req: Request): Promise<Upstream> {
+/**
+ * Read facts from financial-core, for routes that DERIVE rather than proxy.
+ *
+ * `forwardTo` streams a response straight through and is right for everything
+ * this gateway does not reason about. These routes have to open the body — to
+ * apply the VIP ladder, the activity boundaries — so they need it parsed.
+ */
+async function forwardJson<T>(
+  config: GatewayConfig,
+  req: Request,
+  path: string,
+): Promise<Upstream<T>> {
   try {
-    const upstream = await fetch(`${config.financialCoreUrl}/api/v1/me/agent/eligibility`, {
+    const upstream = await fetch(`${config.financialCoreUrl}/api/v1${path}`, {
       headers: { authorization: req.headers.authorization ?? '' },
     });
     const body: unknown = await upstream.json().catch(() => null);
     if (!upstream.ok || body === null) {
       return { ok: false, status: upstream.status, error: 'financial service unavailable' };
     }
-    return { ok: true, body: body as EligibilityFacts };
+    return { ok: true, body: body as T };
   } catch (err) {
     console.error('[gateway] financial-core unreachable:', err);
     return { ok: false, status: 502, error: 'financial service unavailable' };
   }
 }
+
+const upstreamEligibility = (
+  config: GatewayConfig,
+  req: Request,
+): Promise<Upstream<EligibilityFacts>> => forwardJson(config, req, '/me/agent/eligibility');

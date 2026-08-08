@@ -19,6 +19,16 @@ export {
   type ApplicationOutcome,
 } from './agent-registry';
 export {
+  AGENT_RANGES,
+  isAgentRange,
+  windowFor,
+  activityFor,
+  ACTIVE_WITHIN_DAYS,
+  DORMANT_WITHIN_DAYS,
+  type AgentRange,
+  type ActivityStatus,
+} from './dashboard';
+export {
   agentCan,
   agentCanTouchPlayerFunds,
   commissionCreditScope,
