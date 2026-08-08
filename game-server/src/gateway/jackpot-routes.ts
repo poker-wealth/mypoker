@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { TIERS, TIER_CONFIG, GRAND_WINDOW, type JackpotTier } from '../jackpot/index';
 import { grandWindow, isInGrandWindow } from '../jackpot/schedule';
 import type { LobbyService } from '../lobby/lobby-service';
+import type { GatewayConfig } from './config';
 
 /**
  * Public jackpot state.
@@ -30,8 +31,43 @@ export interface TierState {
   cadence: string;
 }
 
-export function buildJackpotRouter(lobby: LobbyService): Router {
+export function buildJackpotRouter(lobby: LobbyService, config?: GatewayConfig): Router {
   const r = Router();
+
+  /**
+   * Past hits (§5: "No time limit. Player UI default: last 30 days + full
+   * date-range query.").
+   *
+   * Proxied straight to financial-core, which reads them from the ledger. The
+   * gateway has nothing to add — no rule applies to a list of things that
+   * already happened — so this forwards rather than deriving.
+   */
+  r.get('/history', (req: Request, res: Response) => {
+    void (async () => {
+      if (!config) {
+        res.status(503).json({ error: 'history unavailable' });
+        return;
+      }
+      const query = new URLSearchParams();
+      for (const key of ['from', 'to', 'tier', 'limit']) {
+        const value = req.query[key];
+        if (typeof value === 'string' && value !== '') query.set(key, value);
+      }
+      try {
+        const upstream = await fetch(
+          `${config.financialCoreUrl}/api/v1/jackpot/history?${query.toString()}`,
+        );
+        const body: unknown = await upstream.json().catch(() => null);
+        if (!upstream.ok || body === null) {
+          res.status(upstream.status || 502).json({ error: 'history unavailable' });
+          return;
+        }
+        res.json(body);
+      } catch {
+        res.status(502).json({ error: 'history unavailable' });
+      }
+    })();
+  });
 
   r.get('/', (_req: Request, res: Response) => {
     const now = Date.now();

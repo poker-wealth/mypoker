@@ -1,4 +1,5 @@
 import {
+  estimateDaysToNextTier,
   scoreFor,
   tierOf,
   VERY_POOR_CEILING,
@@ -108,5 +109,41 @@ describe('vipProgress — the one ladder', () => {
     expect(p.tier).toBe('V1');
     expect(p.next!.tier).toBe('V2');
     expect(p.next!.remaining).toBe($(10_000));
+  });
+});
+
+describe('estimateDaysToNextTier — §10.2 "estimated upgrade time"', () => {
+  it('projects from this month’s pace', () => {
+    // $300 of effective volume over 10 days = $30/day; $600 remaining = 20 days.
+    expect(
+      estimateDaysToNextTier({ remaining: $(600), monthlyEffective: $(300), daysElapsed: 10 }),
+    ).toBe(20);
+  });
+
+  it('gives no estimate in the first days of a month', () => {
+    // One good session on the 2nd projects to a number that is simply noise.
+    expect(
+      estimateDaysToNextTier({ remaining: $(600), monthlyEffective: $(300), daysElapsed: 2 }),
+    ).toBeNull();
+  });
+
+  it('gives no estimate at zero pace', () => {
+    // "Never" is not an estimate, and infinity renders badly.
+    expect(
+      estimateDaysToNextTier({ remaining: $(600), monthlyEffective: 0, daysElapsed: 20 }),
+    ).toBeNull();
+  });
+
+  it('gives no estimate when nothing is remaining', () => {
+    expect(
+      estimateDaysToNextTier({ remaining: 0, monthlyEffective: $(300), daysElapsed: 20 }),
+    ).toBeNull();
+  });
+
+  it('rounds up, so the estimate never promises early', () => {
+    // 21 days of pace, not 20.4 rounded down.
+    expect(
+      estimateDaysToNextTier({ remaining: $(613), monthlyEffective: $(300), daysElapsed: 10 }),
+    ).toBe(21);
   });
 });

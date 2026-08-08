@@ -296,7 +296,11 @@
       "WINDOW": "토요일에만"
     },
     "youWon": "잭팟 당첨",
-    "tapToDismiss": "아무 곳이나 탭하여 계속"
+    "tapToDismiss": "아무 곳이나 탭하여 계속",
+    "history": "최근 당첨",
+    "allTime": "전체",
+    "lastDays": "{{count}}일",
+    "noHits": "이 기간에 잭팟 당첨이 없습니다."
   },
   "onboarding": {
     "skip": "건너뛰기",
@@ -338,7 +342,8 @@
       "V3": "Pro Tracker HUD (VPIP, PFR, 포지션 통계) — 출시 예정. 전용 지원 채널.",
       "V4": "우선 출금 대기열. 무제한 상대 태그. 1:1 컨시어지. 엘리트 테이블.",
       "V5": "즉시 자동 송금. 실시간 상대 전적 분석. 블랙 골드 테이블. 전체화면 입장 연출."
-    }
+    },
+    "estimatedUpgrade": "이번 달 속도로 약 {{count}}일"
   },
   "notifications": {
     "title": "알림",

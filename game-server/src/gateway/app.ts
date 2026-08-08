@@ -44,7 +44,7 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
   // router serves the public lobby only.
   if (lobby) app.use('/lobby', buildLobbyRouter(lobby, config));
   // Jackpot pools are derived from the same tables, so it shares the gate.
-  if (lobby) app.use('/jackpot', buildJackpotRouter(lobby));
+  if (lobby) app.use('/jackpot', buildJackpotRouter(lobby, config));
 
   app.use((_req: Request, res: Response) => {
     res.status(404).json({ error: 'not found' });

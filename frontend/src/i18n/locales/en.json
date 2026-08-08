@@ -296,7 +296,11 @@
       "WINDOW": "Saturdays only"
     },
     "youWon": "Jackpot won",
-    "tapToDismiss": "Tap anywhere to continue"
+    "tapToDismiss": "Tap anywhere to continue",
+    "history": "Recent wins",
+    "allTime": "All",
+    "lastDays": "{{count}}d",
+    "noHits": "No jackpot has dropped in this period yet."
   },
   "onboarding": {
     "skip": "Skip",
@@ -338,7 +342,8 @@
       "V3": "Pro Tracker HUD (VPIP, PFR, positional stats) — coming soon. Dedicated support channel.",
       "V4": "Priority withdrawal queue. Unlimited opponent tagging. 1-on-1 concierge. Elite tables.",
       "V5": "Instant auto-transfer. Live head-to-head profiling. Black Gold tables. Full-screen entry effect."
-    }
+    },
+    "estimatedUpgrade": "About {{count}} days at this month’s pace"
   },
   "notifications": {
     "title": "Notifications",

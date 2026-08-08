@@ -106,6 +106,45 @@ export interface VipProgress {
 
 /** Tier + progress for a cumulative effective volume (micro-USD). One home for
  *  this arithmetic, beside the ladder it measures. */
+/**
+ * Estimated time to the next tier (§10.2: "'My VIP' page: real-time progress
+ * bar + $X remaining to next tier + estimated upgrade time").
+ *
+ * Projected from THIS MONTH's effective volume, which is the only pace signal
+ * that is already stored. Two guards, both there to avoid publishing a number
+ * that is really noise:
+ *
+ *   - nothing is shown in the first few days of a month, when one good session
+ *     projects to an absurd date;
+ *   - nothing is shown at zero pace, because "never" is not an estimate.
+ *
+ * Returning null is a normal outcome, not a failure. A missing estimate is far
+ * better than a confident wrong one — a player told they are eleven days from
+ * Platinum will remember it, and will be right to be annoyed when it slips.
+ */
+export const MIN_DAYS_FOR_ESTIMATE = 5;
+
+export function estimateDaysToNextTier(input: {
+  /** micro-USD still needed for the next tier. */
+  remaining: number;
+  /** micro-USD of effective volume so far this calendar month. */
+  monthlyEffective: number;
+  /** How many days of this month have elapsed, including today. */
+  daysElapsed: number;
+}): number | null {
+  if (input.remaining <= 0) return null;
+  if (input.daysElapsed < MIN_DAYS_FOR_ESTIMATE) return null;
+  if (input.monthlyEffective <= 0) return null;
+
+  const perDay = input.monthlyEffective / input.daysElapsed;
+  if (perDay <= 0) return null;
+
+  return Math.ceil(input.remaining / perDay);
+}
+
+/** Days elapsed in the current UTC calendar month, including today. */
+export const daysElapsedThisMonth = (at: Date): number => at.getUTCDate();
+
 export function vipProgress(cumulativeVolume: number): VipProgress {
   const current = tierForVolume(cumulativeVolume);
   const nextSpec = VIP_TIERS[indexOf(current.tier) + 1] ?? null;

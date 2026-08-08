@@ -296,7 +296,11 @@
       "WINDOW": "hanya Sabtu"
     },
     "youWon": "Jackpot dimenangkan",
-    "tapToDismiss": "Ketuk di mana saja untuk lanjut"
+    "tapToDismiss": "Ketuk di mana saja untuk lanjut",
+    "history": "Kemenangan terbaru",
+    "allTime": "Semua",
+    "lastDays": "{{count}} hr",
+    "noHits": "Belum ada jackpot yang jatuh pada periode ini."
   },
   "onboarding": {
     "skip": "Lewati",
@@ -338,7 +342,8 @@
       "V3": "Pro Tracker HUD (VPIP, PFR, statistik posisi) — segera hadir. Kanal dukungan khusus.",
       "V4": "Antrean penarikan prioritas. Penandaan lawan tanpa batas. Concierge 1-on-1. Meja Elite.",
       "V5": "Transfer otomatis instan. Profil head-to-head langsung. Meja Emas Hitam. Efek masuk layar penuh."
-    }
+    },
+    "estimatedUpgrade": "Sekitar {{count}} hari pada laju bulan ini"
   },
   "notifications": {
     "title": "Notifikasi",

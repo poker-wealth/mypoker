@@ -296,7 +296,11 @@
       "WINDOW": "仅限周六"
     },
     "youWon": "恭喜中奖",
-    "tapToDismiss": "点击任意处继续"
+    "tapToDismiss": "点击任意处继续",
+    "history": "近期中奖",
+    "allTime": "全部",
+    "lastDays": "{{count}}天",
+    "noHits": "此时间段内暂无奖池派彩。"
   },
   "onboarding": {
     "skip": "跳过",
@@ -338,7 +342,8 @@
       "V3": "专业追踪 HUD（VPIP、PFR、位置数据）—— 即将推出。专属客服通道。",
       "V4": "优先提现队列。无限对手标记。一对一专属客服。精英牌桌。",
       "V5": "即时自动出款。实时对手对战数据。黑金牌桌。全屏入场特效。"
-    }
+    },
+    "estimatedUpgrade": "按本月速度约需 {{count}} 天"
   },
   "notifications": {
     "title": "通知",

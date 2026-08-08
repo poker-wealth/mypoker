@@ -296,7 +296,11 @@
       "WINDOW": "chỉ thứ Bảy"
     },
     "youWon": "Trúng jackpot",
-    "tapToDismiss": "Chạm bất kỳ đâu để tiếp tục"
+    "tapToDismiss": "Chạm bất kỳ đâu để tiếp tục",
+    "history": "Thắng gần đây",
+    "allTime": "Tất cả",
+    "lastDays": "{{count}} ngày",
+    "noHits": "Chưa có jackpot nào nổ trong kỳ này."
   },
   "onboarding": {
     "skip": "Bỏ qua",
@@ -338,7 +342,8 @@
       "V3": "Pro Tracker HUD (VPIP, PFR, thống kê vị trí) — sắp ra mắt. Kênh hỗ trợ riêng.",
       "V4": "Hàng đợi rút tiền ưu tiên. Gắn thẻ đối thủ không giới hạn. Trợ lý riêng 1-1. Bàn Elite.",
       "V5": "Tự động chuyển tiền tức thì. Phân tích đối đầu trực tiếp. Bàn Hắc Kim. Hiệu ứng vào bàn toàn màn hình."
-    }
+    },
+    "estimatedUpgrade": "Khoảng {{count}} ngày theo tốc độ tháng này"
   },
   "notifications": {
     "title": "Thông báo",

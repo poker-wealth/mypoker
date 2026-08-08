@@ -1,7 +1,8 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { Money } from '../domain/money';
-import { LedgerType } from '../domain/account-types';
+import { LedgerType, LedgerDirection } from '../domain/account-types';
+import { LedgerModel } from '../wallet/ledger.model';
 import { transfer } from '../wallet/transfer';
 import { TableType } from '../settlement/settlement-domain';
 import { settleRound } from '../settlement/settle-round';
@@ -425,8 +426,69 @@ export function buildRouter(): Router {
         type: LedgerType.JACKPOT_PAYOUT,
         businessId: b.roundId,
         idempotencyKey: `${b.roundId}:jackpot:${b.tier}`,
+        // Which tier and table this was. The idempotency key happens to contain
+        // the tier, but parsing a dedup guard to recover domain data makes the
+        // key's format load-bearing for a feature that has nothing to do with
+        // deduplication. History reads these fields instead.
+        metadata: { tier: b.tier, tableId: b.tableId },
       });
       res.json({ applied: result.applied ?? true });
+    }),
+  );
+
+  /**
+   * Jackpot history (spec §5: "No time limit. Player UI default: last 30 days
+   * + full date-range query.").
+   *
+   * Read from the LEDGER, not from the jackpot engines. The engines hold their
+   * hits in memory per table, so their history dies with the process and is
+   * gone on the next deploy — "no time limit" cannot be served from something
+   * that forgets. Every paid hit left a JACKPOT_PAYOUT credit, which is
+   * permanent by construction.
+   *
+   * Public, like the pools themselves: recent winners are the reason anyone
+   * looks at this page. Only the winning ACCOUNT id is exposed, never a balance
+   * and never the rest of that player's ledger.
+   */
+  const jackpotHistoryQuery = z.object({
+    from: z.string().datetime().optional(),
+    to: z.string().datetime().optional(),
+    tier: z.enum(['mini', 'minor', 'major', 'grand']).optional(),
+    limit: z.coerce.number().int().positive().max(200).optional(),
+  });
+  r.get(
+    '/jackpot/history',
+    asyncHandler(async (req: Request, res: Response) => {
+      const q = jackpotHistoryQuery.parse(req.query);
+      const query: Record<string, unknown> = {
+        type: LedgerType.JACKPOT_PAYOUT,
+        // The credit side only: the debit is the pool paying, and listing both
+        // would show every win twice.
+        direction: LedgerDirection.CREDIT,
+      };
+      if (q.tier) query['metadata.tier'] = q.tier;
+      if (q.from || q.to) {
+        query.createdAt = {
+          ...(q.from ? { $gte: new Date(q.from) } : {}),
+          ...(q.to ? { $lte: new Date(q.to) } : {}),
+        };
+      }
+
+      const rows = await LedgerModel.find(query)
+        .sort({ createdAt: -1 })
+        .limit(q.limit ?? 50)
+        .lean();
+
+      res.json({
+        hits: rows.map((r) => ({
+          at: r.createdAt.toISOString(),
+          tier: (r.metadata?.tier as string) ?? 'unknown',
+          tableId: (r.metadata?.tableId as string) ?? null,
+          roundId: r.businessId ?? null,
+          accountId: r.accountId,
+          amount: r.amount.toString(),
+        })),
+      });
     }),
   );
 

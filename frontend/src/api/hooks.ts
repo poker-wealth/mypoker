@@ -1,7 +1,7 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchSettings, patchSettings, type PlayerSettings, type SettingsPatch } from './settings';
 import { fetchReputation } from './reputation';
-import { fetchJackpot } from './jackpot';
+import { fetchJackpot, fetchJackpotHistory } from './jackpot';
 import { fetchVip } from './vip';
 import { fetchMyLeagues, fetchLeagues, createLeagueApi, joinLeagueApi } from './leagues';
 import { fetchNotifications, markNotificationsRead, type NotificationPage } from './notifications';
@@ -188,6 +188,21 @@ export function useJackpot() {
     queryFn: fetchJackpot,
     staleTime: 10_000,
     refetchInterval: 30_000,
+    retry: 1,
+  });
+}
+
+/**
+ * Past jackpot hits. Defaults to the last 30 days, per §5.
+ *
+ * Cached longer than the pools: a hit that already happened does not change,
+ * and re-polling settled history every 30 seconds would be pure noise.
+ */
+export function useJackpotHistory(range?: { from?: string; to?: string; tier?: string }) {
+  return useQuery({
+    queryKey: ['jackpot', 'history', range ?? null],
+    queryFn: () => fetchJackpotHistory(range),
+    staleTime: 60_000,
     retry: 1,
   });
 }

@@ -22,6 +22,11 @@ export interface VipStanding {
   monthlyEffective: number;
   next: { tier: VipTier; title: string; threshold: number; remaining: number } | null;
   progressPct: number;
+  /**
+   * Days to the next tier at this month's pace, or null when the month is too
+   * young to project from or no volume has been played. Null is normal.
+   */
+  estimatedDaysToNextTier: number | null;
   breakdown: GameBreakdown[];
 }
 

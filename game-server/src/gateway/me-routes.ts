@@ -7,6 +7,8 @@ import {
   DEDUCTION,
   NORMAL_ROUNDS_TO_GOOD,
   vipProgress,
+  estimateDaysToNextTier,
+  daysElapsedThisMonth,
   type FindingReason,
 } from '../players/index';
 
@@ -102,7 +104,16 @@ export function buildMeRouter(config: GatewayConfig): Router {
       if (!facts.ok) return sendUpstreamError(res, facts);
 
       const progress = vipProgress(facts.body.cumulativeEffective);
-      res.json({ ...progress, ...facts.body });
+      const now = new Date();
+      const estimatedDaysToNextTier = progress.next
+        ? estimateDaysToNextTier({
+            remaining: progress.next.remaining,
+            monthlyEffective: facts.body.monthlyEffective,
+            daysElapsed: daysElapsedThisMonth(now),
+          })
+        : null;
+
+      res.json({ ...progress, ...facts.body, estimatedDaysToNextTier });
     })();
   });
   r.get('/leagues', (req, res) => void forwardTo(config, req, res, '/me/leagues'));

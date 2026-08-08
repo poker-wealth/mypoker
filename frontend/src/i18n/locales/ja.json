@@ -296,7 +296,11 @@
       "WINDOW": "土曜のみ"
     },
     "youWon": "ジャックポット獲得",
-    "tapToDismiss": "タップして続ける"
+    "tapToDismiss": "タップして続ける",
+    "history": "最近の当選",
+    "allTime": "全期間",
+    "lastDays": "{{count}}日",
+    "noHits": "この期間にジャックポットの当選はありません。"
   },
   "onboarding": {
     "skip": "スキップ",
@@ -338,7 +342,8 @@
       "V3": "Pro Tracker HUD（VPIP・PFR・ポジション統計）—— 近日公開。専用サポート窓口。",
       "V4": "出金優先キュー。対戦相手タグ無制限。1対1コンシェルジュ。エリートテーブル。",
       "V5": "即時自動送金。対戦相手のH2Hライブ表示。ブラックゴールドテーブル。全画面入場演出。"
-    }
+    },
+    "estimatedUpgrade": "今月のペースで約 {{count}} 日"
   },
   "notifications": {
     "title": "通知",
