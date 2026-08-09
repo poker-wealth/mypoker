@@ -76,6 +76,17 @@ export function buildMeRouter(config: GatewayConfig): Router {
 
   r.get('/stats', (req, res) => void forwardTo(config, req, res, '/me/stats'));
   r.get('/history', (req, res) => void forwardTo(config, req, res, '/me/history'));
+
+  // Wallet. financial-core owns every balance and the withdrawal state machine;
+  // the gateway forwards the player's own token so FC scopes each read/write to
+  // that player. No money logic lives here — the deposit address is derived, the
+  // balance is read, and a withdrawal is a request FC risk-reviews before any
+  // deduction (iron rules #1 and #3).
+  r.get('/balance', (req, res) => void forwardTo(config, req, res, '/me/balance'));
+  r.get('/deposit-address', (req, res) => void forwardTo(config, req, res, '/me/deposit-address'));
+  r.get('/transactions', (req, res) => void forwardTo(config, req, res, '/me/transactions'));
+  r.get('/withdrawals', (req, res) => void forwardTo(config, req, res, '/me/withdrawals'));
+  r.post('/withdrawals', (req, res) => void forwardTo(config, req, res, '/me/withdrawals'));
   // Reputation and VIP: financial-core returns FACTS (rounds, findings, volume)
   // and the canonical rules in src/players/ turn them into a score, band, tier
   // and progress HERE — one home for the rules, so a second copy cannot drift.

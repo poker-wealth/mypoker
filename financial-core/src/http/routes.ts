@@ -17,6 +17,9 @@ import {
 } from '../withdrawal/withdrawal-state-machine';
 import { getOrCreatePlayerAccount, ensureJackpotAccounts } from '../wallet/system-accounts';
 import { getInsuranceReserve } from '../wallet/insurance-reserve';
+import { getDepositAddress } from '../wallet/deposit-address';
+import { getWalletTransactions, getWithdrawals } from '../wallet/wallet-views';
+import { isValidTronAddress } from '../wallet/tron-address';
 import { getPlayerStats, getPlayerHistory } from '../stats/player-stats';
 import { getSettings, updateSettings } from '../settings/player-settings';
 import { getReputationFacts } from '../reputation/player-reputation';
@@ -75,12 +78,46 @@ export function buildRouter(): Router {
     asyncHandler(async (req: Request, res: Response) => {
       const playerId = req.dataScope!.playerId;
       const acc = await getOrCreatePlayerAccount(playerId);
+      const available = Money.fromDecimal128(acc.availableBalance);
+      const locked = Money.fromDecimal128(acc.lockedBalance);
+      const clearing = Money.fromDecimal128(acc.clearingBalance);
       res.json({
         playerId,
-        available: Money.fromDecimal128(acc.availableBalance).toString(),
-        locked: Money.fromDecimal128(acc.lockedBalance).toString(),
-        clearing: Money.fromDecimal128(acc.clearingBalance).toString(),
+        available: available.toString(),
+        locked: locked.toString(),
+        clearing: clearing.toString(),
+        // Summed here with exact Money arithmetic so the client never adds
+        // decimal strings as floats.
+        total: available.add(locked).add(clearing).toString(),
       });
+    }),
+  );
+
+  // The player's permanent TRC-20 deposit address (derived from the account xpub).
+  // 200 with { configured: false } when no xpub is provisioned yet, so the client
+  // can show "deposits open after chain setup" rather than treating it as an error.
+  r.get(
+    '/me/deposit-address',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const addr = await getDepositAddress(req.dataScope!.playerId);
+      if (!addr) {
+        res.json({ configured: false });
+        return;
+      }
+      res.json({ configured: true, ...addr });
+    }),
+  );
+
+  // Wallet money movements (deposits, withdrawals, bets, wins) — read-only.
+  const txnQuery = z.object({ limit: z.coerce.number().int().positive().max(200).optional() });
+  r.get(
+    '/me/transactions',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { limit } = txnQuery.parse(req.query);
+      const acc = await getOrCreatePlayerAccount(req.dataScope!.playerId);
+      res.json(await getWalletTransactions(acc._id, { ...(limit !== undefined ? { limit } : {}) }));
     }),
   );
 
@@ -685,12 +722,27 @@ export function buildRouter(): Router {
     }),
   );
 
+  // A player's own withdrawals with their lifecycle state — read-only status view.
+  r.get(
+    '/me/withdrawals',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { limit } = txnQuery.parse(req.query);
+      const acc = await getOrCreatePlayerAccount(req.dataScope!.playerId);
+      res.json(await getWithdrawals(acc._id, { ...(limit !== undefined ? { limit } : {}) }));
+    }),
+  );
+
   const withdrawalBody = z.object({ amount: money, address: z.string().min(1) });
   r.post(
     '/me/withdrawals',
     dataScopeMiddleware,
     asyncHandler(async (req: Request, res: Response) => {
       const { amount, address } = withdrawalBody.parse(req.body);
+      // Reject a malformed TRON address here — before any state is created — so a
+      // typo can never reach the broadcast step. (Reputation/anti-bot must NOT
+      // gate withdrawals, iron rule #3; a checksum is address hygiene, not a gate.)
+      if (!isValidTronAddress(address)) throw new ApiError(400, 'invalid TRON address');
       const acc = await getOrCreatePlayerAccount(req.dataScope!.playerId);
       const withdrawalId = await requestWithdrawal({
         playerAccountId: acc._id,

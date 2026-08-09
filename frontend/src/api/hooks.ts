@@ -20,6 +20,14 @@ import {
   createReferralLinkApi,
 } from './agent';
 import { fetchStats, fetchHistory, type HistoryPage, type StatsPeriod } from './stats';
+import {
+  fetchBalance,
+  fetchDepositAddress,
+  fetchTransactions,
+  fetchWithdrawals,
+  requestWithdrawal,
+  type WithdrawRequest,
+} from './wallet';
 import { fetchLobbyGames, fetchTables, type TableFilter } from './lobby';
 import { useSession } from '@/store/session';
 import { useContextStore } from '@/store/context';
@@ -371,4 +379,61 @@ export function useSetSubAgentRate() {
 /** Public payout rates. No session — the point is anyone can read them. */
 export function useRtp() {
   return useQuery({ queryKey: ['fairness', 'rtp'], queryFn: fetchRtp, staleTime: 60_000, retry: 1 });
+}
+
+// ── Wallet ──────────────────────────────────────────────────────────────────
+// financial-core owns every figure; these only display it. The player id is in
+// each key so a shared device can't show the previous account's balance.
+
+export function useBalance() {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery({
+    queryKey: ['wallet', 'balance', playerId],
+    queryFn: fetchBalance,
+    enabled: Boolean(playerId),
+    // Balance moves on deposits, buy-ins and settlements — refresh while open.
+    staleTime: 5_000,
+    refetchInterval: 15_000,
+  });
+}
+
+export function useDepositAddress() {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery({
+    queryKey: ['wallet', 'deposit-address', playerId],
+    queryFn: fetchDepositAddress,
+    enabled: Boolean(playerId),
+    // The address is permanent per player — derive once and keep it.
+    staleTime: Infinity,
+  });
+}
+
+export function useTransactions(limit = 50) {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery({
+    queryKey: ['wallet', 'transactions', playerId, limit],
+    queryFn: () => fetchTransactions(limit),
+    enabled: Boolean(playerId),
+    staleTime: 10_000,
+  });
+}
+
+export function useWithdrawals(limit = 50) {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery({
+    queryKey: ['wallet', 'withdrawals', playerId, limit],
+    queryFn: () => fetchWithdrawals(limit),
+    enabled: Boolean(playerId),
+    staleTime: 10_000,
+  });
+}
+
+export function useWithdraw() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: WithdrawRequest) => requestWithdrawal(body),
+    // A request doesn't move the balance yet (risk review first), but it must
+    // appear in the withdrawals list immediately.
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['wallet'] }),
+  });
 }
