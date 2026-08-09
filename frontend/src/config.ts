@@ -8,12 +8,11 @@
  */
 
 /**
- * Where the API lives.
- *
- * Unset means same-origin, which is what the deployed site wants: `/auth/*` is
- * served by a Netlify Function alongside the app, so there's no cross-origin hop
- * and no CORS involved. Local dev sets this to the Express gateway (port 4100)
- * via .env.local.
+ * Where the API lives — the game-server gateway. There are no Netlify Functions;
+ * the deployed static site reaches the gateway cross-origin, so VITE_API_URL MUST
+ * be set to the gateway's URL in the deploy environment (the gateway sets CORS).
+ * Local dev points this at the Express gateway (port 4100) via .env.local. Unset
+ * falls back to same-origin, which only works when something local proxies the API.
  */
 export const API_URL = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
 

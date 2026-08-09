@@ -1,53 +1,25 @@
-# Netlify config for the MYPOKER Mini App.
+# Netlify hosts the MYPOKER Mini App as a STATIC SPA. There are no serverless
+# functions — none, deliberately.
 #
-# Lives at the repo root (not in frontend/) because the auth function imports the
-# shared verification code from game-server/ — the build context has to span both
-# packages, so a base of "frontend" would cut the function off from it.
+# The app is a static bundle that talks only to the game-server gateway (auth,
+# lobby, jackpot, live tables) — the documented architecture in
+# docs/handoff/02-architecture.md. Point the frontend at the gateway by setting
+# VITE_API_URL (and VITE_TABLES_URL / VITE_TABLES_WS_URL for the socket) in the
+# Netlify build environment. Nothing is served same-origin by Netlify except the
+# static files themselves.
 
 [build]
-  # Only the frontend is installed. The functions import from game-server/src,
-  # but every module they reach is dependency-free (node builtins only), so
-  # there is nothing to resolve. Keep it that way: Netlify leaves bare imports
-  # external, so a third-party package anywhere in a function's import graph
-  # fails at runtime with module-not-found, not at build time.
-  command = "npm --prefix frontend install && npm --prefix frontend run build"
-  publish = "frontend/dist"
-  functions = "netlify/functions"
+  base = "frontend"
+  command = "npm install && npm run build"
+  publish = "dist"
 
-# Serverless API. These MUST come before the SPA fallback below — redirect rules
-# are evaluated top-down, and the catch-all would otherwise swallow them and
-# serve index.html instead of running the function.
-[[redirects]]
-  from = "/auth/*"
-  to = "/.netlify/functions/auth-:splat"
-  status = 200
-
-# The lobby is a static seed today, so it runs serverless. When the game loop
-# owns live lobby state this has to move to the running gateway — state cannot
-# be rebuilt per request.
-[[redirects]]
-  from = "/lobby/*"
-  to = "/.netlify/functions/lobby/:splat"
-  status = 200
-
-[[redirects]]
-  from = "/lobby"
-  to = "/.netlify/functions/lobby"
-  status = 200
-
-# Jackpot pools — same static-seed caveat as the lobby above.
-[[redirects]]
-  from = "/jackpot"
-  to = "/.netlify/functions/jackpot"
-  status = 200
-
-# SPA fallback — every other route serves index.html (React Router handles it).
+# SPA fallback — every route serves index.html; React Router takes it from there.
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# Allow embedding inside the Telegram in-app browser.
+# Allow embedding inside the Telegram in-app browser + basic hardening.
 [[headers]]
   for = "/*"
   [headers.values]
