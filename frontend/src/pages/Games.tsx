@@ -61,10 +61,9 @@ export function Games() {
       >
         <div className="absolute inset-0" style={{ backgroundImage: 'var(--brand-gradient)', opacity: 0.9 }} />
         <img 
-          src="/brand/jackpot.png" 
-          alt="Jackpot" 
-          className="absolute left-0 top-0 h-full object-cover mix-blend-screen opacity-90" 
-          style={{ maskImage: 'linear-gradient(to right, black 50%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to right, black 50%, transparent 100%)' }}
+          src="/brand/unnamed.png" 
+          alt="Grand Jackpot Trophy" 
+          className="absolute left-2 top-1/2 -translate-y-1/2 h-[115%] w-auto object-contain drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)] z-10 pointer-events-none" 
         />
         <motion.div
           className="absolute inset-y-0 w-1/3 bg-white/20 blur-2xl"
@@ -72,7 +71,7 @@ export function Games() {
           animate={{ x: '360%' }}
           transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut', repeatDelay: 1.5 }}
         />
-        <div className="relative text-white z-10 flex flex-col items-center pl-10">
+        <div className="relative text-white z-10 flex flex-col items-center pl-20">
           <div className="text-[0.7rem] font-bold uppercase tracking-wider text-white/90">
             Grand Jackpot
           </div>
