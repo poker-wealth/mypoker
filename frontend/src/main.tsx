@@ -11,10 +11,13 @@ import { ConnectionBanner } from '@/components/ConnectionBanner';
 import { LanguageGate } from '@/components/LanguageGate';
 import { Onboarding } from '@/components/Onboarding';
 import { router } from '@/router';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 // Imported for its side effect: initialises i18next before anything renders, so
 // the first paint is already in the right language.
 import '@/i18n';
 import './index.css';
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'unset-google-client-id';
 
 initTelegram();
 watchConnection();
@@ -38,7 +41,9 @@ createRoot(document.getElementById('root')!).render(
       <Toaster />
       <LanguageGate />
       <Onboarding />
-      <RouterProvider router={router} />
+      <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+        <RouterProvider router={router} />
+      </GoogleOAuthProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

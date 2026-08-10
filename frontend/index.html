@@ -56,22 +56,6 @@
         filter: drop-shadow(0 0 28px rgb(187 92 246 / 0.45));
         animation: splash-turn 3.4s linear infinite;
       }
-      #splash-bar {
-        width: 116px;
-        height: 3px;
-        border-radius: 999px;
-        overflow: hidden;
-        background: rgb(255 255 255 / 0.09);
-      }
-      #splash-bar::after {
-        content: '';
-        display: block;
-        width: 40%;
-        height: 100%;
-        border-radius: 999px;
-        background: linear-gradient(90deg, #6366f1, #bb5cf6, #00d4ff);
-        animation: splash-sweep 1.15s ease-in-out infinite;
-      }
       @keyframes splash-in {
         from { opacity: 0; transform: scale(0.94); }
         to   { opacity: 1; transform: scale(1); }
@@ -80,16 +64,11 @@
         from { transform: rotateY(0deg); }
         to   { transform: rotateY(360deg); }
       }
-      @keyframes splash-sweep {
-        0%   { transform: translateX(-100%); }
-        100% { transform: translateX(350%); }
-      }
       /* Honour the OS setting: show the same screen, just hold it still. */
       @media (prefers-reduced-motion: reduce) {
         #splash { transition-duration: 1ms; }
         #splash-mark-wrap { animation: none; }
         #splash-mark { animation: none; }
-        #splash-bar::after { animation: none; width: 100%; }
       }
     </style>
   </head>
@@ -103,7 +82,6 @@
           onerror="this.onerror=null;this.src='/brand/logo-mark.png'"
         />
       </div>
-      <div id="splash-bar"></div>
     </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
