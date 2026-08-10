@@ -21,7 +21,8 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "watch:deposits": "ts-node scripts/deposit-watcher.ts"
   },
   "dependencies": {
     "@noble/curves": "^1.9.7",
