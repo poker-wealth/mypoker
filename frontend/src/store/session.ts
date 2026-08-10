@@ -1,7 +1,15 @@
 import { create } from 'zustand';
 import i18n from 'i18next';
 import { setAuthToken, setUnauthorizedHandler, ApiError } from '@/api/client';
-import { loginWithTelegram, loginAsDevPlayer, type Player } from '@/api/auth';
+import {
+  loginWithTelegram,
+  loginAsDevPlayer,
+  loginWithGoogle,
+  loginWithEmail,
+  signupWithEmail,
+  type LoginResponse,
+  type Player,
+} from '@/api/auth';
 import { initData } from '@/lib/telegram';
 import { DEV_AUTH_BYPASS } from '@/config';
 import { toast } from '@/lib/toast';
@@ -44,13 +52,37 @@ interface SessionState {
   error: string | null;
   /** Sign in from the Telegram launch payload. Safe to call more than once. */
   signIn: () => Promise<void>;
+  /** Browser sign-in: exchange a Google OAuth access token for a session. */
+  signInWithGoogle: (accessToken: string) => Promise<void>;
+  signInWithEmail: (email: string, passwordPlain: string) => Promise<void>;
+  signUpWithEmail: (email: string, passwordPlain: string, displayName?: string) => Promise<void>;
   signOut: () => void;
 }
 
 const storedToken = localStorage.getItem(TOKEN_KEY);
 setAuthToken(storedToken);
 
-export const useSession = create<SessionState>((set, get) => ({
+export const useSession = create<SessionState>((set, get) => {
+  // Shared tail of every browser login flavour: run the exchange, store what
+  // came back, tell the player. Only how the credential is obtained differs.
+  const settle = async (login: () => Promise<LoginResponse>): Promise<void> => {
+    if (get().status === 'authenticating') return;
+    set({ status: 'authenticating', error: null });
+    try {
+      const { token, player } = await login();
+      setAuthToken(token);
+      persist(token, player);
+      set({ token, player, status: 'authenticated', error: null });
+      toast.success(i18n.t('toasts.signedIn', { name: player.displayName }));
+    } catch (e) {
+      const message = e instanceof ApiError ? e.message : i18n.t('toasts.signInFailed');
+      set({ status: 'error', error: message });
+      toast.error(message);
+      throw e;
+    }
+  };
+
+  return {
   token: storedToken,
   player: storedToken ? readStoredPlayer() : null,
   status: storedToken ? 'authenticated' : 'idle',
@@ -84,6 +116,18 @@ export const useSession = create<SessionState>((set, get) => ({
     }
   },
 
+  signInWithGoogle: async (accessToken) => {
+    await settle(() => loginWithGoogle(accessToken));
+  },
+
+  signInWithEmail: async (email, passwordPlain) => {
+    await settle(() => loginWithEmail(email, passwordPlain));
+  },
+
+  signUpWithEmail: async (email, passwordPlain, displayName) => {
+    await settle(() => signupWithEmail(email, passwordPlain, displayName));
+  },
+
   signOut: () => {
     setAuthToken(null);
     persist(null, null);
@@ -94,7 +138,8 @@ export const useSession = create<SessionState>((set, get) => ({
     set({ token: null, player: null, status: 'anonymous', error: null });
     toast.info(i18n.t('toasts.signedOut'));
   },
-}));
+  };
+});
 
 // A 401 from any call means the token is dead — drop it rather than letting the
 // UI keep claiming the player is signed in.

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'motion/react';
-import { Trophy, Lock, Clock } from 'lucide-react';
+import { Lock, Clock } from 'lucide-react';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useJackpot, useJackpotHistory } from '@/api/hooks';
@@ -54,7 +54,8 @@ export function Jackpot() {
 
       {jackpot.isSuccess && (
         <>
-          <div className="rounded-(--radius-app) border border-jackpot/30 bg-jackpot/10 p-4 text-center">
+          <div className="relative overflow-hidden rounded-(--radius-app) border border-jackpot/30 bg-jackpot/10 p-4 text-center">
+            <img src="/brand/unnamed.png" alt="Trophy" className="absolute -right-2 -bottom-2 h-20 w-auto opacity-20 object-contain pointer-events-none" />
             <div className="text-[0.66rem] font-bold uppercase tracking-widest text-jackpot/80">
               {t('jackpot.totalPools')}
             </div>
@@ -251,7 +252,7 @@ function GrandWindow({ grand }: { grand: { open: boolean; opensAt: string; close
           animate={{ scale: [1, 1.12, 1] }}
           transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
         >
-          <Trophy size={22} className="shrink-0 text-success" />
+          <img src="/brand/unnamed.png" alt="Trophy" className="size-7 object-contain shrink-0 drop-shadow-[0_2px_8px_rgba(234,179,8,0.5)]" />
         </motion.div>
       ) : (
         <Clock size={22} className="shrink-0 text-dim" />

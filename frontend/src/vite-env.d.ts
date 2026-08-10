@@ -1,6 +1,8 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  /** Google OAuth client id (Web application type) for browser sign-in. */
+  readonly VITE_GOOGLE_CLIENT_ID?: string;
   /** Base URL of the game-server gateway, e.g. http://localhost:4100. */
   readonly VITE_API_URL?: string;
   /**

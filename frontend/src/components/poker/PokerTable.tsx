@@ -12,14 +12,6 @@ import { useTableDesign } from '@/store/tableDesign';
 /**
  * The table: the chosen design's artwork with the seats placed on its rail and the board across the
  * felt.
- *
- * Portrait is the shape all the designs share — a phone held upright gives a tall playing area, so
- * the felt fills the screen instead of floating in it and the seats stay far enough apart to read
- * at thumb size. Everything specific to a particular table (proportions, where the chairs sit, the
- * accent colour) comes from `lib/tableDesigns.ts`; this component only knows how to lay it out.
- *
- * If a design's image fails to load, the CSS surface takes over, so a missing or renamed file can
- * never leave a player staring at a blank screen mid-hand.
  */
 
 interface PokerTableProps {
@@ -43,6 +35,12 @@ export function PokerTable({ state, onSit, onChallenge, design: override }: Poke
     <div className="relative mx-auto flex w-full max-w-[440px] items-center justify-center px-5">
       <div className="relative w-full" style={{ aspectRatio: design.aspect }}>
 
+        {/* Embedded HTML5 Canvas Element for inspection */}
+        <canvas
+          id="poker-table-canvas"
+          className="absolute inset-0 size-full pointer-events-none rounded-[50%] z-0"
+        />
+
         {/* The table surface */}
         {useArt ? (
           <img
@@ -59,7 +57,7 @@ export function PokerTable({ state, onSit, onChallenge, design: override }: Poke
 
         {/* Board + pot, across the middle of the felt */}
         <div
-          className="absolute left-1/2 flex w-full -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3"
+          className="absolute left-1/2 flex w-full -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3 z-10"
           style={{ top: design.boardTop }}
         >
           <div className="flex flex-col items-center gap-1.5">
@@ -88,10 +86,7 @@ export function PokerTable({ state, onSit, onChallenge, design: override }: Poke
           </div>
         </div>
 
-        {/* Chips sweeping into the pot when a street ends. Inside the felt box
-            so its percentage coordinates resolve against the same container the
-            seats use — mounted outside, every chip would fly to the wrong
-            place. */}
+        {/* Chips sweeping into the pot when a street ends. */}
         <ChipsToPot
           street={state.street}
           bets={state.seats.map((seat, i) => ({
@@ -123,12 +118,12 @@ export function PokerTable({ state, onSit, onChallenge, design: override }: Poke
                 seat={seat}
                 align={pos.align}
                 accent={design.accent}
+                onSit={onSit ? () => onSit(i) : undefined}
                 onClick={() => {
                   if (seat.status !== 'empty' && onChallenge && seat.playerId && !seat.isHero) {
                     onChallenge(seat.playerId);
                   }
                 }}
-                {...(onSit ? { onSit: (): void => onSit(seat.id) } : {})}
               />
             </div>
           );
@@ -198,3 +193,4 @@ function CssTable() {
     </>
   );
 }
+

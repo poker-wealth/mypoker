@@ -14,6 +14,7 @@ import { useStats, useReputation } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
 import { moneyFromDecimal } from '@/lib/money';
 import { isTelegram } from '@/lib/telegram';
+import { GoogleAuthButton } from '@/components/GoogleAuthButton';
 import { LANGUAGES } from '@/i18n/languages';
 
 export function Profile() {
@@ -65,27 +66,29 @@ export function Profile() {
 
       {/* Sign-in CTA — hidden once signed in */}
       {!signedIn && (
-        <div className="rounded-(--radius-app) border border-brand/30 bg-brand/5 p-4">
-          <div className="text-sm font-semibold">
-            {status === 'anonymous'
-              ? t('account.openInTelegramTitle')
-              : t('account.signInTitle')}
-          </div>
-          <div className="mt-1 text-xs text-dim">
-            {status === 'anonymous'
-              ? t('account.openInTelegramBlurb')
-              : t('account.signInBlurb')}
+        <div className="rounded-(--radius-app) border border-brand/30 bg-brand/5 p-4 space-y-3">
+          <div>
+            <div className="text-sm font-semibold">
+              {isTelegram() ? t('account.signInTitle') : 'Sign in to save your progress'}
+            </div>
+            <div className="mt-1 text-xs text-dim">
+              {isTelegram()
+                ? t('account.signInBlurb')
+                : 'Sign in with your Google account on the web to track stats, access your wallet, and save game progress.'}
+            </div>
           </div>
           {status === 'error' && error && (
-            <div className="mt-2 text-xs text-danger">{error}</div>
+            <div className="text-xs text-danger">{error}</div>
           )}
-          {(isTelegram() || status === 'error') && (
-            <Button full className="mt-3" onClick={() => void signIn()} disabled={status === 'authenticating'}>
+          {isTelegram() ? (
+            <Button full onClick={() => void signIn()} disabled={status === 'authenticating'}>
               <Send size={17} />
               {status === 'authenticating'
                 ? t('account.signingIn')
                 : t('account.continueWithTelegram')}
             </Button>
+          ) : (
+            <GoogleAuthButton />
           )}
         </div>
       )}

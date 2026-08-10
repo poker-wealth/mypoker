@@ -6,6 +6,15 @@ import { signToken } from '../../src/http/jwt';
 import { AccountModel } from '../../src/wallet/account.model';
 import { LedgerModel } from '../../src/wallet/ledger.model';
 import { SecurityLogModel } from '../../src/security/security-log.model';
+
+/**
+ * A checksum-valid TRON address (the public USDT-TRC20 contract).
+ *
+ * Real rather than a placeholder because /me/withdrawals validates the address
+ * before creating any state — a fake string makes every withdrawal test a test
+ * of the validator instead of the flow it means to exercise.
+ */
+const VALID_TRON_ADDRESS = 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t';
 import { SettlementModel } from '../../src/settlement/settlement.model';
 import { WithdrawalModel } from '../../src/withdrawal/withdrawal.model';
 import { OFFICIAL_USDT_TRC20_CONTRACT } from '../../src/deposit/trc20';
@@ -110,7 +119,15 @@ describe('Financial Core HTTP API (/api/v1)', () => {
     expect(await balRes.json()).toMatchObject({ playerId: 'p-api', available: '500.000000' });
 
     // Player requests a withdrawal.
-    const wRes = await post('/me/withdrawals', { amount: '200', address: 'TXaddr' }, playerToken('p-api'));
+    // A checksum-valid TRON address. 'TXaddr' was a placeholder, and the
+    // withdrawal route now rejects malformed addresses before creating any
+    // state — so the test data has to be a real address or it exercises the
+    // validator instead of the flow.
+    const wRes = await post(
+      '/me/withdrawals',
+      { amount: '200', address: VALID_TRON_ADDRESS },
+      playerToken('p-api'),
+    );
     expect(wRes.status).toBe(201);
     expect(await wRes.json()).toMatchObject({ state: 'REQUESTED' });
   });
@@ -137,7 +154,11 @@ describe('Financial Core HTTP API (/api/v1)', () => {
     expect(bad.status).toBe(400);
 
     // Overdraft withdrawal → 409.
-    const res = await post('/me/withdrawals', { amount: '999', address: 'TXaddr' }, playerToken('broke'));
+    const res = await post(
+      '/me/withdrawals',
+      { amount: '999', address: VALID_TRON_ADDRESS },
+      playerToken('broke'),
+    );
     expect(res.status).toBe(409);
   });
 

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
-import { Trophy } from 'lucide-react';
 import { haptic } from '@/lib/telegram';
 import { chips } from '@/lib/money';
 import type { JackpotTier } from '@/api/jackpot';
@@ -95,10 +94,14 @@ export function JackpotBurst({ win, onDone }: { win: JackpotWin | null; onDone: 
             transition={reduced ? { duration: 0.2 } : { type: 'spring', stiffness: 260, damping: 18 }}
           >
             <motion.div
-              animate={reduced ? {} : { rotate: [0, -8, 8, 0] }}
-              transition={{ duration: 0.9, repeat: Infinity, repeatDelay: 0.5 }}
+              animate={reduced ? {} : { rotate: [0, -6, 6, 0], scale: [1, 1.06, 1] }}
+              transition={{ duration: 1.2, repeat: Infinity, repeatDelay: 0.3 }}
             >
-              <Trophy size={52} className={`mx-auto ${style.text}`} />
+              <img 
+                src="/brand/unnamed.png" 
+                alt="Trophy" 
+                className="mx-auto h-20 w-auto object-contain drop-shadow-[0_6px_20px_rgba(234,179,8,0.6)]" 
+              />
             </motion.div>
 
             <div className={`mt-3 text-xs font-black uppercase tracking-[0.2em] ${style.text}`}>
