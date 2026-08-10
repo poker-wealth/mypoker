@@ -33,7 +33,7 @@ export function Login() {
           await signInWithGoogle(credentialResponse.access_token);
           navigate('/');
         }
-      } catch (err) {
+      } catch {
         toast.error('Google login failed');
       }
     },
