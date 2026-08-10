@@ -118,12 +118,12 @@ export function PokerTable({ state, onSit, onChallenge, design: override }: Poke
                 seat={seat}
                 align={pos.align}
                 accent={design.accent}
+                onSit={onSit ? () => onSit(i) : undefined}
                 onClick={() => {
                   if (seat.status !== 'empty' && onChallenge && seat.playerId && !seat.isHero) {
                     onChallenge(seat.playerId);
                   }
                 }}
-                {...(onSit ? { onSit: (): void => onSit(seat.id) } : {})}
               />
             </div>
           );

@@ -29,36 +29,25 @@ const AVATAR = 'size-[56px] sm:size-[62px]';
 
 export function PlayerSeat({ seat, align = 'bottom', onSit, onClick, accent = 'var(--accent)' }: PlayerSeatProps) {
   if (seat.status === 'empty') {
-    // On a live table an open chair is the invitation to play — make it obviously tappable.
-    if (onSit) {
-      return (
-        <motion.button
-          whileTap={{ scale: 0.93 }}
-          onClick={onSit}
-          className={cn(
-            AVATAR,
-            'grid place-items-center rounded-full border-[1.5px] border-dashed text-[0.55rem] font-bold leading-tight tracking-wider backdrop-blur-sm transition-opacity hover:opacity-100',
-            'opacity-80',
-          )}
-          style={{
-            borderColor: accent,
-            color: accent,
-            background: `color-mix(in srgb, ${accent} 14%, rgba(0,0,0,0.45))`,
-          }}
-        >
-          SIT
-          <br />
-          HERE
-        </motion.button>
-      );
-    }
     return (
-      <div
+      <motion.button
+        whileTap={{ scale: 0.93 }}
+        onClick={onSit || onClick}
         className={cn(
           AVATAR,
-          'grid place-items-center rounded-full border-[1.5px] border-dashed border-white/15 bg-black/30 text-[0.5rem] leading-tight tracking-wider text-white/40',
+          'grid place-items-center rounded-full border-[1.5px] border-dashed text-[0.6rem] font-black leading-tight tracking-wider backdrop-blur-md transition-all hover:opacity-100 shadow-md',
+          'opacity-90 hover:scale-105',
         )}
-      />
+        style={{
+          borderColor: accent,
+          color: accent,
+          background: `color-mix(in srgb, ${accent} 20%, rgba(0,0,0,0.6))`,
+        }}
+      >
+        + SIT
+        <br />
+        HERE
+      </motion.button>
     );
   }
 
