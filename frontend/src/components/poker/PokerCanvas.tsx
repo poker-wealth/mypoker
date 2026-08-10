@@ -74,7 +74,7 @@ export function PokerCanvas({ state, onSit, onChallenge }: PokerCanvasProps) {
 
     // Brand Watermark on Felt
     ctx.save();
-    ctx.font = 'bold 32px Inter, sans-serif';
+    ctx.font = "bold 32px 'Nunito', 'Lora', 'Inter', 'Poppins', sans-serif";
     ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -86,7 +86,7 @@ export function PokerCanvas({ state, onSit, onChallenge }: PokerCanvasProps) {
     if (state.pot > 0) {
       const potText = `POT $${(state.pot / 1_000_000).toLocaleString()}`;
       ctx.save();
-      ctx.font = 'bold 13px Inter, sans-serif';
+      ctx.font = "bold 13px 'Nunito', 'Lora', 'Inter', 'Poppins', sans-serif";
       const textWidth = ctx.measureText(potText).width;
       const pillW = textWidth + 24;
       const pillH = 26;
@@ -177,7 +177,7 @@ export function PokerCanvas({ state, onSit, onChallenge }: PokerCanvasProps) {
 
         // Player Initial
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 16px Inter, sans-serif';
+        ctx.font = "bold 16px 'Nunito', 'Lora', 'Inter', 'Poppins', sans-serif";
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         const initial = (seat.name || 'P').charAt(0).toUpperCase();
@@ -200,13 +200,13 @@ export function PokerCanvas({ state, onSit, onChallenge }: PokerCanvasProps) {
         ctx.stroke();
 
         // Name
-        ctx.font = 'bold 10px Inter, sans-serif';
+        ctx.font = "bold 10px 'Nunito', 'Lora', 'Inter', 'Poppins', sans-serif";
         ctx.fillStyle = '#f3f4f6';
         ctx.textAlign = 'center';
         ctx.fillText(truncateText(ctx, seat.name || 'Player', labelW - 10), seatX, labelY + 12);
 
         // Chips / Status
-        ctx.font = 'bold 10px Inter, sans-serif';
+        ctx.font = "bold 10px 'Nunito', 'Lora', 'Inter', 'Poppins', sans-serif";
         ctx.fillStyle = '#f5b93b';
         const chipText = `$${(seat.stack / 1_000_000).toLocaleString()}`;
         ctx.fillText(chipText, seatX, labelY + 24);
@@ -229,7 +229,7 @@ export function PokerCanvas({ state, onSit, onChallenge }: PokerCanvasProps) {
           const betY = seatY + (centerY - seatY) * 0.35;
 
           ctx.save();
-          ctx.font = 'bold 10px Inter, sans-serif';
+          ctx.font = "bold 10px 'Nunito', 'Lora', 'Inter', 'Poppins', sans-serif";
           ctx.fillStyle = '#00d4ff';
           ctx.textAlign = 'center';
           ctx.fillText(`$${(seat.bet / 1_000_000).toLocaleString()}`, betX, betY);
@@ -249,7 +249,7 @@ export function PokerCanvas({ state, onSit, onChallenge }: PokerCanvasProps) {
         ctx.stroke();
 
         ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-        ctx.font = 'bold 11px Inter, sans-serif';
+        ctx.font = "bold 11px 'Nunito', 'Lora', 'Inter', 'Poppins', sans-serif";
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('+ SIT', seatX, seatY);
@@ -350,12 +350,12 @@ function drawCard(
 
   // Rank & Suit
   ctx.fillStyle = isRed ? '#dc2626' : '#111827';
-  ctx.font = `bold ${mini ? 11 : 16}px Inter, sans-serif`;
+  ctx.font = `bold ${mini ? 11 : 16}px 'Nunito', 'Lora', 'Inter', 'Poppins', sans-serif`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.fillText(rank, x + (mini ? 3 : 5), y + (mini ? 2 : 4));
 
-  ctx.font = `${mini ? 10 : 14}px Inter, sans-serif`;
+  ctx.font = `${mini ? 10 : 14}px 'Nunito', 'Lora', 'Inter', 'Poppins', sans-serif`;
   ctx.fillText(suitSymbol, x + (mini ? 3 : 5), y + (mini ? 14 : 22));
 
   // Big center suit
