@@ -13,6 +13,7 @@ import { Vip } from '@/pages/Vip';
 import { Notifications } from '@/pages/Notifications';
 import { AgentCenter } from '@/pages/AgentCenter';
 import { Table } from '@/pages/Table';
+import { Login } from '@/pages/Login';
 
 export const router = createBrowserRouter([
   {
@@ -28,6 +29,9 @@ export const router = createBrowserRouter([
       // Not a tab — reached from My Account's deposit/withdraw.
       { path: 'wallet', element: <Wallet /> },
       { path: 'settings', element: <Settings /> },
+      // Browser sign-in (email/password + Google); inside Telegram the Mini App
+      // signs in automatically and this screen is never routed to.
+      { path: 'login', element: <Login /> },
       { path: 'fairness', element: <Fairness /> },
       { path: 'jackpot', element: <Jackpot /> },
       { path: 'vip', element: <Vip /> },

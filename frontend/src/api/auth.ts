@@ -23,6 +23,25 @@ export function loginWithTelegram(initData: string): Promise<LoginResponse> {
   return api.post<LoginResponse>('/auth/telegram', { initData }, { anonymous: true });
 }
 
+/**
+ * The payload Telegram's Login Widget hands to its onauth callback. Signed with
+ * a different scheme than initData; the gateway verifies it at /auth/telegram-widget.
+ */
+export interface TelegramWidgetUser {
+  id: number;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date: number;
+  hash: string;
+}
+
+/** Exchange a Login Widget payload (browser sign-in, outside the Mini App) for a session. */
+export function loginWithTelegramWidget(user: TelegramWidgetUser): Promise<LoginResponse> {
+  return api.post<LoginResponse>('/auth/telegram-widget', user, { anonymous: true });
+}
+
 /** Dev-only sign-in for working in a plain browser. Rejected unless the server runs with it enabled. */
 export function loginAsDevPlayer(): Promise<LoginResponse> {
   return api.post<LoginResponse>('/auth/dev', {}, { anonymous: true });
@@ -31,4 +50,16 @@ export function loginAsDevPlayer(): Promise<LoginResponse> {
 /** Re-read the signed-in player (e.g. after a reload, to confirm the token is still good). */
 export function fetchMe(): Promise<Player> {
   return api.get<Player>('/auth/me');
+}
+
+export function signupWithEmail(email: string, passwordPlain: string, displayName?: string): Promise<LoginResponse> {
+  return api.post<LoginResponse>('/auth/signup', { email, password: passwordPlain, displayName }, { anonymous: true });
+}
+
+export function loginWithEmail(email: string, passwordPlain: string): Promise<LoginResponse> {
+  return api.post<LoginResponse>('/auth/login', { email, password: passwordPlain }, { anonymous: true });
+}
+
+export function loginWithGoogle(token: string): Promise<LoginResponse> {
+  return api.post<LoginResponse>('/auth/google', { credential: token, idToken: token }, { anonymous: true });
 }
