@@ -9,18 +9,19 @@ export function buildAuthRouter(): Router {
   const router = Router();
 
   router.post('/signup', (req: Request, res: Response) => {
-    const { email, password, displayName } = req.body;
+    const identifier = req.body.email || req.body.phone || req.body.identifier;
+    const { password, displayName } = req.body;
 
-    if (!email || !password) {
-      res.status(400).json({ error: 'email and password are required' });
+    if (!identifier || !password) {
+      res.status(400).json({ error: 'email or phone number and password are required' });
       return;
     }
 
-    createUserWithPassword(email, password, displayName)
+    createUserWithPassword(identifier, password, displayName)
       .then((user) => {
         res.json({
           playerId: user._id,
-          email: user.email,
+          email: user.email || user.phone,
           displayName: user.displayName,
         });
       })
@@ -30,14 +31,15 @@ export function buildAuthRouter(): Router {
   });
 
   router.post('/verify-password', (req: Request, res: Response) => {
-    const { email, password } = req.body;
+    const identifier = req.body.email || req.body.phone || req.body.identifier;
+    const { password } = req.body;
 
-    if (!email || !password) {
-      res.status(400).json({ error: 'email and password are required' });
+    if (!identifier || !password) {
+      res.status(400).json({ error: 'email or phone number and password are required' });
       return;
     }
 
-    verifyPassword(email, password)
+    verifyPassword(identifier, password)
       .then((user) => {
         if (!user) {
           res.status(401).json({ error: 'invalid email or password' });
@@ -45,7 +47,7 @@ export function buildAuthRouter(): Router {
         }
         res.json({
           playerId: user._id,
-          email: user.email,
+          email: user.email || user.phone,
           displayName: user.displayName,
         });
       })

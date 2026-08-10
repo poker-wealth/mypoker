@@ -106,9 +106,13 @@ export function buildAuthRouter(config: GatewayConfig): Router {
   });
 
   r.post('/signup', (req: Request, res: Response) => {
-    const { email, password, displayName } = (req.body ?? {}) as Record<string, string>;
+    const body = (req.body ?? {}) as Record<string, string>;
+    const email = body['email'] || body['phone'] || body['identifier'];
+    const password = body['password'];
+    const displayName = body['displayName'];
+
     if (!email || !password) {
-      res.status(400).json({ error: 'email and password are required' });
+      res.status(400).json({ error: 'email or phone number and password are required' });
       return;
     }
     authClient
@@ -118,9 +122,12 @@ export function buildAuthRouter(config: GatewayConfig): Router {
   });
 
   r.post('/login', (req: Request, res: Response) => {
-    const { email, password } = (req.body ?? {}) as Record<string, string>;
+    const body = (req.body ?? {}) as Record<string, string>;
+    const email = body['email'] || body['phone'] || body['identifier'];
+    const password = body['password'];
+
     if (!email || !password) {
-      res.status(400).json({ error: 'email and password are required' });
+      res.status(400).json({ error: 'email or phone number and password are required' });
       return;
     }
     authClient

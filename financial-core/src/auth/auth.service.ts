@@ -3,8 +3,15 @@ import { UserModel, type UserDoc } from './user.model';
 
 const SALT_ROUNDS = 10;
 
+export async function findUserByIdentifier(identifier: string): Promise<UserDoc | null> {
+  const clean = identifier.trim();
+  return UserModel.findOne({
+    $or: [{ email: clean.toLowerCase() }, { phone: clean }, { email: clean }],
+  }).lean();
+}
+
 export async function findUserByEmail(email: string): Promise<UserDoc | null> {
-  return UserModel.findOne({ email }).lean();
+  return findUserByIdentifier(email);
 }
 
 export async function findUserByGoogleId(googleId: string): Promise<UserDoc | null> {
@@ -12,28 +19,30 @@ export async function findUserByGoogleId(googleId: string): Promise<UserDoc | nu
 }
 
 export async function createUserWithPassword(
-  email: string,
+  identifier: string,
   passwordPlain: string,
   displayName?: string,
 ): Promise<UserDoc> {
-  const existing = await findUserByEmail(email);
+  const clean = identifier.trim();
+  const existing = await findUserByIdentifier(clean);
   if (existing) {
-    throw new Error('User with this email already exists');
+    throw new Error('User with this email or phone number already exists');
   }
 
   const passwordHash = await bcrypt.hash(passwordPlain, SALT_ROUNDS);
+  const isEmail = clean.includes('@');
   
   const user = await UserModel.create({
-    email,
+    ...(isEmail ? { email: clean.toLowerCase() } : { phone: clean }),
     passwordHash,
-    displayName: displayName || email.split('@')[0],
+    displayName: displayName || (isEmail ? clean.split('@')[0] : `User-${clean.slice(-4)}`),
   });
   
   return user.toObject();
 }
 
-export async function verifyPassword(email: string, passwordPlain: string): Promise<UserDoc | null> {
-  const user = await UserModel.findOne({ email }).lean();
+export async function verifyPassword(identifier: string, passwordPlain: string): Promise<UserDoc | null> {
+  const user = await findUserByIdentifier(identifier);
   if (!user || !user.passwordHash) return null;
 
   const isValid = await bcrypt.compare(passwordPlain, user.passwordHash);
