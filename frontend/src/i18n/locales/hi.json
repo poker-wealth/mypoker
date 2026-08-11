@@ -144,7 +144,13 @@
     "signOut": "साइन आउट",
     "buildLine": "MYPOKER · स्टेजिंग बिल्ड · v0.1",
     "noHands": "अभी तक कोई हाथ नहीं खेला",
-    "noHandsBlurb": "किसी टेबल से जुड़ें, आपका रिकॉर्ड यहाँ दिखेगा।"
+    "noHandsBlurb": "किसी टेबल से जुड़ें, आपका रिकॉर्ड यहाँ दिखेगा।",
+    "personalInfo": "व्यक्तिगत जानकारी",
+    "vipMembership": "VIP सदस्यता",
+    "checkPrivileges": "विशेषाधिकार देखें",
+    "inviteFriends": "मित्रों को आमंत्रित करें",
+    "earnRewards": "पुरस्कार कमाएँ",
+    "messageCenter": "संदेश केंद्र"
   },
   "wallet": {
     "totalBalance": "कुल बैलेंस",
@@ -176,7 +182,11 @@
     "insufficient": "Amount exceeds your available balance.",
     "invalidAddress": "That is not a valid TRON address.",
     "availableToWithdraw": "Available: {{amount}}",
-    "withdrawalsTitle": "Withdrawals"
+    "withdrawalsTitle": "Withdrawals",
+    "showBalance": "बैलेंस दिखाएँ",
+    "hideBalance": "बैलेंस छिपाएँ",
+    "detail": "विवरण",
+    "availableSplit": "उपलब्ध {{available}} · खेल में {{locked}}"
   },
   "table": {
     "fold": "फ़ोल्ड",

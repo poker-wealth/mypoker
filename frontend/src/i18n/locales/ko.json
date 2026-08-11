@@ -144,7 +144,13 @@
     "signOut": "로그아웃",
     "buildLine": "MYPOKER · 스테이징 빌드 · v0.1",
     "noHands": "아직 플레이 기록이 없습니다",
-    "noHandsBlurb": "테이블에 참여하면 기록이 여기에 표시됩니다."
+    "noHandsBlurb": "테이블에 참여하면 기록이 여기에 표시됩니다.",
+    "personalInfo": "개인정보",
+    "vipMembership": "VIP 멤버십",
+    "checkPrivileges": "혜택 보기",
+    "inviteFriends": "친구 초대",
+    "earnRewards": "보상 받기",
+    "messageCenter": "메시지 센터"
   },
   "wallet": {
     "totalBalance": "총 잔액",
@@ -176,7 +182,11 @@
     "insufficient": "Amount exceeds your available balance.",
     "invalidAddress": "That is not a valid TRON address.",
     "availableToWithdraw": "Available: {{amount}}",
-    "withdrawalsTitle": "Withdrawals"
+    "withdrawalsTitle": "Withdrawals",
+    "showBalance": "잔액 표시",
+    "hideBalance": "잔액 숨기기",
+    "detail": "상세",
+    "availableSplit": "사용 가능 {{available}} · 게임 중 {{locked}}"
   },
   "table": {
     "fold": "폴드",
