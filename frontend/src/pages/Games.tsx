@@ -21,7 +21,7 @@ export function Games() {
   const [q, setQ] = useState('');
 
   const lobby = useLobbyGames();
-  const jackpot = lobby.data ? `$ ${formatMicros(lobby.data.totalJackpot)}` : '$ 1,253,842.28';
+  const jackpot = lobby.data ? `$ ${formatMicros(lobby.data.totalJackpot)}` : '$ 0.00';
 
   const query = q.trim().toLowerCase();
   
@@ -61,7 +61,7 @@ export function Games() {
       >
         <div className="absolute inset-0" style={{ backgroundImage: 'var(--brand-gradient)', opacity: 0.9 }} />
         <img 
-          src="/brand/unnamed.png" 
+          src="/brand/trophy.png" 
           alt="Grand Jackpot Trophy" 
           className="absolute left-2 top-1/2 -translate-y-1/2 h-[115%] w-auto object-contain drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)] z-10 pointer-events-none" 
         />
@@ -84,7 +84,6 @@ export function Games() {
               {jackpot}
             </div>
           )}
-          <div className="mt-1 text-xs font-bold text-success drop-shadow-sm">+ $322.16 / hr</div>
         </div>
       </div>
 

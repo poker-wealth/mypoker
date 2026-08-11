@@ -217,7 +217,7 @@ describe('PokerRoom — a table real people sit at', () => {
   it('pushes a snapshot to every watcher when the table changes', async () => {
     const h = harness();
     const seen: TableSnapshot[] = [];
-    const stop = h.room.join(h.bob, { sendSnapshot: (snapshot: any) => { seen.push(snapshot); }, sendEvent: () => {} });
+    const stop = h.room.join(h.bob, { sendSnapshot: (snapshot: TableSnapshot) => { seen.push(snapshot); }, sendEvent: () => {} });
 
     await h.room.command(h.alice, { kind: 'sit', seat: 0, buyIn: 2_000 });
     expect(seen.length).toBeGreaterThanOrEqual(2); // initial + the sit

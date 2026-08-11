@@ -54,7 +54,6 @@ import { getVolumeFacts, recordVolume, getPublicRtp } from '../vip/volume-tracke
 import { AccountModel } from '../wallet/account.model';
 import { WithdrawalModel } from '../withdrawal/withdrawal.model';
 import { asyncHandler, internalAuth, dataScopeMiddleware, ApiError } from './middleware';
-import { buildAuthRouter } from '../auth/auth.routes';
 import { openApiSpec } from './openapi';
 
 const money = z.string().min(1);
@@ -397,7 +396,6 @@ export function buildRouter(): Router {
 
   // Web identity (email/password + Google) for the browser build. Kept behind
   // the internal secret: only the gateway calls these.
-  r.use('/internal/auth', internalAuth, buildAuthRouter());
 
   // Enrolment is an OPS action, not self-service. The spec routes agent
   // applications through customer service; a public endpoint would let anyone

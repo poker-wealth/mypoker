@@ -1,3 +1,5 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import {
   createAgent,
   createReferralLink,
@@ -238,8 +240,6 @@ describe('IRON RULE: an agent never sees a player balance', () => {
   });
 
   it('does not import the wallet or balance modules', () => {
-    const fs = require('node:fs') as typeof import('node:fs');
-    const path = require('node:path') as typeof import('node:path');
 
     const source = fs.readFileSync(
       path.join(__dirname, '..', '..', 'src', 'agent', 'agent-store.ts'),

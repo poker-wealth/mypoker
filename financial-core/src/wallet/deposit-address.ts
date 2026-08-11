@@ -1,5 +1,5 @@
 import mongoose, { Schema, type Model } from 'mongoose';
-import { OFFICIAL_USDT_TRC20_CONTRACT } from '../deposit/trc20';
+import { usdtContract } from '../config/chain';
 import { tronAddressFromXpub } from './tron-address';
 
 /**
@@ -42,7 +42,7 @@ const depositAddressSchema = new Schema<DepositAddressDoc>(
   },
   { timestamps: { createdAt: true, updatedAt: false }, versionKey: false },
 );
-const DepositAddressModel: Model<DepositAddressDoc> =
+export const DepositAddressModel: Model<DepositAddressDoc> =
   (mongoose.models.DepositAddress as Model<DepositAddressDoc>) ??
   mongoose.model<DepositAddressDoc>('DepositAddress', depositAddressSchema);
 
@@ -66,7 +66,7 @@ export async function getDepositAddress(playerId: string): Promise<DepositAddres
 
   const existing = await DepositAddressModel.findById(playerId).lean();
   if (existing) {
-    return { address: existing.address, network: 'TRC20', contract: OFFICIAL_USDT_TRC20_CONTRACT };
+    return { address: existing.address, network: 'TRC20', contract: usdtContract() };
   }
 
   // Reserve the next index atomically. If two first-requests race, each reserves
@@ -81,11 +81,11 @@ export async function getDepositAddress(playerId: string): Promise<DepositAddres
 
   try {
     await DepositAddressModel.create({ _id: playerId, index, address });
-    return { address, network: 'TRC20', contract: OFFICIAL_USDT_TRC20_CONTRACT };
+    return { address, network: 'TRC20', contract: usdtContract() };
   } catch {
     // Lost the race — the winner's address is authoritative.
     const winner = await DepositAddressModel.findById(playerId).lean();
-    if (winner) return { address: winner.address, network: 'TRC20', contract: OFFICIAL_USDT_TRC20_CONTRACT };
+    if (winner) return { address: winner.address, network: 'TRC20', contract: usdtContract() };
     throw new Error('deposit address assignment failed');
   }
 }

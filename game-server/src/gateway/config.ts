@@ -16,6 +16,9 @@ export interface GatewayConfig {
   financialCoreUrl: string;
   internalApiSecret: string;
   corsOrigins: string[];
+  /** The gateway's own database (identity/user store). */
+  mongoUri: string;
+  mongoTls: boolean;
 }
 
 function num(value: string | undefined, fallback: number): number {
@@ -40,12 +43,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
       .split(',')
       .map((o) => o.trim())
       .filter(Boolean),
+    mongoUri: env.MONGO_URI ?? '',
+    mongoTls: env.MONGO_TLS === 'true',
   };
 
   // A missing JWT secret would mean signing with '' — every token forgeable.
   if (!config.jwtSecret) {
     throw new Error('JWT_SECRET is required (it must match the Financial Core exactly)');
   }
+  // MONGO_URI is validated at connect time (server.ts -> connectDb), not here, so
+  // config-only consumers (tests, tooling that never opens the DB) don't need it.
   if (isProduction && !config.botToken) {
     throw new Error('TELEGRAM_BOT_TOKEN is required in production');
   }
