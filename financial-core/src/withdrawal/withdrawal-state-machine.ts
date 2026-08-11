@@ -18,6 +18,11 @@ import {
   WithdrawalNotFoundError,
 } from '../wallet/errors';
 import { WithdrawalModel, type WithdrawalDoc } from './withdrawal.model';
+import { networkLabel } from '../config/chain';
+import {
+  announceWithdrawalRequested,
+  announceWithdrawalSent,
+} from '../notifications/email/money-mail';
 
 /**
  * Withdrawal state machine (FairPlay §3.6). Each step moves funds across the player's
@@ -65,6 +70,17 @@ export async function requestWithdrawal(input: RequestWithdrawalInput): Promise<
       state: WithdrawalState.REQUESTED,
     },
   ]);
+
+  // The receipt. Sent at REQUESTED — before any balance moves — because this
+  // is the message that tells a player about a withdrawal they did not make,
+  // and it is worth least if it waits for the money to leave.
+  await announceWithdrawalRequested({
+    playerId: player.ownerId,
+    withdrawalId: doc!._id,
+    amount: input.amount.toString(),
+    address: input.address,
+  });
+
   return doc!._id;
 }
 
@@ -105,6 +121,21 @@ export async function broadcastWithdrawal(withdrawalId: string, txHash: string):
   );
   if (moved.matchedCount === 0) {
     throw new InvalidWithdrawalTransitionError(w.state, WithdrawalState.BROADCASTING);
+  }
+
+  // "It's on its way." Sent at BROADCASTING rather than CONFIRMED: the tx hash
+  // exists from here, and that is the thing a player wants — something they
+  // can paste into an explorer while they wait for confirmations.
+  const player = await AccountModel.findById(w.playerAccountId);
+  if (player) {
+    await announceWithdrawalSent({
+      playerId: player.ownerId,
+      withdrawalId,
+      amount: Money.fromDecimal128(w.amount).toString(),
+      address: w.address,
+      txHash,
+      network: networkLabel(),
+    });
   }
 }
 

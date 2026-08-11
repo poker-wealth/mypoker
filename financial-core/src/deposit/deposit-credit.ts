@@ -14,6 +14,8 @@ import { AccountNotFoundError, IllegalFundFlowError } from '../wallet/errors';
 import { alertOps } from '../lib/alert';
 import { SecurityLogModel } from '../security/security-log.model';
 import { isOfficialContract, isConfirmed } from './trc20';
+import { networkLabel } from '../config/chain';
+import { announceDeposit } from '../notifications/email/money-mail';
 
 /**
  * Deposit crediting (FairPlay §3.7). A confirmed on-chain USDT deposit is recorded as the
@@ -105,6 +107,21 @@ export async function creditDeposit(input: CreditDepositInput): Promise<{ credit
     if (isDuplicateKeyError(err)) return { credited: false };
     throw err;
   }
+
+  // AFTER the credit is written, and only when it actually was. Announcing a
+  // deposit that failed to commit is worse than announcing none: a player
+  // reads "₮500.00 received", checks the balance, and finds nothing.
+  //
+  // Awaited rather than fired and forgotten, because a floating promise in a
+  // serverless or short-lived process is a message that never gets sent —
+  // announce() swallows its own failures, so awaiting costs correctness
+  // nothing and cannot fail this credit.
+  await announceDeposit({
+    playerId: player.ownerId,
+    amount: input.amount.toString(),
+    txHash: input.txHash,
+    network: networkLabel(),
+  });
 
   return { credited: true };
 }
