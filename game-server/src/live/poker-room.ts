@@ -41,6 +41,7 @@ const chipsFromUsd = (decimal: string): number => {
   return Number.isSafeInteger(n) ? n : 0;
 };
 import type { HandResult } from '../games/texas/texas-hand';
+import type { LiveRoom, LiveTableConfig } from './live-room';
 import type { PlayerDirectory } from './players';
 import type {
   FairnessSnapshot,
@@ -72,9 +73,10 @@ import { newTargetState, evaluateChallenge, recordPrompt, recordResult, type Tar
  * mid-flight can't interleave and corrupt the hand.
  */
 
-export interface PokerRoomConfig {
+export interface PokerRoomConfig extends LiveTableConfig {
   id: string;
   name: string;
+  /** Which poker game this table hosts; also the `game` the hub dispatches on. */
   variantId: 'texas' | 'short-deck' | 'omaha';
   smallBlind: number;
   bigBlind: number;
@@ -159,6 +161,7 @@ const ABANDON_MULTIPLIER = 5;
 const MAX_SPECTATORS = 20;
 
 export const DEFAULT_ROOM: Omit<PokerRoomConfig, 'id' | 'name'> = {
+  game: 'texas',
   variantId: 'texas',
   smallBlind: 10,
   bigBlind: 20,
@@ -177,7 +180,7 @@ export const DEFAULT_ROOM: Omit<PokerRoomConfig, 'id' | 'name'> = {
   rake: { bps: 500, cap: 600, noFlopNoDrop: true },
 };
 
-export class PokerRoom {
+export class PokerRoom implements LiveRoom {
   readonly config: PokerRoomConfig;
   private readonly directory: PlayerDirectory;
   private readonly fc: FinancialCoreClient;
