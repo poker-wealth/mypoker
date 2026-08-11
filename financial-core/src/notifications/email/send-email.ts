@@ -1,5 +1,5 @@
 import { Schema, model } from 'mongoose';
-import { mailTransport } from './transport';
+import { mailTransport, mailConfig } from './transport';
 import type { EmailTemplate } from './templates';
 
 /**
@@ -76,7 +76,9 @@ export async function sendEmail(
 
   try {
     await transport.sendMail({
-      from: process.env.EMAIL_FROM ?? process.env.SMTP_USER,
+      // From the same config the transport was built from — re-reading env here
+      // would be a second copy of the fallback rule, free to drift from it.
+      from: mailConfig()!.from,
       to,
       subject: template.subject,
       html: template.html,
