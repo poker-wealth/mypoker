@@ -1,3 +1,5 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { Decimal128 } from 'bson';
 import {
   getReputationFacts,
@@ -77,8 +79,6 @@ describe('facts', () => {
 
 describe('IRON RULE: reputation never blocks funds', () => {
   it('is not imported by any withdrawal or balance module', () => {
-    const fs = require('node:fs') as typeof import('node:fs');
-    const path = require('node:path') as typeof import('node:path');
 
     const moneyDirs = ['withdrawal', 'wallet', 'settlement', 'deposit', 'clearing'];
     const offenders: string[] = [];

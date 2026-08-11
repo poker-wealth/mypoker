@@ -1,7 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import type { GatewayConfig } from './config';
-import { AuthClient } from '../core/auth-client';
+import { userStore } from '../auth/user-store';
 import { signToken, verifyToken, TokenError } from './tokens';
 import {
   verifyInitData,
@@ -72,14 +72,11 @@ export function requireAuth(config: GatewayConfig) {
 export function buildAuthRouter(config: GatewayConfig): Router {
   const r = Router();
 
-  // Web identity (email/password + Google) — the browser sign-in path. The
-  // account store lives in financial-core; this gateway only verifies the
-  // Google token / forwards credentials, then signs the same JWT every other
-  // login flavour gets.
-  const authClient = new AuthClient({
-    financialCoreUrl: config.financialCoreUrl,
-    internalSecret: config.internalApiSecret,
-  });
+  // Web identity (email/password + Google) — the browser sign-in path. The user
+  // store lives HERE in the gateway (financial-core is money-only and just
+  // verifies the JWT). This verifies the Google token / checks credentials, then
+  // signs the same JWT every other login flavour gets.
+  const authClient = userStore;
   const googleClient = new OAuth2Client();
 
   const issue = (player: PlayerProfile): { token: string; player: PlayerProfile } => ({

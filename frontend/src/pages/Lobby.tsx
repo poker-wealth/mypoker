@@ -31,9 +31,7 @@ const SAMPLE_TABLES: DisplayTable[] = [
 
 const VARIANTS = [
   { id: 'dezhou', label: 'DEZHOU' },
-  { id: 'xuzhou', label: 'XUZHOU' },
   { id: 'ausha', label: 'AUSHA' },
-  { id: 'macau', label: 'MACAU' },
   { id: 'others', label: 'OTHERS' },
 ];
 
@@ -60,7 +58,7 @@ export function Lobby() {
   });
 
   const rawJackpot = lobby.data?.totalJackpot;
-  const jackpotDisplay = rawJackpot ? `$ ${formatMicros(rawJackpot)}` : '$ 1,253,842.28';
+  const jackpotDisplay = rawJackpot ? `$ ${formatMicros(rawJackpot)}` : '$ 0.00';
 
   const backendTables = tablesData?.tables || [];
   const displayTables: DisplayTable[] =
@@ -96,7 +94,7 @@ export function Lobby() {
       >
         <div className="absolute inset-0" style={{ backgroundImage: 'var(--brand-gradient)', opacity: 0.9 }} />
         <img 
-          src="/brand/unnamed.png" 
+          src="/brand/trophy.png" 
           alt="Grand Jackpot Trophy" 
           className="absolute left-2 top-1/2 -translate-y-1/2 h-[115%] w-auto object-contain drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)] z-10 pointer-events-none" 
         />
@@ -119,7 +117,6 @@ export function Lobby() {
               {jackpotDisplay}
             </div>
           )}
-          <div className="mt-1 text-xs font-bold text-success drop-shadow-sm">+ $322.16 / hr</div>
         </div>
       </div>
 
