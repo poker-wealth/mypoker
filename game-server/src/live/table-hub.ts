@@ -4,7 +4,8 @@ import {
   type GameSocketServerConfig,
 } from '../transport/ws-server';
 import type { Inbound } from '../transport/protocol';
-import { PokerRoom, type PokerRoomConfig, type PokerRoomDeps } from './poker-room';
+import './rooms'; // side effect: registers every game's room implementation
+import { createRoom, type LiveRoom, type LiveTableConfig, type RoomDeps } from './live-room';
 import { tableCommandSchema, type TableSummary } from './room-state';
 
 /**
@@ -25,13 +26,13 @@ export type TokenVerifier = (token: string) => { playerId: string };
  * which player it is. Everything above that seam is poker.
  */
 export class TableHub {
-  private readonly rooms = new Map<string, PokerRoom>();
+  private readonly rooms = new Map<string, LiveRoom>();
   /** Per connection, per room: how to stop sending it snapshots. */
   private readonly subscriptions = new Map<ClientContext, Map<string, () => void>>();
   private readonly socket: GameSocketServer;
 
   constructor(
-    private readonly deps: PokerRoomDeps,
+    private readonly deps: RoomDeps,
     verifyToken: TokenVerifier,
     /** Optional connection log — see `GameSocketServerConfig.onEvent`. */
     onEvent?: GameSocketServerConfig['onEvent'],
@@ -44,15 +45,16 @@ export class TableHub {
     });
   }
 
-  /** Open a table. Returns the room so callers can inspect it in tests. */
-  addTable(config: PokerRoomConfig): PokerRoom {
+  /** Open a table. The `game` on the config selects which room implementation runs it. The config
+   *  is the full per-game config (poker blinds, etc.); the factory for that game reads its own fields. */
+  addTable<C extends LiveTableConfig>(config: C): LiveRoom {
     if (this.rooms.has(config.id)) throw new Error(`table already exists: ${config.id}`);
-    const room = new PokerRoom(config, this.deps);
+    const room = createRoom(config, this.deps);
     this.rooms.set(config.id, room);
     return room;
   }
 
-  room(tableId: string): PokerRoom | undefined {
+  room(tableId: string): LiveRoom | undefined {
     return this.rooms.get(tableId);
   }
 
@@ -87,6 +89,10 @@ export class TableHub {
     switch (msg.type) {
       case 'join': {
         this.unsubscribe(ctx, msg.roomId); // re-joining resyncs rather than double-subscribing
+        // Warm this player's real balance before they can sit. The buy-in pre-check reads the
+        // directory synchronously; priming on join means it is fresh by sit-time. No-op for the
+        // in-memory dev directory.
+        void this.deps.directory.prime?.(playerId);
         let stop: () => void;
         try {
           stop = room.join(playerId, {

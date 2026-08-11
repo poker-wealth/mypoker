@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { Money } from '../domain/money';
-import { LedgerType, LedgerDirection } from '../domain/account-types';
+import { LedgerType, LedgerDirection, PLATFORM_SCOPE } from '../domain/account-types';
 import { LedgerModel } from '../wallet/ledger.model';
 import { transfer } from '../wallet/transfer';
 import { TableType } from '../settlement/settlement-domain';
@@ -781,6 +781,22 @@ export function buildRouter(): Router {
     }),
   );
 
+  // Resolve a player's account id for money movement. Per the spec the account `_id` is a UUID and
+  // `owner_id` is the playerId, and the money layer keys by `_id`; callers pass the playerId (what
+  // the platform holds), so we resolve it to the account here. Scoping by table type is also what
+  // enforces Platform/League dual-wallet isolation — the same player is a DIFFERENT account inside a
+  // league, so a league hand can never touch platform funds and vice-versa.
+  function playerScope(tableType: TableType | undefined, leagueId: string | undefined): string {
+    if (tableType === TableType.LEAGUE) {
+      if (!leagueId) throw new ApiError(400, 'leagueId is required for a LEAGUE table');
+      return leagueId;
+    }
+    return PLATFORM_SCOPE;
+  }
+  async function resolvePlayerAccountId(playerId: string, scope: string): Promise<string> {
+    return (await getOrCreatePlayerAccount(playerId, scope))._id;
+  }
+
   const settleBody = z.object({
     roundId: z.string().min(1),
     tableType: z.nativeEnum(TableType),
@@ -800,11 +816,15 @@ export function buildRouter(): Router {
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
       const b = settleBody.parse(req.body);
+      const winnerAccountId = await resolvePlayerAccountId(
+        b.winnerAccountId,
+        playerScope(b.tableType, b.leagueId),
+      );
       const receipt = await settleRound({
         roundId: b.roundId,
         tableType: b.tableType,
         ...(b.leagueId ? { leagueId: b.leagueId } : {}),
-        winnerAccountId: b.winnerAccountId,
+        winnerAccountId,
         winnerProfit: Money.fromDecimalString(b.winnerProfit),
         rake: Money.fromDecimalString(b.rake),
         jackpotAccounts: b.jackpotAccounts,
@@ -843,12 +863,21 @@ export function buildRouter(): Router {
       const tableOwner = b.jackpotAccounts.mini.split(':')[1] || b.roundId;
       await ensureJackpotAccounts(tableOwner, b.jackpotAccounts);
       const m = (s: string): Money => Money.fromDecimalString(s);
+      // Each party is a playerId (owner_id); resolve to its account _id in the table's scope before
+      // the ledger, which keys by _id. The scope routes a league hand to the player's league wallet.
+      const scope = playerScope(b.tableType, b.leagueId);
+      const losers = await Promise.all(
+        b.losers.map(async (l) => ({ accountId: await resolvePlayerAccountId(l.playerAccountId, scope), amount: m(l.amount) })),
+      );
+      const winners = await Promise.all(
+        b.winners.map(async (w) => ({ accountId: await resolvePlayerAccountId(w.playerAccountId, scope), amount: m(w.amount) })),
+      );
       const result = await settleTableHand({
         roundId: b.roundId,
         tableType: b.tableType,
         ...(b.leagueId ? { leagueId: b.leagueId } : {}),
-        losers: b.losers.map((l) => ({ accountId: l.playerAccountId, amount: m(l.amount) })),
-        winners: b.winners.map((w) => ({ accountId: w.playerAccountId, amount: m(w.amount) })),
+        losers,
+        winners,
         rake: m(b.rake),
         jackpot: {
           mini: m(b.jackpot.mini),
@@ -862,13 +891,21 @@ export function buildRouter(): Router {
     }),
   );
 
-  const seatBody = z.object({ playerAccountId: accountId, amount: money });
+  // playerAccountId is a playerId (owner_id); tableType/leagueId select the scope so the buy-in
+  // locks the SAME account settlement will pay from. Absent → PLATFORM, matching a platform table.
+  const seatBody = z.object({
+    playerAccountId: accountId,
+    amount: money,
+    tableType: z.nativeEnum(TableType).optional(),
+    leagueId: z.string().min(1).optional(),
+  });
   r.post(
     '/internal/buy-ins',
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
-      const { playerAccountId, amount } = seatBody.parse(req.body);
-      await lockForBuyIn(playerAccountId, Money.fromDecimalString(amount));
+      const b = seatBody.parse(req.body);
+      const id = await resolvePlayerAccountId(b.playerAccountId, playerScope(b.tableType, b.leagueId));
+      await lockForBuyIn(id, Money.fromDecimalString(b.amount));
       res.json({ ok: true });
     }),
   );
@@ -876,9 +913,29 @@ export function buildRouter(): Router {
     '/internal/releases',
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
-      const { playerAccountId, amount } = seatBody.parse(req.body);
-      await releaseToAvailable(playerAccountId, Money.fromDecimalString(amount));
+      const b = seatBody.parse(req.body);
+      const id = await resolvePlayerAccountId(b.playerAccountId, playerScope(b.tableType, b.leagueId));
+      await releaseToAvailable(id, Money.fromDecimalString(b.amount));
       res.json({ ok: true });
+    }),
+  );
+
+  // A player's balance by account id, for the live-table server's buy-in pre-check. Internal
+  // (service-secret) — unlike /me/balance it is not JWT-scoped, because the caller is the table
+  // service acting on a token it already verified. Creates a zero account on first sight, so a
+  // brand-new player reads ₮0 rather than 404.
+  r.get(
+    '/internal/accounts/:id/balance',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const id = accountId.parse(req.params.id);
+      const acc = await getOrCreatePlayerAccount(id);
+      res.json({
+        accountId: id,
+        available: Money.fromDecimal128(acc.availableBalance).toString(),
+        locked: Money.fromDecimal128(acc.lockedBalance).toString(),
+        clearing: Money.fromDecimal128(acc.clearingBalance).toString(),
+      });
     }),
   );
 

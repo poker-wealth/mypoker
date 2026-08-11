@@ -34,6 +34,12 @@ export interface PlayerDirectory {
    * Optional; directories that already know every player can leave it out.
    */
   ensure?(playerId: string, profile?: { displayName?: string; avatarUrl?: string }): TablePlayer;
+  /**
+   * Optionally warm a player's balance when they connect, before they sit. A remote (Financial
+   * Core-backed) directory fetches here so the synchronous buy-in pre-check reads a fresh figure;
+   * an in-memory directory that already holds every balance can ignore it.
+   */
+  prime?(playerId: string): Promise<void>;
 }
 
 /**

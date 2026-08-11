@@ -1,9 +1,12 @@
 import express, { type Express, type Request, type Response } from 'express';
 import { createServer, type Server } from 'node:http';
 import { ChipBank } from './chip-bank';
-import { DevPlayers } from './players';
+import { DevPlayers, type PlayerDirectory } from './players';
 import { DEFAULT_ROOM, type PokerRoomConfig } from './poker-room';
 import { TableHub, type TokenVerifier } from './table-hub';
+import { ChipDenominatedFc } from './fc-chip-adapter';
+import { FcPlayerDirectory } from './fc-directory';
+import { HttpFinancialCoreClient, type FinancialCoreClient } from '../core/financial-core-client';
 import { chainClientFromEnv } from '../fairness/chain-from-env';
 import { verifyToken } from '../gateway/tokens';
 
@@ -24,8 +27,14 @@ import { verifyToken } from '../gateway/tokens';
 export interface TableServerConfig {
   port: number;
   jwtSecret: string;
-  /** Where table chips are persisted. Play money until the Financial Core is wired in. */
+  /** Where table chips are persisted. Only used in dev (play-money) mode, i.e. when
+   *  `financialCore` is absent. */
   chipsFile?: string;
+  /**
+   * When set, tables settle real money through the Financial Core ledger (1 chip = ₮0.01) instead
+   * of the local play-chip bank. Absent → the DevPlayers/ChipBank play-money path, for local dev.
+   */
+  financialCore?: { baseUrl: string; internalSecret: string };
   /** Origins allowed to call the HTTP API. Empty means "any" (fine for a token-guarded read). */
   corsOrigins: string[];
   tables: PokerRoomConfig[];
@@ -37,20 +46,26 @@ export interface TableServer {
   app: Express;
   server: Server;
   hub: TableHub;
-  players: DevPlayers;
+  /** The play-money ledger — present only in dev mode (absent when settling through the FC). */
+  players?: DevPlayers;
   /** Begin listening. Resolves with the port actually bound. */
   listen(): Promise<number>;
   close(): Promise<void>;
 }
 
-/** The tables a fresh deployment opens. Both seat six, matching the table artwork. */
+/**
+ * The tables a fresh deployment opens. Both seat six, matching the table artwork.
+ *
+ * Stakes are in chips; 1 chip = ₮0.01 (v5.9 spec: amounts are integer cents). So the ₮0.10/0.20
+ * table below has 10/20-chip blinds and a 2,000-chip (₮20) buy-in.
+ */
 export function defaultTables(): PokerRoomConfig[] {
   return [
-    { ...DEFAULT_ROOM, id: 'texas', name: "Hold'em · ₮10/20" },
+    { ...DEFAULT_ROOM, id: 'texas', name: "Hold'em · ₮0.10/0.20" },
     {
       ...DEFAULT_ROOM,
       id: 'texas-high',
-      name: "Hold'em · ₮50/100",
+      name: "Hold'em · ₮0.50/1",
       smallBlind: 50,
       bigBlind: 100,
       minBuyIn: 2_000,
@@ -65,16 +80,35 @@ export function createTableServer(config: TableServerConfig): TableServer {
     playerId: verifyToken(token, config.jwtSecret).playerId,
   });
 
-  const players = new DevPlayers({
-    ...(config.chipsFile ? { file: config.chipsFile } : {}),
-    startingChips: 10_000,
-  });
-  const bank = new ChipBank(players);
+  // The money backend is chosen once, here. With `financialCore` set, hands settle through the real
+  // double-entry ledger (chips → USDT via ChipDenominatedFc, balances read via FcPlayerDirectory);
+  // without it, the DevPlayers/ChipBank play-money path so tables run locally with no Mongo/Redis.
+  // Not one line of room, game or settlement code differs between the two.
+  let directory: PlayerDirectory;
+  let fc: FinancialCoreClient;
+  let devPlayers: DevPlayers | undefined;
+  let fcDirectory: FcPlayerDirectory | undefined;
+
+  if (config.financialCore) {
+    const apiBase = `${config.financialCore.baseUrl.replace(/\/$/, '')}/api/v1`;
+    fc = new ChipDenominatedFc(
+      new HttpFinancialCoreClient({ baseUrl: apiBase, internalSecret: config.financialCore.internalSecret }),
+    );
+    fcDirectory = new FcPlayerDirectory({ baseUrl: apiBase, internalSecret: config.financialCore.internalSecret });
+    directory = fcDirectory;
+  } else {
+    devPlayers = new DevPlayers({
+      ...(config.chipsFile ? { file: config.chipsFile } : {}),
+      startingChips: 10_000,
+    });
+    directory = devPlayers;
+    fc = new ChipBank(devPlayers);
+  }
 
   const hub = new TableHub(
     // The chain notary is decided by env once, here: real Solana when
     // configured, the deterministic fake otherwise. See chain-from-env.ts.
-    { directory: players, fc: bank, chain: chainClientFromEnv() },
+    { directory, fc, chain: chainClientFromEnv() },
     verifyPlayerToken,
     config.logSockets === false
       ? undefined
@@ -111,16 +145,27 @@ export function createTableServer(config: TableServerConfig): TableServer {
     res.json({ tables: hub.tables() });
   });
 
-  /** Your buy-in budget. Identity comes from the token the Mini App already holds. */
-  app.get('/api/live/chips', (req: Request, res: Response) => {
+  /** Your buy-in budget, in chips. Identity comes from the token the Mini App already holds. In
+   *  real-money mode this is a fresh read of the Financial Core available balance. */
+  app.get('/api/live/chips', (req: Request, res: Response): void => {
     const header = req.headers.authorization;
-    if (!header?.startsWith('Bearer ')) return res.status(401).json({ error: 'missing bearer token' });
-    try {
-      const { playerId } = verifyPlayerToken(header.slice('Bearer '.length));
-      return res.json({ playerId, available: players.ensure(playerId).available });
-    } catch {
-      return res.status(401).json({ error: 'invalid token' });
+    if (!header?.startsWith('Bearer ')) {
+      res.status(401).json({ error: 'missing bearer token' });
+      return;
     }
+    let playerId: string;
+    try {
+      ({ playerId } = verifyPlayerToken(header.slice('Bearer '.length)));
+    } catch {
+      res.status(401).json({ error: 'invalid token' });
+      return;
+    }
+    const available = fcDirectory
+      ? fcDirectory.availableChips(playerId)
+      : Promise.resolve(devPlayers!.ensure(playerId).available);
+    available
+      .then((chips) => res.json({ playerId, available: chips }))
+      .catch(() => res.status(502).json({ error: 'balance unavailable' }));
   });
 
   const server = createServer(app);
@@ -130,7 +175,7 @@ export function createTableServer(config: TableServerConfig): TableServer {
     app,
     server,
     hub,
-    players,
+    ...(devPlayers ? { players: devPlayers } : {}),
     listen: (): Promise<number> =>
       new Promise((resolve) => {
         // 0.0.0.0, not localhost: every container platform routes to the former only.
@@ -154,9 +199,17 @@ export function startFromEnv(): TableServer {
   // the injected PORT exists, and binding anything else means the health check never passes.
   const port = Number(process.env.TABLES_PORT ?? process.env.PORT ?? 4200);
 
+  // Real money when both are present; play-money dev mode otherwise. Requiring the internal secret
+  // as well as the URL means a half-configured deploy stays in dev mode rather than firing
+  // unauthenticated calls at the ledger.
+  const fcUrl = process.env.FINANCIAL_CORE_URL;
+  const fcSecret = process.env.INTERNAL_API_SECRET;
+  const financialCore = fcUrl && fcSecret ? { baseUrl: fcUrl, internalSecret: fcSecret } : undefined;
+
   const server = createTableServer({
     port,
     jwtSecret,
+    ...(financialCore ? { financialCore } : {}),
     ...(process.env.TABLE_CHIPS_FILE ? { chipsFile: process.env.TABLE_CHIPS_FILE } : {}),
     corsOrigins: (process.env.CORS_ORIGINS ?? '')
       .split(',')
@@ -169,6 +222,11 @@ export function startFromEnv(): TableServer {
     console.log(`\n  Live tables   http://localhost:${bound}`);
     console.log(`  Game socket   ws://localhost:${bound}/ws`);
     console.log(`  Open tables   ${defaultTables().map((t) => t.id).join(', ')}`);
+    console.log(
+      financialCore
+        ? `  Money         REAL — settling through the Financial Core at ${fcUrl} (1 chip = ₮0.01)`
+        : `  Money         PLAY CHIPS — set FINANCIAL_CORE_URL + INTERNAL_API_SECRET for real money`,
+    );
     console.log(`  Player ids come from the session token (JWT_SECRET must match the issuer)\n`);
   });
 
