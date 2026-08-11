@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { Zap, SlidersHorizontal, Plus } from 'lucide-react';
@@ -7,27 +8,28 @@ import { formatMicros } from '@/api/lobby';
 import { ContextBanner } from '@/components/ContextBanner';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/cn';
+import { haptic } from '@/lib/telegram';
 
+/**
+ * A lobby row, built only from what the server actually sent.
+ *
+ * There is deliberately no sample/fallback list any more. Six invented tables
+ * (T-001…T-006, with "$1,200" and "$980" in the status column) used to render
+ * whenever the API returned nothing — which, with the gateway undeployed, is
+ * every time. A player opening the app saw a full lobby of tables that do not
+ * exist, priced with figures nobody computed. An empty lobby is a fact; a
+ * fabricated one is a lie that also happens to be unjoinable.
+ */
 interface DisplayTable {
   id: string;
-  code: string;
   blinds: string;
   players: string;
   buyIn: string;
-  status: string;
+  /** Pooled jackpot on this table, micro-USD. Null when the table has none. */
+  jackpot: number | null;
   isFull: boolean;
   stakes: number;
-  variant: string;
 }
-
-const SAMPLE_TABLES: DisplayTable[] = [
-  { id: 'texas', code: 'T-001', blinds: '1/2', players: '6 / 9', buyIn: '42 BB', status: '$1,200', isFull: false, stakes: 2_000_000, variant: 'dezhou' },
-  { id: 'texas-2', code: 'T-002', blinds: '1/2', players: '8 / 9', buyIn: '38 BB', status: '$980', isFull: false, stakes: 2_000_000, variant: 'dezhou' },
-  { id: 'texas-3', code: 'T-003', blinds: '5/10', players: '7 / 9', buyIn: '88 BB', status: '$2,100', isFull: false, stakes: 10_000_000, variant: 'dezhou' },
-  { id: 'texas-4', code: 'T-004', blinds: '5/10', players: '9 / 9', buyIn: '112 BB', status: 'WAIT', isFull: true, stakes: 10_000_000, variant: 'dezhou' },
-  { id: 'texas-5', code: 'T-005', blinds: '25/50', players: '6 / 9', buyIn: '240 BB', status: '$8,900', isFull: false, stakes: 50_000_000, variant: 'dezhou' },
-  { id: 'texas-6', code: 'T-006', blinds: '100/200', players: '9 / 9', buyIn: '512 BB', status: 'WAIT', isFull: true, stakes: 200_000_000, variant: 'dezhou' },
-];
 
 const VARIANTS = [
   { id: 'dezhou', label: 'DEZHOU' },
@@ -48,33 +50,43 @@ export function Lobby() {
   const lobby = useLobbyGames();
   const [variant, setVariant] = useState('dezhou');
   const [blinds, setBlinds] = useState('all');
+  const [onlyOpen, setOnlyOpen] = useState(false);
+  const { t } = useTranslation();
 
   const targetStakes = STAKES_OPTIONS.find((s) => s.id === blinds)?.minStakes;
 
-  const { data: tablesData } = useTables({
+  const tables = useTables({
     gameId: variant === 'dezhou' ? 'texas' : variant === 'ausha' ? 'omaha' : variant === 'all' ? undefined : variant,
     minStakes: targetStakes,
     maxStakes: targetStakes,
+    // Server-side, so the count the lobby shows is the count it filtered —
+    // filtering client-side would leave the stake pills disagreeing with it.
+    ...(onlyOpen ? { hasSeats: true } : {}),
   });
+  const tablesData = tables.data;
 
+  // Null while the lobby has not answered. '$ 0.00' is a claim about the pools
+  // and it is the wrong one — the hero shows a skeleton instead.
   const rawJackpot = lobby.data?.totalJackpot;
-  const jackpotDisplay = rawJackpot ? `$ ${formatMicros(rawJackpot)}` : '$ 0.00';
+  const jackpotDisplay = rawJackpot === undefined ? null : `$ ${formatMicros(rawJackpot)}`;
 
-  const backendTables = tablesData?.tables || [];
-  const displayTables: DisplayTable[] =
-    backendTables.length > 0
-      ? backendTables.map((t, idx) => ({
-          id: t.id,
-          code: `T-00${idx + 1}`,
-          blinds: `${formatMicros(t.stakes / 2, 0)}/${formatMicros(t.stakes, 0)}`,
-          players: `${t.players} / ${t.maxPlayers}`,
-          buyIn: `${t.buyInBB || 40} BB`,
-          status: t.status === 'FULL' ? 'WAIT' : t.status === 'WAITING' ? 'WAIT' : `$${formatMicros(t.jackpot || t.stakes * 10, 0)}`,
-          isFull: t.status === 'FULL' || t.players >= t.maxPlayers,
-          stakes: t.stakes,
-          variant: t.gameId,
-        }))
-      : SAMPLE_TABLES.filter((t) => (blinds === 'all' ? true : t.blinds === blinds));
+  const displayTables: DisplayTable[] = (tablesData?.tables ?? []).map((t) => ({
+    id: t.id,
+    blinds: `${formatMicros(t.stakes / 2, 0)}/${formatMicros(t.stakes, 0)}`,
+    players: `${t.players} / ${t.maxPlayers}`,
+    // The server's own figure. It used to fall back to 40 when absent, which
+    // put a buy-in on the row that the table had never quoted.
+    buyIn: `${t.buyInBB} BB`,
+    // Null rather than a substitute. The old line read
+    //   t.jackpot || t.stakes * 10
+    // so a table with an empty pool advertised ten times its blind as a dollar
+    // amount — invented from unrelated data, on REAL tables, not just the
+    // sample ones. Nothing here may stand in for a number the server did not
+    // send.
+    jackpot: t.jackpot > 0 ? t.jackpot : null,
+    isFull: t.status === 'FULL' || t.players >= t.maxPlayers,
+    stakes: t.stakes,
+  }));
 
   const handleQuickJoin = () => {
     const available = displayTables.find((t) => !t.isFull) || displayTables[0];
@@ -114,7 +126,10 @@ export function Lobby() {
             </div>
           ) : (
             <div className="mt-0.5 text-[2.2rem] font-black leading-none tracking-tight tabular-nums text-yellow-400 drop-shadow-sm">
-              {jackpotDisplay}
+              {/* An em dash when the pools are unknown. A jackpot is the one
+                  number on this screen a player might act on, and "$ 0.00"
+                  would be a statement that there is nothing to win. */}
+              {jackpotDisplay ?? '—'}
             </div>
           )}
         </div>
@@ -162,9 +177,22 @@ export function Lobby() {
             );
           })}
         </div>
+        {/* Was inert. Toggles the one filter a player in a lobby actually
+            wants — hide tables they cannot sit at — which the API already
+            supports via hasSeats. */}
         <button
-          aria-label="Filter"
-          className="grid size-7 shrink-0 place-items-center rounded-md border border-border bg-surface-2 text-dim hover:text-text active:scale-95"
+          aria-label={t('lobby.onlyOpen')}
+          aria-pressed={onlyOpen}
+          onClick={() => {
+            haptic('light');
+            setOnlyOpen((v) => !v);
+          }}
+          className={cn(
+            'grid size-7 shrink-0 place-items-center rounded-md border transition-colors active:scale-95',
+            onlyOpen
+              ? 'border-[#22c55e] bg-[#0f3922] text-[#22c55e]'
+              : 'border-border bg-surface-2 text-dim hover:text-text',
+          )}
         >
           <SlidersHorizontal size={14} />
         </button>
@@ -183,31 +211,57 @@ export function Lobby() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border/40">
-            {displayTables.length === 0 ? (
+            {tables.isPending ? (
+              [0, 1, 2].map((i) => (
+                <tr key={i}>
+                  <td colSpan={5} className="px-3 py-3">
+                    <Skeleton className="h-4 w-full" />
+                  </td>
+                </tr>
+              ))
+            ) : tables.isError ? (
+              // An unreachable lobby is not an empty one. Saying "no tables
+              // found" when the request failed tells the player the platform
+              // is dead rather than that we could not ask.
               <tr>
                 <td colSpan={5} className="py-8 text-center text-dim">
-                  No tables found
+                  {t('states.serviceUnavailable')}
+                </td>
+              </tr>
+            ) : displayTables.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-8 text-center text-dim">
+                  {t('lobby.noTables')}
                 </td>
               </tr>
             ) : (
-              displayTables.map((t) => (
+              displayTables.map((tbl) => (
                 <tr
-                  key={t.id}
-                  onClick={() => navigate(`/table/${t.id}`)}
+                  key={tbl.id}
+                  onClick={() => navigate(`/table/${tbl.id}`)}
                   className="cursor-pointer transition-colors active:bg-surface-2/80 hover:bg-surface-2/40"
                 >
-                  <td className="px-3 py-3 font-bold text-[#eab308]">{t.code}</td>
-                  <td className="px-3 py-3 tabular-nums text-dim font-medium">{t.blinds}</td>
-                  <td className="px-3 py-3 tabular-nums font-semibold text-text">{t.players}</td>
-                  <td className="px-3 py-3 tabular-nums text-dim font-medium">{t.buyIn}</td>
+                  {/* The table's real id. It used to render `T-00${index}`, a
+                      label invented per render that matched nothing a player
+                      could be told over support. */}
+                  <td className="px-3 py-3 font-bold text-[#eab308]">{tbl.id}</td>
+                  <td className="px-3 py-3 tabular-nums text-dim font-medium">{tbl.blinds}</td>
+                  <td className="px-3 py-3 tabular-nums font-semibold text-text">{tbl.players}</td>
+                  <td className="px-3 py-3 tabular-nums text-dim font-medium">{tbl.buyIn}</td>
                   <td className="px-3 py-3 text-right">
-                    {t.isFull ? (
+                    {tbl.isFull ? (
                       <span className="inline-block min-w-16 rounded-md border border-border bg-surface-2 px-2.5 py-1 text-center text-[0.7rem] font-bold text-dim">
-                        WAIT
+                        {t('lobby.wait')}
+                      </span>
+                    ) : tbl.jackpot !== null ? (
+                      <span className="inline-block min-w-16 rounded-md border border-[#22c55e]/40 bg-[#064e3b]/80 px-2.5 py-1 text-center text-[0.7rem] font-bold text-[#4ade80] shadow-xs">
+                        ${formatMicros(tbl.jackpot, 0)}
                       </span>
                     ) : (
+                      // Open, but with no pool to advertise. Say the table is
+                      // open rather than print a dollar sign next to nothing.
                       <span className="inline-block min-w-16 rounded-md border border-[#22c55e]/40 bg-[#064e3b]/80 px-2.5 py-1 text-center text-[0.7rem] font-bold text-[#4ade80] shadow-xs">
-                        {t.status}
+                        {t('lobby.open')}
                       </span>
                     )}
                   </td>
@@ -227,12 +281,18 @@ export function Lobby() {
           <Zap size={18} className="fill-current text-white" />
           QUICK JOIN
         </button>
+        {/* Disabled, not removed. There is no create-table endpoint — the
+            gateway exposes reads only — and this button used to open
+            /table/texas, so it appeared to work while silently dropping the
+            player onto an existing public table. A control that lies is worse
+            than one that is visibly not ready yet. */}
         <button
-          onClick={() => navigate('/table/texas')}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface hover:bg-surface-2 py-3 px-3 text-xs font-bold text-text active:scale-[0.98] transition-all"
+          disabled
+          title={t('lobby.createSoon')}
+          className="flex flex-1 cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-surface/50 py-3 px-3 text-xs font-bold text-dim"
         >
           <Plus size={16} className="text-dim" />
-          CREATE PRIVATE TABLE
+          {t('lobby.createPrivate')}
         </button>
       </div>
     </div>

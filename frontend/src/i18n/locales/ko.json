@@ -30,8 +30,8 @@
     "colBuyIn": "바이인",
     "colStatus": "상태",
     "quickJoin": "빠른 참여",
-    "createPrivate": "프라이빗 테이블 만들기",
-    "noTables": "조건에 맞는 테이블이 없습니다",
+    "createPrivate": "프라이빗 테이블 생성",
+    "noTables": "현재 열린 테이블이 없습니다",
     "noTablesBlurb": "다른 스테이크를 선택해 보세요.",
     "tabNotMapped": "아직 설정되지 않았습니다",
     "tab": {
@@ -46,7 +46,11 @@
       "waiting": "대기",
       "full": "만석",
       "unavailable": "이용 불가"
-    }
+    },
+    "wait": "대기",
+    "open": "참여 가능",
+    "onlyOpen": "빈자리가 있는 테이블만",
+    "createSoon": "프라이빗 테이블은 아직 제공되지 않습니다"
   },
   "games": {
     "searchPlaceholder": "게임 검색",
