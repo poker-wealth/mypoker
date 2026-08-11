@@ -87,6 +87,10 @@ export class TableHub {
     switch (msg.type) {
       case 'join': {
         this.unsubscribe(ctx, msg.roomId); // re-joining resyncs rather than double-subscribing
+        // Warm this player's real balance before they can sit. The buy-in pre-check reads the
+        // directory synchronously; priming on join means it is fresh by sit-time. No-op for the
+        // in-memory dev directory.
+        void this.deps.directory.prime?.(playerId);
         let stop: () => void;
         try {
           stop = room.join(playerId, {

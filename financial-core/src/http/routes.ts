@@ -882,6 +882,25 @@ export function buildRouter(): Router {
     }),
   );
 
+  // A player's balance by account id, for the live-table server's buy-in pre-check. Internal
+  // (service-secret) — unlike /me/balance it is not JWT-scoped, because the caller is the table
+  // service acting on a token it already verified. Creates a zero account on first sight, so a
+  // brand-new player reads ₮0 rather than 404.
+  r.get(
+    '/internal/accounts/:id/balance',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const id = accountId.parse(req.params.id);
+      const acc = await getOrCreatePlayerAccount(id);
+      res.json({
+        accountId: id,
+        available: Money.fromDecimal128(acc.availableBalance).toString(),
+        locked: Money.fromDecimal128(acc.lockedBalance).toString(),
+        clearing: Money.fromDecimal128(acc.clearingBalance).toString(),
+      });
+    }),
+  );
+
   // ── Withdrawal lifecycle (internal / ops) ────────────────────────────────
   async function currentState(id: string): Promise<string> {
     const w = await WithdrawalModel.findById(id);
