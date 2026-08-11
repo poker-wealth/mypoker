@@ -55,22 +55,34 @@ export function Lobby() {
 
   const targetStakes = STAKES_OPTIONS.find((s) => s.id === blinds)?.minStakes;
 
+  // DEZHOU and AUSHA are single games and filter server-side. OTHERS means
+  // "every table that is not one of those tabs" — a set the server has no
+  // filter parameter for, and sending `gameId: 'others'` is a 400: the filter
+  // parser rejects unknown game ids by design. (It always did; the sample-table
+  // fallback used to swallow the error and show fake tables instead, which is
+  // how a permanently broken tab went unnoticed.) So OTHERS fetches unfiltered
+  // and excludes the named tabs' games client-side.
+  const TAB_GAME: Record<string, string | undefined> = { dezhou: 'texas', ausha: 'omaha' };
   const tables = useTables({
-    gameId: variant === 'dezhou' ? 'texas' : variant === 'ausha' ? 'omaha' : variant === 'all' ? undefined : variant,
+    ...(TAB_GAME[variant] ? { gameId: TAB_GAME[variant] } : {}),
     minStakes: targetStakes,
     maxStakes: targetStakes,
-    // Server-side, so the count the lobby shows is the count it filtered —
-    // filtering client-side would leave the stake pills disagreeing with it.
+    // Stakes and seat filters stay server-side, so the count the lobby shows
+    // is the count the server filtered.
     ...(onlyOpen ? { hasSeats: true } : {}),
   });
-  const tablesData = tables.data;
+
+  const rawTables =
+    variant === 'others'
+      ? (tables.data?.tables ?? []).filter((tb) => !Object.values(TAB_GAME).includes(tb.gameId))
+      : (tables.data?.tables ?? []);
 
   // Null while the lobby has not answered. '$ 0.00' is a claim about the pools
   // and it is the wrong one — the hero shows a skeleton instead.
   const rawJackpot = lobby.data?.totalJackpot;
   const jackpotDisplay = rawJackpot === undefined ? null : `$ ${formatMicros(rawJackpot)}`;
 
-  const displayTables: DisplayTable[] = (tablesData?.tables ?? []).map((t) => ({
+  const displayTables: DisplayTable[] = rawTables.map((t) => ({
     id: t.id,
     blinds: `${formatMicros(t.stakes / 2, 0)}/${formatMicros(t.stakes, 0)}`,
     players: `${t.players} / ${t.maxPlayers}`,
