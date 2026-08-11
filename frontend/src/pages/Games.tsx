@@ -21,7 +21,14 @@ export function Games() {
   const [q, setQ] = useState('');
 
   const lobby = useLobbyGames();
-  const jackpot = lobby.data ? `$ ${formatMicros(lobby.data.totalJackpot)}` : '$ 0.00';
+  // Null, not '$ 0.00', while the lobby is still answering — a zero jackpot is
+  // a claim about the pools, and it is the wrong one.
+  const jackpot = lobby.data ? `$ ${formatMicros(lobby.data.totalJackpot)}` : null;
+
+  // Live figures per game, keyed by id. The tiles take their table count and
+  // jackpot from here; nothing on this screen comes from the static catalog
+  // except artwork, names and categories.
+  const live = new Map((lobby.data?.games ?? []).map((g) => [g.gameId, g]));
 
   const query = q.trim().toLowerCase();
   
@@ -106,7 +113,13 @@ export function Games() {
             <h2 className="mb-3 text-xs font-bold text-white tracking-wider">POKER GAMES</h2>
             <div className="grid grid-cols-3 gap-2">
               {getShown(grouped.poker).map((g) => (
-                <GameTile key={g.id} game={g} onClick={() => navigate(`/table/${g.id}`)} />
+                <GameTile
+                  key={g.id}
+                  game={g}
+                  tables={live.get(g.id)?.tables}
+                  jackpot={live.get(g.id)?.jackpot}
+                  onClick={() => navigate(`/table/${g.id}`)}
+                />
               ))}
             </div>
           </section>
@@ -117,7 +130,13 @@ export function Games() {
             <h2 className="mb-3 text-xs font-bold text-white tracking-wider">CARD GAMES</h2>
             <div className="grid grid-cols-3 gap-2">
               {getShown(grouped.card).map((g) => (
-                <GameTile key={g.id} game={g} onClick={() => navigate(`/table/${g.id}`)} />
+                <GameTile
+                  key={g.id}
+                  game={g}
+                  tables={live.get(g.id)?.tables}
+                  jackpot={live.get(g.id)?.jackpot}
+                  onClick={() => navigate(`/table/${g.id}`)}
+                />
               ))}
             </div>
           </section>
@@ -128,7 +147,13 @@ export function Games() {
             <h2 className="mb-3 text-xs font-bold text-white tracking-wider">QUICK GAMES</h2>
             <div className="grid grid-cols-3 gap-2">
               {getShown(grouped.quick).map((g) => (
-                <GameTile key={g.id} game={g} onClick={() => navigate(`/table/${g.id}`)} />
+                <GameTile
+                  key={g.id}
+                  game={g}
+                  tables={live.get(g.id)?.tables}
+                  jackpot={live.get(g.id)?.jackpot}
+                  onClick={() => navigate(`/table/${g.id}`)}
+                />
               ))}
             </div>
           </section>
