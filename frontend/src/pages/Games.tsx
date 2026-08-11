@@ -88,7 +88,10 @@ export function Games() {
             </div>
           ) : (
             <div className="mt-0.5 text-[2.2rem] font-black leading-none tracking-tight tabular-nums text-yellow-400 drop-shadow-sm">
-              {jackpot}
+              {/* Em dash when the lobby failed — a hero that renders empty
+                  looks broken, and "$ 0.00" would claim there is nothing to
+                  win. Unknown is neither. */}
+              {jackpot ?? '—'}
             </div>
           )}
         </div>
