@@ -41,10 +41,6 @@ export function GameTile({ game, onClick }: { game: GameDef; onClick?: () => voi
         <div className="text-[0.65rem] text-dim">
           {game.players.toLocaleString()} tables
         </div>
-        <div className="text-[0.7rem] font-bold text-yellow-500">
-          {/* Mocked amounts for now to match UI */}
-          ${(game.players * 49.35).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </div>
       </div>
     </motion.button>
   );
