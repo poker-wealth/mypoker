@@ -4,6 +4,7 @@ import { WithdrawalState } from '../domain/withdrawal-types';
 import { AccountModel } from '../wallet/account.model';
 import { LedgerModel } from '../wallet/ledger.model';
 import { WithdrawalModel } from '../withdrawal/withdrawal.model';
+import { VolumeModel, DailyVolumeModel } from '../vip/volume-tracker';
 import { SecurityLogModel } from '../security/security-log.model';
 import { CIRCUIT_BREAKERS } from '../circuit-breakers/registry';
 
@@ -37,9 +38,40 @@ export interface BreakerStatus {
   lastTripAt: string | null;
 }
 
+export interface TableJackpot {
+  tableId: string;
+  /** Decimal strings, USD, per tier. */
+  mini: string;
+  minor: string;
+  major: string;
+  grand: string;
+  total: string;
+}
+
 export interface OpsOverview {
   at: string;
   balances: BalanceByType[];
+  /**
+   * Wagered volume and the rake taken from it (12-week plan, W10: "platform
+   * overview dashboard — total volume, rake, active players…").
+   *
+   * Volume is what players staked; rake is what the platform kept. Shown
+   * together because either alone invites the wrong conclusion — rake without
+   * volume looks like profit rather than a rate, and volume without rake looks
+   * like activity that earned nothing.
+   */
+  volume: { allTime: string; today: string };
+  rake: { allTime: string; today: string };
+  /** Distinct players who generated volume in the window. */
+  activePlayers: { today: number; last7Days: number };
+  /**
+   * Jackpot pools per table, per tier. The spec asks for these by TABLE
+   * ("admin dashboard: per-table Jackpot balances (Mini/Minor/Major/Grand) in
+   * real-time"), and the accounts are keyed that way — pools are per table by
+   * design, so an aggregate would hide the one thing worth watching, which is
+   * a single table's pool behaving oddly.
+   */
+  jackpotByTable: TableJackpot[];
   /**
    * What the platform owes players — the sum of every PLAYER account's three
    * balances. The single number an operator most needs, and the one no other
@@ -68,12 +100,52 @@ function startOfUtcDay(now: Date): Date {
   return d;
 }
 
+/** YYYY-MM-DD in UTC — the key format the daily volume rollup uses. */
+const dayKey = (at: Date): string => at.toISOString().slice(0, 10);
+
+/**
+ * Volume is stored as integer micro-USD, so it is summed in the database.
+ *
+ * Safe because these are integers, not decimals: `$sum` is exact until the
+ * total passes 2^53 micro-USD, which is about nine billion dollars of lifetime
+ * wagering. Money's Decimal128 path is reserved for balances and transfers,
+ * where the values are decimal and the arithmetic decides payouts. This is a
+ * statistic and nothing pays out from it.
+ */
+const microsToUsd = (micros: number): string => Money.fromMicros(BigInt(Math.round(micros))).toString();
+
+/** JACKPOT_MINI → 'mini', and so on. */
+const TIER_OF: Record<string, 'mini' | 'minor' | 'major' | 'grand'> = {
+  [AccountType.JACKPOT_MINI]: 'mini',
+  [AccountType.JACKPOT_MINOR]: 'minor',
+  [AccountType.JACKPOT_MAJOR]: 'major',
+  [AccountType.JACKPOT_GRAND]: 'grand',
+};
+
 export async function getOpsOverview(now = new Date()): Promise<OpsOverview> {
   const dayStart = startOfUtcDay(now);
 
-  const [accounts, withdrawalCounts, awaitingSecond, depositRows, withdrawalRows, trips] =
-    await Promise.all([
-      AccountModel.find({}, { accountType: 1, availableBalance: 1, lockedBalance: 1, clearingBalance: 1 }).lean(),
+  const today = dayKey(now);
+  const weekAgo = dayKey(new Date(now.getTime() - 6 * 86_400_000));
+
+  const [
+    accounts,
+    withdrawalCounts,
+    awaitingSecond,
+    depositRows,
+    withdrawalRows,
+    trips,
+    volumeAll,
+    volumeToday,
+    rakeAll,
+    rakeToday,
+    activeToday,
+    active7d,
+  ] = await Promise.all([
+      AccountModel.find(
+        {},
+        { accountType: 1, ownerId: 1, availableBalance: 1, lockedBalance: 1, clearingBalance: 1 },
+      ).lean(),
       WithdrawalModel.aggregate<{ _id: string; n: number }>([
         { $group: { _id: '$state', n: { $sum: 1 } } },
       ]),
@@ -100,6 +172,25 @@ export async function getOpsOverview(now = new Date()): Promise<OpsOverview> {
       })
         .sort({ createdAt: -1 })
         .lean(),
+      // Wagered volume — the monthly rows are the complete record (the daily
+      // rollup only starts from the day it shipped), so all-time reads those.
+      VolumeModel.aggregate<{ _id: null; staked: number }>([
+        { $group: { _id: null, staked: { $sum: '$staked' } } },
+      ]),
+      DailyVolumeModel.aggregate<{ _id: null; staked: number }>([
+        { $match: { date: today } },
+        { $group: { _id: null, staked: { $sum: '$staked' } } },
+      ]),
+      // Rake — the CREDIT side only. The debit is the pot paying it, and
+      // counting both would double every figure.
+      LedgerModel.find({ type: LedgerType.RAKE, direction: LedgerDirection.CREDIT }).lean(),
+      LedgerModel.find({
+        type: LedgerType.RAKE,
+        direction: LedgerDirection.CREDIT,
+        createdAt: { $gte: dayStart },
+      }).lean(),
+      DailyVolumeModel.distinct('playerId', { date: today }),
+      DailyVolumeModel.distinct('playerId', { date: { $gte: weekAgo, $lte: today } }),
     ]);
 
   // Balances by type, summed exactly. A player's holding is all three balances:
@@ -113,6 +204,26 @@ export async function getOpsOverview(now = new Date()): Promise<OpsOverview> {
       .add(Money.fromDecimal128(a.clearingBalance));
     const entry = byType.get(a.accountType) ?? { total: Money.ZERO, accounts: 0 };
     byType.set(a.accountType, { total: entry.total.add(held), accounts: entry.accounts + 1 });
+  }
+
+  // Jackpot pools per table. The accounts are already keyed by table
+  // (ownerId = tableId, per spec), so this groups rather than derives.
+  const tables = new Map<string, TableJackpot>();
+  for (const a of accounts) {
+    const tier = TIER_OF[a.accountType];
+    if (!tier) continue;
+    const row = tables.get(a.ownerId) ?? {
+      tableId: a.ownerId,
+      mini: '0.000000',
+      minor: '0.000000',
+      major: '0.000000',
+      grand: '0.000000',
+      total: '0.000000',
+    };
+    const pool = Money.fromDecimal128(a.availableBalance);
+    row[tier] = pool.toString();
+    row.total = Money.fromDecimalString(row.total).add(pool).toString();
+    tables.set(a.ownerId, row);
   }
 
   const counts = new Map(withdrawalCounts.map((r) => [r._id, r.n]));
@@ -135,6 +246,19 @@ export async function getOpsOverview(now = new Date()): Promise<OpsOverview> {
       }))
       .sort((a, b) => a.accountType.localeCompare(b.accountType)),
     playerFunds: (byType.get(AccountType.PLAYER)?.total ?? Money.ZERO).toString(),
+    volume: {
+      allTime: microsToUsd(volumeAll[0]?.staked ?? 0),
+      today: microsToUsd(volumeToday[0]?.staked ?? 0),
+    },
+    rake: {
+      allTime: Money.sum(rakeAll.map((r) => Money.fromDecimal128(r.amount))).toString(),
+      today: Money.sum(rakeToday.map((r) => Money.fromDecimal128(r.amount))).toString(),
+    },
+    activePlayers: { today: activeToday.length, last7Days: active7d.length },
+    // Biggest pool first — the one most worth a second look.
+    jackpotByTable: [...tables.values()].sort(
+      (a, b) => Number(b.total) - Number(a.total) || a.tableId.localeCompare(b.tableId),
+    ),
     withdrawals: {
       pending: counts.get(WithdrawalState.REQUESTED) ?? 0,
       awaitingSecondApproval: awaitingSecond,

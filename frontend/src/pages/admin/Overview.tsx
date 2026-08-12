@@ -56,6 +56,36 @@ export function AdminOverview() {
 
   return (
     <div className="space-y-6">
+      {/*
+        Activity first. Volume, rake and active players are what an owner opens
+        this screen for; balances answer "is the money safe", which is the next
+        question rather than the first.
+      */}
+      <section>
+        <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-dim">Activity</h2>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          <Metric
+            label="Volume"
+            value={moneyFromDecimal(d.volume.allTime)}
+            hint={`${moneyFromDecimal(d.volume.today)} today`}
+          />
+          {/*
+            Rake is shown beside volume deliberately. On its own it reads as
+            profit rather than as a rate on what was wagered.
+          */}
+          <Metric
+            label="Rake"
+            value={moneyFromDecimal(d.rake.allTime)}
+            hint={`${moneyFromDecimal(d.rake.today)} today`}
+          />
+          <Metric
+            label="Active players"
+            value={String(d.activePlayers.today)}
+            hint={`${d.activePlayers.last7Days} in 7 days`}
+          />
+        </div>
+      </section>
+
       <section>
         <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-dim">Funds</h2>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
@@ -109,6 +139,55 @@ export function AdminOverview() {
           />
         </div>
       </section>
+
+      {/*
+        Per table, not pooled. The spec asks for it this way and the accounts
+        are keyed that way — an aggregate would hide the thing worth watching,
+        which is one table's pool behaving unlike the others.
+      */}
+      {d.jackpotByTable.length > 0 && (
+        <section>
+          <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-dim">
+            Jackpot pools by table
+          </h2>
+          <div className="overflow-x-auto rounded-(--radius-app) border border-border bg-surface">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-border/50 text-[0.6rem] uppercase text-dim">
+                  <th className="px-3 py-2 font-semibold">Table</th>
+                  <th className="px-3 py-2 text-right font-semibold">Mini</th>
+                  <th className="px-3 py-2 text-right font-semibold">Minor</th>
+                  <th className="px-3 py-2 text-right font-semibold">Major</th>
+                  <th className="px-3 py-2 text-right font-semibold">Grand</th>
+                  <th className="px-3 py-2 text-right font-semibold">Total</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/50">
+                {d.jackpotByTable.map((t) => (
+                  <tr key={t.tableId}>
+                    <td className="px-3 py-2 font-mono text-[0.66rem]">{t.tableId}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-dim">
+                      {moneyFromDecimal(t.mini)}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-dim">
+                      {moneyFromDecimal(t.minor)}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-dim">
+                      {moneyFromDecimal(t.major)}
+                    </td>
+                    <td className="px-3 py-2 text-right tabular-nums text-dim">
+                      {moneyFromDecimal(t.grand)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-bold tabular-nums">
+                      {moneyFromDecimal(t.total)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       <section>
         <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-dim">

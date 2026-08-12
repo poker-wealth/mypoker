@@ -25,9 +25,22 @@ export interface BreakerStatus {
   lastTripAt: string | null;
 }
 
+export interface TableJackpot {
+  tableId: string;
+  mini: string;
+  minor: string;
+  major: string;
+  grand: string;
+  total: string;
+}
+
 export interface OpsOverview {
   at: string;
   balances: BalanceByType[];
+  volume: { allTime: string; today: string };
+  rake: { allTime: string; today: string };
+  activePlayers: { today: number; last7Days: number };
+  jackpotByTable: TableJackpot[];
   /** What the platform owes players: available + locked + clearing. */
   playerFunds: string;
   withdrawals: {
