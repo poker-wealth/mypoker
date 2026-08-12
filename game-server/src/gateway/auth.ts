@@ -87,9 +87,12 @@ export function requireAuth(config: GatewayConfig) {
  * gets 401 from `requireAuth`, because that is a statement about the request
  * rather than about what lies behind it.
  *
- * `league_admin` is deliberately NOT accepted. A league administrator runs
- * their own alliance; the platform's withdrawal queue, player list and
- * treasury are a different scope entirely, and §13.6 keeps those apart.
+ * `league_admin` is deliberately NOT accepted. The spec gives league
+ * administrators their OWN panel, scoped to their alliance — "league overview
+ * (volume, rake, player list, Jackpot balances)… player risk scores visible to
+ * league admin (for their own league players only)" (12-week plan, W10). The
+ * platform's withdrawal queue, player list and treasury are a different scope,
+ * and that panel is a separate build, not this one with a wider role check.
  */
 export function requireAdmin() {
   return (req: Request, res: Response, next: NextFunction): void => {
