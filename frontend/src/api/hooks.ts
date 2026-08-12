@@ -2,6 +2,7 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tansta
 import { fetchSettings, patchSettings, type PlayerSettings, type SettingsPatch } from './settings';
 import { fetchReputation } from './reputation';
 import { fetchJackpot, fetchJackpotHistory } from './jackpot';
+import { fetchOpsOverview } from './admin';
 import { fetchVip } from './vip';
 import { fetchMyLeagues, fetchLeagues, createLeagueApi, joinLeagueApi } from './leagues';
 import { fetchNotifications, markNotificationsRead, type NotificationPage } from './notifications';
@@ -435,5 +436,23 @@ export function useWithdraw() {
     // A request doesn't move the balance yet (risk review first), but it must
     // appear in the withdrawals list immediately.
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['wallet'] }),
+  });
+}
+
+/**
+ * Admin overview. Short stale time — an operator refreshing this screen is
+ * usually reacting to something, and a cached figure would answer the previous
+ * question. Not retried: a 404 here means the caller is not ops, and retrying
+ * a permission answer just repeats it.
+ */
+export function useOpsOverview() {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery({
+    queryKey: ['admin', 'overview', playerId],
+    queryFn: fetchOpsOverview,
+    enabled: Boolean(playerId),
+    staleTime: 10_000,
+    refetchInterval: 30_000,
+    retry: false,
   });
 }
