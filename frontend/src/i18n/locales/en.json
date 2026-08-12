@@ -242,7 +242,9 @@
     "notifyPromos": "Promotions",
     "about": "About",
     "account": "Account",
-    "signInToSync": "Sign in to sync your preferences"
+    "signInToSync": "Sign in to sync your preferences",
+    "soundOn": "Sound on",
+    "soundOff": "Sound off"
   },
   "fairness": {
     "title": "Fairness verification",

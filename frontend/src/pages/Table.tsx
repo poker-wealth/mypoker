@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, Volume2, Settings2, Wifi, WifiOff, MessageSquare } from 'lucide-react';
+import { ChevronLeft, Volume2, VolumeX, Settings2, Wifi, WifiOff, MessageSquare } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { PokerTable } from '@/components/poker/PokerTable';
 import { ActionBar } from '@/components/poker/ActionBar';
@@ -18,6 +18,8 @@ import { useDemoHand } from '@/hooks/useDemoHand';
 import { useLiveTable } from '@/hooks/useLiveTable';
 import { ChatBox } from '@/components/poker/ChatBox';
 import { useTableChat } from '@/hooks/useTableChat';
+import { useSettings, useUpdateSettings } from '@/api/hooks';
+import { haptic } from '@/lib/telegram';
 import { ChallengeModal } from '@/components/poker/ChallengeModal';
 
 /**
@@ -374,9 +376,7 @@ function TopBar({
           </div>
         )}
 
-        <button className="grid size-9 place-items-center rounded-full border border-border bg-surface text-dim active:scale-95">
-          <Volume2 size={16} />
-        </button>
+        <SoundToggle />
         <button
           onClick={onOpenDesigns}
           title={t('table.tableDesign')}
@@ -492,5 +492,47 @@ function DemoTable() {
 
       <TableDesignSheet open={designsOpen} onClose={() => setDesignsOpen(false)} />
     </div>
+  );
+}
+
+/**
+ * The table's sound control.
+ *
+ * It used to be a Volume2 icon with no handler at all — a button that looked
+ * like a mute toggle and did nothing whichever way you tapped it.
+ *
+ * It now drives the SAME account setting the Settings screen shows, rather
+ * than a second piece of local state: muting at the table and finding sound
+ * still on in Settings would be worse than the dead button was. The setting is
+ * persisted server-side, so it follows the player across devices.
+ *
+ * The icon reflects the real value, so it is honest even before any audio
+ * exists — and once the sound layer lands (blocked on licensing, SAMUEL.md
+ * task 2), this already governs it with nothing more to wire.
+ */
+function SoundToggle() {
+  const { t } = useTranslation();
+  const settings = useSettings();
+  const update = useUpdateSettings();
+
+  // Hidden rather than shown inert while unknown: a mute button whose state is
+  // a guess is the problem this is fixing.
+  if (!settings.isSuccess) return null;
+
+  const on = settings.data.sound;
+
+  return (
+    <button
+      onClick={() => {
+        haptic('light');
+        update.mutate({ sound: !on });
+      }}
+      disabled={update.isPending}
+      aria-pressed={on}
+      title={on ? t('settings.soundOn') : t('settings.soundOff')}
+      className="grid size-9 place-items-center rounded-full border border-border bg-surface text-dim active:scale-95 disabled:opacity-60"
+    >
+      {on ? <Volume2 size={16} /> : <VolumeX size={16} className="text-dim/60" />}
+    </button>
   );
 }

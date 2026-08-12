@@ -242,7 +242,9 @@
     "notifyPromos": "プロモーション",
     "about": "情報",
     "signInToSync": "ログインすると設定が同期されます",
-    "account": "アカウント"
+    "account": "アカウント",
+    "soundOn": "サウンド オン",
+    "soundOff": "サウンド オフ"
   },
   "fairness": {
     "title": "公平性の検証",
