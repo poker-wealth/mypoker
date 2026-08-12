@@ -946,12 +946,22 @@ export function buildRouter(): Router {
     return w.state;
   }
 
+  /**
+   * Approve a withdrawal, as a named person (§3.6).
+   *
+   * `approvedBy` is required in the body. `internalAuth` proves the caller is
+   * the gateway, not which administrator is behind it — and "which
+   * administrator" is the whole content of a second signature. The gateway
+   * takes it from the admin's own token and passes it here.
+   */
+  const approveBody = z.object({ approvedBy: z.string().min(1) });
   r.post(
     '/internal/withdrawals/:id/approve',
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
-      await approveWithdrawal(req.params.id as string);
-      res.json({ state: await currentState(req.params.id as string) });
+      const { approvedBy } = approveBody.parse(req.body);
+      const outcome = await approveWithdrawal(req.params.id as string, approvedBy);
+      res.json({ ...outcome, state: await currentState(req.params.id as string) });
     }),
   );
   const broadcastBody = z.object({ txHash: z.string().min(1) });

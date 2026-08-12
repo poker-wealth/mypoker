@@ -19,6 +19,8 @@ export interface WithdrawalDoc {
   failureReason?: string;
   createdAt: Date;
   updatedAt: Date;
+  /** Ops playerIds who have approved this. See the schema note below. */
+  approvals: string[];
 }
 
 const withdrawalSchema = new Schema<WithdrawalDoc>(
@@ -36,6 +38,19 @@ const withdrawalSchema = new Schema<WithdrawalDoc>(
     },
     txHash: { type: String, required: false },
     failureReason: { type: String, required: false },
+    /**
+     * Who has approved this, by ops playerId (§3.6: APPROVED requires "risk
+     * control passed + human review (> $10K)").
+     *
+     * A set of names, not a counter, and written with `$addToSet`. The rule is
+     * "a second PERSON", so one reviewer clicking twice must not release the
+     * money — a counter cannot tell those apart and the database can.
+     *
+     * It is also the audit trail. After a large withdrawal, the first question
+     * is who released it, and a count answers that with a number instead of a
+     * name.
+     */
+    approvals: { type: [String], default: [] },
   },
   { timestamps: true, versionKey: false, minimize: false },
 );

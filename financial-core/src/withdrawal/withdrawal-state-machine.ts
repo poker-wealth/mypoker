@@ -69,9 +69,68 @@ export async function requestWithdrawal(input: RequestWithdrawalInput): Promise<
 }
 
 /** APPROVED: atomically move amount available → clearing (held, not spendable, not re-withdrawable). */
-export async function approveWithdrawal(withdrawalId: string): Promise<void> {
+/**
+ * The amount above which one approver is not enough (§3.6: APPROVED requires
+ * "risk control passed + human review (> $10K)").
+ *
+ * Strictly greater than, matching the spec's `>`: exactly ₮10,000 clears on one
+ * approval. A boundary read the other way would be defensible, but the spec
+ * writes `> $10K` and a threshold that disagrees with the document is a
+ * threshold someone will later "fix" in the wrong direction.
+ */
+export const SECOND_APPROVAL_THRESHOLD = Money.fromDecimalString('10000');
+
+export interface ApprovalOutcome {
+  /** True when this call moved the withdrawal to APPROVED and held the funds. */
+  applied: boolean;
+  /** Everyone who has approved so far, including this caller. */
+  approvals: string[];
+  /** Set when the amount needs a second person and only one has signed. */
+  awaitingSecondApproval?: true;
+}
+
+/**
+ * APPROVED: hold the funds, once enough people have said yes.
+ *
+ * `approvedBy` is required rather than optional. An approval with no name is
+ * the state this function was in before — it released any sum on a single
+ * anonymous call — and an optional parameter would let every existing caller
+ * keep doing exactly that while looking fixed.
+ *
+ * Recording the approval and reading the tally happen in ONE atomic
+ * `findOneAndUpdate`. Read-then-write would let two reviewers approving a large
+ * withdrawal at the same moment both observe one signature, both write theirs,
+ * and both proceed — releasing on two approvals that never saw each other,
+ * which is the precise failure the second signature exists to prevent.
+ *
+ * The `state: REQUESTED` filter is what makes that safe: whoever wins the race
+ * moves the state, and the loser's update matches nothing.
+ */
+export async function approveWithdrawal(
+  withdrawalId: string,
+  approvedBy: string,
+): Promise<ApprovalOutcome> {
+  if (!approvedBy) throw new WithdrawalNotFoundError(withdrawalId);
+
   const w = await loadOrThrow(withdrawalId);
   assertTransition(w.state, WithdrawalState.APPROVED);
+
+  // Record this approver and read the resulting set in one step.
+  const recorded = await WithdrawalModel.findOneAndUpdate(
+    { _id: withdrawalId, state: WithdrawalState.REQUESTED },
+    { $addToSet: { approvals: approvedBy } },
+    { new: true },
+  );
+  if (!recorded) throw new InvalidWithdrawalTransitionError(w.state, WithdrawalState.APPROVED);
+
+  const approvals = recorded.approvals ?? [];
+  const needsSecond = Money.fromDecimal128(recorded.amount).greaterThan(SECOND_APPROVAL_THRESHOLD);
+  if (needsSecond && approvals.length < 2) {
+    // Deliberately still REQUESTED, and no funds moved. The withdrawal stays in
+    // the queue for someone else to review.
+    return { applied: false, approvals, awaitingSecondApproval: true };
+  }
+
   const amountD = w.amount;
   const negAmountD = Money.fromDecimal128(w.amount).negate().toDecimal128();
 
@@ -93,6 +152,8 @@ export async function approveWithdrawal(withdrawalId: string): Promise<void> {
       throw new InvalidWithdrawalTransitionError(w.state, WithdrawalState.APPROVED);
     }
   });
+
+  return { applied: true, approvals };
 }
 
 /** BROADCASTING: record the on-chain tx hash. Funds remain held in clearing. */
