@@ -69,6 +69,38 @@ export function requireAuth(config: GatewayConfig) {
   };
 }
 
+/**
+ * Rejects anyone who is not a platform administrator.
+ *
+ * The `ops` role has been carried in the token type since the gateway was
+ * written and enforced by nothing — `requireAuth` reads it onto `req.player`
+ * and no route has ever looked at it. This is the first check, so it is worth
+ * being exact about what it does and does not mean.
+ *
+ * Stack it AFTER `requireAuth`, never instead of it: this reads the role that
+ * middleware put there, so on its own it would authorise an unauthenticated
+ * request whose `req.player` is undefined. Ordering is the whole guard.
+ *
+ * 404, not 403, on the role check. A 403 confirms the admin API exists and
+ * that this account simply lacks the rank — which tells someone probing with a
+ * stolen player token exactly what to go after next. A missing token still
+ * gets 401 from `requireAuth`, because that is a statement about the request
+ * rather than about what lies behind it.
+ *
+ * `league_admin` is deliberately NOT accepted. A league administrator runs
+ * their own alliance; the platform's withdrawal queue, player list and
+ * treasury are a different scope entirely, and §13.6 keeps those apart.
+ */
+export function requireAdmin() {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (req.player?.role !== 'ops') {
+      res.status(404).json({ error: 'not found' });
+      return;
+    }
+    next();
+  };
+}
+
 export function buildAuthRouter(config: GatewayConfig): Router {
   const r = Router();
 
