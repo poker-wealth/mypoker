@@ -6,6 +6,7 @@ import { buildLobbyRouter } from './lobby-routes';
 import { buildJackpotRouter } from './jackpot-routes';
 import { buildLeagueRouter } from './league-routes';
 import { buildAgentRouter } from './agent-routes';
+import { buildAdminRouter } from './admin-routes';
 import { buildMeRouter } from './me-routes';
 import { mountLiveTables } from '../live/mount';
 import { defaultTables } from '../live/server';
@@ -34,6 +35,8 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
   app.use('/me', buildMeRouter(config));
   app.use('/leagues', buildLeagueRouter(config));
   app.use('/agent', buildAgentRouter(config));
+  // Admin. Guarded to role 'ops' inside the router; deliberately NOT a product tab.
+  app.use('/admin', buildAdminRouter(config));
   // Public payout rates — open by design; the numbers exist to be checked.
   app.get('/fairness/rtp', (_req, res) => {
     void fetch(`${config.financialCoreUrl}/api/v1/fairness/rtp`)

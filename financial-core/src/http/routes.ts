@@ -17,6 +17,7 @@ import {
 } from '../withdrawal/withdrawal-state-machine';
 import { getOrCreatePlayerAccount, ensureJackpotAccounts } from '../wallet/system-accounts';
 import { getInsuranceReserve } from '../wallet/insurance-reserve';
+import { getOpsOverview } from '../ops/overview';
 import { getDepositAddress } from '../wallet/deposit-address';
 import { getWalletTransactions, getWithdrawals } from '../wallet/wallet-views';
 import { isValidTronAddress } from '../wallet/tron-address';
@@ -945,6 +946,23 @@ export function buildRouter(): Router {
     if (!w) throw new ApiError(404, `withdrawal not found: ${id}`);
     return w.state;
   }
+
+  /**
+   * The admin Overview's facts (SAMUEL.md task 3, screen 1).
+   *
+   * `internalAuth`, not a player token: this is platform-wide money, and the
+   * only caller is the gateway, which checks the administrator's role before
+   * asking. financial-core has no notion of who is an admin — that role lives
+   * with identity in the gateway — so the boundary here is "internal caller",
+   * and the boundary there is "is this person ops".
+   */
+  r.get(
+    '/internal/ops/overview',
+    internalAuth,
+    asyncHandler(async (_req: Request, res: Response) => {
+      res.json(await getOpsOverview());
+    }),
+  );
 
   r.post(
     '/internal/withdrawals/:id/approve',
