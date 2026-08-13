@@ -30,6 +30,7 @@ export class BaccaratRoom extends BaseLiveRoom<BaccaratRoomConfig, RoomSeat> {
 
   constructor(config: BaccaratRoomConfig, deps: RoomDeps) {
     super(config, deps);
+    this.requireNumbers('rakeBps', 'tiePayout');
 
     this.game = new BaccaratGame(
       config.id,

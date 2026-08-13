@@ -29,6 +29,7 @@ export class LotteryRoom extends BaseLiveRoom<LotteryRoomConfig, RoomSeat> {
 
   constructor(config: LotteryRoomConfig, deps: RoomDeps) {
     super(config, deps);
+    this.requireNumbers('rakeBps', 'range');
 
     this.game = new LotteryGame(
       config.id,

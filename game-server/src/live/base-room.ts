@@ -79,6 +79,30 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
     this.chain = deps.chain ?? new FakeChainClient();
     this.seats = Array.from({ length: config.maxSeats }, () => null);
     this.roomJackpot = new RoomJackpot(config.id);
+
+    this.requireNumbers('minBuyIn', 'maxBuyIn', 'maxSeats');
+    if (config.minBuyIn > config.maxBuyIn) {
+      throw new RoomError(`table ${config.id}: minBuyIn ${config.minBuyIn} exceeds maxBuyIn ${config.maxBuyIn}`);
+    }
+    if (config.maxSeats < 1) throw new RoomError(`table ${config.id}: maxSeats must be at least 1`);
+  }
+
+  /**
+   * Refuse to open a table whose money settings are not numbers.
+   *
+   * A missing `rakeBps` does not fail here by itself — it fails much later as `NaN` inside a
+   * settlement request, surfacing as "bad settlement amount: NaN" from the ledger with nothing to
+   * say which table caused it. A table that needs a figure should say so at construction, by name.
+   */
+  protected requireNumbers(...keys: string[]): void {
+    for (const key of keys) {
+      const value = (this.config as unknown as Record<string, unknown>)[key];
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        throw new RoomError(
+          `table ${this.config.id} (${this.config.game}): ${key} must be a number, got ${String(value)}`,
+        );
+      }
+    }
   }
 
   protected enqueue<T>(task: () => Promise<T> | T): Promise<T> {

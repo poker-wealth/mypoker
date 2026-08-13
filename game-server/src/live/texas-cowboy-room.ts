@@ -38,6 +38,7 @@ function rakeOf(config: TexasCowboyRoomConfig): number {
 export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSeat> {
   private engine: TexasCowboyEngine;
   private timer: NodeJS.Timeout | null = null;
+  private disposed = false;
 
   constructor(config: TexasCowboyRoomConfig, deps: RoomDeps) {
     super(config, deps);
@@ -107,10 +108,14 @@ export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSea
    */
   private schedulePhase(fn: () => void, delayMs: number): void {
     if (this.timer) clearTimeout(this.timer);
+    // A closed table schedules nothing. The round loop is kicked off from the constructor's queue,
+    // so a dispose() arriving first would otherwise be overtaken by the round it was shutting down.
+    if (this.disposed) return;
     this.timer = setTimeout(() => void this.enqueue(fn), delayMs);
   }
 
   private startNextRound(): void {
+    if (this.disposed) return;
     this.handNumber++;
     this.engine = new TexasCowboyEngine(this.config.id, this.handNumber, {
       rakeBps: rakeOf(this.config),
@@ -294,7 +299,9 @@ export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSea
   }
 
   dispose(): void {
+    this.disposed = true;
     super.dispose();
     if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
   }
 }

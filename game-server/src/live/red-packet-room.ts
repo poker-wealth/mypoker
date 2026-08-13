@@ -31,6 +31,7 @@ export class RedPacketRoom extends BaseLiveRoom<RedPacketRoomConfig, RoomSeat> {
 
   constructor(config: RedPacketRoomConfig, deps: RoomDeps) {
     super(config, deps);
+    this.requireNumbers('rakeBps', 'size', 'mineCount');
 
     this.game = new RedPacketGame(
       config.id,

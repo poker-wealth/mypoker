@@ -31,6 +31,7 @@ export class CowboyBeautyRoom extends BaseLiveRoom<CowboyBeautyRoomConfig, RoomS
 
   constructor(config: CowboyBeautyRoomConfig, deps: RoomDeps) {
     super(config, deps);
+    this.requireNumbers('rakeBps');
 
     this.game = new CowboyBeautyGame(
       config.id,

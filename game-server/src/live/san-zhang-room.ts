@@ -28,6 +28,7 @@ export class SanZhangRoom extends BaseLiveRoom<SanZhangRoomConfig, RoomSeat> {
 
   constructor(config: SanZhangRoomConfig, deps: RoomDeps) {
     super(config, deps);
+    this.requireNumbers('rakeBps');
 
     this.game = new SanZhangGame(
       config.id,

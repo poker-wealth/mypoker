@@ -38,6 +38,7 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
 
   constructor(config: DouDiZhuRoomConfig, deps: RoomDeps) {
     super(config, deps);
+    this.requireNumbers('rakeBps', 'baseStake');
 
     this.game = new DouDiZhuGame(
       config.id,

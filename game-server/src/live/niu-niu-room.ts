@@ -28,6 +28,7 @@ export class NiuNiuRoom extends BaseLiveRoom<NiuNiuRoomConfig, RoomSeat> {
 
   constructor(config: NiuNiuRoomConfig, deps: RoomDeps) {
     super(config, deps);
+    this.requireNumbers('rakeBps');
 
     this.game = new NiuNiuGame(
       config.id,

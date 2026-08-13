@@ -24,6 +24,7 @@ export class SlotsRoom extends BaseLiveRoom<SlotsRoomConfig, RoomSeat> {
 
   constructor(config: SlotsRoomConfig, deps: RoomDeps) {
     super(config, deps);
+    this.requireNumbers('commissionBps');
 
     const vendorId = `acc-slots-vendor:${config.id}`;
     this.directory.ensure?.(vendorId, { displayName: 'Slots Vendor' });
