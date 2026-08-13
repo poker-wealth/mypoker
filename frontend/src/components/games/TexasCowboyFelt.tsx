@@ -43,16 +43,10 @@ export function TexasCowboyFelt({
   snapshot?: TableSnapshot | null;
   onCommand?: (cmd: TableCommand) => void;
 }) {
-  // The custom round state is bundled as JSON in `message`
+  // The round arrives in its own field. It used to be JSON stuffed into `message` — the line the
+  // result banner prints — which put the whole round state on screen as text.
   if (!snapshot) return <></>;
-  let tcRound: TexasCowboyRound | null = null;
-  try {
-    if (snapshot.message) {
-      tcRound = JSON.parse(snapshot.message);
-    }
-  } catch {
-    // Ignore parse errors if message is not json
-  }
+  const tcRound = (snapshot.gameState as TexasCowboyRound | undefined) ?? null;
 
   const [selectedMarket, setSelectedMarket] = useState<string | null>(null);
   const [selectedAmount, setSelectedAmount] = useState<number>(100);

@@ -231,10 +231,17 @@ export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSea
     const seat = this.seatOf(playerId);
     const roundState = this.engine.getRoundState();
     
-    // Inject the raw game state into `message` temporarily for the frontend 
-    // to consume without heavily modifying standard TableSnapshot yet.
-    // We'll extend this properly, but for now we piggyback.
-    const tcStateJson = JSON.stringify(roundState);
+    // The felt needs the whole public round — both hands, the markets, the betting window — so it
+    // travels in `gameState`. It used to be serialised into `message`, which is the human line the
+    // result banner prints, so every round painted a wall of JSON across the table.
+    const result = roundState.result;
+    const winnerName = result?.winner === 'COWBOY' ? 'Cowboy' : 'Cowgirl';
+    const handName = (result?.winningHandType ?? '').replace(/_/g, ' ').toLowerCase();
+    const headline = !result
+      ? undefined
+      : result.winner === 'TIE'
+        ? 'Split — the hands tie'
+        : `${winnerName} wins with ${handName}`;
 
     return {
       tableId: this.config.id,
@@ -293,7 +300,8 @@ export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSea
       actionDeadline: this.actionDeadline,
       legal: null,
       winners: [],
-      message: tcStateJson, // Store serialized TC round state
+      gameState: roundState,
+      ...(headline ? { message: headline } : {}),
       serverTime: Date.now(),
     };
   }

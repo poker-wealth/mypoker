@@ -97,6 +97,19 @@ export interface TableSnapshot {
    * uses it to decide which controls to offer; it is never used to decide money.
    */
   stage?: string;
+  /**
+   * Public round state for games whose felt needs more than the shared shape — Texas Cowboy's two
+   * hands, its markets and its betting window, say.
+   *
+   * Opaque here on purpose: the hub does not care what a game puts in it, and each felt narrows it
+   * to its own type. It exists because the alternative was serialising the round into `message`,
+   * which is the human-readable line the result banner prints — so every table showed a wall of
+   * JSON across the felt.
+   *
+   * Public means public: nothing in here may be hidden information (an unrevealed hole card, a
+   * mine number, the rest of the deck), because every viewer receives it.
+   */
+  gameState?: unknown;
   /** Chips already collected into the middle (street bets are shown on the seats). */
   pot: number;
   board: string[];

@@ -69,6 +69,12 @@ export interface TableSnapshot {
    * without stages omit it. Decides which controls to show, never anything about money.
    */
   stage?: string;
+  /**
+   * Public, game-specific round state for felts that need more than the shared shape — Texas
+   * Cowboy's two hands, its markets and its betting window. Each felt narrows it to its own type.
+   * Mirrors `gameState` in game-server/src/live/room-state.ts.
+   */
+  gameState?: unknown;
   pot: number;
   board: Card[];
   seats: LiveSeat[];
