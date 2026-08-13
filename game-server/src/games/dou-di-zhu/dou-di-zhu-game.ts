@@ -83,6 +83,7 @@ export class DouDiZhuGame extends BaseGame<DdzPhase, DdzAction, DdzGameEvents> {
   private winner: string | undefined;
   private net = new Map<string, number>();
   private roundId = '';
+  private handCounter = 0;
 
   constructor(
     roomId: string,
@@ -93,7 +94,7 @@ export class DouDiZhuGame extends BaseGame<DdzPhase, DdzAction, DdzGameEvents> {
   ) {
     super(roomId, fc, events, {
       initial: 'BIDDING',
-      transitions: { BIDDING: ['PLAYING'], PLAYING: ['FINISHED'], FINISHED: [] },
+      transitions: { BIDDING: ['PLAYING'], PLAYING: ['FINISHED'], FINISHED: ['BIDDING'] },
     });
     this.cfg = cfg;
     this.chain = chain;
@@ -102,8 +103,15 @@ export class DouDiZhuGame extends BaseGame<DdzPhase, DdzAction, DdzGameEvents> {
   /** Seat exactly 3 players and deal a provably-fair board; opens bidding. */
   async start(players: string[]): Promise<void> {
     if (players.length !== 3) throw new InvalidActionError('Dou Di Zhu needs exactly 3 players');
+    if (this.sm.is('FINISHED')) {
+      this.sm.transition('BIDDING');
+    }
     this.players = [...players];
-    this.roundId = `${this.roomId}-d1`;
+    this.roundId = `${this.roomId}-d${++this.handCounter}`;
+    this.winner = undefined;
+    this.current = undefined;
+    this.passes = 0;
+    this.bids.clear();
 
     const { serverSeed } = generateServerCommitment();
     const seats: SeatedClientSeed[] = players.map((_, i) => ({
