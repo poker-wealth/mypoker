@@ -7,6 +7,7 @@ import { buildJackpotRouter } from './jackpot-routes';
 import { buildLeagueRouter } from './league-routes';
 import { buildAgentRouter } from './agent-routes';
 import { buildMeRouter } from './me-routes';
+import { createRedEnvelopeRouter } from './red-envelope-routes';
 import type { LobbyService } from '../lobby';
 
 /**
@@ -45,6 +46,8 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
   if (lobby) app.use('/lobby', buildLobbyRouter(lobby, config));
   // Jackpot pools are derived from the same tables, so it shares the gate.
   if (lobby) app.use('/jackpot', buildJackpotRouter(lobby, config));
+
+  app.use('/red-envelope', createRedEnvelopeRouter());
 
   app.use((_req: Request, res: Response) => {
     res.status(404).json({ error: 'not found' });
