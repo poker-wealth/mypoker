@@ -14,6 +14,11 @@ import { Notifications } from '@/pages/Notifications';
 import { AgentCenter } from '@/pages/AgentCenter';
 import { Table } from '@/pages/Table';
 import { Login } from '@/pages/Login';
+import { AdminShell } from '@/components/AdminShell';
+import { AdminOverview } from '@/pages/admin/Overview';
+import { AdminPlayers } from '@/pages/admin/Players';
+import { AdminAlerts } from '@/pages/admin/Alerts';
+import { AdminLeagues } from '@/pages/admin/Leagues';
 
 export const router = createBrowserRouter([
   {
@@ -40,5 +45,18 @@ export const router = createBrowserRouter([
     ],
   },
   // Full-screen game table (no bottom nav / shell chrome).
+  // Admin. Its own shell, deliberately outside AppShell so it never appears in
+  // BottomNav — a player should not learn the panel exists from their own nav.
+  // The real gate is server-side: every /admin API answers 404 to non-ops.
+  {
+    path: '/admin',
+    element: <AdminShell />,
+    children: [
+      { index: true, element: <AdminOverview /> },
+      { path: 'players', element: <AdminPlayers /> },
+      { path: 'leagues', element: <AdminLeagues /> },
+      { path: 'alerts', element: <AdminAlerts /> },
+    ],
+  },
   { path: '/table/:id', element: <Table /> },
 ]);

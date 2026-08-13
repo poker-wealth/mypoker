@@ -2,6 +2,13 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tansta
 import { fetchSettings, patchSettings, type PlayerSettings, type SettingsPatch } from './settings';
 import { fetchReputation } from './reputation';
 import { fetchJackpot, fetchJackpotHistory } from './jackpot';
+import {
+  fetchOpsOverview,
+  searchPlayers,
+  fetchPlayerDetail,
+  fetchAdminAlerts,
+  fetchAdminLeagues,
+} from './admin';
 import { fetchVip } from './vip';
 import { fetchMyLeagues, fetchLeagues, createLeagueApi, joinLeagueApi } from './leagues';
 import { fetchNotifications, markNotificationsRead, type NotificationPage } from './notifications';
@@ -435,5 +442,74 @@ export function useWithdraw() {
     // A request doesn't move the balance yet (risk review first), but it must
     // appear in the withdrawals list immediately.
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['wallet'] }),
+  });
+}
+
+/**
+ * Admin overview. Short stale time — an operator refreshing this screen is
+ * usually reacting to something, and a cached figure would answer the previous
+ * question. Not retried: a 404 here means the caller is not ops, and retrying
+ * a permission answer just repeats it.
+ */
+export function useOpsOverview() {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery({
+    queryKey: ['admin', 'overview', playerId],
+    queryFn: fetchOpsOverview,
+    enabled: Boolean(playerId),
+    staleTime: 10_000,
+    refetchInterval: 30_000,
+    retry: false,
+  });
+}
+
+/** Admin player search. Debounced by the caller; not retried (404 = not ops). */
+export function usePlayerSearch(q: string) {
+  return useQuery({
+    queryKey: ['admin', 'players', q],
+    queryFn: () => searchPlayers(q),
+    enabled: q.trim().length >= 2,
+    staleTime: 15_000,
+    retry: false,
+  });
+}
+
+/** One player's detail, for the admin drawer. */
+export function usePlayerDetail(playerId: string | null) {
+  return useQuery({
+    queryKey: ['admin', 'player', playerId],
+    queryFn: () => fetchPlayerDetail(playerId!),
+    enabled: Boolean(playerId),
+    staleTime: 10_000,
+    retry: false,
+  });
+}
+
+/**
+ * Admin alerts.
+ *
+ * Polled every 5 seconds, which is the spec's budget rather than a guess:
+ * "trigger CB6 (non-whitelist flow attempt) -> alert appears in admin panel
+ * within 5 seconds". Kept polling while the tab is backgrounded would be
+ * wasteful, so refetchIntervalInBackground stays off — an operator not looking
+ * at the screen is not waiting on it.
+ */
+export function useAdminAlerts() {
+  return useQuery({
+    queryKey: ['admin', 'alerts'],
+    queryFn: fetchAdminAlerts,
+    staleTime: 0,
+    refetchInterval: 5_000,
+    retry: false,
+  });
+}
+
+/** Admin league list. Balances move on settlement, so a short window is fine. */
+export function useAdminLeagues() {
+  return useQuery({
+    queryKey: ['admin', 'leagues'],
+    queryFn: fetchAdminLeagues,
+    staleTime: 15_000,
+    retry: false,
   });
 }

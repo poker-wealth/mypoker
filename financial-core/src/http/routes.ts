@@ -17,6 +17,10 @@ import {
 } from '../withdrawal/withdrawal-state-machine';
 import { getOrCreatePlayerAccount, ensureJackpotAccounts } from '../wallet/system-accounts';
 import { getInsuranceReserve } from '../wallet/insurance-reserve';
+import { getOpsOverview } from '../ops/overview';
+import { getAdminPlayerDetail, getPlayerBalances } from '../ops/player-detail';
+import { getSecurityEvents } from '../ops/security-events';
+import { getLeagueOverview } from '../ops/league-overview';
 import { getDepositAddress } from '../wallet/deposit-address';
 import { getWalletTransactions, getWithdrawals } from '../wallet/wallet-views';
 import { isValidTronAddress } from '../wallet/tron-address';
@@ -955,6 +959,85 @@ export function buildRouter(): Router {
    * takes it from the admin's own token and passes it here.
    */
   const approveBody = z.object({ approvedBy: z.string().min(1) });
+
+  /**
+   * The admin Overview's facts (SAMUEL.md task 3, screen 1).
+   *
+   * `internalAuth`, not a player token: this is platform-wide money, and the
+   * only caller is the gateway, which checks the administrator's role before
+   * asking. financial-core has no notion of who is an admin — that role lives
+   * with identity in the gateway — so the boundary here is "internal caller",
+   * and the boundary there is "is this person ops".
+   */
+  r.get(
+    '/internal/ops/overview',
+    internalAuth,
+    asyncHandler(async (_req: Request, res: Response) => {
+      res.json(await getOpsOverview());
+    }),
+  );
+
+  /**
+   * One player's account detail, for the admin Players screen.
+   *
+   * GET only, and there is deliberately no sibling that writes. "No balance
+   * editing from the UI — ever" is held by having nothing here that could:
+   * moving a player's money goes through the withdrawal and settlement paths,
+   * which are audited, idempotent and double-entry. A direct edit is none of
+   * those.
+   */
+  r.get(
+    '/internal/players/:playerId',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json(await getAdminPlayerDetail(String(req.params.playerId)));
+    }),
+  );
+
+  /**
+   * Recent security-log entries for the admin Alerts screen.
+   *
+   * Append-only and read-only: there is no route that edits or deletes one,
+   * which is the point of keeping an audit trail. An admin can acknowledge an
+   * alert in their own head; they cannot make it stop having happened.
+   */
+  const alertsQuery = z.object({ limit: z.coerce.number().int().positive().max(500).optional() });
+  r.get(
+    '/internal/ops/alerts',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { limit } = alertsQuery.parse(req.query);
+      res.json({ events: await getSecurityEvents(limit) });
+    }),
+  );
+
+  /**
+   * Every league with its inventory, rake and insurance (admin screen 4).
+   *
+   * Read-only. Top-up and cash-out move money between TREASURY and
+   * LEAGUE_INVENTORY; the clearing rules permit both and the ledger types
+   * exist, but nothing performs either yet. That is a separate money path.
+   */
+  r.get(
+    '/internal/ops/leagues',
+    internalAuth,
+    asyncHandler(async (_req: Request, res: Response) => {
+      res.json({ leagues: await getLeagueOverview() });
+    }),
+  );
+
+  /** Balances for a set of players, for the admin search results list. */
+  const balancesBody = z.object({ playerIds: z.array(z.string().min(1)).max(100) });
+  r.post(
+    '/internal/players/balances',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { playerIds } = balancesBody.parse(req.body);
+      const balances = await getPlayerBalances(playerIds);
+      res.json({ balances: Object.fromEntries(balances) });
+    }),
+  );
+
   r.post(
     '/internal/withdrawals/:id/approve',
     internalAuth,
