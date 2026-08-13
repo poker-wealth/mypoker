@@ -1,14 +1,10 @@
 import express, { type Express, type Request, type Response } from 'express';
 import { createServer, type Server } from 'node:http';
-import { ChipBank } from './chip-bank';
-import { DevPlayers, type PlayerDirectory } from './players';
-import { DEFAULT_ROOM, type PokerRoomConfig } from './poker-room';
-import { TableHub, type TokenVerifier } from './table-hub';
-import { ChipDenominatedFc } from './fc-chip-adapter';
-import { FcPlayerDirectory } from './fc-directory';
-import { HttpFinancialCoreClient, type FinancialCoreClient } from '../core/financial-core-client';
-import { chainClientFromEnv } from '../fairness/chain-from-env';
-import { verifyToken } from '../gateway/tokens';
+import type { DevPlayers } from './players';
+import { DEFAULT_ROOM } from './poker-room';
+import type { LiveTableConfig } from './live-room';
+import type { TableHub } from './table-hub';
+import { mountLiveTables } from './mount';
 
 /**
  * The live table service — HTTP for the table list, WebSocket for the game.
@@ -37,7 +33,7 @@ export interface TableServerConfig {
   financialCore?: { baseUrl: string; internalSecret: string };
   /** Origins allowed to call the HTTP API. Empty means "any" (fine for a token-guarded read). */
   corsOrigins: string[];
-  tables: PokerRoomConfig[];
+  tables: LiveTableConfig[];
   /** Log every socket's fate. On by default: "it won't connect" is otherwise unanswerable. */
   logSockets?: boolean;
 }
@@ -54,17 +50,18 @@ export interface TableServer {
 }
 
 /**
- * The tables a fresh deployment opens. Both seat six, matching the table artwork.
+ * The tables a fresh deployment opens — one per catalogued game.
  *
  * Stakes are in chips; 1 chip = ₮0.01 (v5.9 spec: amounts are integer cents). So the ₮0.10/0.20
  * table below has 10/20-chip blinds and a 2,000-chip (₮20) buy-in.
  */
-export function defaultTables(): PokerRoomConfig[] {
+export function defaultTables(): LiveTableConfig[] {
   return [
-    { ...DEFAULT_ROOM, id: 'texas', name: "Hold'em · ₮0.10/0.20" },
+    { ...DEFAULT_ROOM, id: 'texas', game: 'texas', name: "Hold'em · ₮0.10/0.20" },
     {
       ...DEFAULT_ROOM,
       id: 'texas-high',
+      game: 'texas',
       name: "Hold'em · ₮0.50/1",
       smallBlind: 50,
       bigBlind: 100,
@@ -72,54 +69,37 @@ export function defaultTables(): PokerRoomConfig[] {
       maxBuyIn: 20_000,
       rake: { bps: 500, cap: 3_000, noFlopNoDrop: true },
     },
+    {
+      ...DEFAULT_ROOM,
+      id: 'short-deck',
+      name: 'Short Deck · ₮0.10/0.20',
+      game: 'short-deck',
+      variantId: 'short-deck',
+    },
+    {
+      ...DEFAULT_ROOM,
+      id: 'omaha',
+      name: 'Omaha · ₮0.10/0.20',
+      game: 'omaha',
+      variantId: 'omaha',
+      // Four hole cards mean far more hands connect with the board, so pots run deeper than
+      // Hold'em at the same blinds: 40 bb minimum rather than 20, and the same 200 bb ceiling.
+      minBuyIn: 800,
+    },
+    { id: 'baccarat', name: 'Baccarat · Player Banked', game: 'baccarat', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 8, rakeBps: 500, tiePayout: 8 },
+    { id: 'niu-niu', name: 'Niu Niu · Player Banked', game: 'niu-niu', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 6, rakeBps: 500 },
+    { id: 'san-zhang', name: 'San Zhang · Player Banked', game: 'san-zhang', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 6, rakeBps: 500 },
+    { id: 'red-packet', name: 'Red Packet Minesweeper', game: 'red-packet', size: 25, mineCount: 5, minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 8, rakeBps: 500 },
+    { id: 'cowboy-beauty', name: 'Cowboy & Beauty', game: 'cowboy-beauty', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 8, rakeBps: 500 },
+    { id: 'dou-di-zhu', name: 'Dou Di Zhu · Fight the Landlord', game: 'dou-di-zhu', baseStake: 100, minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 3, rakeBps: 500 },
+    { id: 'lottery', name: 'Lottery Draw', game: 'lottery', range: 10, minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 8, rakeBps: 500 },
+    { id: 'slots', name: 'Classic Slots', game: 'slots', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 6, commissionBps: 500 },
+    // The rake is required, not decorative: without it every settlement amount comes out NaN.
+    { id: 'texas-cowboy', name: 'Texas Cowboy', game: 'texas-cowboy', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 100, rakeBps: 500 },
   ];
 }
 
 export function createTableServer(config: TableServerConfig): TableServer {
-  const verifyPlayerToken: TokenVerifier = (token) => ({
-    playerId: verifyToken(token, config.jwtSecret).playerId,
-  });
-
-  // The money backend is chosen once, here. With `financialCore` set, hands settle through the real
-  // double-entry ledger (chips → USDT via ChipDenominatedFc, balances read via FcPlayerDirectory);
-  // without it, the DevPlayers/ChipBank play-money path so tables run locally with no Mongo/Redis.
-  // Not one line of room, game or settlement code differs between the two.
-  let directory: PlayerDirectory;
-  let fc: FinancialCoreClient;
-  let devPlayers: DevPlayers | undefined;
-  let fcDirectory: FcPlayerDirectory | undefined;
-
-  if (config.financialCore) {
-    const apiBase = `${config.financialCore.baseUrl.replace(/\/$/, '')}/api/v1`;
-    fc = new ChipDenominatedFc(
-      new HttpFinancialCoreClient({ baseUrl: apiBase, internalSecret: config.financialCore.internalSecret }),
-    );
-    fcDirectory = new FcPlayerDirectory({ baseUrl: apiBase, internalSecret: config.financialCore.internalSecret });
-    directory = fcDirectory;
-  } else {
-    devPlayers = new DevPlayers({
-      ...(config.chipsFile ? { file: config.chipsFile } : {}),
-      startingChips: 10_000,
-    });
-    directory = devPlayers;
-    fc = new ChipBank(devPlayers);
-  }
-
-  const hub = new TableHub(
-    // The chain notary is decided by env once, here: real Solana when
-    // configured, the deterministic fake otherwise. See chain-from-env.ts.
-    { directory, fc, chain: chainClientFromEnv() },
-    verifyPlayerToken,
-    config.logSockets === false
-      ? undefined
-      : (event): void => {
-          const who = event.playerId ? ` ${event.playerId}` : '';
-          const why = event.reason ? ` (${event.reason})` : '';
-          console.log(`  [socket] ${event.type}${who}${why}`);
-        },
-  );
-  for (const table of config.tables) hub.addTable(table);
-
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '64kb' }));
@@ -137,35 +117,19 @@ export function createTableServer(config: TableServerConfig): TableServer {
     return next();
   });
 
+  // The hub + its /api/live/* routes + the money backend all come from mountLiveTables — the same
+  // code the gateway uses when the two are folded into one process.
+  const mounted = mountLiveTables(app, {
+    jwtSecret: config.jwtSecret,
+    ...(config.financialCore ? { financialCore: config.financialCore } : {}),
+    ...(config.chipsFile ? { chipsFile: config.chipsFile } : {}),
+    tables: config.tables,
+    ...(config.logSockets !== undefined ? { logSockets: config.logSockets } : {}),
+  });
+  const { hub } = mounted;
+
   app.get('/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok', service: 'live-tables', tables: hub.tables().length });
-  });
-
-  app.get('/api/live/tables', (_req: Request, res: Response) => {
-    res.json({ tables: hub.tables() });
-  });
-
-  /** Your buy-in budget, in chips. Identity comes from the token the Mini App already holds. In
-   *  real-money mode this is a fresh read of the Financial Core available balance. */
-  app.get('/api/live/chips', (req: Request, res: Response): void => {
-    const header = req.headers.authorization;
-    if (!header?.startsWith('Bearer ')) {
-      res.status(401).json({ error: 'missing bearer token' });
-      return;
-    }
-    let playerId: string;
-    try {
-      ({ playerId } = verifyPlayerToken(header.slice('Bearer '.length)));
-    } catch {
-      res.status(401).json({ error: 'invalid token' });
-      return;
-    }
-    const available = fcDirectory
-      ? fcDirectory.availableChips(playerId)
-      : Promise.resolve(devPlayers!.ensure(playerId).available);
-    available
-      .then((chips) => res.json({ playerId, available: chips }))
-      .catch(() => res.status(502).json({ error: 'balance unavailable' }));
   });
 
   const server = createServer(app);
@@ -175,7 +139,7 @@ export function createTableServer(config: TableServerConfig): TableServer {
     app,
     server,
     hub,
-    ...(devPlayers ? { players: devPlayers } : {}),
+    ...(mounted.players ? { players: mounted.players } : {}),
     listen: (): Promise<number> =>
       new Promise((resolve) => {
         // 0.0.0.0, not localhost: every container platform routes to the former only.

@@ -8,6 +8,8 @@ import { buildLeagueRouter } from './league-routes';
 import { buildAgentRouter } from './agent-routes';
 import { buildMeRouter } from './me-routes';
 import { createRedEnvelopeRouter } from './red-envelope-routes';
+import { mountLiveTables } from '../live/mount';
+import { defaultTables } from '../live/server';
 import type { LobbyService } from '../lobby';
 
 /**
@@ -48,6 +50,18 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
   if (lobby) app.use('/jackpot', buildJackpotRouter(lobby, config));
 
   app.use('/red-envelope', createRedEnvelopeRouter());
+  // Live tables, folded into the gateway so ONE origin serves the API and the game socket (`/ws`).
+  // Mounted only when the Financial Core secret is configured — i.e. a real deploy; an auth-only
+  // gateway (and the auth/lobby tests) skip it. The WebSocket itself is attached to the http server
+  // in gateway/server.ts, which reads `app.locals.tableHub`.
+  if (config.internalApiSecret) {
+    const mounted = mountLiveTables(app, {
+      jwtSecret: config.jwtSecret,
+      financialCore: { baseUrl: config.financialCoreUrl, internalSecret: config.internalApiSecret },
+      tables: defaultTables(),
+    });
+    app.locals.tableHub = mounted.hub;
+  }
 
   app.use((_req: Request, res: Response) => {
     res.status(404).json({ error: 'not found' });
