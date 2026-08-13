@@ -1,14 +1,9 @@
 import express, { type Express, type Request, type Response } from 'express';
 import { createServer, type Server } from 'node:http';
-import { ChipBank } from './chip-bank';
-import { DevPlayers, type PlayerDirectory } from './players';
+import type { DevPlayers } from './players';
 import { DEFAULT_ROOM, type PokerRoomConfig } from './poker-room';
-import { TableHub, type TokenVerifier } from './table-hub';
-import { ChipDenominatedFc } from './fc-chip-adapter';
-import { FcPlayerDirectory } from './fc-directory';
-import { HttpFinancialCoreClient, type FinancialCoreClient } from '../core/financial-core-client';
-import { chainClientFromEnv } from '../fairness/chain-from-env';
-import { verifyToken } from '../gateway/tokens';
+import type { TableHub } from './table-hub';
+import { mountLiveTables } from './mount';
 
 /**
  * The live table service — HTTP for the table list, WebSocket for the game.
@@ -76,50 +71,6 @@ export function defaultTables(): PokerRoomConfig[] {
 }
 
 export function createTableServer(config: TableServerConfig): TableServer {
-  const verifyPlayerToken: TokenVerifier = (token) => ({
-    playerId: verifyToken(token, config.jwtSecret).playerId,
-  });
-
-  // The money backend is chosen once, here. With `financialCore` set, hands settle through the real
-  // double-entry ledger (chips → USDT via ChipDenominatedFc, balances read via FcPlayerDirectory);
-  // without it, the DevPlayers/ChipBank play-money path so tables run locally with no Mongo/Redis.
-  // Not one line of room, game or settlement code differs between the two.
-  let directory: PlayerDirectory;
-  let fc: FinancialCoreClient;
-  let devPlayers: DevPlayers | undefined;
-  let fcDirectory: FcPlayerDirectory | undefined;
-
-  if (config.financialCore) {
-    const apiBase = `${config.financialCore.baseUrl.replace(/\/$/, '')}/api/v1`;
-    fc = new ChipDenominatedFc(
-      new HttpFinancialCoreClient({ baseUrl: apiBase, internalSecret: config.financialCore.internalSecret }),
-    );
-    fcDirectory = new FcPlayerDirectory({ baseUrl: apiBase, internalSecret: config.financialCore.internalSecret });
-    directory = fcDirectory;
-  } else {
-    devPlayers = new DevPlayers({
-      ...(config.chipsFile ? { file: config.chipsFile } : {}),
-      startingChips: 10_000,
-    });
-    directory = devPlayers;
-    fc = new ChipBank(devPlayers);
-  }
-
-  const hub = new TableHub(
-    // The chain notary is decided by env once, here: real Solana when
-    // configured, the deterministic fake otherwise. See chain-from-env.ts.
-    { directory, fc, chain: chainClientFromEnv() },
-    verifyPlayerToken,
-    config.logSockets === false
-      ? undefined
-      : (event): void => {
-          const who = event.playerId ? ` ${event.playerId}` : '';
-          const why = event.reason ? ` (${event.reason})` : '';
-          console.log(`  [socket] ${event.type}${who}${why}`);
-        },
-  );
-  for (const table of config.tables) hub.addTable(table);
-
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '64kb' }));
@@ -137,35 +88,19 @@ export function createTableServer(config: TableServerConfig): TableServer {
     return next();
   });
 
+  // The hub + its /api/live/* routes + the money backend all come from mountLiveTables — the same
+  // code the gateway uses when the two are folded into one process.
+  const mounted = mountLiveTables(app, {
+    jwtSecret: config.jwtSecret,
+    ...(config.financialCore ? { financialCore: config.financialCore } : {}),
+    ...(config.chipsFile ? { chipsFile: config.chipsFile } : {}),
+    tables: config.tables,
+    ...(config.logSockets !== undefined ? { logSockets: config.logSockets } : {}),
+  });
+  const { hub } = mounted;
+
   app.get('/health', (_req: Request, res: Response) => {
     res.json({ status: 'ok', service: 'live-tables', tables: hub.tables().length });
-  });
-
-  app.get('/api/live/tables', (_req: Request, res: Response) => {
-    res.json({ tables: hub.tables() });
-  });
-
-  /** Your buy-in budget, in chips. Identity comes from the token the Mini App already holds. In
-   *  real-money mode this is a fresh read of the Financial Core available balance. */
-  app.get('/api/live/chips', (req: Request, res: Response): void => {
-    const header = req.headers.authorization;
-    if (!header?.startsWith('Bearer ')) {
-      res.status(401).json({ error: 'missing bearer token' });
-      return;
-    }
-    let playerId: string;
-    try {
-      ({ playerId } = verifyPlayerToken(header.slice('Bearer '.length)));
-    } catch {
-      res.status(401).json({ error: 'invalid token' });
-      return;
-    }
-    const available = fcDirectory
-      ? fcDirectory.availableChips(playerId)
-      : Promise.resolve(devPlayers!.ensure(playerId).available);
-    available
-      .then((chips) => res.json({ playerId, available: chips }))
-      .catch(() => res.status(502).json({ error: 'balance unavailable' }));
   });
 
   const server = createServer(app);
@@ -175,7 +110,7 @@ export function createTableServer(config: TableServerConfig): TableServer {
     app,
     server,
     hub,
-    ...(devPlayers ? { players: devPlayers } : {}),
+    ...(mounted.players ? { players: mounted.players } : {}),
     listen: (): Promise<number> =>
       new Promise((resolve) => {
         // 0.0.0.0, not localhost: every container platform routes to the former only.

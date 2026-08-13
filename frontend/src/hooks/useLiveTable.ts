@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { TableSocket, type SocketStatus } from '@/api/tableSocket';
 import { TABLES_URL, TABLES_WS_URL } from '@/config';
 import { useSession } from '@/store/session';
@@ -74,6 +75,7 @@ export function useLiveTable(tableId: string): LiveTable {
   const socketRef = useRef<TableSocket | null>(null);
   /** Latest snapshot, readable from callbacks without re-creating them on every push. */
   const latest = useRef<TableSnapshot | null>(null);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!token) {
@@ -82,9 +84,16 @@ export function useLiveTable(tableId: string): LiveTable {
     }
     const socket = new TableSocket(TABLES_WS_URL, token, tableId, {
       onSnapshot: (next) => {
+        const prev = latest.current;
         latest.current = next;
         setSnapshot(next);
         setError(null);
+        // A hand that just reached showdown has settled — real money moved through the ledger, so
+        // refresh the wallet (balance + activity) the moment the result is on screen. Fires once per
+        // hand, on the transition in, not on every snapshot.
+        if (prev?.phase !== 'SHOWDOWN' && next.phase === 'SHOWDOWN') {
+          void queryClient.invalidateQueries({ queryKey: ['wallet'] });
+        }
       },
       onStatus: setStatus,
       onError: setError,
@@ -98,7 +107,7 @@ export function useLiveTable(tableId: string): LiveTable {
       socket.close();
       socketRef.current = null;
     };
-  }, [tableId, token]);
+  }, [tableId, token, queryClient]);
 
   // Your buy-in budget changes when you sit down or cash out, so re-read it on both.
   const seated = snapshot?.yourSeat ?? null;
