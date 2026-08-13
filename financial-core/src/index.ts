@@ -3,6 +3,8 @@ import type { AddressInfo } from 'node:net';
 import { loadConfig } from './config/env';
 import { connectDb, disconnectDb } from './db/connection';
 import { createApp } from './http/app';
+import { setAlertHandler } from './lib/alert';
+import { telegramAlertConfig, telegramAlertHandler } from './lib/telegram-alert';
 
 /**
  * FairPlay Financial Core — production entrypoint.
@@ -22,6 +24,14 @@ export interface RunningServer {
 export async function startServer(): Promise<RunningServer> {
   const config = loadConfig();
   await connectDb({ uri: config.MONGO_URI, tls: config.MONGO_TLS });
+
+  // Ops alerts to Telegram when configured; stderr otherwise. The hook has
+  // always supported this — alertOps call sites do not change.
+  const alertCfg = telegramAlertConfig();
+  if (alertCfg) {
+    setAlertHandler(telegramAlertHandler(alertCfg));
+    console.log('[alerts] ops alerts -> Telegram');
+  }
 
   const app = createApp();
   const server = await new Promise<Server>((resolve) => {
