@@ -112,6 +112,27 @@ export function Games() {
           </section>
         )}
 
+        {/* Bull-Bull Simulator Feature Card */}
+        <div
+          onClick={() => navigate('/simulator/bull-bull')}
+          className="cursor-pointer overflow-hidden rounded-2xl border border-amber-500/40 bg-gradient-to-r from-amber-950/80 via-indigo-950/80 to-slate-900 p-4 text-white shadow-xl transition hover:scale-[1.01] active:scale-[0.99] flex items-center justify-between"
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="rounded bg-amber-500 text-black px-2 py-0.5 text-[0.65rem] font-black uppercase">
+                Interactive Simulator
+              </span>
+              <span className="text-xs font-bold text-amber-300">4-Player Bull-Bull (Niu Niu)</span>
+            </div>
+            <p className="text-xs text-slate-300">
+              Practice 1 Banker vs 3 Players bidding, wagering, card reveals, and zero-sum invariant accounting.
+            </p>
+          </div>
+          <button className="rounded-xl bg-amber-400 px-4 py-2 text-xs font-black text-black shadow-md hover:bg-amber-300">
+            Play Simulator
+          </button>
+        </div>
+
         {getShown(grouped.card).length > 0 && (
           <section>
             <h2 className="mb-3 text-xs font-bold text-white tracking-wider">CARD GAMES</h2>

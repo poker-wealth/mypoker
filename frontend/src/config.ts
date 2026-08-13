@@ -50,4 +50,26 @@ export const SUPPORT_URL =
 
 /** The table opened when a game id isn't itself a table id (see the table server's room list). */
 export const DEFAULT_TABLE_ID = 'texas';
-export const LIVE_TABLE_IDS = new Set(['texas', 'texas-high']);
+
+
+/**
+ * Tables with a screen behind them — must match the ids `defaultTables()` opens on the table
+ * server. Anything else routes to "not ready yet" rather than dealing the wrong game's felt.
+ * The three Hold'em-family variants share this screen; a non-poker game brings its own.
+ */
+export const LIVE_TABLE_IDS = new Set([
+  'texas',
+  'texas-high',
+  'short-deck',
+  'omaha',
+  'baccarat',
+  'niu-niu',
+  'san-zhang',
+  'red-packet',
+  'cowboy-beauty',
+  'dou-di-zhu',
+  'lottery',
+  'slots',
+  'texas-cowboy',
+]);
+

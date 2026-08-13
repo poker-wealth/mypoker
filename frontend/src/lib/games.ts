@@ -26,7 +26,8 @@ export type GameId =
   | 'red-packet'
   | 'cowboy-beauty'
   | 'lottery'
-  | 'slots';
+  | 'slots'
+  | 'texas-cowboy';
 
 export interface GameDef {
   id: GameId;
@@ -56,6 +57,7 @@ export const GAMES: GameDef[] = [
   { id: 'slots', name: 'Slot Machines', category: 'arcade', image: '/brand/slots.png', glyph: '🎰', gradient: ['#bb5cf6', '#3fd07a'], players: 2145, minBuy: '0.5' },
   { id: 'cowboy-beauty', name: 'Cowboy & Beauty', category: 'quick', image: '/brand/envelope.png', glyph: '🤠', gradient: ['#f85677', '#6366f1'], players: 486, minBuy: '1' },
   { id: 'lottery', name: 'Lottery', category: 'quick', image: '/brand/envelope.png', glyph: '🎟', gradient: ['#00d4ff', '#6366f1'], players: 1120, minBuy: '0.2' },
+  { id: 'texas-cowboy', name: 'Texas Cowboy', category: 'quick', image: '/brand/cards.png', glyph: '🤠', gradient: ['#f59e0b', '#dc2626'], players: 3042, minBuy: '1', hot: true },
 ];
 
 /**

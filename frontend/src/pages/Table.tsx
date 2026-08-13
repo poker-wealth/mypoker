@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, Volume2, Settings2, Wifi, WifiOff, MessageSquare } from 'lucide-react';
+import { ChevronLeft, Volume2, Settings2, Wifi, WifiOff, MessageSquare, ShieldCheck } from 'lucide-react';
+import { FairnessModal } from '@/components/poker/FairnessModal';
 import { AnimatePresence, motion } from 'motion/react';
 import { PokerTable } from '@/components/poker/PokerTable';
 import { ActionBar } from '@/components/poker/ActionBar';
@@ -20,6 +21,48 @@ import { ChatBox } from '@/components/poker/ChatBox';
 import { useTableChat } from '@/hooks/useTableChat';
 import { ChallengeModal } from '@/components/poker/ChallengeModal';
 
+import { DouDiZhuFelt } from '@/components/games/DouDiZhuFelt';
+import { BaccaratFelt } from '@/components/games/BaccaratFelt';
+import { NiuNiuFelt } from '@/components/games/NiuNiuFelt';
+import { SanZhangFelt } from '@/components/games/SanZhangFelt';
+import { RedPacketFelt } from '@/components/games/RedPacketFelt';
+import { CowboyBeautyFelt } from '@/components/games/CowboyBeautyFelt';
+import { LotteryFelt } from '@/components/games/LotteryFelt';
+import { SlotsFelt } from '@/components/games/SlotsFelt';
+import { TexasCowboyFelt } from '@/components/games/TexasCowboyFelt';
+import type { TableCommand, TableSnapshot } from '@/lib/liveTable';
+
+/**
+ * Which screen each table gets. A table id missing from here falls through to the Hold'em felt,
+ * which is right for the three poker variants and wrong for everything else — so a new game's
+ * table id belongs here at the same time as it goes into `LIVE_TABLE_IDS`.
+ */
+type FeltComponent = (props: {
+  snapshot?: TableSnapshot | null;
+  onCommand?: (cmd: TableCommand) => void;
+}) => React.ReactElement;
+
+const GAME_FELTS: Record<string, FeltComponent> = {
+  baccarat: BaccaratFelt,
+  'niu-niu': NiuNiuFelt,
+  'san-zhang': SanZhangFelt,
+  'red-packet': RedPacketFelt,
+  'cowboy-beauty': CowboyBeautyFelt,
+  'dou-di-zhu': DouDiZhuFelt,
+  lottery: LotteryFelt,
+  slots: SlotsFelt,
+  'texas-cowboy': TexasCowboyFelt,
+};
+
+/**
+ * The screen for a table id. A practice table (`<game>-ai`) is the same game, so it gets the same
+ * felt — and the poker family has no entry at all, which is how it falls through to the Hold'em
+ * table below.
+ */
+function feltFor(tableId: string): FeltComponent | undefined {
+  return GAME_FELTS[tableId] ?? GAME_FELTS[tableId.replace(/-ai$/, '')];
+}
+
 /**
  * The table screen.
  *
@@ -27,9 +70,12 @@ import { ChallengeModal } from '@/components/poker/ChallengeModal';
  * socket, and the people in the other chairs are other people. `?demo=1` still runs the offline
  * browser engine, so the screen can always be shown with no backend running.
  *
- * This screen is Texas Hold'em ONLY. The lobby lists games whose screens don't exist yet (Baccarat,
- * Niu Niu, Dou Di Zhu, Red Packet), and every route used to fall through to the Hold'em felt — so
- * tapping Baccarat dealt you poker. Anything without a table of its own now says so plainly.
+ * This screen is the Hold'em family — Texas, Short Deck and Omaha. All three are the same felt,
+ * the same betting and the same commands; only the deck, the hand ranking and the number of hole
+ * cards differ, and all three of those come from the server's snapshot. The lobby lists games whose
+ * screens don't exist yet (Baccarat, Niu Niu, Dou Di Zhu, Red Packet), and every route used to fall
+ * through to the Hold'em felt — so tapping Baccarat dealt you poker. Anything without a table of its
+ * own now says so plainly.
  */
 export function Table() {
   const [params] = useSearchParams();
@@ -59,6 +105,7 @@ function LiveTable({ tableId }: { tableId: string }) {
   const [jackpotSeen, setJackpotSeen] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [challengePrompt, setChallengePrompt] = useState<string | null>(null);
+  const [fairnessOpen, setFairnessOpen] = useState(false);
 
   const { messages, sendChat } = useTableChat(live.socket);
 
@@ -90,6 +137,7 @@ function LiveTable({ tableId }: { tableId: string }) {
   const seated = snapshot?.yourSeat != null;
   const mySeat = snapshot?.seats.find((s) => s.isYou);
   const playersReady = snapshot?.seats.filter((s) => s.status !== 'sittingout').length ?? 0;
+  const Felt = feltFor(tableId);
 
   return (
     <div
@@ -105,14 +153,26 @@ function LiveTable({ tableId }: { tableId: string }) {
         onBack={() => navigate(-1)}
         status={status}
         onOpenDesigns={() => setDesignsOpen(true)}
+        onOpenFairness={() => setFairnessOpen(true)}
       />
 
-      <div className="flex flex-1 items-center px-3 relative">
-        <PokerTable
-          state={view}
-          {...(seated ? {} : { onSit: (seatIndex: number): void => setBuyInFor(seatIndex) })}
-          onChallenge={(playerId) => live.challenge(playerId)}
+      {fairnessOpen && (
+        <FairnessModal
+          fairness={snapshot?.fairness}
+          onClose={() => setFairnessOpen(false)}
         />
+      )}
+
+      <div className="flex flex-1 items-center px-3 relative">
+        {Felt ? (
+          <Felt snapshot={snapshot} onCommand={(cmd) => live.command(cmd)} />
+        ) : (
+          <PokerTable
+            state={view}
+            {...(seated ? {} : { onSit: (seatIndex: number): void => setBuyInFor(seatIndex) })}
+            onChallenge={(playerId) => live.challenge(playerId)}
+          />
+        )}
         
         {/* Floating Chat Toggle Button */}
         <button
@@ -204,7 +264,7 @@ function LiveTable({ tableId }: { tableId: string }) {
         onDecline={() => setInsuranceDeclined(snapshot?.handId ?? null)}
       />
 
-      {/* Action dock */}
+
       <div className="border-t border-border bg-surface/80 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 backdrop-blur">
         {live.heroToAct ? (
           <ActionBar state={view} onAction={live.heroAct} />
@@ -294,7 +354,7 @@ function statusLine(
 }
 
 /**
- * A game with no table behind it yet. Only Texas Hold'em is playable; the rest of the catalogue is
+ * A game with no table behind it yet. The Hold'em family is playable; the rest of the catalogue is
  * still tiles. Better to say so than to open a poker felt under a Baccarat heading.
  */
 function NoTableYet({ gameId }: { gameId: string | undefined }) {
@@ -318,7 +378,8 @@ function NoTableYet({ gameId }: { gameId: string | undefined }) {
         )}
         <h2 className="mt-5 text-lg font-bold">{game?.name ?? 'This game'} isn’t ready yet</h2>
         <p className="mt-2 text-sm text-dim">
-          Texas Hold’em is the only table you can sit at right now. This one is still being built.
+          Texas Hold’em, Short Deck and Omaha are the tables you can sit at right now. This one is
+          still being built.
         </p>
         <Button full className="mt-6" onClick={() => navigate('/table/texas')}>
           Play Texas Hold’em
@@ -341,12 +402,15 @@ function TopBar({
   onBack,
   status,
   onOpenDesigns,
+  onOpenFairness,
 }: {
   subtitle: string;
   onBack: () => void;
   status?: string;
   /** Opens the table-design picker. */
   onOpenDesigns?: () => void;
+  /** Opens the provably fair verification inspector. */
+  onOpenFairness?: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -372,6 +436,16 @@ function TopBar({
               <WifiOff size={15} className="text-danger" />
             )}
           </div>
+        )}
+
+        {onOpenFairness && (
+          <button
+            onClick={onOpenFairness}
+            title="Provably Fair Verification"
+            className="grid size-9 place-items-center rounded-full border border-border bg-surface text-emerald-400 hover:text-emerald-300 active:scale-95"
+          >
+            <ShieldCheck size={16} />
+          </button>
         )}
 
         <button className="grid size-9 place-items-center rounded-full border border-border bg-surface text-dim active:scale-95">

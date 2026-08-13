@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { TableSocket, type SocketStatus } from '@/api/tableSocket';
 import { TABLES_URL, TABLES_WS_URL } from '@/config';
 import { useSession } from '@/store/session';
@@ -38,6 +39,7 @@ export interface LiveTable {
   topUp: (amount: number) => void;
   challenge: (targetId: string) => void;
   answerChallenge: (passed: boolean, responseMs: number) => void;
+  command: (cmd: TableCommand) => void;
   socket: TableSocket | null;
 }
 
@@ -54,6 +56,7 @@ const EMPTY_VIEW: TableState = {
 };
 
 export function useLiveTable(tableId: string): LiveTable {
+  const queryClient = useQueryClient();
   const token = useSession((s) => s.token);
   const player = useSession((s) => s.player);
   const sessionStatus = useSession((s) => s.status);
@@ -74,6 +77,15 @@ export function useLiveTable(tableId: string): LiveTable {
   const socketRef = useRef<TableSocket | null>(null);
   /** Latest snapshot, readable from callbacks without re-creating them on every push. */
   const latest = useRef<TableSnapshot | null>(null);
+  const prevPhaseRef = useRef<string | null>(null);
+
+  // Refetch wallet balance (/me/balance) whenever a hand settles
+  useEffect(() => {
+    if (snapshot?.phase === 'SHOWDOWN' && prevPhaseRef.current !== 'SHOWDOWN') {
+      void queryClient.invalidateQueries({ queryKey: ['wallet'] });
+    }
+    prevPhaseRef.current = snapshot?.phase ?? null;
+  }, [snapshot?.phase, queryClient]);
 
   useEffect(() => {
     if (!token) {
@@ -170,6 +182,7 @@ export function useLiveTable(tableId: string): LiveTable {
     topUp: useCallback((amount: number) => send({ kind: 'buyIn', amount }), [send]),
     challenge: useCallback((targetId: string) => send({ kind: 'challenge', targetId }), [send]),
     answerChallenge: useCallback((passed: boolean, responseMs: number) => send({ kind: 'answer_challenge', passed, responseMs }), [send]),
+    command: useCallback((cmd: TableCommand) => send(cmd), [send]),
     socket: socketRef.current,
   };
 }
