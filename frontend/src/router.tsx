@@ -16,6 +16,7 @@ import { Table } from '@/pages/Table';
 import { Login } from '@/pages/Login';
 import { AdminShell } from '@/components/AdminShell';
 import { AdminOverview } from '@/pages/admin/Overview';
+import { AdminPlayers } from '@/pages/admin/Players';
 
 export const router = createBrowserRouter([
   {
@@ -48,7 +49,10 @@ export const router = createBrowserRouter([
   {
     path: '/admin',
     element: <AdminShell />,
-    children: [{ index: true, element: <AdminOverview /> }],
+    children: [
+      { index: true, element: <AdminOverview /> },
+      { path: 'players', element: <AdminPlayers /> },
+    ],
   },
   { path: '/table/:id', element: <Table /> },
 ]);

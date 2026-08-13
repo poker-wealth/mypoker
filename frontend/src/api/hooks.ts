@@ -2,7 +2,7 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tansta
 import { fetchSettings, patchSettings, type PlayerSettings, type SettingsPatch } from './settings';
 import { fetchReputation } from './reputation';
 import { fetchJackpot, fetchJackpotHistory } from './jackpot';
-import { fetchOpsOverview } from './admin';
+import { fetchOpsOverview, searchPlayers, fetchPlayerDetail } from './admin';
 import { fetchVip } from './vip';
 import { fetchMyLeagues, fetchLeagues, createLeagueApi, joinLeagueApi } from './leagues';
 import { fetchNotifications, markNotificationsRead, type NotificationPage } from './notifications';
@@ -453,6 +453,28 @@ export function useOpsOverview() {
     enabled: Boolean(playerId),
     staleTime: 10_000,
     refetchInterval: 30_000,
+    retry: false,
+  });
+}
+
+/** Admin player search. Debounced by the caller; not retried (404 = not ops). */
+export function usePlayerSearch(q: string) {
+  return useQuery({
+    queryKey: ['admin', 'players', q],
+    queryFn: () => searchPlayers(q),
+    enabled: q.trim().length >= 2,
+    staleTime: 15_000,
+    retry: false,
+  });
+}
+
+/** One player's detail, for the admin drawer. */
+export function usePlayerDetail(playerId: string | null) {
+  return useQuery({
+    queryKey: ['admin', 'player', playerId],
+    queryFn: () => fetchPlayerDetail(playerId!),
+    enabled: Boolean(playerId),
+    staleTime: 10_000,
     retry: false,
   });
 }

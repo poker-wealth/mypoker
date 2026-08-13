@@ -57,3 +57,39 @@ export interface OpsOverview {
 
 export const fetchOpsOverview = (): Promise<OpsOverview> =>
   api.get<OpsOverview>('/admin/overview');
+
+export interface PlayerSearchRow {
+  playerId: string;
+  displayName: string | null;
+  email: string | null;
+  /** null means no account exists — a different fact from a zero balance. */
+  balance: string | null;
+}
+
+export interface PlayerSearchResult {
+  players: PlayerSearchRow[];
+  truncated: boolean;
+  /** Set when the result needs explaining rather than just listing. */
+  note?: string;
+}
+
+export interface AdminPlayerDetail {
+  playerId: string;
+  hasAccount: boolean;
+  balances: { available: string; locked: string; clearing: string; total: string };
+  reputation: {
+    roundsPlayed: number;
+    findings: string[];
+    score: number;
+    band: string;
+  };
+  vip: { tier: string; title: string };
+  volume: { cumulativeEffective: number; monthlyEffective: number };
+  identity: { displayName: string | null; email: string | null; createdAt: string | null } | null;
+}
+
+export const searchPlayers = (q: string): Promise<PlayerSearchResult> =>
+  api.get<PlayerSearchResult>(`/admin/players?q=${encodeURIComponent(q)}`);
+
+export const fetchPlayerDetail = (playerId: string): Promise<AdminPlayerDetail> =>
+  api.get<AdminPlayerDetail>(`/admin/players/${encodeURIComponent(playerId)}`);

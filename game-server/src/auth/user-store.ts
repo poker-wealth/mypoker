@@ -107,4 +107,42 @@ export const userStore = {
   ): Promise<StoredIdentity> {
     return toIdentity(await findOrCreateGoogle(googleId, email, displayName, photoUrl));
   },
+
+  /**
+   * Admin player search — by display name, email, phone, or playerId.
+   *
+   * Takes a compiled RegExp rather than a raw string, so escaping is the
+   * caller's decision and visible at the call site. Passing user input
+   * straight into `$regex` is the classic way an admin search becomes a way
+   * to hang the database.
+   *
+   * Only web sign-ups appear here. Telegram players have no document at all —
+   * their playerId is derived from the Telegram user id and nothing is written
+   * — so they are reachable by exact id only, which the admin route says out
+   * loud rather than returning a silently short list.
+   */
+  async search(pattern: RegExp, limit: number): Promise<(StoredIdentity & { createdAt: string })[]> {
+    const docs = await UserModel.find({
+      $or: [
+        { displayName: pattern },
+        { email: pattern },
+        { phone: pattern },
+        { _id: pattern },
+      ],
+    })
+      .limit(limit)
+      .lean();
+
+    return docs.map((d) => ({
+      ...toIdentity(d as UserDoc),
+      createdAt: d.createdAt.toISOString(),
+    }));
+  },
+
+  /** One identity by playerId, or null for a Telegram player (who has none). */
+  async byPlayerId(playerId: string): Promise<(StoredIdentity & { createdAt: string }) | null> {
+    const doc = await UserModel.findById(playerId).lean();
+    if (!doc) return null;
+    return { ...toIdentity(doc as UserDoc), createdAt: doc.createdAt.toISOString() };
+  },
 };

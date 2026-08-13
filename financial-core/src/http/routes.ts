@@ -18,6 +18,7 @@ import {
 import { getOrCreatePlayerAccount, ensureJackpotAccounts } from '../wallet/system-accounts';
 import { getInsuranceReserve } from '../wallet/insurance-reserve';
 import { getOpsOverview } from '../ops/overview';
+import { getAdminPlayerDetail, getPlayerBalances } from '../ops/player-detail';
 import { getDepositAddress } from '../wallet/deposit-address';
 import { getWalletTransactions, getWithdrawals } from '../wallet/wallet-views';
 import { isValidTronAddress } from '../wallet/tron-address';
@@ -961,6 +962,35 @@ export function buildRouter(): Router {
     internalAuth,
     asyncHandler(async (_req: Request, res: Response) => {
       res.json(await getOpsOverview());
+    }),
+  );
+
+  /**
+   * One player's account detail, for the admin Players screen.
+   *
+   * GET only, and there is deliberately no sibling that writes. "No balance
+   * editing from the UI — ever" is held by having nothing here that could:
+   * moving a player's money goes through the withdrawal and settlement paths,
+   * which are audited, idempotent and double-entry. A direct edit is none of
+   * those.
+   */
+  r.get(
+    '/internal/players/:playerId',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json(await getAdminPlayerDetail(String(req.params.playerId)));
+    }),
+  );
+
+  /** Balances for a set of players, for the admin search results list. */
+  const balancesBody = z.object({ playerIds: z.array(z.string().min(1)).max(100) });
+  r.post(
+    '/internal/players/balances',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { playerIds } = balancesBody.parse(req.body);
+      const balances = await getPlayerBalances(playerIds);
+      res.json({ balances: Object.fromEntries(balances) });
     }),
   );
 
