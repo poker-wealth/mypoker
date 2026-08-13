@@ -19,6 +19,7 @@ import { getOrCreatePlayerAccount, ensureJackpotAccounts } from '../wallet/syste
 import { getInsuranceReserve } from '../wallet/insurance-reserve';
 import { getOpsOverview } from '../ops/overview';
 import { getAdminPlayerDetail, getPlayerBalances } from '../ops/player-detail';
+import { getSecurityEvents } from '../ops/security-events';
 import { getDepositAddress } from '../wallet/deposit-address';
 import { getWalletTransactions, getWithdrawals } from '../wallet/wallet-views';
 import { isValidTronAddress } from '../wallet/tron-address';
@@ -979,6 +980,23 @@ export function buildRouter(): Router {
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
       res.json(await getAdminPlayerDetail(String(req.params.playerId)));
+    }),
+  );
+
+  /**
+   * Recent security-log entries for the admin Alerts screen.
+   *
+   * Append-only and read-only: there is no route that edits or deletes one,
+   * which is the point of keeping an audit trail. An admin can acknowledge an
+   * alert in their own head; they cannot make it stop having happened.
+   */
+  const alertsQuery = z.object({ limit: z.coerce.number().int().positive().max(500).optional() });
+  r.get(
+    '/internal/ops/alerts',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { limit } = alertsQuery.parse(req.query);
+      res.json({ events: await getSecurityEvents(limit) });
     }),
   );
 

@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { requireAuth, requireAdmin } from './auth';
 import { userStore } from '../auth/user-store';
 import { scoreFor, tierOf, tierForVolume, type FindingReason } from '../players/index';
+import { severityOf, labelOf } from '../ops/alert-severity';
 import type { GatewayConfig } from './config';
 
 /**
@@ -144,6 +145,41 @@ export function buildAdminRouter(config: GatewayConfig): Router {
     }),
   );
 
+  /**
+   * Screen 5 — Alerts. The seven breakers' states, plus the security log.
+   *
+   * The spec budgets five seconds from a CB6 trip to it appearing here
+   * ("trigger CB6 → alert appears in admin panel within 5 seconds"), which the
+   * client meets by polling; nothing is cached on this path.
+   */
+  r.get(
+    '/alerts',
+    handle(async (req, res) => {
+      const limit = typeof req.query.limit === 'string' ? req.query.limit : '100';
+      const [events, overview] = await Promise.all([
+        internal<{ events: RawSecurityEvent[] }>(`/internal/ops/alerts?limit=${encodeURIComponent(limit)}`),
+        internal<{ breakers: BreakerShape[] }>('/internal/ops/overview'),
+      ]);
+
+      if (!events.ok) {
+        res.status(events.status).json({ error: events.error });
+        return;
+      }
+
+      res.json({
+        // Newest first is the storage order; kept, because an operator reads
+        // an alert feed from the top and stops when they reach what they saw
+        // last time.
+        events: events.body.events.map((e) => ({
+          ...e,
+          severity: severityOf(e.event),
+          label: labelOf(e.event),
+        })),
+        breakers: overview.ok ? overview.body.breakers : [],
+      });
+    }),
+  );
+
   /** One player's full detail. Read-only — there is no write counterpart. */
   r.get(
     '/players/:playerId',
@@ -183,6 +219,21 @@ export function buildAdminRouter(config: GatewayConfig): Router {
   );
 
   return r;
+}
+
+interface RawSecurityEvent {
+  id: string;
+  at: string;
+  event: string;
+  detail: Record<string, unknown>;
+}
+
+interface BreakerShape {
+  id: string;
+  name: string;
+  status: string;
+  tripsToday: number;
+  lastTripAt: string | null;
 }
 
 /** What financial-core returns for one player, before this layer derives from it. */

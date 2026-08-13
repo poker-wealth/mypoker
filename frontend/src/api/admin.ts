@@ -93,3 +93,21 @@ export const searchPlayers = (q: string): Promise<PlayerSearchResult> =>
 
 export const fetchPlayerDetail = (playerId: string): Promise<AdminPlayerDetail> =>
   api.get<AdminPlayerDetail>(`/admin/players/${encodeURIComponent(playerId)}`);
+
+export interface AdminAlert {
+  id: string;
+  at: string;
+  event: string;
+  detail: Record<string, unknown>;
+  severity: 'INFO' | 'WARN' | 'CRITICAL';
+  /** A human label, derived server-side so every channel uses one wording. */
+  label: string;
+}
+
+export interface AdminAlerts {
+  events: AdminAlert[];
+  breakers: BreakerStatus[];
+}
+
+export const fetchAdminAlerts = (): Promise<AdminAlerts> =>
+  api.get<AdminAlerts>('/admin/alerts');

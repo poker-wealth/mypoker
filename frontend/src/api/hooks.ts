@@ -2,7 +2,7 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tansta
 import { fetchSettings, patchSettings, type PlayerSettings, type SettingsPatch } from './settings';
 import { fetchReputation } from './reputation';
 import { fetchJackpot, fetchJackpotHistory } from './jackpot';
-import { fetchOpsOverview, searchPlayers, fetchPlayerDetail } from './admin';
+import { fetchOpsOverview, searchPlayers, fetchPlayerDetail, fetchAdminAlerts } from './admin';
 import { fetchVip } from './vip';
 import { fetchMyLeagues, fetchLeagues, createLeagueApi, joinLeagueApi } from './leagues';
 import { fetchNotifications, markNotificationsRead, type NotificationPage } from './notifications';
@@ -475,6 +475,25 @@ export function usePlayerDetail(playerId: string | null) {
     queryFn: () => fetchPlayerDetail(playerId!),
     enabled: Boolean(playerId),
     staleTime: 10_000,
+    retry: false,
+  });
+}
+
+/**
+ * Admin alerts.
+ *
+ * Polled every 5 seconds, which is the spec's budget rather than a guess:
+ * "trigger CB6 (non-whitelist flow attempt) -> alert appears in admin panel
+ * within 5 seconds". Kept polling while the tab is backgrounded would be
+ * wasteful, so refetchIntervalInBackground stays off — an operator not looking
+ * at the screen is not waiting on it.
+ */
+export function useAdminAlerts() {
+  return useQuery({
+    queryKey: ['admin', 'alerts'],
+    queryFn: fetchAdminAlerts,
+    staleTime: 0,
+    refetchInterval: 5_000,
     retry: false,
   });
 }
