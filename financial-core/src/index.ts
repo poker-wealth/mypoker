@@ -3,6 +3,8 @@ import type { AddressInfo } from 'node:net';
 import { loadConfig } from './config/env';
 import { connectDb, disconnectDb } from './db/connection';
 import { createApp } from './http/app';
+import { setRecipientResolver } from './notifications/email/money-mail';
+import { gatewayRecipientResolver } from './notifications/email/gateway-recipient';
 
 /**
  * FairPlay Financial Core — production entrypoint.
@@ -22,6 +24,19 @@ export interface RunningServer {
 export async function startServer(): Promise<RunningServer> {
   const config = loadConfig();
   await connectDb({ uri: config.MONGO_URI, tls: config.MONGO_TLS });
+
+  // Email addresses live with identity, in the gateway. Wired here, once, so
+  // the money paths never have to know where an address comes from — they just
+  // ask, and get null when there is none (every Telegram player, and any
+  // deployment with no GATEWAY_URL configured).
+  if (process.env.GATEWAY_URL) {
+    setRecipientResolver(
+      gatewayRecipientResolver({
+        gatewayUrl: process.env.GATEWAY_URL,
+        internalSecret: config.INTERNAL_API_SECRET,
+      }),
+    );
+  }
 
   const app = createApp();
   const server = await new Promise<Server>((resolve) => {

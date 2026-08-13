@@ -28,18 +28,21 @@ import * as tg from '../telegram/messages';
 /**
  * Where a player's email address comes from.
  *
- * UNRESOLVED BY DESIGN — this returns null until someone wires it, and every
- * send degrades to 'no_recipient', which is already a normal outcome.
+ * Resolved by asking the gateway, per event, storing nothing — see
+ * `gateway-recipient.ts` for why that beats the alternatives. Installed at
+ * startup in src/index.ts when GATEWAY_URL is set; absent, it stays null and
+ * every send degrades to 'no_recipient', which is a normal outcome.
  *
- * financial-core cannot answer this question. The user store — and every email
- * address — lives in the gateway (game-server/src/auth/user-store.ts); this
- * service holds accounts keyed by playerId with no PII, and per
- * docs/handoff/02-architecture.md it never calls outward. Resolving it means
- * either copying addresses into this service or having the gateway supply
- * them, and that is an architecture and PII decision, not an implementation
- * detail — so it is left as one named seam rather than guessed at.
+ * An earlier version of this comment claimed financial-core "never calls
+ * outward, per docs/handoff/02-architecture.md". Both halves were wrong: the
+ * architecture doc draws the arrow gateway → financial-core but does not
+ * forbid the reverse, and this service already calls out to TronGrid to watch
+ * for deposits. The seam was left unwired longer than it needed to be on the
+ * strength of a rule that was never written down.
  *
- * Wiring it is the only change needed to turn every money email on.
+ * Only web sign-ups reach it at all. A Telegram player's chat id is inside
+ * their playerId, so they are notified with no lookup — see
+ * notifications/telegram/.
  */
 export type RecipientResolver = (playerId: string) => Promise<string | null>;
 

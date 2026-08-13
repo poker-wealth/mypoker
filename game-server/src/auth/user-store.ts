@@ -107,4 +107,17 @@ export const userStore = {
   ): Promise<StoredIdentity> {
     return toIdentity(await findOrCreateGoogle(googleId, email, displayName, photoUrl));
   },
+
+  /**
+   * One identity by playerId, or null.
+   *
+   * Null is the normal answer for a Telegram player: their playerId is derived
+   * from the Telegram user id and no document is ever written, so there is
+   * nothing here to find. That is not a missing record — it is an account that
+   * lives entirely in Telegram.
+   */
+  async byPlayerId(playerId: string): Promise<StoredIdentity | null> {
+    const doc = await UserModel.findById(playerId).lean();
+    return doc ? toIdentity(doc as UserDoc) : null;
+  },
 };
