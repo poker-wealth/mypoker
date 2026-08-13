@@ -14,6 +14,9 @@ import {
   approveFunding,
   rejectFunding,
   executeFunding,
+  fetchWithdrawalQueue,
+  approveWithdrawal,
+  rejectWithdrawal,
 } from './admin';
 import { fetchVip } from './vip';
 import { fetchMyLeagues, fetchLeagues, createLeagueApi, joinLeagueApi } from './leagues';
@@ -553,5 +556,34 @@ export function useLeagueFundingActions() {
       onSuccess: after,
     }),
     execute: useMutation({ mutationFn: executeFunding, onSuccess: after }),
+  };
+}
+
+/** The withdrawal review queue. Polled — money is waiting on it. */
+export function useWithdrawalQueue() {
+  return useQuery({
+    queryKey: ['admin', 'withdrawals'],
+    queryFn: fetchWithdrawalQueue,
+    staleTime: 5_000,
+    refetchInterval: 15_000,
+    retry: false,
+  });
+}
+
+export function useWithdrawalActions() {
+  const queryClient = useQueryClient();
+  // The queue and the overview both count pending withdrawals; approving one
+  // must not leave the other saying otherwise.
+  const after = (): void => {
+    void queryClient.invalidateQueries({ queryKey: ['admin', 'withdrawals'] });
+    void queryClient.invalidateQueries({ queryKey: ['admin', 'overview'] });
+  };
+
+  return {
+    approve: useMutation({ mutationFn: approveWithdrawal, onSuccess: after }),
+    reject: useMutation({
+      mutationFn: ({ id, reason }: { id: string; reason: string }) => rejectWithdrawal(id, reason),
+      onSuccess: after,
+    }),
   };
 }

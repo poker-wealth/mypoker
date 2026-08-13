@@ -19,6 +19,7 @@ import { AdminOverview } from '@/pages/admin/Overview';
 import { AdminPlayers } from '@/pages/admin/Players';
 import { AdminAlerts } from '@/pages/admin/Alerts';
 import { AdminLeagues } from '@/pages/admin/Leagues';
+import { AdminWithdrawals } from '@/pages/admin/Withdrawals';
 
 export const router = createBrowserRouter([
   {
@@ -53,6 +54,7 @@ export const router = createBrowserRouter([
     element: <AdminShell />,
     children: [
       { index: true, element: <AdminOverview /> },
+      { path: 'withdrawals', element: <AdminWithdrawals /> },
       { path: 'players', element: <AdminPlayers /> },
       { path: 'leagues', element: <AdminLeagues /> },
       { path: 'alerts', element: <AdminAlerts /> },

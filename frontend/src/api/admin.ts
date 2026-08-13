@@ -169,3 +169,25 @@ export const rejectFunding = (id: string, reason: string): Promise<{ ok: true }>
 
 export const executeFunding = (id: string): Promise<{ applied: boolean }> =>
   api.post<{ applied: boolean }>(`/admin/league-funding/${encodeURIComponent(id)}/execute`, {});
+
+export interface QueuedWithdrawal {
+  withdrawalId: string;
+  playerId: string;
+  amount: string;
+  address: string;
+  state: 'REQUESTED' | 'APPROVED';
+  /** Ops who have already approved, by name — the rule is a second person. */
+  approvals: string[];
+  vipTier: string;
+  vipTitle: string;
+  requestedAt: string;
+}
+
+export const fetchWithdrawalQueue = (): Promise<{ withdrawals: QueuedWithdrawal[] }> =>
+  api.get<{ withdrawals: QueuedWithdrawal[] }>('/admin/withdrawals');
+
+export const approveWithdrawal = (id: string): Promise<FundingApproval> =>
+  api.post<FundingApproval>(`/admin/withdrawals/${encodeURIComponent(id)}/approve`, {});
+
+export const rejectWithdrawal = (id: string, reason: string): Promise<{ state: string }> =>
+  api.post<{ state: string }>(`/admin/withdrawals/${encodeURIComponent(id)}/reject`, { reason });

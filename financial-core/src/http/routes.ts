@@ -14,12 +14,14 @@ import {
   approveWithdrawal,
   broadcastWithdrawal,
   confirmWithdrawal,
+  rollbackWithdrawal,
 } from '../withdrawal/withdrawal-state-machine';
 import { getOrCreatePlayerAccount, ensureJackpotAccounts } from '../wallet/system-accounts';
 import { getInsuranceReserve } from '../wallet/insurance-reserve';
 import { getOpsOverview } from '../ops/overview';
 import { getAdminPlayerDetail, getPlayerBalances } from '../ops/player-detail';
 import { getSecurityEvents } from '../ops/security-events';
+import { getWithdrawalQueue } from '../ops/withdrawal-queue';
 import { getLeagueOverview } from '../ops/league-overview';
 import {
   requestTopUp,
@@ -1118,6 +1120,39 @@ export function buildRouter(): Router {
       const treasury = await AccountModel.findOne({ accountType: 'TREASURY' }).lean();
       if (!treasury) throw new ApiError(409, 'no treasury account');
       res.json(await executeLeagueFunding(String(req.params.id), treasury._id));
+    }),
+  );
+
+  /** The withdrawal review queue (admin screen 2). */
+  r.get(
+    '/internal/ops/withdrawals',
+    internalAuth,
+    asyncHandler(async (_req: Request, res: Response) => {
+      res.json({ withdrawals: await getWithdrawalQueue() });
+    }),
+  );
+
+  /**
+   * Refuse a withdrawal and release any hold.
+   *
+   * rollbackWithdrawal already existed with no route — the state machine could
+   * refuse one, nothing could ask it to. From REQUESTED there is nothing held
+   * to release; from APPROVED the clearing hold returns to spendable, which is
+   * the part a player notices.
+   */
+  const rejectWithdrawalBody = z.object({
+    rejectedBy: z.string().min(1),
+    reason: z.string().min(1).max(200),
+  });
+  r.post(
+    '/internal/withdrawals/:id/reject',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const b = rejectWithdrawalBody.parse(req.body);
+      // The refusing administrator is recorded in the reason, since the
+      // withdrawal document has no rejectedBy field of its own.
+      await rollbackWithdrawal(String(req.params.id), `${b.reason} (refused by ${b.rejectedBy})`);
+      res.json({ state: await currentState(String(req.params.id)) });
     }),
   );
 

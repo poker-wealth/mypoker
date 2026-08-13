@@ -68,6 +68,33 @@ export function buildAdminRouter(config: GatewayConfig): Router {
       });
     };
 
+  /**
+   * The acting administrator, from the verified token.
+   *
+   * Never from the body. financial-core's internal secret proves the gateway is
+   * calling but cannot say which administrator is behind it, and that is the
+   * whole content of an approval — a client able to name its own approver could
+   * satisfy the two-person rule single-handed.
+   */
+  const actor = (req: Request): string => req.player!.playerId;
+
+  /** POST through to financial-core, with a body this layer composes. */
+  const post = (
+    path: string,
+    body: (req: Request) => Record<string, unknown>,
+  ): ((req: Request, res: Response) => void) =>
+    handle(async (req, res) => {
+      const result = await internal<unknown>(path.replace(':id', String(req.params.id ?? '')), {
+        method: 'POST',
+        body: body(req),
+      });
+      if (!result.ok) {
+        res.status(result.status).json({ error: result.error });
+        return;
+      }
+      res.json(result.body);
+    });
+
   /** Screen 1 — Overview. Read-only platform facts. */
   r.get(
     '/overview',
@@ -180,6 +207,50 @@ export function buildAdminRouter(config: GatewayConfig): Router {
     }),
   );
 
+  /**
+   * Screen 2 — the withdrawal review queue.
+   *
+   * `approvedBy` is taken from the verified token and never from the body. The
+   * internal secret proves the gateway is calling; it cannot say WHICH
+   * administrator, and that is the entire content of a second signature. A
+   * client able to name its own approver could satisfy the two-person rule
+   * alone.
+   *
+   * The VIP tier is derived here, from the same ladder the player's own profile
+   * uses, so the queue's filter and the player's screen cannot disagree.
+   */
+  r.get(
+    '/withdrawals',
+    handle(async (_req, res) => {
+      const result = await internal<{ withdrawals: QueuedWithdrawalShape[] }>(
+        '/internal/ops/withdrawals',
+      );
+      if (!result.ok) {
+        res.status(result.status).json({ error: result.error });
+        return;
+      }
+      res.json({
+        withdrawals: result.body.withdrawals.map((w) => {
+          const tier = tierForVolume(w.cumulativeEffective);
+          return { ...w, vipTier: tier.tier, vipTitle: tier.title };
+        }),
+      });
+    }),
+  );
+
+  r.post(
+    '/withdrawals/:id/approve',
+    post('/internal/withdrawals/:id/approve', (req) => ({ approvedBy: actor(req) })),
+  );
+
+  r.post(
+    '/withdrawals/:id/reject',
+    post('/internal/withdrawals/:id/reject', (req) => ({
+      rejectedBy: actor(req),
+      reason: (req.body as { reason?: string }).reason,
+    })),
+  );
+
   /** Screen 4 — Leagues. */
   r.get(
     '/leagues',
@@ -205,8 +276,6 @@ export function buildAdminRouter(config: GatewayConfig): Router {
    * WHICH administrator, which is the whole content of an approval. This layer
    * is the only place that knows.
    */
-  const actor = (req: Request): string => req.player!.playerId;
-
   r.get(
     '/league-funding',
     handle(async (_req, res) => {
@@ -218,22 +287,6 @@ export function buildAdminRouter(config: GatewayConfig): Router {
       res.json(result.body);
     }),
   );
-
-  const post = (
-    path: string,
-    body: (req: Request) => Record<string, unknown>,
-  ): ((req: Request, res: Response) => void) =>
-    handle(async (req, res) => {
-      const result = await internal<unknown>(path.replace(':id', String(req.params.id ?? '')), {
-        method: 'POST',
-        body: body(req),
-      });
-      if (!result.ok) {
-        res.status(result.status).json({ error: result.error });
-        return;
-      }
-      res.json(result.body);
-    });
 
   r.post(
     '/league-funding/top-ups',
@@ -327,6 +380,17 @@ interface BreakerShape {
   status: string;
   tripsToday: number;
   lastTripAt: string | null;
+}
+
+interface QueuedWithdrawalShape {
+  withdrawalId: string;
+  playerId: string;
+  amount: string;
+  address: string;
+  state: string;
+  approvals: string[];
+  cumulativeEffective: number;
+  requestedAt: string;
 }
 
 /** What financial-core returns for one player, before this layer derives from it. */
