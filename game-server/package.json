@@ -19,6 +19,7 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
     "all-games-demo": "ts-node scripts/all-games-demo.ts",
+    "demo-readiness": "ts-node scripts/demo-readiness.ts",
     "web": "ts-node scripts/web-demo.ts",
     "app": "ts-node scripts/app-server.ts",
     "gateway": "ts-node src/gateway/server.ts",
