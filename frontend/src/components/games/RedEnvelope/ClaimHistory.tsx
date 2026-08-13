@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Bomb, Gift, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Bomb, CheckCircle2 } from 'lucide-react';
 
 interface ClaimEvent {
   envelopeId: string;
