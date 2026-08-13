@@ -126,3 +126,46 @@ export interface LeagueOverviewRow {
 
 export const fetchAdminLeagues = (): Promise<{ leagues: LeagueOverviewRow[] }> =>
   api.get<{ leagues: LeagueOverviewRow[] }>('/admin/leagues');
+
+export type LeagueFundingKind = 'TOPUP' | 'CASHOUT';
+export type LeagueFundingState = 'REQUESTED' | 'APPROVED' | 'EXECUTED' | 'REJECTED';
+
+export interface LeagueFundingRequest {
+  _id: string;
+  leagueId: string;
+  kind: LeagueFundingKind;
+  amount: string;
+  state: LeagueFundingState;
+  requestedBy: string;
+  approvals: string[];
+  address?: string;
+  createdAt: string;
+}
+
+export interface FundingApproval {
+  applied: boolean;
+  approvals: string[];
+  awaitingSecondApproval?: true;
+}
+
+export const fetchLeagueFunding = (): Promise<{ requests: LeagueFundingRequest[] }> =>
+  api.get<{ requests: LeagueFundingRequest[] }>('/admin/league-funding');
+
+export const requestTopUp = (body: { leagueId: string; amount: string }): Promise<{ requestId: string }> =>
+  api.post<{ requestId: string }>('/admin/league-funding/top-ups', body);
+
+export const requestCashOut = (body: {
+  leagueId: string;
+  amount: string;
+  address: string;
+}): Promise<{ requestId: string }> =>
+  api.post<{ requestId: string }>('/admin/league-funding/cash-outs', body);
+
+export const approveFunding = (id: string): Promise<FundingApproval> =>
+  api.post<FundingApproval>(`/admin/league-funding/${encodeURIComponent(id)}/approve`, {});
+
+export const rejectFunding = (id: string, reason: string): Promise<{ ok: true }> =>
+  api.post<{ ok: true }>(`/admin/league-funding/${encodeURIComponent(id)}/reject`, { reason });
+
+export const executeFunding = (id: string): Promise<{ applied: boolean }> =>
+  api.post<{ applied: boolean }>(`/admin/league-funding/${encodeURIComponent(id)}/execute`, {});

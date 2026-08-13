@@ -8,6 +8,12 @@ import {
   fetchPlayerDetail,
   fetchAdminAlerts,
   fetchAdminLeagues,
+  fetchLeagueFunding,
+  requestTopUp,
+  requestCashOut,
+  approveFunding,
+  rejectFunding,
+  executeFunding,
 } from './admin';
 import { fetchVip } from './vip';
 import { fetchMyLeagues, fetchLeagues, createLeagueApi, joinLeagueApi } from './leagues';
@@ -512,4 +518,40 @@ export function useAdminLeagues() {
     staleTime: 15_000,
     retry: false,
   });
+}
+
+/** Outstanding league funding requests. */
+export function useLeagueFunding() {
+  return useQuery({
+    queryKey: ['admin', 'league-funding'],
+    queryFn: fetchLeagueFunding,
+    staleTime: 5_000,
+    retry: false,
+  });
+}
+
+/**
+ * Every league money action, sharing one invalidation.
+ *
+ * All five refresh both the request queue and the league balances, because an
+ * execution changes both and an admin watching one should not have to guess
+ * whether the other moved.
+ */
+export function useLeagueFundingActions() {
+  const queryClient = useQueryClient();
+  const after = (): void => {
+    void queryClient.invalidateQueries({ queryKey: ['admin', 'league-funding'] });
+    void queryClient.invalidateQueries({ queryKey: ['admin', 'leagues'] });
+  };
+
+  return {
+    topUp: useMutation({ mutationFn: requestTopUp, onSuccess: after }),
+    cashOut: useMutation({ mutationFn: requestCashOut, onSuccess: after }),
+    approve: useMutation({ mutationFn: approveFunding, onSuccess: after }),
+    reject: useMutation({
+      mutationFn: ({ id, reason }: { id: string; reason: string }) => rejectFunding(id, reason),
+      onSuccess: after,
+    }),
+    execute: useMutation({ mutationFn: executeFunding, onSuccess: after }),
+  };
 }

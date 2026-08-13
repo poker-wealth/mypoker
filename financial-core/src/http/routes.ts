@@ -21,6 +21,14 @@ import { getOpsOverview } from '../ops/overview';
 import { getAdminPlayerDetail, getPlayerBalances } from '../ops/player-detail';
 import { getSecurityEvents } from '../ops/security-events';
 import { getLeagueOverview } from '../ops/league-overview';
+import {
+  requestTopUp,
+  requestCashOut,
+  approveLeagueFunding,
+  rejectLeagueFunding,
+  executeLeagueFunding,
+  pendingLeagueFunding,
+} from '../league/league-funding';
 import { getDepositAddress } from '../wallet/deposit-address';
 import { getWalletTransactions, getWithdrawals } from '../wallet/wallet-views';
 import { isValidTronAddress } from '../wallet/tron-address';
@@ -1023,6 +1031,93 @@ export function buildRouter(): Router {
     internalAuth,
     asyncHandler(async (_req: Request, res: Response) => {
       res.json({ leagues: await getLeagueOverview() });
+    }),
+  );
+
+  /**
+   * League funding — request, review, execute (12-week plan, W10).
+   *
+   * Three endpoints because it is three decisions, and they are deliberately
+   * not collapsible: ops confirming a TRC-20 receipt is a judgment about the
+   * outside world, and it must be possible to reverse it before the ledger
+   * moves. See src/league/league-funding.ts.
+   *
+   * Every actor is named in the body. internalAuth proves the gateway is
+   * calling; it says nothing about WHICH administrator, and that is the entire
+   * content of an approval.
+   */
+  r.get(
+    '/internal/league-funding',
+    internalAuth,
+    asyncHandler(async (_req: Request, res: Response) => {
+      res.json({ requests: await pendingLeagueFunding() });
+    }),
+  );
+
+  const topUpBody = z.object({
+    leagueId: z.string().min(1),
+    amount: money,
+    requestedBy: z.string().min(1),
+  });
+  r.post(
+    '/internal/league-funding/top-ups',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const b = topUpBody.parse(req.body);
+      const id = await requestTopUp({
+        leagueId: b.leagueId,
+        amount: Money.fromDecimalString(b.amount),
+        requestedBy: b.requestedBy,
+      });
+      res.status(201).json({ requestId: id });
+    }),
+  );
+
+  const cashOutBody = topUpBody.extend({ address: z.string().min(1) });
+  r.post(
+    '/internal/league-funding/cash-outs',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const b = cashOutBody.parse(req.body);
+      const id = await requestCashOut({
+        leagueId: b.leagueId,
+        amount: Money.fromDecimalString(b.amount),
+        requestedBy: b.requestedBy,
+        address: b.address,
+      });
+      res.status(201).json({ requestId: id });
+    }),
+  );
+
+  const approverBody = z.object({ approvedBy: z.string().min(1) });
+  r.post(
+    '/internal/league-funding/:id/approve',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { approvedBy } = approverBody.parse(req.body);
+      res.json(await approveLeagueFunding(String(req.params.id), approvedBy));
+    }),
+  );
+
+  const rejectBody = z.object({ rejectedBy: z.string().min(1), reason: z.string().min(1).max(200) });
+  r.post(
+    '/internal/league-funding/:id/reject',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const b = rejectBody.parse(req.body);
+      await rejectLeagueFunding(String(req.params.id), b.rejectedBy, b.reason);
+      res.json({ ok: true });
+    }),
+  );
+
+  /** The only one that moves money. Separate from approval on purpose. */
+  r.post(
+    '/internal/league-funding/:id/execute',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const treasury = await AccountModel.findOne({ accountType: 'TREASURY' }).lean();
+      if (!treasury) throw new ApiError(409, 'no treasury account');
+      res.json(await executeLeagueFunding(String(req.params.id), treasury._id));
     }),
   );
 

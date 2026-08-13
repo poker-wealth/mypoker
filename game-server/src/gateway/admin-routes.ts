@@ -180,15 +180,7 @@ export function buildAdminRouter(config: GatewayConfig): Router {
     }),
   );
 
-  /**
-   * Screen 4 — Leagues. Read-only.
-   *
-   * The top-up and cash-out actions SAMUEL.md describes are not here. They move
-   * money between TREASURY and LEAGUE_INVENTORY, and nothing performs that
-   * movement yet — the ledger types and clearing paths exist, the transfer does
-   * not. Building it belongs with the other money work, senior-reviewed, rather
-   * than inside a screen PR.
-   */
+  /** Screen 4 — Leagues. */
   r.get(
     '/leagues',
     handle(async (_req, res) => {
@@ -199,6 +191,86 @@ export function buildAdminRouter(config: GatewayConfig): Router {
       }
       res.json(result.body);
     }),
+  );
+
+  /**
+   * League funding — the money actions.
+   *
+   * EVERY actor comes from the verified token, never the body. `requestedBy`,
+   * `approvedBy` and `rejectedBy` are all read from req.player, so a client
+   * cannot name someone else as the approver — a second signature the caller
+   * fills in is not a second signature.
+   *
+   * financial-core's internalAuth proves the gateway is asking; it cannot tell
+   * WHICH administrator, which is the whole content of an approval. This layer
+   * is the only place that knows.
+   */
+  const actor = (req: Request): string => req.player!.playerId;
+
+  r.get(
+    '/league-funding',
+    handle(async (_req, res) => {
+      const result = await internal<unknown>('/internal/league-funding');
+      if (!result.ok) {
+        res.status(result.status).json({ error: result.error });
+        return;
+      }
+      res.json(result.body);
+    }),
+  );
+
+  const post = (
+    path: string,
+    body: (req: Request) => Record<string, unknown>,
+  ): ((req: Request, res: Response) => void) =>
+    handle(async (req, res) => {
+      const result = await internal<unknown>(path.replace(':id', String(req.params.id ?? '')), {
+        method: 'POST',
+        body: body(req),
+      });
+      if (!result.ok) {
+        res.status(result.status).json({ error: result.error });
+        return;
+      }
+      res.json(result.body);
+    });
+
+  r.post(
+    '/league-funding/top-ups',
+    post('/internal/league-funding/top-ups', (req) => ({
+      leagueId: (req.body as { leagueId?: string }).leagueId,
+      amount: (req.body as { amount?: string }).amount,
+      requestedBy: actor(req),
+    })),
+  );
+
+  r.post(
+    '/league-funding/cash-outs',
+    post('/internal/league-funding/cash-outs', (req) => ({
+      leagueId: (req.body as { leagueId?: string }).leagueId,
+      amount: (req.body as { amount?: string }).amount,
+      address: (req.body as { address?: string }).address,
+      requestedBy: actor(req),
+    })),
+  );
+
+  r.post(
+    '/league-funding/:id/approve',
+    post('/internal/league-funding/:id/approve', (req) => ({ approvedBy: actor(req) })),
+  );
+
+  r.post(
+    '/league-funding/:id/reject',
+    post('/internal/league-funding/:id/reject', (req) => ({
+      rejectedBy: actor(req),
+      reason: (req.body as { reason?: string }).reason,
+    })),
+  );
+
+  // The only one that moves money.
+  r.post(
+    '/league-funding/:id/execute',
+    post('/internal/league-funding/:id/execute', () => ({})),
   );
 
   /** One player's full detail. Read-only — there is no write counterpart. */
