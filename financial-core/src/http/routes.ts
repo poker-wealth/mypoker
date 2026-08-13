@@ -20,6 +20,7 @@ import { getInsuranceReserve } from '../wallet/insurance-reserve';
 import { getOpsOverview } from '../ops/overview';
 import { getAdminPlayerDetail, getPlayerBalances } from '../ops/player-detail';
 import { getSecurityEvents } from '../ops/security-events';
+import { getLeagueOverview } from '../ops/league-overview';
 import { getDepositAddress } from '../wallet/deposit-address';
 import { getWalletTransactions, getWithdrawals } from '../wallet/wallet-views';
 import { isValidTronAddress } from '../wallet/tron-address';
@@ -997,6 +998,21 @@ export function buildRouter(): Router {
     asyncHandler(async (req: Request, res: Response) => {
       const { limit } = alertsQuery.parse(req.query);
       res.json({ events: await getSecurityEvents(limit) });
+    }),
+  );
+
+  /**
+   * Every league with its inventory, rake and insurance (admin screen 4).
+   *
+   * Read-only. Top-up and cash-out move money between TREASURY and
+   * LEAGUE_INVENTORY; the clearing rules permit both and the ledger types
+   * exist, but nothing performs either yet. That is a separate money path.
+   */
+  r.get(
+    '/internal/ops/leagues',
+    internalAuth,
+    asyncHandler(async (_req: Request, res: Response) => {
+      res.json({ leagues: await getLeagueOverview() });
     }),
   );
 

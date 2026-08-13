@@ -2,7 +2,13 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tansta
 import { fetchSettings, patchSettings, type PlayerSettings, type SettingsPatch } from './settings';
 import { fetchReputation } from './reputation';
 import { fetchJackpot, fetchJackpotHistory } from './jackpot';
-import { fetchOpsOverview, searchPlayers, fetchPlayerDetail, fetchAdminAlerts } from './admin';
+import {
+  fetchOpsOverview,
+  searchPlayers,
+  fetchPlayerDetail,
+  fetchAdminAlerts,
+  fetchAdminLeagues,
+} from './admin';
 import { fetchVip } from './vip';
 import { fetchMyLeagues, fetchLeagues, createLeagueApi, joinLeagueApi } from './leagues';
 import { fetchNotifications, markNotificationsRead, type NotificationPage } from './notifications';
@@ -494,6 +500,16 @@ export function useAdminAlerts() {
     queryFn: fetchAdminAlerts,
     staleTime: 0,
     refetchInterval: 5_000,
+    retry: false,
+  });
+}
+
+/** Admin league list. Balances move on settlement, so a short window is fine. */
+export function useAdminLeagues() {
+  return useQuery({
+    queryKey: ['admin', 'leagues'],
+    queryFn: fetchAdminLeagues,
+    staleTime: 15_000,
     retry: false,
   });
 }

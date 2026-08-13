@@ -180,6 +180,27 @@ export function buildAdminRouter(config: GatewayConfig): Router {
     }),
   );
 
+  /**
+   * Screen 4 — Leagues. Read-only.
+   *
+   * The top-up and cash-out actions SAMUEL.md describes are not here. They move
+   * money between TREASURY and LEAGUE_INVENTORY, and nothing performs that
+   * movement yet — the ledger types and clearing paths exist, the transfer does
+   * not. Building it belongs with the other money work, senior-reviewed, rather
+   * than inside a screen PR.
+   */
+  r.get(
+    '/leagues',
+    handle(async (_req, res) => {
+      const result = await internal<unknown>('/internal/ops/leagues');
+      if (!result.ok) {
+        res.status(result.status).json({ error: result.error });
+        return;
+      }
+      res.json(result.body);
+    }),
+  );
+
   /** One player's full detail. Read-only — there is no write counterpart. */
   r.get(
     '/players/:playerId',

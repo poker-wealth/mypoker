@@ -111,3 +111,18 @@ export interface AdminAlerts {
 
 export const fetchAdminAlerts = (): Promise<AdminAlerts> =>
   api.get<AdminAlerts>('/admin/alerts');
+
+export interface LeagueOverviewRow {
+  leagueId: string;
+  name: string;
+  ownerId: string;
+  memberCount: number;
+  inviteOnly: boolean;
+  inventory: string;
+  rake: string;
+  insurance: string;
+  createdAt: string;
+}
+
+export const fetchAdminLeagues = (): Promise<{ leagues: LeagueOverviewRow[] }> =>
+  api.get<{ leagues: LeagueOverviewRow[] }>('/admin/leagues');
