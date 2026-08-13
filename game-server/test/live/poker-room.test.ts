@@ -50,7 +50,7 @@ function harness(overrides: Partial<PokerRoomConfig> = {}): Harness {
   const bank = new ChipBank(players);
   const alice = players.create('Alice').id;
   const bob = players.create('Bob').id;
-  const room = new PokerRoom({ ...FAST, id: 't1', name: 'Test table', ...overrides }, {
+  const room = new PokerRoom({ ...FAST, id: 't1', name: 'Test table', ...overrides } as PokerRoomConfig, {
     directory: players,
     fc: bank,
   });

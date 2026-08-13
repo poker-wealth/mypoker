@@ -32,6 +32,11 @@ export interface SeatSnapshot {
   isWinner: boolean;
   isYou: boolean;
   /**
+   * This chair is played by the house AI (practice tables only). Sent so the client can say so
+   * plainly instead of assuming which seats are bots — at a table of three humans, none are.
+   */
+  isBot?: boolean;
+  /**
    * Hole cards as the VIEWER may see them: card strings for your own seat (and for everyone shown
    * down at showdown), `null` for a face-down card, empty when they aren't in the hand.
    */
@@ -86,6 +91,12 @@ export interface TableSnapshot {
   handId: string | null;
   handNumber: number;
   street: Street | null;
+  /**
+   * A game-specific sub-phase inside `IN_HAND`, for games whose hand has stages the hub does not
+   * model — Dou Di Zhu's `BIDDING` vs `PLAYING`, say. Omitted by games that have none. The client
+   * uses it to decide which controls to offer; it is never used to decide money.
+   */
+  stage?: string;
   /** Chips already collected into the middle (street bets are shown on the seats). */
   pot: number;
   board: string[];
@@ -143,10 +154,56 @@ export interface TableSummary {
 
 // ── Client → server ───────────────────────────────────────────────────────────
 
+/**
+ * A move, in whatever vocabulary the game speaks.
+ *
+ * One command channel serves every table, so this has to cover poker's four verbs AND how the
+ * other games name a move: a baccarat spot, a side, a grid cell, a lottery number, an auction bid.
+ * An enumerated set plus two narrow patterns, not a bare string — the room still decides what a
+ * move MEANS (range, stake, whose turn it is), but a shape no game speaks never reaches a room.
+ *
+ * Careful either way: too loose and the boundary checks nothing; too strict and a game is silently
+ * unplayable over the socket while its in-process tests still pass, because those call the room
+ * directly and never cross this schema. `wire-vocabulary.test.ts` pins one real command per game.
+ */
 export const betActionSchema = z.object({
-  type: z.enum(['fold', 'check', 'call', 'raise']),
-  /** For 'raise': the TOTAL this player's street contribution becomes (raise-to). */
+  type: z.union([
+    z.enum([
+      // Poker
+      'fold',
+      'check',
+      'call',
+      'raise',
+      // Stakes, the bank, a played combination, a pass, an auction bid
+      'bet',
+      'claim-banker',
+      'claim',
+      'play',
+      'pass',
+      'bid',
+      // Baccarat spots and Cowboy & Beauty sides
+      'player',
+      'banker',
+      'tie',
+      'cowboy',
+      'beauty',
+      // Slots and lottery
+      'spin',
+      'buy-ticket',
+      // Practice tables: how hard the house AI plays. A table setting, not a move.
+      'ai-easy',
+      'ai-medium',
+      'ai-hard',
+    ]),
+    /** Dou Di Zhu's auction: `bid-0` (pass) through `bid-3`. */
+    z.string().regex(/^bid-[0-3]$/),
+    /** A minesweeper cell or a lottery number — the room checks it against the board's range. */
+    z.string().regex(/^\d{1,3}$/),
+  ]),
+  /** For 'raise' / bet actions: the amount or total target. */
   amount: z.number().int().nonnegative().optional(),
+  /** For card games like Dou Dizhu: the played card combination. */
+  cards: z.array(z.string()).optional(),
 });
 
 export const tableCommandSchema = z.discriminatedUnion('kind', [

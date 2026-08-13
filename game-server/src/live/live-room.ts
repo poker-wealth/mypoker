@@ -45,11 +45,19 @@ export interface LiveRoom {
 }
 
 /** The minimum every table config carries; `game` selects the room implementation. */
-export interface LiveTableConfig {
+export interface BaseTableConfig {
   id: string;
   name: string;
   game: GameId;
+  minBuyIn?: number;
+  maxBuyIn?: number;
+  maxSeats?: number;
+  rakeBps?: number;
+  spectatorDelayMs?: number;
+  maxSpectators?: number;
 }
+
+export type LiveTableConfig = BaseTableConfig & Record<string, unknown>;
 
 /** Builds a room for one table. Each game registers exactly one. */
 export type RoomFactory = (config: LiveTableConfig, deps: RoomDeps) => LiveRoom;
@@ -63,9 +71,13 @@ export function registerRoom(game: GameId, factory: RoomFactory): void {
 
 /** Build the right room for a table config. Throws if that game has no room registered yet. */
 export function createRoom(config: LiveTableConfig, deps: RoomDeps): LiveRoom {
-  const factory = registry.get(config.game);
+  const gameId = config.game;
+  if (!gameId) {
+    throw new Error('missing "game" in LiveTableConfig');
+  }
+  const factory = registry.get(gameId);
   if (!factory) {
-    throw new Error(`no live room registered for game "${config.game}" — add one in live/rooms.ts`);
+    throw new Error(`no live room registered for game "${gameId}" — add one in live/rooms.ts`);
   }
   return factory(config, deps);
 }

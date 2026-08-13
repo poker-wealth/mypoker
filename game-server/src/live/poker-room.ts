@@ -236,6 +236,14 @@ export class PokerRoom implements LiveRoom {
   private readonly handFc: FinancialCoreClient;
 
   constructor(config: PokerRoomConfig, deps: PokerRoomDeps) {
+    // The hub dispatches on `game`; the engine deals from `variantId`. All three poker ids resolve
+    // to this same class, so a mismatch is not a type error — it is an Omaha table quietly dealing
+    // Hold'em. Refuse the table instead of opening it.
+    if (config.game !== config.variantId) {
+      throw new Error(
+        `table ${config.id}: game "${config.game}" and variantId "${config.variantId}" must match`,
+      );
+    }
     this.config = config;
     this.directory = deps.directory;
     this.fc = deps.fc;
@@ -590,6 +598,7 @@ export class PokerRoom implements LiveRoom {
     this.requireSeat(playerId);
     if (this.toActPlayer() !== playerId) throw new RoomError('not your turn');
     await this.applyAction(playerId, action, this.describeAction(action));
+    // The action passed to the bots — play their turns before handing the table back.
   }
 
   // ── The hand loop ───────────────────────────────────────────────────────────

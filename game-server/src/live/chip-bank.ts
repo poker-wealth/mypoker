@@ -39,7 +39,16 @@ export class ChipBank implements FinancialCoreClient {
   async settleTableHand(req: TableSettlementRequest): Promise<{ roundId: string; applied: boolean }> {
     if (this.settled.has(req.roundId)) return { roundId: req.roundId, applied: false };
 
-    // Losers first: the chips must exist before anyone is paid out of them.
+    // Atomic pre-validation: verify all loser accounts have sufficient locked balance before mutating any account
+    for (const loser of req.losers) {
+      const loserChips = toChips(loser.amount);
+      const lockedStack = this.ledger.locked ? this.ledger.locked(loser.playerAccountId) : Infinity;
+      if (lockedStack < loserChips) {
+        throw new Error(`loser account ${loser.playerAccountId} has insufficient locked chips: ${lockedStack} < ${loserChips}`);
+      }
+    }
+
+    // Apply settlement atomically
     for (const loser of req.losers) this.ledger.adjustLocked(loser.playerAccountId, -toChips(loser.amount));
     for (const winner of req.winners) this.ledger.adjustLocked(winner.playerAccountId, toChips(winner.amount));
 

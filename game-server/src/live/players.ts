@@ -48,6 +48,8 @@ export interface PlayerDirectory {
  */
 export interface ChipLedger {
   available(playerId: string): number;
+  /** locked stack at table */
+  locked(playerId: string): number;
   /** available → locked (buy-in). Throws if they can't cover it. */
   lock(playerId: string, amount: number): void;
   /** locked → available (leaving the table). */
