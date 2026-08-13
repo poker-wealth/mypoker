@@ -16,6 +16,8 @@ import { SecurityLogModel } from '../security/security-log.model';
 import { isOfficialContract, isConfirmed } from './trc20';
 import { networkLabel } from '../config/chain';
 import { announceDeposit } from '../notifications/email/money-mail';
+import { sendTelegram } from '../notifications/telegram/send-telegram';
+import { nonOfficialContract } from '../notifications/telegram/messages';
 
 /**
  * Deposit crediting (FairPlay §3.7). A confirmed on-chain USDT deposit is recorded as the
@@ -140,7 +142,7 @@ export type DepositOutcome =
 
 /**
  * Gate a raw on-chain deposit event through the TRC-20 rules, then credit it.
- *   - Non-official contract → never credited (logged + ops alert + player notified upstream).
+ *   - Non-official contract → never credited (logged + ops alert + the player is told).
  *   - Fewer than 20 confirmations (incl. mempool) → never credited; caller re-checks later.
  */
 export async function processConfirmedDeposit(
@@ -161,6 +163,31 @@ export async function processConfirmedDeposit(
       contractAddress: event.contractAddress,
       txHash: event.txHash,
     });
+
+    // Tell the PLAYER, not just ops. The spec is explicit — "send to wrong
+    // contract → no credit, TG notification sent" — and this comment used to
+    // claim they were "notified upstream" when nothing notified them at all.
+    //
+    // It is the one message here that is not a receipt. Someone has sent real
+    // funds to a contract the platform does not accept; silence would leave
+    // them waiting for a deposit that is never coming, and the transaction id
+    // is what support needs to help them.
+    //
+    // Wrapped, like every other announce: a failed message must not change the
+    // outcome of a deposit that was already rejected.
+    try {
+      const account = await AccountModel.findById(event.playerAccountId).lean();
+      if (account) {
+        await sendTelegram(
+          account.ownerId,
+          nonOfficialContract({ txHash: event.txHash }),
+          `deposit:${event.txHash}:rejected`,
+        );
+      }
+    } catch (err) {
+      console.error(`[deposit] could not notify ${event.txHash} rejection:`, err);
+    }
+
     return { credited: false, reason: 'wrong_contract' };
   }
 

@@ -1,6 +1,8 @@
 import { notify } from '../notification-store';
 import { sendEmail } from './send-email';
 import { depositReceived, withdrawalRequested, withdrawalSent } from './templates';
+import { sendTelegram } from '../telegram/send-telegram';
+import * as tg from '../telegram/messages';
 
 /**
  * The money events a player is told about, in one place.
@@ -55,6 +57,8 @@ async function announce(input: {
   titleKey: string;
   params: Record<string, string | number>;
   template: Parameters<typeof sendEmail>[1];
+  /** The Telegram body for this event. */
+  telegram: string;
 }): Promise<void> {
   try {
     await notify({
@@ -68,10 +72,24 @@ async function announce(input: {
     console.error(`[money-mail] in-app notification failed for ${input.eventId}:`, err);
   }
 
+  // Telegram FIRST, and it is the channel the spec actually names. It also
+  // needs no address: a Telegram player's id IS their chat id, so this reaches
+  // the majority of players with nothing to look up.
+  try {
+    await sendTelegram(input.playerId, input.telegram, input.eventId);
+  } catch (err) {
+    console.error(`[money-mail] telegram failed for ${input.eventId}:`, err);
+  }
+
+  // Email is the fallback for web sign-ups, who have no Telegram to reach.
+  // Both are attempted: sendTelegram returns not_telegram for a web account and
+  // sendEmail returns no_recipient for a Telegram one, so each player gets
+  // exactly the channel that can reach them without either needing to know
+  // about the other.
   try {
     const to = await resolveRecipient(input.playerId);
-    // Same event id as the notification: one event, one email, however many
-    // times the credit or the transition is retried.
+    // Same event id as the notification: one event, one message per channel,
+    // however many times the credit or the transition is retried.
     await sendEmail(to, input.template, input.eventId);
   } catch (err) {
     console.error(`[money-mail] email failed for ${input.eventId}:`, err);
@@ -102,6 +120,7 @@ export async function announceDeposit(input: {
       network: input.network,
       at,
     }),
+    telegram: tg.depositReceived({ amount: input.amount, txHash: input.txHash }),
   });
 }
 
@@ -128,6 +147,7 @@ export async function announceWithdrawalRequested(input: {
       address: input.address,
       at: input.at ?? new Date(),
     }),
+    telegram: tg.withdrawalRequested({ amount: input.amount, address: input.address }),
   });
 }
 
@@ -154,5 +174,6 @@ export async function announceWithdrawalSent(input: {
       network: input.network,
       at: input.at ?? new Date(),
     }),
+    telegram: tg.withdrawalSent({ amount: input.amount, txHash: input.txHash }),
   });
 }
