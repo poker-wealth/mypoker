@@ -35,9 +35,14 @@ function rakeOf(config: TexasCowboyRoomConfig): number {
   return config.rakeBps ?? 500;
 }
 
+/** How many past results the board keeps — the road a player reads before betting. */
+const HISTORY_LENGTH = 20;
+
 export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSeat> {
   private engine: TexasCowboyEngine;
   private timer: NodeJS.Timeout | null = null;
+  /** Winners of the last rounds, oldest first. Public — it is the road every player reads. */
+  private readonly history: Array<'COWBOY' | 'COWGIRL' | 'TIE'> = [];
   private disposed = false;
 
   constructor(config: TexasCowboyRoomConfig, deps: RoomDeps) {
@@ -173,6 +178,15 @@ export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSea
   private evaluateHands(): void {
     this.phase = 'SHOWDOWN';
     this.engine.evaluateHands();
+
+    // Keep the road: the board shows how the last twenty rounds went, the way a baccarat table
+    // keeps its bead plate. Results only — who won, never anyone's cards or stakes.
+    const outcome = this.engine.getRoundState().result?.winner;
+    if (outcome) {
+      this.history.push(outcome);
+      if (this.history.length > HISTORY_LENGTH) this.history.shift();
+    }
+
     this.push();
     this.schedulePhase(() => this.settleRound(), 4000); // Let players see results
   }
@@ -300,7 +314,14 @@ export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSea
       actionDeadline: this.actionDeadline,
       legal: null,
       winners: [],
-      gameState: roundState,
+      // The board also shows what is riding on each market: the table's chips, which are public the
+      // way chips on a felt are, and this viewer's own stake, which is not.
+      gameState: {
+        ...roundState,
+        history: [...this.history],
+        pools: this.engine.poolByMarket(),
+        yourStakes: this.engine.poolByMarket(playerId),
+      },
       ...(headline ? { message: headline } : {}),
       serverTime: Date.now(),
     };

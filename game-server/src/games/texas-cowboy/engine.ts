@@ -153,6 +153,21 @@ export class TexasCowboyEngine {
       .reduce((total, b) => total + b.amount, 0);
   }
 
+  /**
+   * Chips on each market, market id → total.
+   *
+   * Public: the board shows what the table is backing, the same way chips sit on a felt in front of
+   * everyone. Pass a `userId` to get only that player's own stake instead.
+   */
+  poolByMarket(userId?: string): Record<string, number> {
+    const pools: Record<string, number> = {};
+    for (const bet of this.userBets) {
+      if (userId !== undefined && bet.userId !== userId) continue;
+      pools[bet.marketId] = (pools[bet.marketId] ?? 0) + bet.amount;
+    }
+    return pools;
+  }
+
   openBetting(durationMs = 12_000, now = Date.now()): void {
     if (this.state.phase !== 'WAITING' && this.state.phase !== 'RESET') {
       throw new Error(`Cannot open betting from phase ${this.state.phase}`);
