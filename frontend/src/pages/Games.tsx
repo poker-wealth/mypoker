@@ -6,7 +6,7 @@ import { motion } from 'motion/react';
 import { Segmented } from '@/components/ui/Segmented';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { GameTile } from '@/components/GameTile';
-import { GAMES, type GameCategory } from '@/lib/games';
+import { visibleGames, type GameCategory, type GameDef } from '@/lib/games';
 import { useLobbyGames } from '@/api/hooks';
 import { formatMicros } from '@/api/lobby';
 
@@ -31,15 +31,19 @@ export function Games() {
   const live = new Map((lobby.data?.games ?? []).map((g) => [g.gameId, g]));
 
   const query = q.trim().toLowerCase();
-  
-  // Group games by category
+
+  // visibleGames(), NOT GAMES: the launch gate (HIDDEN_GAMES, withheld on
+  // Victor's instruction) lives in that filter, and iterating the raw list
+  // here rendered withheld games as tappable tiles that navigated to real
+  // tables. An audit caught this page as the one map site bypassing the gate.
+  const games = visibleGames();
   const grouped = {
-    poker: GAMES.filter(g => g.category === 'poker'),
-    card: GAMES.filter(g => g.category === 'card'),
-    quick: GAMES.filter(g => g.category === 'quick' || g.category === 'arcade'),
+    poker: games.filter(g => g.category === 'poker'),
+    card: games.filter(g => g.category === 'card'),
+    quick: games.filter(g => g.category === 'quick' || g.category === 'arcade'),
   };
 
-  const getShown = (list: typeof GAMES) => {
+  const getShown = (list: GameDef[]) => {
     return list.filter((g) => {
       const inCat = cat === 'all' || g.category === cat;
       const localised = t(`gameNames.${g.id}`, { defaultValue: g.name }).toLowerCase();
@@ -162,7 +166,7 @@ export function Games() {
           </section>
         )}
         
-        {getShown(GAMES).length === 0 && (
+        {getShown(games).length === 0 && (
           <div className="rounded-(--radius-app) border border-border bg-surface py-10 text-center text-sm text-dim">
             {t('games.noMatch', { query: q })}
           </div>

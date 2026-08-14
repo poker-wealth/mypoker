@@ -8,8 +8,9 @@
  *
  * What lives here is the *visual* identity — glyph, gradient, category — which
  * is a client concern the server has no opinion about. Live figures (players,
- * jackpot, availability) come from GET /lobby/games; the counts below are the
- * offline fallback for when it can't be reached.
+ * jackpot, availability) come from GET /lobby/games; when it can't be reached
+ * the tiles show an em dash, never an invented count. (Hardcoded fallback
+ * counts used to live here; they were deleted with the mock data.)
  *
  * Display names come from the `gameNames.<id>` translation keys, not `name`.
  */

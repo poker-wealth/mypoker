@@ -25,6 +25,7 @@ import { useBalance, useVip, useUnreadCount } from '@/api/hooks';
 import { moneyFromDecimal } from '@/lib/money';
 import { isTelegram, haptic } from '@/lib/telegram';
 import { SUPPORT_URL } from '@/config';
+import { toast } from '@/store/toast';
 import { cn } from '@/lib/cn';
 
 /**
@@ -345,7 +346,15 @@ function Menu({
         icon={<LifeBuoy size={17} className="text-dim" />}
         title={t('account.support')}
         onClick={() => {
-          if (SUPPORT_URL) window.open(SUPPORT_URL, '_blank', 'noopener');
+          // The toast branch matters: with SUPPORT_URL unset (no VITE_SUPPORT_URL,
+          // no bot name) a bare `if` made this a silent no-op — the exact dead
+          // control this task existed to remove, back under default config.
+          // Settings has always had the toast; Profile now matches it.
+          if (SUPPORT_URL) {
+            window.open(SUPPORT_URL, '_blank', 'noopener');
+          } else {
+            toast.info(t('account.supportConnecting', { defaultValue: 'Connecting to support...' }));
+          }
         }}
       />
       <Row
