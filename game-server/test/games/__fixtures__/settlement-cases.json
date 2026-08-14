@@ -1,0 +1,463 @@
+[
+  {
+    "name": "heads-up, even",
+    "why": "The simplest shape. If this drifts, everything has.",
+    "nets": {
+      "winner": 1000,
+      "loser": -1000
+    },
+    "rakeBps": 500,
+    "expected": {
+      "losers": [
+        {
+          "playerId": "loser",
+          "amount": 1000
+        }
+      ],
+      "winners": [
+        {
+          "playerId": "winner",
+          "amount": 945
+        }
+      ],
+      "rake": 50,
+      "jackpotTotal": 5,
+      "jackpot": {
+        "mini": 1,
+        "minor": 1,
+        "major": 1,
+        "grand": 2
+      }
+    }
+  },
+  {
+    "name": "three-way, one winner",
+    "why": "Dou Di Zhu's landlord shape: one player against two.",
+    "nets": {
+      "landlord": 400,
+      "peasantA": -200,
+      "peasantB": -200
+    },
+    "rakeBps": 0,
+    "expected": {
+      "losers": [
+        {
+          "playerId": "peasantA",
+          "amount": 200
+        },
+        {
+          "playerId": "peasantB",
+          "amount": 200
+        }
+      ],
+      "winners": [
+        {
+          "playerId": "landlord",
+          "amount": 398
+        }
+      ],
+      "rake": 0,
+      "jackpotTotal": 2,
+      "jackpot": {
+        "mini": 0,
+        "minor": 0,
+        "major": 0,
+        "grand": 2
+      }
+    }
+  },
+  {
+    "name": "two winners, uneven",
+    "why": "Rake and jackpot must be split BETWEEN winners in proportion, not charged twice.",
+    "nets": {
+      "big": 900,
+      "small": 100,
+      "loser": -1000
+    },
+    "rakeBps": 500,
+    "expected": {
+      "losers": [
+        {
+          "playerId": "loser",
+          "amount": 1000
+        }
+      ],
+      "winners": [
+        {
+          "playerId": "big",
+          "amount": 850
+        },
+        {
+          "playerId": "small",
+          "amount": 95
+        }
+      ],
+      "rake": 50,
+      "jackpotTotal": 5,
+      "jackpot": {
+        "mini": 1,
+        "minor": 1,
+        "major": 1,
+        "grand": 2
+      }
+    }
+  },
+  {
+    "name": "remainder that does not divide",
+    "why": "Three winners sharing a deduction of 1 chip. Largest-remainder must hand the odd chip to exactly one of them — never drop it, never invent a second.",
+    "nets": {
+      "a": 334,
+      "b": 333,
+      "c": 333,
+      "loser": -1000
+    },
+    "rakeBps": 10,
+    "expected": {
+      "losers": [
+        {
+          "playerId": "loser",
+          "amount": 1000
+        }
+      ],
+      "winners": [
+        {
+          "playerId": "a",
+          "amount": 331
+        },
+        {
+          "playerId": "b",
+          "amount": 331
+        },
+        {
+          "playerId": "c",
+          "amount": 332
+        }
+      ],
+      "rake": 1,
+      "jackpotTotal": 5,
+      "jackpot": {
+        "mini": 1,
+        "minor": 1,
+        "major": 1,
+        "grand": 2
+      }
+    }
+  },
+  {
+    "name": "rake rounds to zero",
+    "why": "A tiny pot with a real rate. floor() gives 0, and 0 must not become 1.",
+    "nets": {
+      "winner": 3,
+      "loser": -3
+    },
+    "rakeBps": 500,
+    "expected": {
+      "losers": [
+        {
+          "playerId": "loser",
+          "amount": 3
+        }
+      ],
+      "winners": [
+        {
+          "playerId": "winner",
+          "amount": 3
+        }
+      ],
+      "rake": 0,
+      "jackpotTotal": 0,
+      "jackpot": {
+        "mini": 0,
+        "minor": 0,
+        "major": 0,
+        "grand": 0
+      }
+    }
+  },
+  {
+    "name": "zero rake, jackpot still taken",
+    "why": "The case my own test got wrong: at rakeBps 0, 0.5% still leaves for the jackpot pools, so winners + rake alone does not balance.",
+    "nets": {
+      "winner": 1000,
+      "loser": -1000
+    },
+    "rakeBps": 0,
+    "expected": {
+      "losers": [
+        {
+          "playerId": "loser",
+          "amount": 1000
+        }
+      ],
+      "winners": [
+        {
+          "playerId": "winner",
+          "amount": 995
+        }
+      ],
+      "rake": 0,
+      "jackpotTotal": 5,
+      "jackpot": {
+        "mini": 1,
+        "minor": 1,
+        "major": 1,
+        "grand": 2
+      }
+    }
+  },
+  {
+    "name": "jackpot disabled",
+    "why": "Explicit 0 must actually mean 0 — not fall through to the 50bps default.",
+    "nets": {
+      "winner": 1000,
+      "loser": -1000
+    },
+    "rakeBps": 500,
+    "jackpotBps": 0,
+    "expected": {
+      "losers": [
+        {
+          "playerId": "loser",
+          "amount": 1000
+        }
+      ],
+      "winners": [
+        {
+          "playerId": "winner",
+          "amount": 950
+        }
+      ],
+      "rake": 50,
+      "jackpotTotal": 0,
+      "jackpot": {
+        "mini": 0,
+        "minor": 0,
+        "major": 0,
+        "grand": 0
+      }
+    }
+  },
+  {
+    "name": "large pot",
+    "why": "Guards against precision loss at a scale a real high-stakes table reaches.",
+    "nets": {
+      "winner": 5000000,
+      "loser": -3000000,
+      "loser2": -2000000
+    },
+    "rakeBps": 500,
+    "expected": {
+      "losers": [
+        {
+          "playerId": "loser",
+          "amount": 3000000
+        },
+        {
+          "playerId": "loser2",
+          "amount": 2000000
+        }
+      ],
+      "winners": [
+        {
+          "playerId": "winner",
+          "amount": 4725000
+        }
+      ],
+      "rake": 250000,
+      "jackpotTotal": 25000,
+      "jackpot": {
+        "mini": 5000,
+        "minor": 7500,
+        "major": 6250,
+        "grand": 6250
+      }
+    }
+  },
+  {
+    "name": "many small losers",
+    "why": "Red Packet / Lottery shape: one winner, a crowd of small contributors.",
+    "nets": {
+      "winner": 900,
+      "l1": -100,
+      "l2": -100,
+      "l3": -100,
+      "l4": -100,
+      "l5": -100,
+      "l6": -100,
+      "l7": -100,
+      "l8": -100,
+      "l9": -100
+    },
+    "rakeBps": 250,
+    "expected": {
+      "losers": [
+        {
+          "playerId": "l1",
+          "amount": 100
+        },
+        {
+          "playerId": "l2",
+          "amount": 100
+        },
+        {
+          "playerId": "l3",
+          "amount": 100
+        },
+        {
+          "playerId": "l4",
+          "amount": 100
+        },
+        {
+          "playerId": "l5",
+          "amount": 100
+        },
+        {
+          "playerId": "l6",
+          "amount": 100
+        },
+        {
+          "playerId": "l7",
+          "amount": 100
+        },
+        {
+          "playerId": "l8",
+          "amount": 100
+        },
+        {
+          "playerId": "l9",
+          "amount": 100
+        }
+      ],
+      "winners": [
+        {
+          "playerId": "winner",
+          "amount": 874
+        }
+      ],
+      "rake": 22,
+      "jackpotTotal": 4,
+      "jackpot": {
+        "mini": 0,
+        "minor": 1,
+        "major": 1,
+        "grand": 2
+      }
+    }
+  },
+  {
+    "name": "rake lands exactly on .5",
+    "why": "The floor/round boundary. 5%% of 1010 is 50.5 — floor gives 50, round gives 51. Chosen so a one-character change to the rounding fails here rather than depending on which other case happened to catch it.",
+    "nets": {
+      "winner": 1010,
+      "loser": -1010
+    },
+    "rakeBps": 500,
+    "jackpotBps": 0,
+    "expected": {
+      "losers": [
+        {
+          "playerId": "loser",
+          "amount": 1010
+        }
+      ],
+      "winners": [
+        {
+          "playerId": "winner",
+          "amount": 960
+        }
+      ],
+      "rake": 50,
+      "jackpotTotal": 0,
+      "jackpot": {
+        "mini": 0,
+        "minor": 0,
+        "major": 0,
+        "grand": 0
+      }
+    }
+  },
+  {
+    "name": "rake lands just below .5",
+    "why": "The other side of the same boundary: 50.4 floors and rounds alike.",
+    "nets": {
+      "winner": 1008,
+      "loser": -1008
+    },
+    "rakeBps": 500,
+    "jackpotBps": 0,
+    "expected": {
+      "losers": [
+        {
+          "playerId": "loser",
+          "amount": 1008
+        }
+      ],
+      "winners": [
+        {
+          "playerId": "winner",
+          "amount": 958
+        }
+      ],
+      "rake": 50,
+      "jackpotTotal": 0,
+      "jackpot": {
+        "mini": 0,
+        "minor": 0,
+        "major": 0,
+        "grand": 0
+      }
+    }
+  },
+  {
+    "name": "jackpot lands on a fraction",
+    "why": "Same boundary for the jackpot deduction, which uses its own floor().",
+    "nets": {
+      "winner": 1030,
+      "loser": -1030
+    },
+    "rakeBps": 0,
+    "expected": {
+      "losers": [
+        {
+          "playerId": "loser",
+          "amount": 1030
+        }
+      ],
+      "winners": [
+        {
+          "playerId": "winner",
+          "amount": 1025
+        }
+      ],
+      "rake": 0,
+      "jackpotTotal": 5,
+      "jackpot": {
+        "mini": 1,
+        "minor": 1,
+        "major": 1,
+        "grand": 2
+      }
+    }
+  },
+  {
+    "name": "everyone flat",
+    "why": "A pushed hand. Nothing to allocate, and nothing should be invented.",
+    "nets": {
+      "a": 0,
+      "b": 0
+    },
+    "rakeBps": 500,
+    "expected": {
+      "losers": [],
+      "winners": [],
+      "rake": 0,
+      "jackpotTotal": 0,
+      "jackpot": {
+        "mini": 0,
+        "minor": 0,
+        "major": 0,
+        "grand": 0
+      }
+    }
+  }
+]
