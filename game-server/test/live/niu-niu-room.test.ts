@@ -60,7 +60,12 @@ describe('NiuNiuRoom — Live Room Integration', () => {
 
     await until(() => room.snapshotFor(alice).phase === 'IN_HAND');
 
-    // Bob bets
+    // The round opens with the bank auction now: bid first, then bet against whoever wins it.
+    await room.command(alice, { kind: 'act', action: { type: 'bid-2' } });
+    await room.command(bob, { kind: 'act', action: { type: 'bid-1' } });
+    await until(() => room.snapshotFor(alice).stage === 'BETTING');
+
+    // Bob bets against Alice's 2x bank
     await room.command(bob, { kind: 'act', action: { type: 'bet', amount: 100 } });
 
     await until(() => room.snapshotFor(alice).phase === 'SHOWDOWN');

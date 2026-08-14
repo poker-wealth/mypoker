@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
 import { Alliance } from '@/pages/Alliance';
 import { Lobby } from '@/pages/Lobby';
@@ -16,7 +16,6 @@ import { Table } from '@/pages/Table';
 import { DemoPage } from '@/demo/DemoPage';
 import { Login } from '@/pages/Login';
 
-import { BullBullSimulatorFelt } from '@/components/games/BullBullSimulatorFelt';
 import { DouDiZhuSimulatorFelt } from '@/components/games/DouDiZhuSimulatorFelt';
 
 export const router = createBrowserRouter([
@@ -45,7 +44,9 @@ export const router = createBrowserRouter([
   },
   // Full-screen game table & simulators (no bottom nav / shell chrome).
   { path: '/table/:id', element: <Table /> },
-  { path: '/simulator/bull-bull', element: <BullBullSimulatorFelt /> },
+  // Bull Bull IS Niu Niu. It used to be a second, play-money copy of the same game; the betting
+  // structure now lives on the table that settles through the ledger, so the old link lands there.
+  { path: '/simulator/bull-bull', element: <Navigate to='/table/niu-niu' replace /> },
   { path: '/simulator/dou-di-zhu', element: <DouDiZhuSimulatorFelt /> },
   // THROWAWAY: the scripted walkthrough of every game. Delete this line and src/demo/ to remove.
   { path: '/demo', element: <DemoPage /> },

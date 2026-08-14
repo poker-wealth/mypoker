@@ -28,6 +28,8 @@ export type NiuNiuPhase = 'BETTING' | 'RESOLVED';
 export interface NiuNiuAction {
   type: 'claim-banker' | 'bet';
   amount?: number;
+  /** 1x / 2x / 5x — the bank bid, or the stake multiplier on a bet. */
+  multiplier?: number;
 }
 
 export interface NiuNiuGameEvents extends Record<string, unknown> {
@@ -55,7 +57,10 @@ export class NiuNiuGame extends BaseGame<NiuNiuPhase, NiuNiuAction, NiuNiuGameEv
   private readonly cfg: NiuNiuGameConfig;
   private readonly chain: ChainClient;
   private banker: string | undefined;
-  private readonly bets = new Map<string, number>();
+  /** Stake and the multiplier the bettor chose, per player. */
+  private readonly bets = new Map<string, { amount: number; multiplier: number }>();
+  /** The bid that won the bank, applied to every settlement this round. */
+  private bankerMultiplier = 1;
   private readonly hands = new Map<string, string[]>();
   private net = new Map<string, number>();
   private roundId = '';
@@ -80,23 +85,24 @@ export class NiuNiuGame extends BaseGame<NiuNiuPhase, NiuNiuAction, NiuNiuGameEv
    * Claim the banker seat. Atomic (single-threaded check-and-set == Redis SETNX): the first caller
    * wins; any later caller is rejected until the round resets.
    */
-  claimBanker(playerId: string): void {
+  claimBanker(playerId: string, multiplier = 1): void {
     if (!this.sm.is('BETTING')) throw new InvalidActionError('betting is closed');
     if (this.banker !== undefined) throw new BankerTakenError();
     this.banker = playerId;
+    this.bankerMultiplier = multiplier;
     this.bets.delete(playerId);
   }
 
-  placeBet(playerId: string, amount: number): void {
+  placeBet(playerId: string, amount: number, multiplier = 1): void {
     if (!this.sm.is('BETTING')) throw new InvalidActionError('betting is closed');
     if (amount <= 0) throw new InvalidActionError('bet must be positive');
     if (playerId === this.banker) throw new InvalidActionError('the banker cannot bet');
-    this.bets.set(playerId, amount);
+    this.bets.set(playerId, { amount, multiplier });
   }
 
   handleAction(playerId: string, action: NiuNiuAction): void {
-    if (action.type === 'claim-banker') this.claimBanker(playerId);
-    else if (action.type === 'bet') this.placeBet(playerId, action.amount ?? 0);
+    if (action.type === 'claim-banker') this.claimBanker(playerId, action.multiplier ?? 1);
+    else if (action.type === 'bet') this.placeBet(playerId, action.amount ?? 0, action.multiplier ?? 1);
     else throw new InvalidActionError('unknown action');
   }
 
@@ -127,10 +133,14 @@ export class NiuNiuGame extends BaseGame<NiuNiuPhase, NiuNiuAction, NiuNiuGameEv
     const bankerRank = evaluateNiu(this.hands.get(this.banker)!);
     this.net = new Map();
     let bankerNet = 0;
-    for (const [playerId, amount] of this.bets) {
+    for (const [playerId, bet] of this.bets) {
       const bettorRank = evaluateNiu(this.hands.get(playerId)!);
       const cmp = compareNiu(bettorRank, bankerRank);
-      const g = cmp > 0 ? amount * bettorRank.multiplier : -amount * bankerRank.multiplier;
+      // Stake x the bettor's multiplier x the bank's winning bid x the winning HAND's
+      // multiplier — the bull-bull betting structure on top of the niu niu hand ladder, which is
+      // how the game is played: a bomb against a 5x bank is worth many times a flat win.
+      const stake = bet.amount * bet.multiplier * this.bankerMultiplier;
+      const g = cmp > 0 ? stake * bettorRank.multiplier : -stake * bankerRank.multiplier;
       this.net.set(playerId, g);
       bankerNet -= g;
     }
