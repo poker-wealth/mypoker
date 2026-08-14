@@ -31,7 +31,14 @@ import {
   getRakeAccountId,
   ensureInsuranceAccounts,
   insuranceAccountId,
+  reinsuranceAccountId,
 } from '../wallet/system-accounts';
+import {
+  clawbackTransferable,
+  backstopAmount,
+  assertMultiSig,
+  type ReinsuranceScope,
+} from '../reinsurance/reinsurance-rules';
 import { getInsuranceReserve } from '../wallet/insurance-reserve';
 import { getDepositAddress } from '../wallet/deposit-address';
 import { getWalletTransactions, getWithdrawals } from '../wallet/wallet-views';
@@ -1074,6 +1081,117 @@ export function buildRouter(): Router {
         type: LedgerType.AGENT_COMMISSION,
         businessId: b.businessId,
         idempotencyKey: `${b.businessId}:agent-commission:${b.agentPlayerId}`,
+      });
+      res.json({ applied: result.applied });
+    }),
+  );
+
+  // ── Reinsurance (the backstop behind insurance) ──────────────────────────
+  // Wires the reinsurance rules (pure functions with no callers until now) to real transfers. Scope-
+  // isolated by construction: a league's reinsurance never funds the platform's and vice-versa.
+  // Dormant until the insurance/ops engine calls them.
+  const reinScope = (ownerId: string): ReinsuranceScope =>
+    ownerId === PLATFORM_SCOPE ? { kind: 'PLATFORM' } : { kind: 'LEAGUE', leagueId: ownerId };
+
+  // Clawback: sweep a capped share of the insurance pool's monthly net profit into reinsurance
+  // (INSURANCE → REINSURANCE). Capped so the backstop stays a buffer, not a hoard.
+  const clawbackBody = z.object({
+    ownerId: z.string().min(1).default(PLATFORM_SCOPE),
+    monthlyNetProfit: money,
+    historicalMaxSingleDayPayout: money,
+    businessId: z.string().min(1),
+  });
+  r.post(
+    '/internal/reinsurance/clawback',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const b = clawbackBody.parse(req.body);
+      const reserve = await getInsuranceReserve(b.ownerId);
+      const amount = clawbackTransferable(
+        Money.fromDecimalString(b.monthlyNetProfit),
+        Money.fromDecimalString(reserve.reinsuranceBalance),
+        Money.fromDecimalString(b.historicalMaxSingleDayPayout),
+      );
+      if (!amount.isPositive()) {
+        res.json({ applied: false, amount: '0' });
+        return;
+      }
+      const result = await transfer({
+        fromAccountId: insuranceAccountId(b.ownerId),
+        toAccountId: reinsuranceAccountId(b.ownerId),
+        amount,
+        type: LedgerType.REINSURANCE_INJECT,
+        businessId: b.businessId,
+        idempotencyKey: `${b.businessId}:reins-clawback`,
+      });
+      res.json({ applied: result.applied, amount: amount.toString() });
+    }),
+  );
+
+  // Backstop: reinsurance tops insurance up for a shortfall it can't cover (REINSURANCE → INSURANCE),
+  // never beyond what reinsurance holds, never across scopes.
+  const backstopBody = z.object({
+    ownerId: z.string().min(1).default(PLATFORM_SCOPE),
+    shortfall: money,
+    businessId: z.string().min(1),
+  });
+  r.post(
+    '/internal/reinsurance/backstop',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const b = backstopBody.parse(req.body);
+      const reserve = await getInsuranceReserve(b.ownerId);
+      const scope = reinScope(b.ownerId);
+      const amount = backstopAmount(
+        Money.fromDecimalString(b.shortfall),
+        Money.fromDecimalString(reserve.reinsuranceBalance),
+        scope,
+        scope,
+      );
+      if (!amount.isPositive()) {
+        res.json({ applied: false, amount: '0' });
+        return;
+      }
+      const result = await transfer({
+        fromAccountId: reinsuranceAccountId(b.ownerId),
+        toAccountId: insuranceAccountId(b.ownerId),
+        amount,
+        type: LedgerType.REINSURANCE_PAYOUT,
+        businessId: b.businessId,
+        idempotencyKey: `${b.businessId}:reins-backstop`,
+      });
+      res.json({ applied: result.applied, amount: amount.toString() });
+    }),
+  );
+
+  // Company money into the backstop — the extreme lever, so MULTI-SIG (two DISTINCT approvers).
+  // Deliberately TREASURY → REINSURANCE, not TREASURY → INSURANCE: the latter is off the ClearingRules
+  // whitelist by design (§3.3), so the top-up flows through the backstop, which then covers insurance.
+  const treasuryTopupBody = z.object({
+    amount: money,
+    approvals: z.array(z.object({ approverId: z.string().min(1), at: z.coerce.date() })).min(1),
+    businessId: z.string().min(1),
+  });
+  r.post(
+    '/internal/reinsurance/treasury-topup',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const b = treasuryTopupBody.parse(req.body);
+      try {
+        assertMultiSig(b.approvals);
+      } catch (e) {
+        throw new ApiError(403, e instanceof Error ? e.message : 'multi-sig approval required');
+      }
+      const dest = getRakeDestination(TableType.PLATFORM, undefined);
+      const treasuryId = await getRakeAccountId(dest.accountType, dest.ownerId);
+      await ensureInsuranceAccounts(PLATFORM_SCOPE);
+      const result = await transfer({
+        fromAccountId: treasuryId,
+        toAccountId: reinsuranceAccountId(PLATFORM_SCOPE),
+        amount: Money.fromDecimalString(b.amount),
+        type: LedgerType.REINSURANCE_INJECT,
+        businessId: b.businessId,
+        idempotencyKey: `${b.businessId}:treasury-topup`,
       });
       res.json({ applied: result.applied });
     }),
