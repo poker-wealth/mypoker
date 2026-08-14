@@ -15,12 +15,17 @@ export interface WithdrawalDoc {
   /** Destination on-chain address. */
   address: string;
   state: WithdrawalState;
+  /**
+   * Ops user ids that have approved this withdrawal. Over the dual-confirm
+   * threshold it needs two DISTINCT ones before the funds are held and it
+   * advances to APPROVED. See the schema note below for why it is a set of
+   * names rather than a counter.
+   */
+  approvals?: string[];
   txHash?: string;
   failureReason?: string;
   createdAt: Date;
   updatedAt: Date;
-  /** Ops playerIds who have approved this. See the schema note below. */
-  approvals: string[];
 }
 
 const withdrawalSchema = new Schema<WithdrawalDoc>(
@@ -36,8 +41,6 @@ const withdrawalSchema = new Schema<WithdrawalDoc>(
       default: WithdrawalState.REQUESTED,
       index: true,
     },
-    txHash: { type: String, required: false },
-    failureReason: { type: String, required: false },
     /**
      * Who has approved this, by ops playerId (§3.6: APPROVED requires "risk
      * control passed + human review (> $10K)").
@@ -51,6 +54,8 @@ const withdrawalSchema = new Schema<WithdrawalDoc>(
      * name.
      */
     approvals: { type: [String], default: [] },
+    txHash: { type: String, required: false },
+    failureReason: { type: String, required: false },
   },
   { timestamps: true, versionKey: false, minimize: false },
 );

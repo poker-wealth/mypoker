@@ -238,9 +238,11 @@ export function buildAdminRouter(config: GatewayConfig): Router {
     }),
   );
 
+  // `approverId` is main's field name for the same thing — the named human whose
+  // signature this is. Taken from the verified token, never the body.
   r.post(
     '/withdrawals/:id/approve',
-    post('/internal/withdrawals/:id/approve', (req) => ({ approvedBy: actor(req) })),
+    post('/internal/withdrawals/:id/approve', (req) => ({ approverId: actor(req) })),
   );
 
   r.post(

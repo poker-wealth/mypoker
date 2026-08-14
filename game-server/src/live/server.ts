@@ -67,6 +67,10 @@ export function defaultTables(): PokerRoomConfig[] {
       maxBuyIn: 20_000,
       rake: { bps: 500, cap: 3_000, noFlopNoDrop: true },
     },
+    // Poker variants — same PokerRoom, same real-money rail; a variant only changes the deck,
+    // hole-card count and scoring (see games/texas/variants.ts).
+    { ...DEFAULT_ROOM, id: 'short-deck', game: 'short-deck', variantId: 'short-deck', name: 'Short Deck · ₮0.10/0.20' },
+    { ...DEFAULT_ROOM, id: 'omaha', game: 'omaha', variantId: 'omaha', name: 'Omaha · ₮0.10/0.20' },
   ];
 }
 

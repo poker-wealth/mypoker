@@ -90,6 +90,23 @@ export async function ensureJackpotAccounts(
 }
 
 /**
+ * The rake destination account (TREASURY for a platform table, LEAGUE_INVENTORY for a league),
+ * created on demand. Settlement credits the rake here and throws if it is missing — so, exactly like
+ * the jackpot pools, the settlement path ensures it first. Without this, the FIRST real hand with
+ * rake on a fresh database fails ("Account not found: TREASURY/PLATFORM"). Keyed by a deterministic
+ * system id so two concurrent first-hands cannot create duplicates.
+ */
+export async function ensureRakeAccount(accountType: AccountType, ownerId: string): Promise<void> {
+  // Match on (accountType, ownerId) — the same shape settlement looks it up by — so if one already
+  // exists (any _id) we do NOT create a duplicate; only a fresh system gets a new one.
+  await AccountModel.updateOne(
+    { accountType, ownerId },
+    { $setOnInsert: { accountType, ownerId } },
+    { upsert: true },
+  );
+}
+
+/**
  * The insurance and reinsurance pool for one system, created on demand.
  *
  * Per spec §3.1 the pools are owned by `PLATFORM` or a `leagueId` — the two

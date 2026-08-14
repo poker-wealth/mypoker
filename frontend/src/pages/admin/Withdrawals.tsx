@@ -192,10 +192,12 @@ function ReviewSheet({
 
     approve.mutate(withdrawal.withdrawalId, {
       onSuccess: (res) => {
+        // The server reports the tally, not a boolean: funds move only once the
+        // count of DISTINCT approvers reaches what this amount requires.
         toast.success(
-          res.applied
+          res.approvals >= res.required
             ? 'Approved. Funds are held, ready to broadcast.'
-            : 'Recorded. A second administrator must also approve.',
+            : `Recorded (${res.approvals} of ${res.required}). Another administrator must also approve.`,
         );
         onClose();
       },

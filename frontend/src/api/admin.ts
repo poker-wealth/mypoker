@@ -186,8 +186,22 @@ export interface QueuedWithdrawal {
 export const fetchWithdrawalQueue = (): Promise<{ withdrawals: QueuedWithdrawal[] }> =>
   api.get<{ withdrawals: QueuedWithdrawal[] }>('/admin/withdrawals');
 
-export const approveWithdrawal = (id: string): Promise<FundingApproval> =>
-  api.post<FundingApproval>(`/admin/withdrawals/${encodeURIComponent(id)}/approve`, {});
+/**
+ * What financial-core answers when an approval is recorded.
+ *
+ * `approvals` is a COUNT of distinct approvers so far and `required` is how many
+ * this amount needs (2 above the dual-confirm threshold, 1 below) — so the UI
+ * can say "1 of 2" without knowing the threshold itself. Funds move only when
+ * approvals reaches required; until then the withdrawal stays REQUESTED.
+ */
+export interface WithdrawalApproval {
+  state: string;
+  approvals: number;
+  required: number;
+}
+
+export const approveWithdrawal = (id: string): Promise<WithdrawalApproval> =>
+  api.post<WithdrawalApproval>(`/admin/withdrawals/${encodeURIComponent(id)}/approve`, {});
 
 export const rejectWithdrawal = (id: string, reason: string): Promise<{ state: string }> =>
   api.post<{ state: string }>(`/admin/withdrawals/${encodeURIComponent(id)}/reject`, { reason });
