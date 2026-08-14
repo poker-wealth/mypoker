@@ -20,13 +20,9 @@ import { AdminPlayers } from '@/pages/admin/Players';
 import { AdminAlerts } from '@/pages/admin/Alerts';
 import { AdminLeagues } from '@/pages/admin/Leagues';
 import { AdminWithdrawals } from '@/pages/admin/Withdrawals';
-import { ErrorState } from '@/components/ui/ErrorState';
-
-// The real review queue landed with league-funding, so the stub the audit fix carried is gone;
-// its styled dead-end for an unknown /admin URL (the "crash tab" finding) stays.
-function AdminRouteError() {
-  return <ErrorState message="This admin page does not exist." />;
-}
+// The styled admin dead-end (the "crash tab" fix) lives in route-fallbacks now; the withdrawals
+// stub that file also carries is unused here — the real review queue landed with league-funding.
+import { AdminRouteError } from '@/pages/admin/route-fallbacks';
 
 export const router = createBrowserRouter([
   {
