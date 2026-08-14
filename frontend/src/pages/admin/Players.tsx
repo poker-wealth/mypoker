@@ -103,13 +103,19 @@ export function AdminPlayers() {
                       {/*
                         A dash, not ₮0.00. No account is a different fact from
                         an empty one, and an admin reading zero would conclude
-                        the player had funds and spent them.
+                        the player had funds and spent them. And "no account" is
+                        only claimed when financial-core actually ANSWERED —
+                        with it down, every balance is null, and an admin
+                        reading "no account" on a player holding funds would
+                        act on the wrong fact entirely.
                       */}
                       <div className="text-sm font-bold tabular-nums">
                         {p.balance === null ? '—' : moneyFromDecimal(p.balance)}
                       </div>
                       {p.balance === null && (
-                        <div className="text-[0.58rem] text-dim">no account</div>
+                        <div className="text-[0.58rem] text-dim">
+                          {results.data.balancesUnavailable ? 'balance unavailable' : 'no account'}
+                        </div>
                       )}
                     </div>
                   </button>

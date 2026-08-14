@@ -54,8 +54,10 @@ describe('admin API guard', () => {
 
   it('404s for a league admin', async () => {
     // A league administrator runs their own alliance. The platform's withdrawal
-    // queue and treasury are a different scope (§13.6), and "admin" in one does
-    // not mean "admin" in the other.
+    // queue and treasury are a different scope — the 12-week plan (W10) gives
+    // league admins their own separate panel, scoped to their league's players
+    // only — and "admin" in one does not mean "admin" in the other. (Not §13.6:
+    // that section is Agent Permission Boundaries, about agents.)
     const res = await request(app())
       .get('/admin/overview')
       .set('authorization', `Bearer ${tokenFor('league_admin')}`);

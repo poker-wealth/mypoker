@@ -62,13 +62,22 @@ export interface PlayerSearchRow {
   playerId: string;
   displayName: string | null;
   email: string | null;
-  /** null means no account exists — a different fact from a zero balance. */
+  /**
+   * null means no account exists — a different fact from a zero balance.
+   * Unless balancesUnavailable is set, in which case null means only that
+   * financial-core could not be asked.
+   */
   balance: string | null;
 }
 
 export interface PlayerSearchResult {
   players: PlayerSearchRow[];
   truncated: boolean;
+  /**
+   * financial-core did not answer, so every balance in this response is null
+   * for that reason — render "unavailable", never "no account".
+   */
+  balancesUnavailable?: boolean;
   /** Set when the result needs explaining rather than just listing. */
   note?: string;
 }

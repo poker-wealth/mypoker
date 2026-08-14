@@ -102,9 +102,12 @@ export function AdminAlerts() {
   );
 }
 
+// No gold here: SAMUEL.md reserves the jackpot token for jackpots, admin
+// included — an audit caught text-jackpot on WARN. The hierarchy reads
+// danger-red > plain text > dim instead.
 const TONE: Record<string, { badge: 'warn' | 'neutral' | 'success'; text: string }> = {
   CRITICAL: { badge: 'warn', text: 'text-danger' },
-  WARN: { badge: 'warn', text: 'text-jackpot' },
+  WARN: { badge: 'warn', text: 'text-text' },
   INFO: { badge: 'neutral', text: 'text-dim' },
 };
 
