@@ -757,24 +757,7 @@ export class PokerRoom implements LiveRoom {
 
   // ── Snapshots ───────────────────────────────────────────────────────────────
 
-  /** The table as `playerId` is allowed to see it. Their hole cards; nobody else's. */
-  /**
-   * The insurance offer for one viewer, or null.
-   *
-   * Eligibility is the engine's rule (exactly two all-in, board of 3 or 4), and
-   * it is asked rather than re-derived here — a second definition of "when
-   * insurance applies" would drift from the one the underwriter uses.
-   *
-   * Returns null for everyone except the two all-in players. A spectator or a
-   * folded seat seeing an offer would leak that two people are all-in before the
-   * table shows it.
-   *
-   * PLACEHOLDER RESERVE. The pool balances below are fixed figures, not the real
-   * INSURANCE and REINSURANCE accounts in financial-core. Quoting against a made
-   * up reserve is fine on a testnet staging build and NOT fine against real
-   * money: this must read the live pools before insurance is enabled for real
-   * funds, or the platform can underwrite more than it holds.
-   */
+  /** The four pool account ids for this table, by tier. */
   private jackpotAccountIds(): { mini: string; minor: string; major: string; grand: string } {
     const id = this.config.id;
     return { mini: `jp:${id}:mini`, minor: `jp:${id}:minor`, major: `jp:${id}:major`, grand: `jp:${id}:grand` };
@@ -895,6 +878,23 @@ export class PokerRoom implements LiveRoom {
     return this.reserve;
   }
 
+  /**
+   * The insurance offer for one viewer, or null.
+   *
+   * Eligibility is the engine's rule (exactly two all-in, board of 3 or 4), and
+   * it is asked rather than re-derived here — a second definition of "when
+   * insurance applies" would drift from the one the underwriter uses.
+   *
+   * Returns null for everyone except the two all-in players. A spectator or a
+   * folded seat seeing an offer would leak that two people are all-in before the
+   * table shows it.
+   *
+   * Quotes are arithmetic on the LIVE pool (`currentReserve`), never a fixed
+   * figure. Every way that read can fail — no reserve yet, a stale one, an
+   * unreadable financial-core, a pool of zero — ends at no offer rather than at
+   * a guess, which is also how §4's auto-disable rule is enforced: a reserve
+   * under threshold cannot produce a quote.
+   */
   private insuranceFor(playerId: string, engine: EnginePublicState | null): InsuranceOffer | null {
     if (!engine || this.phase !== 'IN_HAND') return null;
 
@@ -938,6 +938,7 @@ export class PokerRoom implements LiveRoom {
     return { ...result.quote, expiresInSeconds: 10 };
   }
 
+  /** The table as `playerId` is allowed to see it. Their hole cards; nobody else's. */
   snapshotFor(playerId: string): TableSnapshot {
     const live = this.phase === 'IN_HAND' || this.phase === 'SHOWDOWN';
     const engine = live && this.game ? (this.game.getPublicState(playerId) as EnginePublicState) : null;
