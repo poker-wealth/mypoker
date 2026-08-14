@@ -20,6 +20,13 @@ import { AdminPlayers } from '@/pages/admin/Players';
 import { AdminAlerts } from '@/pages/admin/Alerts';
 import { AdminLeagues } from '@/pages/admin/Leagues';
 import { AdminWithdrawals } from '@/pages/admin/Withdrawals';
+import { ErrorState } from '@/components/ui/ErrorState';
+
+// The real review queue landed with league-funding, so the stub the audit fix carried is gone;
+// its styled dead-end for an unknown /admin URL (the "crash tab" finding) stays.
+function AdminRouteError() {
+  return <ErrorState message="This admin page does not exist." />;
+}
 
 export const router = createBrowserRouter([
   {
@@ -52,6 +59,11 @@ export const router = createBrowserRouter([
   {
     path: '/admin',
     element: <AdminShell />,
+    // Without this, any admin URL that fails to match — which for a while
+    // included a TAB — replaces the whole app with React Router's raw crash
+    // page: unstyled, stack-trace-shaped, and confirming to a curious player
+    // that something lives under /admin. A styled dead-end instead.
+    errorElement: <AdminRouteError />,
     children: [
       { index: true, element: <AdminOverview /> },
       { path: 'withdrawals', element: <AdminWithdrawals /> },

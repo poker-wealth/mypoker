@@ -165,6 +165,10 @@ export function buildAdminRouter(config: GatewayConfig): Router {
           };
         }),
         truncated,
+        // Said explicitly, because a downed financial-core and a player with no
+        // account both produce balance: null — and an admin reading "no
+        // account" on a player who holds funds would act on the wrong fact.
+        balancesUnavailable: !balances.ok,
         ...(page.length === 0
           ? { note: 'No identity matched. Telegram players are findable by exact player id only.' }
           : {}),

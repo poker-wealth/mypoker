@@ -502,13 +502,18 @@ export function usePlayerDetail(playerId: string | null) {
  * within 5 seconds". Kept polling while the tab is backgrounded would be
  * wasteful, so refetchIntervalInBackground stays off — an operator not looking
  * at the screen is not waiting on it.
+ *
+ * The interval stops on error. `retry: false` exists because a permission
+ * answer does not change on repetition — but an unconditional interval was
+ * repeating it anyway, forever, five times a minute, for any signed-in player
+ * who found the URL. An error state waits for a human retry instead.
  */
 export function useAdminAlerts() {
   return useQuery({
     queryKey: ['admin', 'alerts'],
     queryFn: fetchAdminAlerts,
     staleTime: 0,
-    refetchInterval: 5_000,
+    refetchInterval: (query) => (query.state.status === 'error' ? false : 5_000),
     retry: false,
   });
 }
