@@ -157,7 +157,7 @@ async function main(): Promise<void> {
   const wreq = await api('POST', '/me/withdrawals', { player: true, body: { amount: '100', address: 'TXaddr' } });
   const wid = wreq.json.withdrawalId as string;
   check('withdrawal REQUESTED', wreq.status === 201 && wreq.json.state === 'REQUESTED');
-  const apv = await api('POST', `/internal/withdrawals/${wid}/approve`, { internal: true });
+  const apv = await api('POST', `/internal/withdrawals/${wid}/approve`, { internal: true, body: { approverId: 'ops-smoke' } });
   check('APPROVED (funds held in clearing)', apv.json.state === 'APPROVED');
   const ba = await bal();
   check('available 145 / clearing 100', ba.available === 145 && ba.clearing === 100, JSON.stringify(ba));

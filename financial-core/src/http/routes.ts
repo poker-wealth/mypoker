@@ -16,6 +16,7 @@ import {
   confirmWithdrawal,
 } from '../withdrawal/withdrawal-state-machine';
 import { signAndBroadcastWithdrawal } from '../withdrawal/withdrawal-broadcast';
+import { evaluateCB4, evaluateCB5 } from '../circuit-breakers/breakers';
 import { getOrCreatePlayerAccount, ensureJackpotAccounts, ensureRakeAccount } from '../wallet/system-accounts';
 import { getInsuranceReserve } from '../wallet/insurance-reserve';
 import { getDepositAddress } from '../wallet/deposit-address';
@@ -748,6 +749,16 @@ export function buildRouter(): Router {
       // gate withdrawals, iron rule #3; a checksum is address hygiene, not a gate.)
       if (!isValidTronAddress(address)) throw new ApiError(400, 'invalid TRON address');
       const acc = await getOrCreatePlayerAccount(req.dataScope!.playerId);
+
+      // Automated withdrawal brakes (§CB4/CB5). These look ONLY at withdrawal-count anomalies —
+      // never reputation or anti-bot (iron rule #3) — and they fail the request temporarily, they do
+      // not touch the account's funds. CB4: this account is withdrawing abnormally often; CB5: the
+      // whole platform's withdrawal rate has spiked. A trip also logs + alerts ops via the breaker.
+      const cb4 = await evaluateCB4(acc._id, Number(process.env.WITHDRAWAL_CB4_LIMIT ?? 5));
+      if (cb4.tripped) throw new ApiError(429, 'too many withdrawals from this account — please try again later');
+      const cb5 = await evaluateCB5(Number(process.env.WITHDRAWAL_CB5_THRESHOLD ?? 100));
+      if (cb5.tripped) throw new ApiError(503, 'withdrawals are briefly throttled — please try again shortly');
+
       const withdrawalId = await requestWithdrawal({
         playerAccountId: acc._id,
         amount: Money.fromDecimalString(amount),
@@ -953,12 +964,15 @@ export function buildRouter(): Router {
     return w.state;
   }
 
+  const approveBody = z.object({ approverId: z.string().min(1) });
   r.post(
     '/internal/withdrawals/:id/approve',
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
-      await approveWithdrawal(req.params.id as string);
-      res.json({ state: await currentState(req.params.id as string) });
+      const { approverId } = approveBody.parse(req.body);
+      // Returns { state, approvals, required }: a large withdrawal stays REQUESTED with e.g. 1/2 until
+      // a second, DISTINCT approver signs off. Funds are only held on the final approval.
+      res.json(await approveWithdrawal(req.params.id as string, approverId));
     }),
   );
   // Take an APPROVED withdrawal on-chain: sign + broadcast the USDT transfer from the hot wallet and

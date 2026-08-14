@@ -68,13 +68,43 @@ export async function requestWithdrawal(input: RequestWithdrawalInput): Promise<
   return doc!._id;
 }
 
-/** APPROVED: atomically move amount available → clearing (held, not spendable, not re-withdrawable). */
-export async function approveWithdrawal(withdrawalId: string): Promise<void> {
+/** Withdrawals strictly above this need TWO distinct approvers (spec: >$10K = second-person confirm). */
+export function dualConfirmThreshold(): Money {
+  return Money.fromDecimalString(process.env.WITHDRAWAL_DUAL_CONFIRM_USD ?? '10000');
+}
+
+/**
+ * APPROVED: record `approverId`, and once enough DISTINCT approvers have signed off, atomically move
+ * amount available → clearing (held, not spendable, not re-withdrawable) and advance to APPROVED.
+ *
+ * A large withdrawal (over the dual-confirm threshold, default $10K) needs two distinct approvers;
+ * smaller ones need one. The tally is returned so an ops UI can show "1 of 2 approvals". The funds
+ * are NOT held until the last required approval — an under-approved large withdrawal stays REQUESTED.
+ */
+export async function approveWithdrawal(
+  withdrawalId: string,
+  approverId: string,
+): Promise<{ state: WithdrawalState; approvals: number; required: number }> {
+  if (!approverId) throw new Error('approverId is required to approve a withdrawal');
   const w = await loadOrThrow(withdrawalId);
-  assertTransition(w.state, WithdrawalState.APPROVED);
+  if (w.state !== WithdrawalState.REQUESTED) {
+    throw new InvalidWithdrawalTransitionError(w.state, WithdrawalState.APPROVED);
+  }
+  const required = Money.fromDecimal128(w.amount).greaterThan(dualConfirmThreshold()) ? 2 : 1;
+
+  // Record this approver. $addToSet is idempotent — the same person cannot count as two.
+  await WithdrawalModel.updateOne(
+    { _id: withdrawalId, state: WithdrawalState.REQUESTED },
+    { $addToSet: { approvals: approverId } },
+  );
+  const after = await loadOrThrow(withdrawalId);
+  const approvals = (after.approvals ?? []).length;
+  if (approvals < required) {
+    return { state: after.state, approvals, required };
+  }
+
   const amountD = w.amount;
   const negAmountD = Money.fromDecimal128(w.amount).negate().toDecimal128();
-
   await runTransaction(async (session) => {
     // Hold funds: available -= amount, clearing += amount (guard prevents overdraft / double-hold).
     const held = await AccountModel.updateOne(
@@ -84,6 +114,7 @@ export async function approveWithdrawal(withdrawalId: string): Promise<void> {
     );
     if (held.matchedCount === 0) throw new InsufficientBalanceError(w.playerAccountId);
 
+    // state:REQUESTED guard → only one concurrent caller makes the move; a loser's hold rolls back.
     const moved = await WithdrawalModel.updateOne(
       { _id: withdrawalId, state: WithdrawalState.REQUESTED },
       { $set: { state: WithdrawalState.APPROVED } },
@@ -93,6 +124,7 @@ export async function approveWithdrawal(withdrawalId: string): Promise<void> {
       throw new InvalidWithdrawalTransitionError(w.state, WithdrawalState.APPROVED);
     }
   });
+  return { state: WithdrawalState.APPROVED, approvals, required };
 }
 
 /** BROADCASTING: record the on-chain tx hash. Funds remain held in clearing. */
