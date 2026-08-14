@@ -15,6 +15,7 @@ import {
   broadcastWithdrawal,
   confirmWithdrawal,
 } from '../withdrawal/withdrawal-state-machine';
+import { signAndBroadcastWithdrawal } from '../withdrawal/withdrawal-broadcast';
 import { getOrCreatePlayerAccount, ensureJackpotAccounts, ensureRakeAccount } from '../wallet/system-accounts';
 import { getInsuranceReserve } from '../wallet/insurance-reserve';
 import { getDepositAddress } from '../wallet/deposit-address';
@@ -958,6 +959,18 @@ export function buildRouter(): Router {
     asyncHandler(async (req: Request, res: Response) => {
       await approveWithdrawal(req.params.id as string);
       res.json({ state: await currentState(req.params.id as string) });
+    }),
+  );
+  // Take an APPROVED withdrawal on-chain: sign + broadcast the USDT transfer from the hot wallet and
+  // record the real txHash. On any failure the withdrawal rolls back (clearing hold released), so a
+  // failed send never strands the player's money. Needs TRON_HOT_WALLET_KEY (else 500 with a clear
+  // message, and the withdrawal stays APPROVED for a retry once the key is set).
+  r.post(
+    '/internal/withdrawals/:id/sign-broadcast',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const txHash = await signAndBroadcastWithdrawal(req.params.id as string);
+      res.json({ state: await currentState(req.params.id as string), txHash });
     }),
   );
   const broadcastBody = z.object({ txHash: z.string().min(1) });

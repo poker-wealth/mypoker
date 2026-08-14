@@ -1,6 +1,8 @@
 import { loadConfig } from '../config/env';
 import { connectDb, disconnectDb } from '../db/connection';
 import { runWatcher } from './deposit-watcher';
+import { runWithdrawalWatcher } from '../withdrawal/withdrawal-watcher';
+import { hotWalletKey } from '../config/chain';
 import { tronApiUrl, usdtContract, requiredConfirmations, depositPollMs } from '../config/chain';
 
 /**
@@ -21,10 +23,14 @@ async function main(): Promise<void> {
   console.log(`  token    ${usdtContract()}`);
   console.log(`  confirms ${requiredConfirmations()}   poll ${depositPollMs()}ms`);
 
-  const watcher = runWatcher();
+  const deposits = runWatcher();
+  // Same dyno also finalizes broadcast withdrawals (→ CONFIRMED) once they're on-chain-final.
+  const withdrawals = runWithdrawalWatcher();
+  console.log(`  withdrawals  confirmation watcher on (hot wallet ${hotWalletKey() ? 'set' : 'NOT set'})`);
 
   const shutdown = (): void => {
-    watcher.stop();
+    deposits.stop();
+    withdrawals.stop();
     void disconnectDb().then(() => process.exit(0));
   };
   process.on('SIGINT', shutdown);

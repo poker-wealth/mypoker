@@ -43,3 +43,26 @@ export function depositPollMs(): number {
   const n = Number(process.env.DEPOSIT_POLL_MS ?? 15_000);
   return Number.isFinite(n) && n >= 1000 ? Math.floor(n) : 15_000;
 }
+
+/**
+ * The hot-wallet private key withdrawals are paid FROM (hex). This is the ONLY online secret; keep
+ * a small float on it and refill from cold storage. Empty ⇒ withdrawals cannot be broadcast — the
+ * platform still takes deposits, but a payout stays REQUESTED/APPROVED until this is provisioned.
+ */
+export function hotWalletKey(): string {
+  return (process.env.TRON_HOT_WALLET_KEY ?? '').trim();
+}
+
+/** fee_limit for a withdrawal transfer, in SUN (1 TRX = 1e6). Default 100 TRX. */
+export function withdrawalFeeLimitSun(): number {
+  const n = Number(process.env.WITHDRAWAL_FEE_LIMIT_SUN ?? 100_000_000);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 100_000_000;
+}
+
+/** Confirmations required before a withdrawal is finalized (CONFIRMED). Default = deposit depth. */
+export function withdrawalConfirmations(): number {
+  const raw = process.env.WITHDRAWAL_CONFIRMATIONS;
+  if (raw === undefined) return requiredConfirmations();
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : requiredConfirmations();
+}
