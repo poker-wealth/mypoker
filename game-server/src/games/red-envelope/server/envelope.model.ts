@@ -77,5 +77,5 @@ const RedEnvelopeSchema = new Schema<IRedEnvelope>(
 RedEnvelopeSchema.index({ state: 1, expiresAt: 1 });
 RedEnvelopeSchema.index({ 'claims.playerId': 1 }); // to quickly check if a user already claimed
 
-export const RedEnvelopeModel: Model<RedEnvelopeDoc> = 
-  mongoose.models.RedEnvelope || mongoose.model<RedEnvelopeDoc>('RedEnvelope', RedEnvelopeSchema);
+export const RedEnvelopeModel = 
+  (mongoose.models.RedEnvelope || mongoose.model('RedEnvelope', RedEnvelopeSchema)) as Model<IRedEnvelope>;

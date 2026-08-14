@@ -35,5 +35,5 @@ const RedEnvelopeLedgerEntrySchema = new Schema<IRedEnvelopeLedgerEntry>(
 RedEnvelopeLedgerEntrySchema.index({ envelopeId: 1, timestamp: -1 });
 RedEnvelopeLedgerEntrySchema.index({ playerId: 1, timestamp: -1 });
 
-export const RedEnvelopeLedgerModel: Model<RedEnvelopeLedgerEntryDoc> = 
-  mongoose.models.RedEnvelopeLedgerEntry || mongoose.model<RedEnvelopeLedgerEntryDoc>('RedEnvelopeLedgerEntry', RedEnvelopeLedgerEntrySchema);
+export const RedEnvelopeLedgerModel = 
+  (mongoose.models.RedEnvelopeLedgerEntry || mongoose.model('RedEnvelopeLedgerEntry', RedEnvelopeLedgerEntrySchema)) as Model<IRedEnvelopeLedgerEntry>;
