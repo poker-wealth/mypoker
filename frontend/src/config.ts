@@ -50,4 +50,4 @@ export const SUPPORT_URL =
 
 /** The table opened when a game id isn't itself a table id (see the table server's room list). */
 export const DEFAULT_TABLE_ID = 'texas';
-export const LIVE_TABLE_IDS = new Set(['texas', 'texas-high']);
+export const LIVE_TABLE_IDS = new Set(['texas', 'texas-high', 'short-deck', 'omaha']);

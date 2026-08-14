@@ -6,7 +6,6 @@ import { PokerTable } from '@/components/poker/PokerTable';
 import { ActionBar } from '@/components/poker/ActionBar';
 import { InsurancePrompt } from '@/components/poker/InsurancePrompt';
 import { JackpotBurst } from '@/components/poker/JackpotBurst';
-import { toast } from '@/lib/toast';
 import { chips } from '@/lib/money';
 import { useTranslation } from 'react-i18next';
 import { BuyInSheet } from '@/components/poker/BuyInSheet';
@@ -51,9 +50,6 @@ function LiveTable({ tableId }: { tableId: string }) {
   const { t } = useTranslation();
   const [buyInFor, setBuyInFor] = useState<number | null | false>(false);
   const [designsOpen, setDesignsOpen] = useState(false);
-  // Cleared when the hand id changes, so declining one hand's offer does not
-  // suppress the next hand's.
-  const [insuranceDeclined, setInsuranceDeclined] = useState<string | null>(null);
   // Which hit this viewer has already watched — so a snapshot refetch does not
   // replay the celebration.
   const [jackpotSeen, setJackpotSeen] = useState<string | null>(null);
@@ -188,20 +184,16 @@ function LiveTable({ tableId }: { tableId: string }) {
         onDone={() => setJackpotSeen(snapshot?.jackpot?.roundId ?? null)}
       />
 
-      {/* Insurance. Rendered purely on the offer's presence: the server sends
-          one only to the two all-in players, so "3+ silently skips" needs no
-          rule here. Declining just clears it locally — the next snapshot will
-          not carry an offer once the street moves on. */}
+      {/* Insurance is deferred to a later milestone: the accept path (a takeInsurance
+          command + the Financial Core premium/payout movement) isn't built yet, so we
+          do NOT surface an offer we can't honour — showing "insured" without taking a
+          premium would be a lie about money. Re-enable by passing the real quote once
+          the room accepts an insurance command. */}
       <InsurancePrompt
-        quote={insuranceDeclined === snapshot?.handId ? null : (snapshot?.insurance ?? null)}
+        quote={null}
         seconds={snapshot?.insurance?.expiresInSeconds ?? 10}
-        onAccept={() => {
-          // TODO: send a takeInsurance command once the room accepts one. The
-          // quote is server-issued, so the client sends intent, never a price.
-          setInsuranceDeclined(snapshot?.handId ?? null);
-          toast.success(t('insurance.taken'));
-        }}
-        onDecline={() => setInsuranceDeclined(snapshot?.handId ?? null)}
+        onAccept={() => {}}
+        onDecline={() => {}}
       />
 
       {/* Action dock */}

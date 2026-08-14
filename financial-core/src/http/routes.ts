@@ -4,7 +4,7 @@ import { Money } from '../domain/money';
 import { LedgerType, LedgerDirection, PLATFORM_SCOPE } from '../domain/account-types';
 import { LedgerModel } from '../wallet/ledger.model';
 import { transfer } from '../wallet/transfer';
-import { TableType } from '../settlement/settlement-domain';
+import { TableType, getRakeDestination } from '../settlement/settlement-domain';
 import { settleRound } from '../settlement/settle-round';
 import { settleTableHand } from '../settlement/table-settlement';
 import { processConfirmedDeposit } from '../deposit/deposit-credit';
@@ -15,7 +15,16 @@ import {
   broadcastWithdrawal,
   confirmWithdrawal,
 } from '../withdrawal/withdrawal-state-machine';
-import { getOrCreatePlayerAccount, ensureJackpotAccounts } from '../wallet/system-accounts';
+import { signAndBroadcastWithdrawal } from '../withdrawal/withdrawal-broadcast';
+import { evaluateCB4, evaluateCB5 } from '../circuit-breakers/breakers';
+import {
+  setWithdrawalAddress,
+  getWithdrawalAddress,
+  assertWithdrawableAddress,
+  withdrawableAt,
+  WithdrawalAddressError,
+} from '../withdrawal/withdrawal-address';
+import { getOrCreatePlayerAccount, ensureJackpotAccounts, ensureRakeAccount } from '../wallet/system-accounts';
 import { getInsuranceReserve } from '../wallet/insurance-reserve';
 import { getOpsOverview } from '../ops/overview';
 import { getAdminPlayerDetail, getPlayerBalances } from '../ops/player-detail';
@@ -740,6 +749,31 @@ export function buildRouter(): Router {
     }),
   );
 
+  // The player's registered withdrawal address + when it becomes withdrawable (48h after a change).
+  r.get(
+    '/me/withdrawal-address',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const rec = await getWithdrawalAddress(req.dataScope!.playerId);
+      if (!rec) {
+        res.json({ configured: false });
+        return;
+      }
+      res.json({ configured: true, address: rec.address, updatedAt: rec.updatedAt, withdrawableAt: withdrawableAt(rec) });
+    }),
+  );
+  const setAddressBody = z.object({ address: z.string().min(1) });
+  r.post(
+    '/me/withdrawal-address',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { address } = setAddressBody.parse(req.body);
+      if (!isValidTronAddress(address)) throw new ApiError(400, 'invalid TRON address');
+      const rec = await setWithdrawalAddress(req.dataScope!.playerId, address);
+      res.json({ address: rec.address, updatedAt: rec.updatedAt, withdrawableAt: withdrawableAt(rec) });
+    }),
+  );
+
   const withdrawalBody = z.object({ amount: money, address: z.string().min(1) });
   r.post(
     '/me/withdrawals',
@@ -750,7 +784,24 @@ export function buildRouter(): Router {
       // typo can never reach the broadcast step. (Reputation/anti-bot must NOT
       // gate withdrawals, iron rule #3; a checksum is address hygiene, not a gate.)
       if (!isValidTronAddress(address)) throw new ApiError(400, 'invalid TRON address');
+      // §3.6: withdrawals go only to the registered address, and only 48h after it was changed.
+      try {
+        await assertWithdrawableAddress(req.dataScope!.playerId, address);
+      } catch (e) {
+        if (e instanceof WithdrawalAddressError) throw new ApiError(403, e.message);
+        throw e;
+      }
       const acc = await getOrCreatePlayerAccount(req.dataScope!.playerId);
+
+      // Automated withdrawal brakes (§CB4/CB5). These look ONLY at withdrawal-count anomalies —
+      // never reputation or anti-bot (iron rule #3) — and they fail the request temporarily, they do
+      // not touch the account's funds. CB4: this account is withdrawing abnormally often; CB5: the
+      // whole platform's withdrawal rate has spiked. A trip also logs + alerts ops via the breaker.
+      const cb4 = await evaluateCB4(acc._id, Number(process.env.WITHDRAWAL_CB4_LIMIT ?? 5));
+      if (cb4.tripped) throw new ApiError(429, 'too many withdrawals from this account — please try again later');
+      const cb5 = await evaluateCB5(Number(process.env.WITHDRAWAL_CB5_THRESHOLD ?? 100));
+      if (cb5.tripped) throw new ApiError(503, 'withdrawals are briefly throttled — please try again shortly');
+
       const withdrawalId = await requestWithdrawal({
         playerAccountId: acc._id,
         amount: Money.fromDecimalString(amount),
@@ -824,6 +875,8 @@ export function buildRouter(): Router {
         b.winnerAccountId,
         playerScope(b.tableType, b.leagueId),
       );
+      const rakeDest = getRakeDestination(b.tableType, b.leagueId);
+      await ensureRakeAccount(rakeDest.accountType, rakeDest.ownerId);
       const receipt = await settleRound({
         roundId: b.roundId,
         tableType: b.tableType,
@@ -866,6 +919,10 @@ export function buildRouter(): Router {
       // at least traceable.
       const tableOwner = b.jackpotAccounts.mini.split(':')[1] || b.roundId;
       await ensureJackpotAccounts(tableOwner, b.jackpotAccounts);
+      // The rake destination (TREASURY / LEAGUE_INVENTORY) must exist before settlement credits it —
+      // on a fresh DB it does not, so ensure it here (like the jackpot pools above).
+      const rakeDest = getRakeDestination(b.tableType, b.leagueId);
+      await ensureRakeAccount(rakeDest.accountType, rakeDest.ownerId);
       const m = (s: string): Money => Money.fromDecimalString(s);
       // Each party is a playerId (owner_id); resolve to its account _id in the table's scope before
       // the ledger, which keys by _id. The scope routes a league hand to the player's league wallet.
@@ -1028,12 +1085,27 @@ export function buildRouter(): Router {
     }),
   );
 
+  const approveBody = z.object({ approverId: z.string().min(1) });
   r.post(
     '/internal/withdrawals/:id/approve',
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
-      await approveWithdrawal(req.params.id as string);
-      res.json({ state: await currentState(req.params.id as string) });
+      const { approverId } = approveBody.parse(req.body);
+      // Returns { state, approvals, required }: a large withdrawal stays REQUESTED with e.g. 1/2 until
+      // a second, DISTINCT approver signs off. Funds are only held on the final approval.
+      res.json(await approveWithdrawal(req.params.id as string, approverId));
+    }),
+  );
+  // Take an APPROVED withdrawal on-chain: sign + broadcast the USDT transfer from the hot wallet and
+  // record the real txHash. On any failure the withdrawal rolls back (clearing hold released), so a
+  // failed send never strands the player's money. Needs TRON_HOT_WALLET_KEY (else 500 with a clear
+  // message, and the withdrawal stays APPROVED for a retry once the key is set).
+  r.post(
+    '/internal/withdrawals/:id/sign-broadcast',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const txHash = await signAndBroadcastWithdrawal(req.params.id as string);
+      res.json({ state: await currentState(req.params.id as string), txHash });
     }),
   );
   const broadcastBody = z.object({ txHash: z.string().min(1) });
