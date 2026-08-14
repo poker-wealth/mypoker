@@ -4,7 +4,7 @@ import { Money } from '../domain/money';
 import { LedgerType, LedgerDirection, PLATFORM_SCOPE } from '../domain/account-types';
 import { LedgerModel } from '../wallet/ledger.model';
 import { transfer } from '../wallet/transfer';
-import { TableType } from '../settlement/settlement-domain';
+import { TableType, getRakeDestination } from '../settlement/settlement-domain';
 import { settleRound } from '../settlement/settle-round';
 import { settleTableHand } from '../settlement/table-settlement';
 import { processConfirmedDeposit } from '../deposit/deposit-credit';
@@ -15,7 +15,7 @@ import {
   broadcastWithdrawal,
   confirmWithdrawal,
 } from '../withdrawal/withdrawal-state-machine';
-import { getOrCreatePlayerAccount, ensureJackpotAccounts } from '../wallet/system-accounts';
+import { getOrCreatePlayerAccount, ensureJackpotAccounts, ensureRakeAccount } from '../wallet/system-accounts';
 import { getInsuranceReserve } from '../wallet/insurance-reserve';
 import { getDepositAddress } from '../wallet/deposit-address';
 import { getWalletTransactions, getWithdrawals } from '../wallet/wallet-views';
@@ -820,6 +820,8 @@ export function buildRouter(): Router {
         b.winnerAccountId,
         playerScope(b.tableType, b.leagueId),
       );
+      const rakeDest = getRakeDestination(b.tableType, b.leagueId);
+      await ensureRakeAccount(rakeDest.accountType, rakeDest.ownerId);
       const receipt = await settleRound({
         roundId: b.roundId,
         tableType: b.tableType,
@@ -862,6 +864,10 @@ export function buildRouter(): Router {
       // at least traceable.
       const tableOwner = b.jackpotAccounts.mini.split(':')[1] || b.roundId;
       await ensureJackpotAccounts(tableOwner, b.jackpotAccounts);
+      // The rake destination (TREASURY / LEAGUE_INVENTORY) must exist before settlement credits it —
+      // on a fresh DB it does not, so ensure it here (like the jackpot pools above).
+      const rakeDest = getRakeDestination(b.tableType, b.leagueId);
+      await ensureRakeAccount(rakeDest.accountType, rakeDest.ownerId);
       const m = (s: string): Money => Money.fromDecimalString(s);
       // Each party is a playerId (owner_id); resolve to its account _id in the table's scope before
       // the ledger, which keys by _id. The scope routes a league hand to the player's league wallet.
