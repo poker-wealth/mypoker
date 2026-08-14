@@ -2,6 +2,7 @@ import { EventBus } from '../core/event-bus';
 import type { FinancialCoreClient } from '../core/financial-core-client';
 import { FakeChainClient } from '../fairness';
 import type { ChainClient } from '../fairness';
+import type { RoundNotary } from '../fairness/round-notary';
 import { TexasGame } from '../games/texas/texas-game';
 import { variant, type PokerVariant } from '../games/texas/variants';
 import type { Action, SeatPublic, Street } from '../games/texas/betting';
@@ -105,6 +106,9 @@ export interface PokerRoomDeps {
   /** The ONLY route money takes. Play chips today, the Financial Core tomorrow. */
   fc: FinancialCoreClient;
   chain?: ChainClient;
+  /** Notarizes each settled round (hash → Merkle batch → on-chain). Absent → hands still play,
+   *  they just aren't published for verification (e.g. the standalone dev table server with no DB). */
+  notary?: RoundNotary;
 }
 
 export interface RoomClient {
@@ -185,6 +189,7 @@ export class PokerRoom implements LiveRoom {
   private readonly directory: PlayerDirectory;
   private readonly fc: FinancialCoreClient;
   private readonly chainClient: ChainClient;
+  private readonly notary: RoundNotary | undefined;
   private readonly spec: PokerVariant;
 
   private readonly seats: (RoomSeat | null)[];
@@ -240,6 +245,7 @@ export class PokerRoom implements LiveRoom {
     this.directory = deps.directory;
     this.fc = deps.fc;
     this.chainClient = deps.chain ?? new FakeChainClient();
+    this.notary = deps.notary;
     this.spec = variant(config.variantId);
     this.seats = Array.from({ length: config.maxSeats }, () => null);
     this.handFc = {
@@ -717,6 +723,10 @@ export class PokerRoom implements LiveRoom {
       this.message = this.describeResult(result);
     }
 
+    // Publish the round for verification — hash it, persist it, queue it on-chain. Fire-and-forget,
+    // off the hand's path (a chain/DB hiccup must never delay the showdown).
+    this.notarizeRound(game);
+
     this.phase = 'SHOWDOWN';
     this.push();
     this.showdownTimer = setTimeout(() => {
@@ -744,6 +754,32 @@ export class PokerRoom implements LiveRoom {
     this.phase = 'WAITING';
     this.push();
     this.maybeStartHand();
+  }
+
+  /**
+   * Publish a settled round for provable-fairness verification — off the critical path, never throws
+   * into the hand. The `cards` bound into the round hash are the FULL deck derived from finalSeed,
+   * which is exactly what the verifier re-derives and checks (step 4/5).
+   */
+  private notarizeRound(game: TexasGame): void {
+    const notary = this.notary;
+    if (!notary) return;
+    const round = game.roundInfo();
+    if (!round) return;
+    const cards = this.spec.deckFor(round.finalSeed);
+    void notary
+      .notarize({
+        roundId: round.roundId,
+        serverCommit: round.serverCommit,
+        serverSeed: round.serverSeed,
+        allClientSeeds: round.allClientSeeds,
+        seatedClientSeeds: round.seats,
+        futureBlockHash: round.futureBlockHash,
+        finalSeed: round.finalSeed,
+        cards,
+        timestamp: Date.now(),
+      })
+      .catch((err) => console.error('[notary] round not notarized:', (err as Error).message));
   }
 
   /** Give a seat's chips back and empty the chair. */

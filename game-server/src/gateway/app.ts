@@ -57,6 +57,8 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
       jwtSecret: config.jwtSecret,
       financialCore: { baseUrl: config.financialCoreUrl, internalSecret: config.internalApiSecret },
       tables: defaultTables(),
+      // The gateway connects to Mongo (the user store), so it can persist round proofs — notarize here.
+      notarize: true,
     });
     app.locals.tableHub = mounted.hub;
   }
