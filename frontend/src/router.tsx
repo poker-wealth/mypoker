@@ -19,29 +19,7 @@ import { AdminOverview } from '@/pages/admin/Overview';
 import { AdminPlayers } from '@/pages/admin/Players';
 import { AdminAlerts } from '@/pages/admin/Alerts';
 import { AdminLeagues } from '@/pages/admin/Leagues';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { ErrorState } from '@/components/ui/ErrorState';
-import { ClipboardList } from 'lucide-react';
-
-/**
- * Deliberately inline rather than a pages/admin/Withdrawals.tsx: the real
- * review queue ships on the league-funding branch under exactly that path,
- * and a stub file there would turn a one-line route conflict into a
- * whole-file one when it lands.
- */
-function AdminWithdrawalsPending() {
-  return (
-    <EmptyState
-      icon={ClipboardList}
-      title="Review queue not deployed yet"
-      description="The withdrawal queue ships with the league-funding changes. Until they land, approvals happen through the internal API."
-    />
-  );
-}
-
-function AdminRouteError() {
-  return <ErrorState message="This admin page does not exist." />;
-}
+import { AdminWithdrawalsPending, AdminRouteError } from '@/pages/admin/route-fallbacks';
 
 export const router = createBrowserRouter([
   {
