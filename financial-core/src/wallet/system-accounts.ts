@@ -106,6 +106,14 @@ export async function ensureRakeAccount(accountType: AccountType, ownerId: strin
   );
 }
 
+/** Ensure and return the account id for a rake destination (TREASURY / LEAGUE_INVENTORY). */
+export async function getRakeAccountId(accountType: AccountType, ownerId: string): Promise<string> {
+  await ensureRakeAccount(accountType, ownerId);
+  const acc = await AccountModel.findOne({ accountType, ownerId }).lean();
+  if (!acc) throw new Error(`rake account missing after ensure: ${accountType}/${ownerId}`);
+  return acc._id;
+}
+
 /**
  * The insurance and reinsurance pool for one system, created on demand.
  *

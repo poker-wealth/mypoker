@@ -24,7 +24,14 @@ import {
   withdrawableAt,
   WithdrawalAddressError,
 } from '../withdrawal/withdrawal-address';
-import { getOrCreatePlayerAccount, ensureJackpotAccounts, ensureRakeAccount } from '../wallet/system-accounts';
+import {
+  getOrCreatePlayerAccount,
+  ensureJackpotAccounts,
+  ensureRakeAccount,
+  getRakeAccountId,
+  ensureInsuranceAccounts,
+  insuranceAccountId,
+} from '../wallet/system-accounts';
 import { getInsuranceReserve } from '../wallet/insurance-reserve';
 import { getDepositAddress } from '../wallet/deposit-address';
 import { getWalletTransactions, getWithdrawals } from '../wallet/wallet-views';
@@ -993,6 +1000,82 @@ export function buildRouter(): Router {
         locked: Money.fromDecimal128(acc.lockedBalance).toString(),
         clearing: Money.fromDecimal128(acc.clearingBalance).toString(),
       });
+    }),
+  );
+
+  // Insurance premium (PLAYER → INSURANCE) and payout (INSURANCE → PLAYER). The pool is owned by
+  // PLATFORM or a leagueId — dual-wallet isolation means a league's premiums fund only its own pool
+  // (the player account is resolved in the owner's scope). Idempotent per (businessId, player). These
+  // close the "INSURANCE_PREMIUM/PAYOUT defined but never moved" gap; they stay dormant until the
+  // game's underwriting calls them (insurance is not surfaced in the client yet).
+  const insuranceBody = z.object({
+    playerId: z.string().min(1),
+    amount: money,
+    ownerId: z.string().min(1).default(PLATFORM_SCOPE),
+    businessId: z.string().min(1),
+  });
+  r.post(
+    '/internal/insurance/premium',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const b = insuranceBody.parse(req.body);
+      await ensureInsuranceAccounts(b.ownerId);
+      const player = await getOrCreatePlayerAccount(b.playerId, b.ownerId);
+      const result = await transfer({
+        fromAccountId: player._id,
+        toAccountId: insuranceAccountId(b.ownerId),
+        amount: Money.fromDecimalString(b.amount),
+        type: LedgerType.INSURANCE_PREMIUM,
+        businessId: b.businessId,
+        idempotencyKey: `${b.businessId}:ins-premium:${b.playerId}`,
+      });
+      res.json({ applied: result.applied });
+    }),
+  );
+  r.post(
+    '/internal/insurance/payouts',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const b = insuranceBody.parse(req.body);
+      await ensureInsuranceAccounts(b.ownerId);
+      const player = await getOrCreatePlayerAccount(b.playerId, b.ownerId);
+      const result = await transfer({
+        fromAccountId: insuranceAccountId(b.ownerId),
+        toAccountId: player._id,
+        amount: Money.fromDecimalString(b.amount),
+        type: LedgerType.INSURANCE_PAYOUT,
+        businessId: b.businessId,
+        idempotencyKey: `${b.businessId}:ins-payout:${b.playerId}`,
+      });
+      res.json({ applied: result.applied });
+    }),
+  );
+
+  // Agent commission (TREASURY → agent's player account). An agent earns a cut of the platform rake
+  // its referred players generate; this actually MOVES that money (the agent store only recorded it
+  // before). Idempotent per (businessId, agent). Dormant until the agent engine calls it per hand.
+  const agentCommissionBody = z.object({
+    agentPlayerId: accountId,
+    amount: money,
+    businessId: z.string().min(1),
+  });
+  r.post(
+    '/internal/agent-commission',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const b = agentCommissionBody.parse(req.body);
+      const dest = getRakeDestination(TableType.PLATFORM, undefined); // commission is a cut of platform rake
+      const treasuryId = await getRakeAccountId(dest.accountType, dest.ownerId);
+      const agent = await getOrCreatePlayerAccount(b.agentPlayerId, PLATFORM_SCOPE);
+      const result = await transfer({
+        fromAccountId: treasuryId,
+        toAccountId: agent._id,
+        amount: Money.fromDecimalString(b.amount),
+        type: LedgerType.AGENT_COMMISSION,
+        businessId: b.businessId,
+        idempotencyKey: `${b.businessId}:agent-commission:${b.agentPlayerId}`,
+      });
+      res.json({ applied: result.applied });
     }),
   );
 
