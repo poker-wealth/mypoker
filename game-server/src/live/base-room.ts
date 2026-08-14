@@ -4,7 +4,7 @@ import type { JackpotCandidate } from '../jackpot/weights';
 import type { GameId } from '../lobby/game-catalog';
 import type { LiveRoom, LiveTableConfig, RoomDeps } from './live-room';
 import type { PlayerDirectory } from './players';
-import type { RoomPhase, TableCommand, TableSnapshot, TableSummary, JackpotWinSnapshot } from './room-state';
+import type { BetAction, RoomPhase, TableCommand, TableSnapshot, TableSummary, JackpotWinSnapshot } from './room-state';
 
 export interface BaseRoomConfig extends LiveTableConfig {
   id: string;
@@ -27,6 +27,13 @@ export interface BaseRoomSeat {
   net?: number | undefined;
   connected: boolean;
   isBanker?: boolean;
+  /**
+   * The worst this seat's standing bet can cost the bank, as a multiple of the stake — a tie at
+   * baccarat's 8:1, a 5x stake against a 5x Niu Niu bank holding Five Small. Written by the room
+   * when the bet is accepted and read back by `checkBankerExposure` when the NEXT bet is weighed,
+   * which is the only way the guard can price a table's worth of bets instead of one at a time.
+   */
+  maxMultiplier?: number;
 }
 
 export class RoomError extends Error {}
@@ -200,10 +207,12 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
     }
   }
 
-  protected abstract handleAct(
-    playerId: string,
-    action: { type: string; amount?: number | undefined },
-  ): Promise<void> | void;
+  /**
+   * A move, already validated by `betActionSchema`. Rooms narrow it to the fields their own game
+   * speaks — the parameter is bivariant, so a room that reads only `type` and `amount` still
+   * satisfies this, while Niu Niu can declare `multiplier` and Dou Di Zhu `cards` without a cast.
+   */
+  protected abstract handleAct(playerId: string, action: BetAction): Promise<void> | void;
 
   protected async sit(
     playerId: string,
@@ -292,6 +301,27 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
   }
 
   /**
+   * Why the table is sitting still, in words a player can act on.
+   *
+   * Every game here refuses to deal below some number of seats, and until now each one just stayed
+   * on WAITING and said nothing: you sat down at San Zhang alone, the felt offered a bet, and the
+   * room answered "betting is closed" — a refusal that describes the state but not the reason.
+   * Rooms put this in their snapshot so the felt can say who it is waiting for, and hide the
+   * controls that cannot work yet.
+   */
+  protected waitingFor(minPlayers: number): string | undefined {
+    if (this.phase !== 'WAITING') return undefined;
+    const seated = this.occupiedSeats().length;
+    const short = minPlayers - seated;
+    if (short <= 0) return undefined;
+    // "2 more players" reads as a lie to someone who has not sat down yet — there is nobody to be
+    // more than. An empty table is waiting for players; a partly full one is waiting for the rest.
+    if (seated === 0) return `Waiting for players — this table deals with ${minPlayers}.`;
+    const players = short === 1 ? 'player' : 'players';
+    return `Waiting for ${short} more ${players} — this table deals with ${minPlayers}.`;
+  }
+
+  /**
    * Banker Exposure Guard:
    * Rejects any bet if aggregate exposure of ALL active bettors exceeds the banker's stack capacity.
    */
@@ -299,7 +329,7 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
     let activeExposure = 0;
     for (const s of this.occupiedSeats()) {
       if (!s.isBanker && s.bet > 0 && s.index !== currentSeatIndex) {
-        const mult = (s as any).maxMultiplier ?? 1;
+        const mult = s.maxMultiplier ?? 1;
         activeExposure += s.bet * mult;
       }
     }

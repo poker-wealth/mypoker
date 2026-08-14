@@ -2,21 +2,13 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import { Bot, User } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { TableNotice } from './TableNotice';
 import type { TableCommand, TableSnapshot } from '@/lib/liveTable';
 
 export interface DouDiZhuFeltProps {
   snapshot?: TableSnapshot | null;
   onCommand?: (cmd: TableCommand) => void;
 }
-
-type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
-
-/** The action string the room reads a difficulty change from. */
-const DIFFICULTY_ACTION: Record<Difficulty, string> = {
-  EASY: 'ai-easy',
-  MEDIUM: 'ai-medium',
-  HARD: 'ai-hard',
-};
 
 const RANK_SUIT_SYMBOLS: Record<string, string> = {
   s: '♠',
@@ -40,7 +32,6 @@ function formatCard(card: string): { rank: string; suit: string; color: string }
 
 export function DouDiZhuFelt({ snapshot, onCommand }: DouDiZhuFeltProps) {
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
-  const [difficulty, setDifficulty] = useState<Difficulty>('MEDIUM');
 
   const phase = snapshot?.phase ?? 'WAITING';
   const seats = snapshot?.seats ?? [];
@@ -70,13 +61,7 @@ export function DouDiZhuFelt({ snapshot, onCommand }: DouDiZhuFeltProps) {
     setSelectedCards([]);
   };
 
-  const chooseDifficulty = (level: Difficulty) => {
-    setDifficulty(level);
-    // Only meaningful once you're seated; the room rejects it otherwise.
-    if (youSeat) handleAct(DIFFICULTY_ACTION[level]);
-  };
-
-  /** Take the first free chair — the practice table fills the rest with AI. */
+  /** Take the first free chair. Dou Di Zhu deals at three, so the table waits until it has them. */
   const sitDown = () => {
     const free = seats.find((s) => !s.playerId);
     onCommand?.({ kind: 'sit', seat: free?.index ?? 0, buyIn: snapshot?.minBuyIn ?? 1_000 });
@@ -111,21 +96,6 @@ export function DouDiZhuFelt({ snapshot, onCommand }: DouDiZhuFeltProps) {
           </div>
         </div>
 
-        {/* AI Difficulty Selector */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-emerald-300">AI:</span>
-          {(['EASY', 'MEDIUM', 'HARD'] as const).map((lvl) => (
-            <button
-              key={lvl}
-              onClick={() => chooseDifficulty(lvl)}
-              className={`rounded px-2 py-1 text-xs font-semibold transition ${
-                difficulty === lvl ? 'bg-amber-500 text-black' : 'bg-emerald-900/60 text-emerald-200'
-              }`}
-            >
-              {lvl}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* The other two players — whoever they turn out to be. A chair is drawn as a bot only when
@@ -272,6 +242,9 @@ export function DouDiZhuFelt({ snapshot, onCommand }: DouDiZhuFeltProps) {
               Sit &amp; Start Game
             </Button>
           )}
+
+          {/* Seated at a table that cannot deal yet — say who it is waiting for. */}
+          {phase === 'WAITING' && youSeat && <TableNotice snapshot={snapshot} />}
 
           {phase === 'SHOWDOWN' && youSeat && (
             <span className="text-xs text-amber-300">{snapshot?.message ?? 'Hand over'}</span>

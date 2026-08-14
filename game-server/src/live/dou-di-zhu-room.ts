@@ -273,6 +273,7 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
       legal: null,
       winners: this.occupiedSeats().filter((s) => (s.net ?? 0) > 0).map((s) => s.index),
       ...(this.resultMessage() ? { message: this.resultMessage()! } : {}),
+      ...(this.waitingFor(3) ? { message: this.waitingFor(3)! } : {}),
       serverTime: Date.now(),
     };
   }

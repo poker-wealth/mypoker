@@ -241,6 +241,7 @@ export class SanZhangRoom extends BaseLiveRoom<SanZhangRoomConfig, RoomSeat> {
       actionDeadline: this.actionDeadline,
       legal: null,
       winners: this.occupiedSeats().filter((s) => (s.net ?? 0) > 0).map((s) => s.index),
+      ...(this.waitingFor(2) ? { message: this.waitingFor(2)! } : {}),
       serverTime: Date.now(),
     };
   }

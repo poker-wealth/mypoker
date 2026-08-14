@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { TableNotice } from './TableNotice';
 
 export interface SanZhangFeltProps {
   snapshot?: any;
@@ -42,7 +43,7 @@ export function SanZhangFelt({ snapshot, onCommand }: SanZhangFeltProps) {
       </div>
 
       <div className="relative z-10 flex flex-col items-center gap-3 pb-2">
-        {isSeated ? (
+        {isSeated && phase === 'IN_HAND' ? (
           <div className="flex items-center gap-3">
             {[50, 100, 500, 1000].map((amt) => (
               <button
@@ -59,6 +60,8 @@ export function SanZhangFelt({ snapshot, onCommand }: SanZhangFeltProps) {
               Place Bet (₮{betAmount})
             </Button>
           </div>
+        ) : isSeated ? (
+          <TableNotice snapshot={snapshot} />
         ) : (
           <Button variant="primary" size="sm" onClick={() => sitDown()}>
             Sit to Play San Zhang

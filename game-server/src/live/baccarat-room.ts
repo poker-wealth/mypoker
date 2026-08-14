@@ -82,7 +82,7 @@ export class BaccaratRoom extends BaseLiveRoom<BaccaratRoomConfig, RoomSeat> {
     if (banker) {
       const maxMultiplier = betType === 'tie' ? this.config.tiePayout : 1;
       this.checkBankerExposure(banker, amount, maxMultiplier, seat.index);
-      (seat as any).maxMultiplier = maxMultiplier;
+      seat.maxMultiplier = maxMultiplier;
     }
 
     seat.betType = betType;
@@ -248,6 +248,7 @@ export class BaccaratRoom extends BaseLiveRoom<BaccaratRoomConfig, RoomSeat> {
       ...(result && this.phase === 'SHOWDOWN'
         ? { message: `Outcome: ${result.outcome} (P: ${result.playerTotal} vs B: ${result.bankerTotal})` }
         : {}),
+      ...(this.waitingFor(2) ? { message: this.waitingFor(2)! } : {}),
       serverTime: Date.now(),
     };
   }

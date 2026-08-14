@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { TableNotice } from './TableNotice';
 import { SeatStrip } from './SeatStrip';
 
 export interface BaccaratFeltProps {
@@ -96,7 +97,7 @@ export function BaccaratFelt({ snapshot, onCommand }: BaccaratFeltProps) {
 
       {/* Controls */}
       <div className="relative z-10 flex flex-col items-center gap-3 pb-2">
-        {isSeated ? (
+        {isSeated && phase === 'IN_HAND' ? (
           <div className="flex items-center gap-3">
             {[50, 100, 500, 1000].map((amt) => (
               <button
@@ -113,6 +114,8 @@ export function BaccaratFelt({ snapshot, onCommand }: BaccaratFeltProps) {
               Place Bet (₮{betAmount})
             </Button>
           </div>
+        ) : isSeated ? (
+          <TableNotice snapshot={snapshot} />
         ) : (
           <Button variant="primary" size="sm" onClick={() => sitDown()}>
             Sit to Play Baccarat

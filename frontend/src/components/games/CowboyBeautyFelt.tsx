@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { TableNotice } from './TableNotice';
 import { SeatStrip } from './SeatStrip';
 
 export interface CowboyBeautyFeltProps {
@@ -60,7 +61,7 @@ export function CowboyBeautyFelt({ snapshot, onCommand }: CowboyBeautyFeltProps)
       </div>
 
       <div className="relative z-10 flex flex-col items-center gap-3 pb-2">
-        {isSeated ? (
+        {isSeated && phase === 'IN_HAND' ? (
           <div className="flex items-center gap-3">
             {[50, 100, 500, 1000].map((amt) => (
               <button
@@ -81,6 +82,8 @@ export function CowboyBeautyFelt({ snapshot, onCommand }: CowboyBeautyFeltProps)
               Bet on {selectedSide} (₮{betAmount})
             </Button>
           </div>
+        ) : isSeated ? (
+          <TableNotice snapshot={snapshot} />
         ) : (
           <Button variant="primary" size="sm" onClick={() => sitDown()}>
             Sit to Play Cowboy & Beauty

@@ -253,6 +253,7 @@ export class CowboyBeautyRoom extends BaseLiveRoom<CowboyBeautyRoomConfig, RoomS
       ...(winner && this.phase === 'SHOWDOWN'
         ? { message: `Winner: ${winner}` }
         : {}),
+      ...(this.waitingFor(2) ? { message: this.waitingFor(2)! } : {}),
       serverTime: Date.now(),
     };
   }

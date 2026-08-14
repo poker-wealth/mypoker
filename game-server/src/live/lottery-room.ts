@@ -246,6 +246,7 @@ export class LotteryRoom extends BaseLiveRoom<LotteryRoomConfig, RoomSeat> {
       ...(winningNumber !== undefined && this.phase === 'SHOWDOWN'
         ? { message: `Winning Number: #${winningNumber}` }
         : {}),
+      ...(this.waitingFor(2) ? { message: this.waitingFor(2)! } : {}),
       serverTime: Date.now(),
     };
   }
