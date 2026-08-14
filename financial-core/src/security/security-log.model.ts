@@ -4,8 +4,14 @@ import { shipToSyslog } from './syslog';
 
 /**
  * security_log — append-only record of security-relevant events (illegal fund flows, address
- * mismatches, etc.). Written whenever a circuit breaker fires. In production this is mirrored to
- * remote syslog so it cannot be deleted (spec §11.2).
+ * mismatches, etc.). Written whenever a circuit breaker fires. Every write is mirrored to remote
+ * syslog (the post-save hook below) so a copy exists off-box.
+ *
+ * That mirror is an APPLICATION-level ship of this collection. It is not spec §11.2, which asks
+ * for MongoDB's own audit log (Enterprise auditing + RBAC, configured on the cluster) shipped to
+ * syslog so a DBA's actions are recorded by a layer the DBA does not control — see the honest
+ * accounting at the top of ./syslog.ts. One protects against events nobody wrote here; this
+ * protects the ones somebody did.
  */
 
 export interface SecurityEventDoc {

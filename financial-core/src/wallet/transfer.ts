@@ -219,7 +219,12 @@ export async function transfer(input: TransferInput): Promise<TransferResult> {
   const elapsed = Date.now() - started;
   if (elapsed > TXN_MAX_MS) {
     // 50ms hard limit is a monitored target (spec §3, Pitfall 1). Surface breaches for tuning.
-    await alertOps(`transfer() local transaction exceeded ${TXN_MAX_MS}ms (${elapsed}ms)`, {
+    // The elapsed time goes in the CONTEXT, not the message: the message is the
+    // rate-limiter's key, and a unique ms reading per breach would give every
+    // slow transfer its own window — an alert per transfer, exactly when Mongo
+    // is degraded and there are hundreds of them.
+    await alertOps(`transfer() local transaction exceeded ${TXN_MAX_MS}ms`, {
+      elapsedMs: elapsed,
       idempotencyKey: input.idempotencyKey,
       type: input.type,
     });

@@ -86,8 +86,13 @@ export function telegramAlertHandler(
       return;
     }
 
-    // A new window. Report how many the previous one swallowed.
+    // A new window. Report how many the previous one swallowed, and sweep
+    // windows that have gone quiet — without this the Map only ever grows, one
+    // entry per distinct message this process has ever alerted.
     const suppressed = open?.suppressed ?? 0;
+    for (const [key, w] of windows) {
+      if (now - w.firstAt >= ALERT_WINDOW_MS) windows.delete(key);
+    }
     windows.set(message, { firstAt: now, suppressed: 0 });
 
     try {
@@ -100,6 +105,11 @@ export function telegramAlertHandler(
           parse_mode: 'HTML',
           disable_web_page_preview: true,
         }),
+        // Callers AWAIT alerts — transfer() awaits one before throwing
+        // IllegalFundFlowError — so an unresponsive api.telegram.org must not
+        // hang a money path for undici's multi-minute default. Five seconds,
+        // then the stderr fallback below still records the alert.
+        signal: AbortSignal.timeout(5_000),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
     } catch (err) {

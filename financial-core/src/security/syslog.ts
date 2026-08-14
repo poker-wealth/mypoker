@@ -45,7 +45,11 @@ export interface SyslogConfig {
 export function syslogConfig(env: NodeJS.ProcessEnv = process.env): SyslogConfig | null {
   const host = env.SYSLOG_HOST;
   if (!host) return null;
-  const port = Number(env.SYSLOG_PORT ?? 514);
+  // `|| 514`, not `?? 514`: a .env with `SYSLOG_PORT=` and no value yields an
+  // EMPTY STRING, which is not nullish — Number('') is 0, and `??` would let
+  // that 0 fail the check below and silently disable shipping with the HOST
+  // still set. A blank value means "the default", the same as no value.
+  const port = Number(env.SYSLOG_PORT || 514);
   if (!Number.isInteger(port) || port <= 0) return null;
   return { host, port, appName: env.SYSLOG_APP_NAME ?? 'financial-core' };
 }
@@ -96,7 +100,14 @@ export function shipToSyslog(
   if (!cfg) return; // Not configured is the dev default, not an error.
 
   try {
-    socket ??= createSocket('udp4');
+    if (!socket) {
+      socket = createSocket('udp4');
+      // Without a listener, a socket-level 'error' (EACCES on the implicit
+      // bind, for one) is an unhandled EventEmitter error — which crashes the
+      // process. From a fire-and-forget logging path, that would be the tail
+      // wagging the dog hard enough to kill it.
+      socket.on('error', (err) => console.error('[syslog] socket error:', err.message));
+    }
     const severity = ALERT_EVENTS.has(event.event) ? SEVERITY.alert : SEVERITY.warning;
     const line = Buffer.from(formatSyslog(cfg, event, severity));
     socket.send(line, cfg.port, cfg.host, (err) => {
