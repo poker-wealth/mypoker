@@ -211,6 +211,19 @@ export class RedPacketRoom extends BaseLiveRoom<RedPacketRoomConfig, RoomSeat> {
       handId: this.phase !== 'WAITING' ? `#${this.handNumber}` : null,
       handNumber: this.handNumber,
       street: null,
+      // The felt draws the grid, who has claimed which packet, and what the mines were. All of it
+      // is public: the picks were already going out to every viewer in `lastAction`, and the mines
+      // only exist here once the round has revealed them.
+      gameState: {
+        size: this.config.size,
+        mineCount: this.config.mineCount,
+        ...(reveal ? { mines: reveal.mines } : {}),
+        seats: this.occupiedSeats().map((s) => ({
+          index: s.index,
+          ...(s.cell !== undefined ? { cell: s.cell } : {}),
+          ...(s.net !== undefined ? { net: s.net } : {}),
+        })),
+      },
       pot: this.occupiedSeats().reduce((sum, s) => sum + s.bet, 0),
       board: reveal ? reveal.mines.map(String) : [],
       seats: this.seats.map((s, idx) => {
@@ -261,6 +274,7 @@ export class RedPacketRoom extends BaseLiveRoom<RedPacketRoomConfig, RoomSeat> {
       legal: null,
       winners: this.occupiedSeats().filter((s) => (s.net ?? 0) > 0).map((s) => s.index),
       ...(reveal ? { message: `Mines: ${reveal.mines.join(', ')}` } : {}),
+      ...(this.waitingFor(2) ? { message: this.waitingFor(2)! } : {}),
       serverTime: Date.now(),
     };
   }
