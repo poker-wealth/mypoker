@@ -16,7 +16,7 @@ import {
   confirmWithdrawal,
 } from '../withdrawal/withdrawal-state-machine';
 import { signAndBroadcastWithdrawal } from '../withdrawal/withdrawal-broadcast';
-import { evaluateCB4, evaluateCB5 } from '../circuit-breakers/breakers';
+import { evaluateCB3, evaluateCB4, evaluateCB5 } from '../circuit-breakers/breakers';
 import {
   setWithdrawalAddress,
   getWithdrawalAddress,
@@ -1243,6 +1243,23 @@ export function buildRouter(): Router {
     asyncHandler(async (req: Request, res: Response) => {
       await confirmWithdrawal(req.params.id as string);
       res.json({ state: await currentState(req.params.id as string) });
+    }),
+  );
+
+  // ── CB3 report (internal) ────────────────────────────────────────────────
+  // The jackpot anomaly detector lives in the game-server's JackpotEngine (it counts a table's
+  // triggers and freezes the pool locally the moment three land inside an hour). This is the FC side
+  // of that breaker: the engine reports the freeze here so it is recorded in the append-only
+  // security_log and paged to ops — closing the gap where a table would silently freeze with nobody
+  // alerted. Idempotent by nature: re-reporting the same anomaly just writes another log line.
+  const cb3Body = z.object({ tableId: z.string().min(1), triggersLastHour: z.number().int().min(0) });
+  r.post(
+    '/internal/circuit-breakers/cb3',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { tableId, triggersLastHour } = cb3Body.parse(req.body);
+      const event = await evaluateCB3(tableId, triggersLastHour);
+      res.json(event);
     }),
   );
 

@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { loadConfig } from './config/env';
 import { connectDb, disconnectDb } from './db/connection';
 import { createApp } from './http/app';
+import { installTelegramAlertsFromEnv } from './lib/telegram-alert';
 
 /**
  * FairPlay Financial Core — production entrypoint.
@@ -22,6 +23,11 @@ export interface RunningServer {
 export async function startServer(): Promise<RunningServer> {
   const config = loadConfig();
   await connectDb({ uri: config.MONGO_URI, tls: config.MONGO_TLS });
+
+  // Route ops alerts (circuit-breaker trips, illegal-flow alarms) to Telegram when the bot is
+  // configured; otherwise the stderr default stands. Logged so a deploy makes the live channel obvious.
+  const alertsLive = installTelegramAlertsFromEnv();
+  console.log(`[ops-alerts] delivery: ${alertsLive ? 'telegram' : 'stderr (TG_BOT_TOKEN/TG_OPS_CHAT_ID unset)'}`);
 
   const app = createApp();
   const server = await new Promise<Server>((resolve) => {

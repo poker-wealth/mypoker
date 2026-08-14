@@ -1,6 +1,9 @@
 import mongoose, { Schema, type Model } from 'mongoose';
 import { usdtContract } from '../config/chain';
 import { tronAddressFromXpub } from './tron-address';
+import { playerDepositPath } from './hd-derivation';
+import { evaluateCB7 } from '../circuit-breakers/breakers';
+import { AccountType } from '../domain/account-types';
 
 /**
  * Per-player TRC-20 deposit addresses.
@@ -78,6 +81,16 @@ export async function getDepositAddress(playerId: string): Promise<DepositAddres
   );
   const index = counter!.seq;
   const address = tronAddressFromXpub(xpub, index);
+
+  // CB7 — the one HD-derivation path that runs live (player deposit addresses). Verify the BIP-44
+  // branch matches the PLAYER account type BEFORE the address is ever persisted or shown; a mismatch
+  // means the derivation constants have drifted and a deposit could land under the wrong pool
+  // (spec §3.4). On a happy path this is two string ops and no DB write; on a trip it writes the
+  // security_log + ops alert and we refuse to hand out the address.
+  const cb7 = await evaluateCB7(AccountType.PLAYER, playerDepositPath(index));
+  if (cb7.tripped) {
+    throw new Error('deposit address derivation failed the CB7 address-mapping check');
+  }
 
   try {
     await DepositAddressModel.create({ _id: playerId, index, address });
