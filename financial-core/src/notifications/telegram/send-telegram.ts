@@ -81,9 +81,14 @@ export async function sendTelegram(
 
   try {
     await TelegramSendModel.create({ _id: eventId, chatId });
-  } catch {
-    // Unique _id already taken — this event was already announced here.
-    return 'duplicate';
+  } catch (err) {
+    // ONLY a duplicate key means "already announced". Anything else — Mongo
+    // down, say — wrote no claim, so calling it a duplicate would be a lie
+    // that also happens to skip the message; the email path next door has
+    // always made this distinction.
+    if (isDuplicateKey(err)) return 'duplicate';
+    console.error(`[telegram] could not claim ${eventId}:`, err);
+    return 'failed';
   }
 
   const doFetch = deps.fetchImpl ?? fetch;
@@ -98,16 +103,32 @@ export async function sendTelegram(
         // A money receipt should not unfurl a link preview over itself.
         disable_web_page_preview: true,
       }),
+      // Awaited (guarded) from the deposit and withdrawal paths: a blackholed
+      // api.telegram.org must stall a credit by seconds at most, not by
+      // undici's multi-minute default.
+      signal: AbortSignal.timeout(5_000),
     });
     if (!res.ok) throw new Error(`telegram sendMessage: HTTP ${res.status}`);
     const body = (await res.json()) as { ok?: boolean; description?: string };
     if (!body.ok) throw new Error(`telegram sendMessage: ${body.description ?? 'refused'}`);
-    await TelegramSendModel.updateOne({ _id: eventId }, { $set: { sentAt: new Date() } });
-    return 'sent';
   } catch (err) {
     // Release the claim so a later retry can still deliver it.
     await TelegramSendModel.deleteOne({ _id: eventId }).catch(() => undefined);
     console.error(`[telegram] send failed for ${eventId}:`, err);
     return 'failed';
   }
+
+  // The message is delivered; bookkeeping failing must not release the claim,
+  // or a retry re-sends what the player already has. Same trade as the email
+  // path: better a missing timestamp than a second receipt.
+  try {
+    await TelegramSendModel.updateOne({ _id: eventId }, { $set: { sentAt: new Date() } });
+  } catch (err) {
+    console.error(`[telegram] sent but could not record sentAt for ${eventId}:`, err);
+  }
+  return 'sent';
+}
+
+function isDuplicateKey(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { code?: number }).code === 11000;
 }

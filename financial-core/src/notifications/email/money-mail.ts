@@ -108,23 +108,34 @@ export async function announceDeposit(input: {
   network: string;
   at?: Date;
 }): Promise<void> {
-  const at = input.at ?? new Date();
-  await announce({
-    playerId: input.playerId,
-    // The tx hash is already the credit's idempotency key, so the receipt is
-    // idempotent on exactly what the money was idempotent on.
-    eventId: `deposit:${input.txHash}`,
-    kind: 'DEPOSIT',
-    titleKey: 'notifications.depositCredited',
-    params: { amount: input.amount },
-    template: depositReceived({
-      amount: input.amount,
-      txHash: input.txHash,
-      network: input.network,
-      at,
-    }),
-    telegram: tg.depositReceived({ amount: input.amount, txHash: input.txHash }),
-  });
+  // The whole body is guarded, TEMPLATE CONSTRUCTION INCLUDED. The templates
+  // are built while announce()'s arguments are evaluated — before any of its
+  // internal try/catches exist — and the callers await these functions from
+  // directly inside the credit and withdrawal paths, after the money has
+  // committed. A throw here (reachable only via a type violation, but this is
+  // the money path we are talking about) must end in a log line, not in a
+  // rejected credit.
+  try {
+    const at = input.at ?? new Date();
+    await announce({
+      playerId: input.playerId,
+      // The tx hash is already the credit's idempotency key, so the receipt is
+      // idempotent on exactly what the money was idempotent on.
+      eventId: `deposit:${input.txHash}`,
+      kind: 'DEPOSIT',
+      titleKey: 'notifications.depositCredited',
+      params: { amount: input.amount },
+      template: depositReceived({
+        amount: input.amount,
+        txHash: input.txHash,
+        network: input.network,
+        at,
+      }),
+      telegram: tg.depositReceived({ amount: input.amount, txHash: input.txHash }),
+    });
+  } catch (err) {
+    console.error(`[money-mail] deposit announce failed for ${input.txHash}:`, err);
+  }
 }
 
 /** Money out, step one — the receipt for a request. */
@@ -135,23 +146,29 @@ export async function announceWithdrawalRequested(input: {
   address: string;
   at?: Date;
 }): Promise<void> {
-  await announce({
-    playerId: input.playerId,
-    eventId: `withdrawal:${input.withdrawalId}:requested`,
-    // SYSTEM, not DEPOSIT: money leaving an account is a security notice, and
-    // §notification toggles make SYSTEM unsuppressible. A player who has
-    // muted deposit alerts must still be told that funds are being sent out —
-    // that message is how they find out about a withdrawal they did not make.
-    kind: 'SYSTEM',
-    titleKey: 'notifications.withdrawalRequested',
-    params: { amount: input.amount },
-    template: withdrawalRequested({
-      amount: input.amount,
-      address: input.address,
-      at: input.at ?? new Date(),
-    }),
-    telegram: tg.withdrawalRequested({ amount: input.amount, address: input.address }),
-  });
+  // Guarded in full — see announceDeposit for why the template construction
+  // must sit inside the try.
+  try {
+    await announce({
+      playerId: input.playerId,
+      eventId: `withdrawal:${input.withdrawalId}:requested`,
+      // SYSTEM, not DEPOSIT: money leaving an account is a security notice, and
+      // §notification toggles make SYSTEM unsuppressible. A player who has
+      // muted deposit alerts must still be told that funds are being sent out —
+      // that message is how they find out about a withdrawal they did not make.
+      kind: 'SYSTEM',
+      titleKey: 'notifications.withdrawalRequested',
+      params: { amount: input.amount },
+      template: withdrawalRequested({
+        amount: input.amount,
+        address: input.address,
+        at: input.at ?? new Date(),
+      }),
+      telegram: tg.withdrawalRequested({ amount: input.amount, address: input.address }),
+    });
+  } catch (err) {
+    console.error(`[money-mail] request announce failed for ${input.withdrawalId}:`, err);
+  }
 }
 
 /** Money out, step two — it has been broadcast. */
@@ -164,19 +181,25 @@ export async function announceWithdrawalSent(input: {
   network: string;
   at?: Date;
 }): Promise<void> {
-  await announce({
-    playerId: input.playerId,
-    eventId: `withdrawal:${input.withdrawalId}:sent`,
-    kind: 'SYSTEM',
-    titleKey: 'notifications.withdrawalSent',
-    params: { amount: input.amount },
-    template: withdrawalSent({
-      amount: input.amount,
-      address: input.address,
-      txHash: input.txHash,
-      network: input.network,
-      at: input.at ?? new Date(),
-    }),
-    telegram: tg.withdrawalSent({ amount: input.amount, txHash: input.txHash }),
-  });
+  // Guarded in full — see announceDeposit for why the template construction
+  // must sit inside the try.
+  try {
+    await announce({
+      playerId: input.playerId,
+      eventId: `withdrawal:${input.withdrawalId}:sent`,
+      kind: 'SYSTEM',
+      titleKey: 'notifications.withdrawalSent',
+      params: { amount: input.amount },
+      template: withdrawalSent({
+        amount: input.amount,
+        address: input.address,
+        txHash: input.txHash,
+        network: input.network,
+        at: input.at ?? new Date(),
+      }),
+      telegram: tg.withdrawalSent({ amount: input.amount, txHash: input.txHash }),
+    });
+  } catch (err) {
+    console.error(`[money-mail] sent announce failed for ${input.withdrawalId}:`, err);
+  }
 }

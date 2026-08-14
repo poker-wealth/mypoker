@@ -36,7 +36,11 @@ export function mailConfig(env: NodeJS.ProcessEnv = process.env): MailConfig | n
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, EMAIL_FROM } = env;
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return null;
 
-  const port = Number(SMTP_PORT ?? 465);
+  // `||`, not `??`: a .env line reading `SMTP_PORT=` with no value yields an
+  // empty string, which is not nullish — Number('') is 0, and `??` would let
+  // that 0 fail the check below and silently disable email with HOST/USER/PASS
+  // all present. Blank means "the default", same as absent.
+  const port = Number(SMTP_PORT || 465);
   if (!Number.isInteger(port) || port <= 0) return null;
 
   return {
@@ -45,8 +49,9 @@ export function mailConfig(env: NodeJS.ProcessEnv = process.env): MailConfig | n
     user: SMTP_USER,
     pass: SMTP_PASS,
     // Falling back to the mailbox address keeps a misconfigured EMAIL_FROM from
-    // producing mail with an empty sender, which every provider rejects.
-    from: EMAIL_FROM ?? SMTP_USER,
+    // producing mail with an empty sender, which every provider rejects. `||`
+    // for the same blank-line reason as the port.
+    from: EMAIL_FROM || SMTP_USER,
   };
 }
 

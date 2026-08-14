@@ -84,8 +84,6 @@ export async function sendEmail(
       html: template.html,
       text: template.text,
     });
-    await EmailSendModel.updateOne({ _id: eventId }, { $set: { sentAt: new Date() } });
-    return 'sent';
   } catch (err) {
     // Release the claim so a later retry can try again — a claimed-but-unsent
     // row would silently suppress the receipt forever.
@@ -96,6 +94,18 @@ export async function sendEmail(
     console.error(`[email] send failed for ${eventId}:`, err);
     return 'failed';
   }
+
+  // The mail is GONE at this point, so the bookkeeping failing must not
+  // release the claim — the old shape had one catch around both, and a DB
+  // hiccup in the millisecond after a successful SMTP send deleted the claim,
+  // letting a retry send the same receipt twice. The claim row (sentAt null)
+  // stands either way; losing the timestamp is the cheap end of that trade.
+  try {
+    await EmailSendModel.updateOne({ _id: eventId }, { $set: { sentAt: new Date() } });
+  } catch (err) {
+    console.error(`[email] sent but could not record sentAt for ${eventId}:`, err);
+  }
+  return 'sent';
 }
 
 function isDuplicateKey(err: unknown): boolean {
