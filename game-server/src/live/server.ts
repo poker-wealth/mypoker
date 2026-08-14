@@ -69,23 +69,11 @@ export function defaultTables(): LiveTableConfig[] {
       maxBuyIn: 20_000,
       rake: { bps: 500, cap: 3_000, noFlopNoDrop: true },
     },
-    {
-      ...DEFAULT_ROOM,
-      id: 'short-deck',
-      name: 'Short Deck · ₮0.10/0.20',
-      game: 'short-deck',
-      variantId: 'short-deck',
-    },
-    {
-      ...DEFAULT_ROOM,
-      id: 'omaha',
-      name: 'Omaha · ₮0.10/0.20',
-      game: 'omaha',
-      variantId: 'omaha',
-      // Four hole cards mean far more hands connect with the board, so pots run deeper than
-      // Hold'em at the same blinds: 40 bb minimum rather than 20, and the same 200 bb ceiling.
-      minBuyIn: 800,
-    },
+
+    // Poker variants — same PokerRoom, same real-money rail; a variant only changes the deck,
+    // hole-card count and scoring (see games/texas/variants.ts).
+    { ...DEFAULT_ROOM, id: 'short-deck', game: 'short-deck', variantId: 'short-deck', name: 'Short Deck · ₮0.10/0.20' },
+    { ...DEFAULT_ROOM, id: 'omaha', game: 'omaha', variantId: 'omaha', name: 'Omaha · ₮0.10/0.20' },
     { id: 'baccarat', name: 'Baccarat · Player Banked', game: 'baccarat', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 8, rakeBps: 500, tiePayout: 8 },
     { id: 'niu-niu', name: 'Niu Niu · Player Banked', game: 'niu-niu', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 6, rakeBps: 500 },
     { id: 'san-zhang', name: 'San Zhang · Player Banked', game: 'san-zhang', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 6, rakeBps: 500 },

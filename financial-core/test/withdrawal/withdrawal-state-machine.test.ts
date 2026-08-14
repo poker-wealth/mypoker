@@ -60,7 +60,7 @@ describe('withdrawal state machine', () => {
     // REQUESTED: nothing moved yet.
     expect((await balances(player))).toEqual({ available: 1000, clearing: 0 });
 
-    await approveWithdrawal(id);
+    await approveWithdrawal(id, 'ops-1');
     // APPROVED: held in clearing.
     expect(await balances(player)).toEqual({ available: 700, clearing: 300 });
 
@@ -90,7 +90,7 @@ describe('withdrawal state machine', () => {
       amount: Money.fromDecimalString('500'),
       address: 'TXaddr',
     });
-    await approveWithdrawal(id);
+    await approveWithdrawal(id, 'ops-1');
     expect(await balances(player)).toEqual({ available: 0, clearing: 500 });
 
     // A second withdrawal for the same funds cannot be approved — available is now 0.
@@ -112,7 +112,7 @@ describe('withdrawal state machine', () => {
       amount: Money.fromDecimalString('400'),
       address: 'TXaddr',
     });
-    await approveWithdrawal(id);
+    await approveWithdrawal(id, 'ops-1');
     expect(await balances(player)).toEqual({ available: 600, clearing: 400 });
 
     await rollbackWithdrawal(id, 'broadcast failed');
@@ -123,6 +123,36 @@ describe('withdrawal state machine', () => {
     expect(w!.failureReason).toBe('broadcast failed');
     // No money left the platform → no WITHDRAW ledger entry.
     expect(await LedgerModel.countDocuments({ type: LedgerType.WITHDRAW })).toBe(0);
+  });
+
+  it('a withdrawal over $10k needs two DISTINCT approvers before funds are held', async () => {
+    const player = await makePlayer('20000');
+    await makeTreasury();
+    const id = await requestWithdrawal({
+      playerAccountId: player,
+      amount: Money.fromDecimalString('15000'),
+      address: 'TXbig',
+    });
+
+    // One approval is not enough: still REQUESTED, nothing held.
+    expect(await approveWithdrawal(id, 'ops-1')).toEqual({
+      state: WithdrawalState.REQUESTED,
+      approvals: 1,
+      required: 2,
+    });
+    expect(await balances(player)).toEqual({ available: 20000, clearing: 0 });
+
+    // The SAME approver again is idempotent — still 1 of 2.
+    expect((await approveWithdrawal(id, 'ops-1')).approvals).toBe(1);
+    expect(await balances(player)).toEqual({ available: 20000, clearing: 0 });
+
+    // A second, distinct approver crosses the threshold: funds held, APPROVED.
+    expect(await approveWithdrawal(id, 'ops-2')).toEqual({
+      state: WithdrawalState.APPROVED,
+      approvals: 2,
+      required: 2,
+    });
+    expect(await balances(player)).toEqual({ available: 5000, clearing: 15000 });
   });
 
   it('rolls back a REQUESTED withdrawal with no balance to release', async () => {

@@ -50,8 +50,6 @@ export const SUPPORT_URL =
 
 /** The table opened when a game id isn't itself a table id (see the table server's room list). */
 export const DEFAULT_TABLE_ID = 'texas';
-
-
 /**
  * Tables with a screen behind them — must match the ids `defaultTables()` opens on the table
  * server. Anything else routes to "not ready yet" rather than dealing the wrong game's felt.
