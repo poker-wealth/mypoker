@@ -143,6 +143,8 @@ export interface TableSummary {
 export interface TableAction {
   type: 'fold' | 'check' | 'call' | 'raise' | (string & {});
   amount?: number;
+  /** 1x / 2x / 5x — the stake multiplier, or a bid for the bank. */
+  multiplier?: number;
   /** The card combination, for games where a move is cards (Dou Di Zhu). */
   cards?: string[];
   selection?: string;

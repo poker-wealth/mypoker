@@ -208,13 +208,20 @@ export const betActionSchema = z.object({
       'ai-medium',
       'ai-hard',
     ]),
-    /** Dou Di Zhu's auction: `bid-0` (pass) through `bid-3`. */
-    z.string().regex(/^bid-[0-3]$/),
+    /**
+     * An auction bid. Two games bid, for different things: Dou Di Zhu bids `bid-0` (pass) through
+     * `bid-3` for the landlord's chair, Niu Niu bids `bid-1`, `bid-2` or `bid-5` for the bank — the
+     * winning bid multiplies every settlement of the round. Only those five are spoken, so `bid-9`
+     * stays junk rather than becoming a 9x bank nobody's stack was checked against.
+     */
+    z.string().regex(/^bid-(?:[0-3]|5)$/),
     /** A minesweeper cell or a lottery number — the room checks it against the board's range. */
     z.string().regex(/^\d{1,3}$/),
   ]),
   /** For 'raise' / bet actions: the amount or total target. */
   amount: z.number().int().nonnegative().optional(),
+  /** 1x / 2x / 5x — the stake multiplier, or a bid for the bank. */
+  multiplier: z.number().int().positive().optional(),
   /** For card games like Dou Dizhu: the played card combination. */
   cards: z.array(z.string()).optional(),
 });

@@ -19,7 +19,9 @@ const REAL_COMMANDS: Array<[string, unknown]> = [
   ['baccarat · back the player', { kind: 'act', action: { type: 'player', amount: 100 } }],
   ['baccarat · back the tie', { kind: 'act', action: { type: 'tie', amount: 100 } }],
   ['niu niu · stake', { kind: 'act', action: { type: 'bet', amount: 100 } }],
-  ['niu niu · take the bank', { kind: 'act', action: { type: 'claim-banker' } }],
+  ['niu niu · stake at 5x', { kind: 'act', action: { type: 'bet', amount: 100, multiplier: 5 } }],
+  ['niu niu · bid 1x for the bank', { kind: 'act', action: { type: 'bid-1' } }],
+  ['niu niu · bid 5x for the bank', { kind: 'act', action: { type: 'bid-5' } }],
   ['san zhang · stake', { kind: 'act', action: { type: 'bet', amount: 100 } }],
   ['red packet · pick cell 3', { kind: 'act', action: { type: '3', amount: 100 } }],
   ['red packet · pick cell 24', { kind: 'act', action: { type: '24', amount: 100 } }],
@@ -37,6 +39,15 @@ describe('the wire speaks every game', () => {
   it.each(REAL_COMMANDS)('accepts %s', (_label, command) => {
     const parsed = tableCommandSchema.safeParse(command);
     expect(parsed.success).toBe(true);
+  });
+
+  it('keeps the stake multiplier, which decides how much money moves', () => {
+    // Dropped, a 5x stake settles at 1x and the bank keeps four fifths of what it owed.
+    const parsed = tableCommandSchema.safeParse({
+      kind: 'act',
+      action: { type: 'bet', amount: 100, multiplier: 5 },
+    });
+    expect(parsed.success && parsed.data.kind === 'act' && parsed.data.action.multiplier).toBe(5);
   });
 
   it('keeps the played cards, which belong INSIDE the action', () => {
