@@ -25,6 +25,14 @@ export type LeagueFundingState =
   | 'REQUESTED'
   /** Ops has signed off. Money still has not moved. */
   | 'APPROVED'
+  /**
+   * One executor has claimed the request and the transfer is in flight. The
+   * claim is what makes execute and reject mutually exclusive: a rejection can
+   * land any time up to the claim, and never after — without it, a reject
+   * slipping between the state check and the transfer would be silently
+   * overwritten by EXECUTED, and money would move against a refusal.
+   */
+  | 'EXECUTING'
   /** The transfer is written to the ledger. Terminal. */
   | 'EXECUTED'
   /** Refused. Terminal, and kept — a refusal is a record. */
@@ -48,6 +56,8 @@ export interface LeagueFundingDoc {
   approvals: string[];
   rejectedBy?: string;
   rejectionReason?: string;
+  /** The ops person who ran the execution — the transfer names a human too. */
+  executedBy?: string;
   /** For cash-out: where the TRC-20 goes. Captured at request time. */
   address?: string;
   /** The on-chain send, once it happens. Out of scope for the ledger move. */
@@ -64,7 +74,7 @@ const schema = new Schema<LeagueFundingDoc>(
     amount: { type: Schema.Types.Decimal128, required: true },
     state: {
       type: String,
-      enum: ['REQUESTED', 'APPROVED', 'EXECUTED', 'REJECTED'],
+      enum: ['REQUESTED', 'APPROVED', 'EXECUTING', 'EXECUTED', 'REJECTED'],
       required: true,
       default: 'REQUESTED',
       index: true,
@@ -73,6 +83,7 @@ const schema = new Schema<LeagueFundingDoc>(
     approvals: { type: [String], default: [] },
     rejectedBy: { type: String, required: false },
     rejectionReason: { type: String, required: false },
+    executedBy: { type: String, required: false },
     address: { type: String, required: false },
     txHash: { type: String, required: false },
   },

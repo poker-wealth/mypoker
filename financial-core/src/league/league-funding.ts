@@ -42,7 +42,9 @@ export class LeagueFundingError extends Error {
 }
 
 /**
- * Above this, a top-up needs a second ops signature.
+ * Above this, a funding movement — top-up OR cash-out — needs a second ops
+ * signature (W10: "league top-up and cash-out workflow with second-person
+ * confirmation"; §11.2: "All admin actions require second ops person approval").
  *
  * THE SPEC DOES NOT GIVE A NUMBER. It says "large top-up (>threshold)" twice
  * and never defines the threshold. This reuses the withdrawal figure — §3.6's
@@ -173,17 +175,41 @@ export async function approveLeagueFunding(
   if (!recorded) throw new LeagueFundingError('request is not awaiting approval');
 
   const approvals = recorded.approvals ?? [];
-  // Only top-ups carry the threshold. A cash-out moves a league's OWN money
-  // back out; the spec asks for review, not for two signatures.
-  const needsSecond =
-    recorded.kind === 'TOPUP' &&
-    Money.fromDecimal128(recorded.amount).greaterThan(LEAGUE_SECOND_APPROVAL_THRESHOLD);
+  // BOTH kinds carry the threshold. The W10 deliverables line is explicit that
+  // the workflow — "league top-up and cash-out workflow with second-person
+  // confirmation" — covers both directions, and §11.2's Operations Staff row
+  // backs it up: "All admin actions require second ops person approval." A
+  // cash-out is a league's own money, but it leaves the platform for a TRC-20
+  // address someone typed; that is exactly the operation a second pair of eyes
+  // exists for.
+  const needsSecond = Money.fromDecimal128(recorded.amount).greaterThan(
+    LEAGUE_SECOND_APPROVAL_THRESHOLD,
+  );
 
   if (needsSecond && approvals.length < 2) {
     return { applied: false, approvals, awaitingSecondApproval: true };
   }
 
-  await LeagueFundingModel.updateOne({ _id: requestId }, { $set: { state: 'APPROVED' } });
+  // CAS, not a blind $set: only a request still REQUESTED may become APPROVED.
+  // Without the filter, an approval racing a rejection would flip the doc from
+  // REJECTED back to APPROVED — and the next /execute would move money that an
+  // ops person explicitly stopped. (The withdrawal path this file mirrors has
+  // always had this guard; its absence here was the gap.)
+  const promoted = await LeagueFundingModel.updateOne(
+    { _id: requestId, state: 'REQUESTED' },
+    { $set: { state: 'APPROVED' } },
+  );
+  if (promoted.matchedCount === 0) {
+    // Somebody else moved the state after our signature landed. A concurrent
+    // approver reaching APPROVED first is the same outcome we wanted; anything
+    // else (rejected, executing) means this approval must not stand as applied.
+    const current = await LeagueFundingModel.findById(requestId).lean();
+    if (current?.state !== 'APPROVED') {
+      throw new LeagueFundingError(
+        `request is ${current?.state ?? 'gone'}, not approvable`,
+      );
+    }
+  }
   return { applied: true, approvals };
 }
 
@@ -194,7 +220,10 @@ export async function rejectLeagueFunding(
 ): Promise<void> {
   const moved = await LeagueFundingModel.updateOne(
     // Rejectable while requested OR approved: someone who signed off and then
-    // learned the TRC-20 never arrived must be able to stop it.
+    // learned the TRC-20 never arrived must be able to stop it. NOT while
+    // EXECUTING — past the claim the transfer may already be in the ledger,
+    // and a rejection that pretends to have stopped it would be a lie in the
+    // audit trail. Too late is an answer, and this returns it.
     { _id: requestId, state: { $in: ['REQUESTED', 'APPROVED'] } },
     { $set: { state: 'REJECTED', rejectedBy, rejectionReason: reason } },
   );
@@ -221,15 +250,38 @@ async function ensureInventory(leagueId: string): Promise<string> {
  * twice. The transfer itself enforces the clearing rules and refuses an
  * overdraft, which is what stops a cash-out draining an inventory that has
  * already been spent since the request was made.
+ *
+ * Three steps, and the ORDER is the safety:
+ *
+ *   1. CLAIM — one atomic CAS takes APPROVED → EXECUTING. From that moment a
+ *      reject can no longer land (it targets REQUESTED/APPROVED only), so the
+ *      old race — reject slipping in between "state is APPROVED" and the
+ *      transfer, then being buried under EXECUTED — cannot happen.
+ *   2. TRANSFER — idempotent on the request id.
+ *   3. MARK — EXECUTING → EXECUTED.
+ *
+ * The claim also accepts a request already EXECUTING: that is a retry resuming
+ * after a crash between steps 2 and 3, and the idempotency key makes the
+ * replayed transfer a no-op. A transfer that FAILS hands the claim back
+ * (EXECUTING → APPROVED) so the request is not stranded; if even that write is
+ * lost, EXECUTING remains resumable rather than stuck.
  */
 export async function executeLeagueFunding(
   requestId: string,
   treasuryAccountId: string,
+  executedBy: string,
 ): Promise<{ applied: boolean }> {
-  const req = await LeagueFundingModel.findById(requestId).lean();
-  if (!req) throw new LeagueFundingError(`no such request: ${requestId}`);
-  if (req.state !== 'APPROVED') {
-    throw new LeagueFundingError(`request is ${req.state}, not APPROVED`);
+  if (!executedBy) throw new LeagueFundingError('an executor is required');
+
+  const req = await LeagueFundingModel.findOneAndUpdate(
+    { _id: requestId, state: { $in: ['APPROVED', 'EXECUTING'] } },
+    { $set: { state: 'EXECUTING', executedBy } },
+    { new: true },
+  ).lean();
+  if (!req) {
+    const current = await LeagueFundingModel.findById(requestId).lean();
+    if (!current) throw new LeagueFundingError(`no such request: ${requestId}`);
+    throw new LeagueFundingError(`request is ${current.state}, not APPROVED`);
   }
 
   const inventory = await ensureInventory(req.leagueId);
@@ -240,19 +292,36 @@ export async function executeLeagueFunding(
       ? ([treasuryAccountId, inventory, LedgerType.LEAGUE_TOPUP] as const)
       : ([inventory, treasuryAccountId, LedgerType.LEAGUE_CASHOUT] as const);
 
-  const result = await transfer({
-    fromAccountId: from,
-    toAccountId: to,
-    amount,
-    type,
-    businessId: requestId,
-    // The request id, so a replayed execution is a no-op rather than a second
-    // movement — the same guard every other money path here uses.
-    idempotencyKey: `league:${req.kind.toLowerCase()}:${requestId}`,
-    metadata: { leagueId: req.leagueId, ...(req.address ? { address: req.address } : {}) },
-  });
+  let result: Awaited<ReturnType<typeof transfer>>;
+  try {
+    result = await transfer({
+      fromAccountId: from,
+      toAccountId: to,
+      amount,
+      type,
+      businessId: requestId,
+      // The request id, so a replayed execution is a no-op rather than a second
+      // movement — the same guard every other money path here uses.
+      idempotencyKey: `league:${req.kind.toLowerCase()}:${requestId}`,
+      metadata: { leagueId: req.leagueId, ...(req.address ? { address: req.address } : {}) },
+    });
+  } catch (err) {
+    // No money moved. Hand the claim back so the request can be re-executed or
+    // rejected — a failed transfer must not leave it wedged in EXECUTING.
+    await LeagueFundingModel.updateOne(
+      { _id: requestId, state: 'EXECUTING' },
+      { $set: { state: 'APPROVED' } },
+    ).catch(() => {
+      // The revert itself failing leaves EXECUTING, which the claim above
+      // accepts on retry. Recoverable either way; the original error matters more.
+    });
+    throw err;
+  }
 
-  await LeagueFundingModel.updateOne({ _id: requestId }, { $set: { state: 'EXECUTED' } });
+  await LeagueFundingModel.updateOne(
+    { _id: requestId, state: 'EXECUTING' },
+    { $set: { state: 'EXECUTED' } },
+  );
   return { applied: result.applied ?? true };
 }
 

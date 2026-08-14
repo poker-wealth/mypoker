@@ -23,9 +23,10 @@ import { moneyFromDecimal } from '@/lib/money';
  *
  * Top-up and cash-out are here now that the path behind them exists. Both are
  * requests, not transfers: the money moves at execution, after a separate
- * review, and a large top-up needs a second person. The UI mirrors that rather
- * than flattening it into a button — a confirm dialog that fires a transfer is
- * how one careless click empties a treasury.
+ * review, and a large movement in either direction needs a second person (W10:
+ * "top-up and cash-out workflow with second-person confirmation"). The UI
+ * mirrors that rather than flattening it into a button — a confirm dialog that
+ * fires a transfer is how one careless click empties a treasury.
  *
  * Every actor comes from the signed-in token server-side; nothing here names
  * an approver, because an approval the client fills in is not an approval.

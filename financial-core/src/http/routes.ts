@@ -1113,13 +1113,15 @@ export function buildRouter(): Router {
   );
 
   /** The only one that moves money. Separate from approval on purpose. */
+  const executeBody = z.object({ executedBy: z.string().min(1) });
   r.post(
     '/internal/league-funding/:id/execute',
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
+      const { executedBy } = executeBody.parse(req.body);
       const treasury = await AccountModel.findOne({ accountType: 'TREASURY' }).lean();
       if (!treasury) throw new ApiError(409, 'no treasury account');
-      res.json(await executeLeagueFunding(String(req.params.id), treasury._id));
+      res.json(await executeLeagueFunding(String(req.params.id), treasury._id, executedBy));
     }),
   );
 

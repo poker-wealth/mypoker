@@ -320,10 +320,11 @@ export function buildAdminRouter(config: GatewayConfig): Router {
     })),
   );
 
-  // The only one that moves money.
+  // The only one that moves money. The executor is named from the verified
+  // token, like every other actor here — the ledger records WHO ran it.
   r.post(
     '/league-funding/:id/execute',
-    post('/internal/league-funding/:id/execute', () => ({})),
+    post('/internal/league-funding/:id/execute', (req) => ({ executedBy: actor(req) })),
   );
 
   /** One player's full detail. Read-only — there is no write counterpart. */
