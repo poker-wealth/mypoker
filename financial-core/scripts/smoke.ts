@@ -154,7 +154,11 @@ async function main(): Promise<void> {
   check('winner paid 55 (jackpot 5 + rake 50): available 245', b7.available === 245, JSON.stringify(b7));
 
   console.log('8) Withdraw 100 — full lifecycle REQUESTED → APPROVED → BROADCASTING → CONFIRMED');
-  const wreq = await api('POST', '/me/withdrawals', { player: true, body: { amount: '100', address: 'TXaddr' } });
+  // §3.6: withdrawals go to the registered address, 48h after a change. Register it first; the smoke
+  // FC should run with WITHDRAWAL_ADDRESS_COOLDOWN_MS=0 so it's immediately withdrawable.
+  const waddr = 'TYgJ95nhTefUuoTYxEHvVCrfYvroGrSuSU';
+  await api('POST', '/me/withdrawal-address', { player: true, body: { address: waddr } });
+  const wreq = await api('POST', '/me/withdrawals', { player: true, body: { amount: '100', address: waddr } });
   const wid = wreq.json.withdrawalId as string;
   check('withdrawal REQUESTED', wreq.status === 201 && wreq.json.state === 'REQUESTED');
   const apv = await api('POST', `/internal/withdrawals/${wid}/approve`, { internal: true, body: { approverId: 'ops-smoke' } });

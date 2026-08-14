@@ -66,3 +66,13 @@ export function withdrawalConfirmations(): number {
   const n = Number(raw);
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : requiredConfirmations();
 }
+
+/**
+ * How long after a player CHANGES their withdrawal address before withdrawals to it are allowed
+ * (spec §3.6: 48h cooldown, so a compromised account can't immediately redirect funds). Env-tunable
+ * (ms) — set to 0 only in dev/tests where waiting 48h is impractical. Default 48h.
+ */
+export function withdrawalAddressCooldownMs(): number {
+  const n = Number(process.env.WITHDRAWAL_ADDRESS_COOLDOWN_MS ?? 172_800_000);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 172_800_000;
+}

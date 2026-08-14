@@ -17,6 +17,13 @@ import {
 } from '../withdrawal/withdrawal-state-machine';
 import { signAndBroadcastWithdrawal } from '../withdrawal/withdrawal-broadcast';
 import { evaluateCB4, evaluateCB5 } from '../circuit-breakers/breakers';
+import {
+  setWithdrawalAddress,
+  getWithdrawalAddress,
+  assertWithdrawableAddress,
+  withdrawableAt,
+  WithdrawalAddressError,
+} from '../withdrawal/withdrawal-address';
 import { getOrCreatePlayerAccount, ensureJackpotAccounts, ensureRakeAccount } from '../wallet/system-accounts';
 import { getInsuranceReserve } from '../wallet/insurance-reserve';
 import { getDepositAddress } from '../wallet/deposit-address';
@@ -738,6 +745,31 @@ export function buildRouter(): Router {
     }),
   );
 
+  // The player's registered withdrawal address + when it becomes withdrawable (48h after a change).
+  r.get(
+    '/me/withdrawal-address',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const rec = await getWithdrawalAddress(req.dataScope!.playerId);
+      if (!rec) {
+        res.json({ configured: false });
+        return;
+      }
+      res.json({ configured: true, address: rec.address, updatedAt: rec.updatedAt, withdrawableAt: withdrawableAt(rec) });
+    }),
+  );
+  const setAddressBody = z.object({ address: z.string().min(1) });
+  r.post(
+    '/me/withdrawal-address',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { address } = setAddressBody.parse(req.body);
+      if (!isValidTronAddress(address)) throw new ApiError(400, 'invalid TRON address');
+      const rec = await setWithdrawalAddress(req.dataScope!.playerId, address);
+      res.json({ address: rec.address, updatedAt: rec.updatedAt, withdrawableAt: withdrawableAt(rec) });
+    }),
+  );
+
   const withdrawalBody = z.object({ amount: money, address: z.string().min(1) });
   r.post(
     '/me/withdrawals',
@@ -748,6 +780,13 @@ export function buildRouter(): Router {
       // typo can never reach the broadcast step. (Reputation/anti-bot must NOT
       // gate withdrawals, iron rule #3; a checksum is address hygiene, not a gate.)
       if (!isValidTronAddress(address)) throw new ApiError(400, 'invalid TRON address');
+      // §3.6: withdrawals go only to the registered address, and only 48h after it was changed.
+      try {
+        await assertWithdrawableAddress(req.dataScope!.playerId, address);
+      } catch (e) {
+        if (e instanceof WithdrawalAddressError) throw new ApiError(403, e.message);
+        throw e;
+      }
       const acc = await getOrCreatePlayerAccount(req.dataScope!.playerId);
 
       // Automated withdrawal brakes (§CB4/CB5). These look ONLY at withdrawal-count anomalies —
