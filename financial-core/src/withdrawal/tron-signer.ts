@@ -88,11 +88,16 @@ export function addressToHex(base58Addr: string): string {
   return bytesToHex(decoded.slice(0, 21));
 }
 
-/** The hot wallet's own address (hex + base58), derived from its private key. */
-export function addressFromPrivateKey(privateKeyHex: string): { hex: string; base58: string } {
-  const priv = hexToBytes(privateKeyHex.replace(/^0x/, ''));
-  const pub = secp256k1.getPublicKey(priv, false); // uncompressed: 0x04 ‖ X ‖ Y
-  const body = keccak_256(pub.slice(1)).slice(-20);
+/**
+ * A secp256k1 uncompressed public key (65 bytes, `0x04‖X‖Y`) → its TRON address (hex `0x41‖20-byte`
+ * and base58check). Shared by every key backend so the address a signer reports is derived the exact
+ * same way whether the key is local or in KMS.
+ */
+export function tronAddressFromPublicKey(pubUncompressed: Uint8Array): { hex: string; base58: string } {
+  if (pubUncompressed.length !== 65 || pubUncompressed[0] !== 0x04) {
+    throw new Error('expected a 65-byte uncompressed secp256k1 public key (0x04‖X‖Y)');
+  }
+  const body = keccak_256(pubUncompressed.slice(1)).slice(-20);
   const addr = new Uint8Array(21);
   addr[0] = TRON_PREFIX;
   addr.set(body, 1);
@@ -101,6 +106,12 @@ export function addressFromPrivateKey(privateKeyHex: string): { hex: string; bas
   full.set(addr, 0);
   full.set(checksum, 21);
   return { hex: bytesToHex(addr), base58: base58.encode(full) };
+}
+
+/** The hot wallet's own address (hex + base58), derived from its private key. */
+export function addressFromPrivateKey(privateKeyHex: string): { hex: string; base58: string } {
+  const priv = hexToBytes(privateKeyHex.replace(/^0x/, ''));
+  return tronAddressFromPublicKey(secp256k1.getPublicKey(priv, false)); // uncompressed: 0x04‖X‖Y
 }
 
 /** ABI-encode `transfer(address to, uint256 amount)` — two 32-byte words, hex. */

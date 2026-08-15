@@ -25,6 +25,7 @@
     "watch:deposits": "ts-node scripts/deposit-watcher.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-kms": "^3.1111.0",
     "@noble/curves": "^1.9.7",
     "@noble/hashes": "^1.8.0",
     "@scure/base": "^1.2.6",

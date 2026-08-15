@@ -1,4 +1,6 @@
 import { LocalPrivateKeySigner, type TronSigner } from './tron-signer';
+import { KmsTronSigner } from './kms-signer';
+import { AwsKmsSignPort } from './aws-kms-port';
 import { hotWalletKey } from '../config/chain';
 
 /**
@@ -6,7 +8,7 @@ import { hotWalletKey } from '../config/chain';
  * the hot-wallet key lives; everything downstream sees only the {@link TronSigner} port.
  *
  *   - `AWS_KMS_CMK_ARN` set → the key never leaves AWS KMS; signing is a KMS API call (spec §3.4,
- *     the mainnet target). [wired in Phase 2 — see kms-signer.ts]
+ *     the mainnet target). `AWS_REGION` selects the region (else the SDK's default chain).
  *   - else `TRON_HOT_WALLET_KEY` set → a local private key in this process (the MVP / testnet path).
  *   - else → throw, so a misconfigured deploy fails loudly instead of silently being unable to pay out.
  *
@@ -16,9 +18,7 @@ import { hotWalletKey } from '../config/chain';
 export function signerFromEnv(): TronSigner {
   const kmsArn = process.env.AWS_KMS_CMK_ARN?.trim();
   if (kmsArn) {
-    // Phase 2 plugs the KMS signer in here, keyed by the ARN. Until then, fail clearly rather than
-    // silently fall back to a local key when an operator explicitly asked for KMS.
-    throw new Error('AWS_KMS_CMK_ARN is set but the KMS signer is not wired yet (Phase 2)');
+    return new KmsTronSigner(new AwsKmsSignPort(kmsArn, process.env.AWS_REGION?.trim() || undefined));
   }
 
   const key = hotWalletKey();
