@@ -205,6 +205,8 @@ export class PokerRoom implements LiveRoom {
 
   private phase: RoomPhase = 'WAITING';
   private game: TexasGame | undefined;
+  /** Device-generated client seeds players have supplied, applied to each hand's deal (§ provable fairness). */
+  private readonly pendingClientSeeds = new Map<string, string>();
   private handNumber = 0;
   private buttonSeat = -1;
   private actionDeadline: number | null = null;
@@ -401,9 +403,18 @@ export class PokerRoom implements LiveRoom {
       case 'answer_challenge':
         this.answerChallenge(playerId, cmd.passed, cmd.responseMs);
         break;
+      case 'set_client_seed':
+        this.setClientSeed(playerId, cmd.seed);
+        break;
       default:
         throw new RoomError('unknown command');
     }
+  }
+
+  /** A seated player supplies their device-generated client seed; it feeds every subsequent deal. */
+  private setClientSeed(playerId: string, seed: string): void {
+    if (!this.hasSeated(playerId)) throw new RoomError('take a seat before setting a client seed');
+    this.pendingClientSeeds.set(playerId, seed.toLowerCase());
   }
 
   private async sit(
@@ -645,6 +656,12 @@ export class PokerRoom implements LiveRoom {
       this.chainClient,
     );
     for (const seat of players) await game.seatPlayer(seat.playerId, seat.stack);
+    // Feed each player's own client seed into this deal before it commits (provable fairness). A seat
+    // that never supplied one falls back to a server seed inside the engine.
+    for (const seat of players) {
+      const seed = this.pendingClientSeeds.get(seat.playerId);
+      if (seed) game.setClientSeed(seat.playerId, seed);
+    }
     await game.startHand(buttonIndex);
 
     this.game = game;
