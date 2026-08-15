@@ -1,6 +1,7 @@
 import type {
   FinancialCoreClient,
   InsuranceReserveFacts,
+  JackpotAnomalyReport,
   JackpotPayoutRequest,
   SettleRoundRequest,
   SettlementReceipt,
@@ -54,6 +55,13 @@ export class ChipDenominatedFc implements FinancialCoreClient {
   jackpotPayout(req: JackpotPayoutRequest): Promise<{ applied: boolean }> {
     if (!this.inner.jackpotPayout) return Promise.resolve({ applied: false });
     return this.inner.jackpotPayout({ ...req, amount: chipsToUsdt(req.amount) });
+  }
+
+  reportJackpotAnomaly(req: JackpotAnomalyReport): Promise<void> {
+    // No money, no units — tableId + a count. Straight pass-through (no-op if the inner client,
+    // e.g. a demo fake, has no CB3 endpoint).
+    if (!this.inner.reportJackpotAnomaly) return Promise.resolve();
+    return this.inner.reportJackpotAnomaly(req);
   }
 
   insuranceReserve(ownerId: string): Promise<InsuranceReserveFacts> {

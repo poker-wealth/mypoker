@@ -847,10 +847,13 @@ export class PokerRoom implements LiveRoom {
     if (winnerProfit > 0) this.jackpot().inject(Math.round(winnerProfit * CHIPS_TO_MICROS));
 
     const seatIds = [...req.winners, ...req.losers].map((p) => p.playerAccountId);
-    const hits = this.jackpot().onRoundSettled({
+    const engine = this.jackpot();
+    const now = Date.now();
+    const wasFrozen = engine.isFrozen();
+    const hits = engine.onRoundSettled({
       roundId: req.roundId,
       seed: this.game?.roundInfo()?.finalSeed ?? req.roundId,
-      now: Date.now(),
+      now,
       candidates: seatIds.map((playerId) => ({
         playerId,
         baseWeight: 1,
@@ -858,6 +861,16 @@ export class PokerRoom implements LiveRoom {
         associated: false,
       })),
     });
+
+    // CB3 edge — the engine froze THIS round (three jackpots inside an hour on this table, a farming
+    // signature). It has already stopped paying locally; report it to FC so the freeze lands in the
+    // append-only security_log and pages ops. Fire-and-forget: a reporting hiccup must never disturb
+    // settlement, and the local freeze already holds regardless of whether the alert gets through.
+    if (!wasFrozen && engine.isFrozen() && this.fc.reportJackpotAnomaly) {
+      void this.fc
+        .reportJackpotAnomaly({ tableId: this.config.id, triggersLastHour: engine.triggersLastHour(now) })
+        .catch((err) => console.error('[room] CB3 anomaly report to FC failed:', err));
+    }
 
     const pools = this.jackpotAccountIds();
     for (const hit of hits) {
