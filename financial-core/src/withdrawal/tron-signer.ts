@@ -32,14 +32,48 @@ interface TronTx {
   [k: string]: unknown;
 }
 
+/**
+ * The signing seam. Every fund movement needs exactly two things from the hot wallet: its own
+ * address, and a signature over the transaction's txID (a 32-byte digest). Nothing else in the
+ * broadcast touches the key. So this is the ONLY interface a key backend has to implement — a local
+ * private key today, an AWS KMS / HSM key tomorrow — and the withdrawal machine never changes when
+ * the backend does. The private key literally cannot leak into the rest of the code, because the rest
+ * of the code only ever sees this port.
+ */
+export interface TronSigner {
+  /** The signing wallet's own address (hex `0x41‖20-byte` and base58check). May be cached. */
+  address(): Promise<{ hex: string; base58: string }>;
+  /**
+   * Sign a 32-byte txID (hex, no `0x`) → a 65-byte TRON signature hex: `r(32)‖s(32)‖recovery(1)`,
+   * where the recovery byte is `00` or `01`. TRON verifies the recovered pubkey against owner_address,
+   * so the recovery byte must be correct — a backend that cannot report recovery must search it.
+   */
+  signTxId(txIdHex: string): Promise<string>;
+}
+
+/** The local hot-wallet signer: a private key held in this process (the MVP backend). */
+export class LocalPrivateKeySigner implements TronSigner {
+  private readonly priv: string;
+  constructor(privateKeyHex: string) {
+    this.priv = privateKeyHex.replace(/^0x/, '');
+  }
+  async address(): Promise<{ hex: string; base58: string }> {
+    return addressFromPrivateKey(this.priv);
+  }
+  async signTxId(txIdHex: string): Promise<string> {
+    const sig = secp256k1.sign(txIdHex, this.priv);
+    return bytesToHex(sig.toCompactRawBytes()) + (sig.recovery === 1 ? '01' : '00');
+  }
+}
+
 export interface SignerConfig {
   /** e.g. https://nile.trongrid.io (testnet) or https://api.trongrid.io (mainnet). */
   apiUrl: string;
   apiKey: string;
   /** USDT TRC-20 contract, base58. */
   contractAddress: string;
-  /** Hot-wallet private key (hex, 32 bytes). The only online secret. */
-  privateKeyHex: string;
+  /** The key backend. The only thing here that ever touches a secret — and it is behind a port. */
+  signer: TronSigner;
   /** fee_limit in SUN (1 TRX = 1e6). A USDT transfer needs energy/bandwidth; 100 TRX is safe. */
   feeLimitSun?: number;
   fetchImpl?: typeof fetch;
@@ -96,7 +130,7 @@ export async function signAndBroadcastTransfer(
 ): Promise<string> {
   const doFetch = cfg.fetchImpl ?? fetch;
   const base = cfg.apiUrl.replace(/\/+$/, '');
-  const owner = addressFromPrivateKey(cfg.privateKeyHex);
+  const owner = await cfg.signer.address();
   const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (cfg.apiKey) headers['TRON-PRO-API-KEY'] = cfg.apiKey;
 
@@ -120,10 +154,9 @@ export async function signAndBroadcastTransfer(
   }
   const tx = built.transaction;
 
-  // 2. Sign the txID (sha256 of raw_data) locally — the only step that needs the secret.
-  const priv = cfg.privateKeyHex.replace(/^0x/, '');
-  const sig = secp256k1.sign(tx.txID, priv);
-  const signatureHex = bytesToHex(sig.toCompactRawBytes()) + (sig.recovery === 1 ? '01' : '00');
+  // 2. Sign the txID (sha256 of raw_data) — the only step that needs the secret, and it happens
+  //    behind the TronSigner port so the key backend (local / KMS / HSM) is invisible here.
+  const signatureHex = await cfg.signer.signTxId(tx.txID);
 
   // 3. Broadcast the signed transaction.
   const bcRes = await doFetch(`${base}/wallet/broadcasttransaction`, {

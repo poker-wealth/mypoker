@@ -1,4 +1,13 @@
-import { addressToHex, encodeTransfer, usdtToUnits, addressFromPrivateKey } from '../../src/withdrawal/tron-signer';
+import { secp256k1 } from '@noble/curves/secp256k1';
+import { keccak_256 } from '@noble/hashes/sha3';
+import { hexToBytes } from '@noble/hashes/utils';
+import {
+  addressToHex,
+  encodeTransfer,
+  usdtToUnits,
+  addressFromPrivateKey,
+  LocalPrivateKeySigner,
+} from '../../src/withdrawal/tron-signer';
 import { isValidTronAddress } from '../../src/wallet/tron-address';
 
 /**
@@ -37,5 +46,37 @@ describe('tron-signer', () => {
     expect(isValidTronAddress(a.base58)).toBe(true);
     expect(a.hex).toMatch(/^41[0-9a-f]{40}$/);
     expect(addressFromPrivateKey(key).base58).toBe(a.base58); // deterministic
+  });
+
+  describe('LocalPrivateKeySigner (the TronSigner port)', () => {
+    const key = 'da146374a75310b9666e834ee4ad0866d6f4035967bfc76217c5a495fff9f0d0';
+    // A stand-in txID: any 32-byte digest (TronGrid gives us sha256(raw_data) as the real one).
+    const txId = 'a'.repeat(64);
+
+    it('reports the same address as the raw key derivation', async () => {
+      const signer = new LocalPrivateKeySigner(key);
+      expect(await signer.address()).toEqual(addressFromPrivateKey(key));
+      // Tolerates a 0x prefix on the key, like the raw helper.
+      expect(await new LocalPrivateKeySigner(`0x${key}`).address()).toEqual(addressFromPrivateKey(key));
+    });
+
+    it('signs a txID into 65 bytes (r‖s‖recovery) whose recovery byte recovers the signer address', async () => {
+      const signer = new LocalPrivateKeySigner(key);
+      const sigHex = await signer.signTxId(txId);
+      // 32 + 32 + 1 bytes = 130 hex chars, recovery byte 00 or 01.
+      expect(sigHex).toHaveLength(130);
+      const recoveryByte = sigHex.slice(128);
+      expect(['00', '01']).toContain(recoveryByte);
+
+      // TRON accepts the transfer only if the pubkey recovered from (r,s,recovery) hashes to
+      // owner_address — so the recovery byte MUST be right. Reconstruct and verify it does.
+      const compact = hexToBytes(sigHex.slice(0, 128));
+      const recovery = Number.parseInt(recoveryByte, 16);
+      const sig = secp256k1.Signature.fromCompact(compact).addRecoveryBit(recovery);
+      const pub = sig.recoverPublicKey(txId).toRawBytes(false); // 0x04‖X‖Y
+      const recoveredBody = keccak_256(pub.slice(1)).slice(-20);
+      const expectedBody = addressToHex(addressFromPrivateKey(key).base58).slice(2); // drop 0x41
+      expect(Buffer.from(recoveredBody).toString('hex')).toBe(expectedBody);
+    });
   });
 });
