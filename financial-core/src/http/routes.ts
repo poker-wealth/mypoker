@@ -14,6 +14,7 @@ import {
   approveWithdrawal,
   broadcastWithdrawal,
   confirmWithdrawal,
+  rollbackWithdrawal,
 } from '../withdrawal/withdrawal-state-machine';
 import { signAndBroadcastWithdrawal } from '../withdrawal/withdrawal-broadcast';
 import { evaluateCB3, evaluateCB4, evaluateCB5 } from '../circuit-breakers/breakers';
@@ -40,6 +41,19 @@ import {
   type ReinsuranceScope,
 } from '../reinsurance/reinsurance-rules';
 import { getInsuranceReserve } from '../wallet/insurance-reserve';
+import { getOpsOverview } from '../ops/overview';
+import { getAdminPlayerDetail, getPlayerBalances } from '../ops/player-detail';
+import { getSecurityEvents } from '../ops/security-events';
+import { getWithdrawalQueue } from '../ops/withdrawal-queue';
+import { getLeagueOverview } from '../ops/league-overview';
+import {
+  requestTopUp,
+  requestCashOut,
+  approveLeagueFunding,
+  rejectLeagueFunding,
+  executeLeagueFunding,
+  pendingLeagueFunding,
+} from '../league/league-funding';
 import { getDepositAddress } from '../wallet/deposit-address';
 import { getWalletTransactions, getWithdrawals } from '../wallet/wallet-views';
 import { isValidTronAddress } from '../wallet/tron-address';
@@ -1204,6 +1218,214 @@ export function buildRouter(): Router {
     return w.state;
   }
 
+  /**
+   * The admin Overview's facts (SAMUEL.md task 3, screen 1).
+   *
+   * `internalAuth`, not a player token: this is platform-wide money, and the
+   * only caller is the gateway, which checks the administrator's role before
+   * asking. financial-core has no notion of who is an admin — that role lives
+   * with identity in the gateway — so the boundary here is "internal caller",
+   * and the boundary there is "is this person ops".
+   */
+  r.get(
+    '/internal/ops/overview',
+    internalAuth,
+    asyncHandler(async (_req: Request, res: Response) => {
+      res.json(await getOpsOverview());
+    }),
+  );
+
+  /**
+   * One player's account detail, for the admin Players screen.
+   *
+   * GET only, and there is deliberately no sibling that writes. "No balance
+   * editing from the UI — ever" is held by having nothing here that could:
+   * moving a player's money goes through the withdrawal and settlement paths,
+   * which are audited, idempotent and double-entry. A direct edit is none of
+   * those.
+   */
+  r.get(
+    '/internal/players/:playerId',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json(await getAdminPlayerDetail(String(req.params.playerId)));
+    }),
+  );
+
+  /**
+   * Recent security-log entries for the admin Alerts screen.
+   *
+   * Append-only and read-only: there is no route that edits or deletes one,
+   * which is the point of keeping an audit trail. An admin can acknowledge an
+   * alert in their own head; they cannot make it stop having happened.
+   */
+  const alertsQuery = z.object({ limit: z.coerce.number().int().positive().max(500).optional() });
+  r.get(
+    '/internal/ops/alerts',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { limit } = alertsQuery.parse(req.query);
+      res.json({ events: await getSecurityEvents(limit) });
+    }),
+  );
+
+  /**
+   * Every league with its inventory, rake and insurance (admin screen 4).
+   *
+   * Read-only. Top-up and cash-out move money between TREASURY and
+   * LEAGUE_INVENTORY; the clearing rules permit both and the ledger types
+   * exist, but nothing performs either yet. That is a separate money path.
+   */
+  r.get(
+    '/internal/ops/leagues',
+    internalAuth,
+    asyncHandler(async (_req: Request, res: Response) => {
+      res.json({ leagues: await getLeagueOverview() });
+    }),
+  );
+
+  /**
+   * League funding — request, review, execute (12-week plan, W10).
+   *
+   * Three endpoints because it is three decisions, and they are deliberately
+   * not collapsible: ops confirming a TRC-20 receipt is a judgment about the
+   * outside world, and it must be possible to reverse it before the ledger
+   * moves. See src/league/league-funding.ts.
+   *
+   * Every actor is named in the body. internalAuth proves the gateway is
+   * calling; it says nothing about WHICH administrator, and that is the entire
+   * content of an approval.
+   */
+  r.get(
+    '/internal/league-funding',
+    internalAuth,
+    asyncHandler(async (_req: Request, res: Response) => {
+      res.json({ requests: await pendingLeagueFunding() });
+    }),
+  );
+
+  const topUpBody = z.object({
+    leagueId: z.string().min(1),
+    amount: money,
+    requestedBy: z.string().min(1),
+  });
+  r.post(
+    '/internal/league-funding/top-ups',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const b = topUpBody.parse(req.body);
+      const id = await requestTopUp({
+        leagueId: b.leagueId,
+        amount: Money.fromDecimalString(b.amount),
+        requestedBy: b.requestedBy,
+      });
+      res.status(201).json({ requestId: id });
+    }),
+  );
+
+  const cashOutBody = topUpBody.extend({ address: z.string().min(1) });
+  r.post(
+    '/internal/league-funding/cash-outs',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const b = cashOutBody.parse(req.body);
+      const id = await requestCashOut({
+        leagueId: b.leagueId,
+        amount: Money.fromDecimalString(b.amount),
+        requestedBy: b.requestedBy,
+        address: b.address,
+      });
+      res.status(201).json({ requestId: id });
+    }),
+  );
+
+  const approverBody = z.object({ approvedBy: z.string().min(1) });
+  r.post(
+    '/internal/league-funding/:id/approve',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { approvedBy } = approverBody.parse(req.body);
+      res.json(await approveLeagueFunding(String(req.params.id), approvedBy));
+    }),
+  );
+
+  const rejectBody = z.object({ rejectedBy: z.string().min(1), reason: z.string().min(1).max(200) });
+  r.post(
+    '/internal/league-funding/:id/reject',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const b = rejectBody.parse(req.body);
+      await rejectLeagueFunding(String(req.params.id), b.rejectedBy, b.reason);
+      res.json({ ok: true });
+    }),
+  );
+
+  /** The only one that moves money. Separate from approval on purpose. */
+  const executeBody = z.object({ executedBy: z.string().min(1) });
+  r.post(
+    '/internal/league-funding/:id/execute',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { executedBy } = executeBody.parse(req.body);
+      const treasury = await AccountModel.findOne({ accountType: 'TREASURY' }).lean();
+      if (!treasury) throw new ApiError(409, 'no treasury account');
+      res.json(await executeLeagueFunding(String(req.params.id), treasury._id, executedBy));
+    }),
+  );
+
+  /** The withdrawal review queue (admin screen 2). */
+  r.get(
+    '/internal/ops/withdrawals',
+    internalAuth,
+    asyncHandler(async (_req: Request, res: Response) => {
+      res.json({ withdrawals: await getWithdrawalQueue() });
+    }),
+  );
+
+  /**
+   * Refuse a withdrawal and release any hold.
+   *
+   * rollbackWithdrawal already existed with no route — the state machine could
+   * refuse one, nothing could ask it to. From REQUESTED there is nothing held
+   * to release; from APPROVED the clearing hold returns to spendable, which is
+   * the part a player notices.
+   */
+  const rejectWithdrawalBody = z.object({
+    rejectedBy: z.string().min(1),
+    reason: z.string().min(1).max(200),
+  });
+  r.post(
+    '/internal/withdrawals/:id/reject',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const b = rejectWithdrawalBody.parse(req.body);
+      // The refusing administrator is recorded in the reason, since the
+      // withdrawal document has no rejectedBy field of its own.
+      await rollbackWithdrawal(String(req.params.id), `${b.reason} (refused by ${b.rejectedBy})`);
+      res.json({ state: await currentState(String(req.params.id)) });
+    }),
+  );
+
+  /** Balances for a set of players, for the admin search results list. */
+  const balancesBody = z.object({ playerIds: z.array(z.string().min(1)).max(100) });
+  r.post(
+    '/internal/players/balances',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { playerIds } = balancesBody.parse(req.body);
+      const balances = await getPlayerBalances(playerIds);
+      res.json({ balances: Object.fromEntries(balances) });
+    }),
+  );
+
+  /**
+   * Approve a withdrawal, as a named person (§3.6).
+   *
+   * `approverId` is required. `internalAuth` proves the caller is the gateway,
+   * not WHICH administrator is behind it — and which administrator is the whole
+   * content of a second signature. The gateway takes it from the admin's own
+   * token and passes it here; it is never read from a client-supplied body.
+   */
   const approveBody = z.object({ approverId: z.string().min(1) });
   r.post(
     '/internal/withdrawals/:id/approve',
