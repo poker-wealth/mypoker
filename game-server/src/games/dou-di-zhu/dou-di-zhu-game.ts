@@ -161,7 +161,7 @@ export class DouDiZhuGame extends BaseGame<DdzPhase, DdzAction, DdzGameEvents> {
     this.events.emit('landlordChosen', { landlord: best, bidPoints: this.bidPoints });
   }
 
-  play(playerId: string, cards: string[]): void {
+  async play(playerId: string, cards: string[]): Promise<void> {
     if (!this.sm.is('PLAYING')) throw new InvalidActionError('not in play');
     if (this.turn !== playerId) throw new InvalidActionError('not your turn');
     if (cards.length === 0 || new Set(cards).size !== cards.length) {
@@ -182,7 +182,7 @@ export class DouDiZhuGame extends BaseGame<DdzPhase, DdzAction, DdzGameEvents> {
     this.passes = 0;
 
     if (this.hands.get(playerId)!.length === 0) {
-      this.finish(playerId);
+      await this.finish(playerId);
     } else {
       this.advanceTurn();
     }
@@ -205,12 +205,18 @@ export class DouDiZhuGame extends BaseGame<DdzPhase, DdzAction, DdzGameEvents> {
     }
   }
 
-  private finish(winner: string): void {
+  private async finish(winner: string): Promise<void> {
     this.winner = winner;
     const stake = this.cfg.baseStake * this.bidPoints * this.multiplier;
     this.net = scoreDouDiZhu(winner === this.landlord, this.landlord!, this.players, stake);
     this.sm.transition('FINISHED');
-    void this.settle();
+    // AWAITED, like every other game here. This was `void this.settle()`, which
+    // made a financial-core outage an unhandled rejection: no caller could catch
+    // it, the hand still reported as finished, and in Node 15+ an unhandled
+    // rejection terminates the process — so a settlement failure at one Dou Di
+    // Zhu table took down the whole game server. A settlement test caught it on
+    // the first run by crashing the test runner.
+    await this.settle();
   }
 
   private async settle(): Promise<void> {
@@ -232,7 +238,9 @@ export class DouDiZhuGame extends BaseGame<DdzPhase, DdzAction, DdzGameEvents> {
 
   async handleAction(playerId: string, action: DdzAction): Promise<void> {
     if (action.type === 'bid') this.bid(playerId, action.points);
-    else if (action.type === 'play') this.play(playerId, action.cards);
+    // Awaited, or the fix one level down is undone here: a winning play settles,
+    // and an unawaited settle is the unhandled rejection this just removed.
+    else if (action.type === 'play') await this.play(playerId, action.cards);
     else if (action.type === 'pass') await this.pass(playerId);
     else throw new InvalidActionError('unknown action');
   }

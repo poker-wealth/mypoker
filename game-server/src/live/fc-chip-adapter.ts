@@ -65,12 +65,16 @@ export class ChipDenominatedFc implements FinancialCoreClient {
   }
 
   insuranceReserve(ownerId: string): Promise<InsuranceReserveFacts> {
+    // A client that cannot report the reserve reports EMPTY, never a guess. Zero
+    // is below §4's threshold, so the underwriter declines and no offer is made
+    // — the safe end of the only two ways this can be wrong. Inventing a balance
+    // here would let the platform underwrite more than it holds.
     if (!this.inner.insuranceReserve) {
       return Promise.resolve({ ownerId, insuranceBalance: '0', reinsuranceBalance: '0', todayPaidOut: '0' });
     }
-    // Insurance money is not wired for real until Day 5. These facts are USDT decimals and are read
-    // only by the placeholder insurance offer, which moves no money — so they pass through as-is and
-    // get chip-converted when the insurance premium/payout paths land.
+    // Passed through as the USDT decimal strings financial-core returns; the room
+    // converts to chips at the point of use (`chipsFromUsd`). Converting here as
+    // well would double-apply the rate.
     return this.inner.insuranceReserve(ownerId);
   }
 }
