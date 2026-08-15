@@ -242,7 +242,9 @@
     "notifyPromos": "优惠活动",
     "about": "关于",
     "signInToSync": "登录以同步您的偏好设置",
-    "account": "账户"
+    "account": "账户",
+    "soundOn": "音效开启",
+    "soundOff": "音效关闭"
   },
   "fairness": {
     "title": "公平性验证",

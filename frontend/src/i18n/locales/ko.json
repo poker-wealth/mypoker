@@ -242,7 +242,9 @@
     "notifyPromos": "프로모션",
     "about": "정보",
     "signInToSync": "로그인하면 설정이 동기화됩니다",
-    "account": "계정"
+    "account": "계정",
+    "soundOn": "소리 켜짐",
+    "soundOff": "소리 꺼짐"
   },
   "fairness": {
     "title": "공정성 검증",

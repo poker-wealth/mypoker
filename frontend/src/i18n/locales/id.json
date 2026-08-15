@@ -242,7 +242,9 @@
     "notifyPromos": "Promosi",
     "about": "Tentang",
     "signInToSync": "Masuk untuk menyinkronkan preferensi Anda",
-    "account": "Akun"
+    "account": "Akun",
+    "soundOn": "Suara aktif",
+    "soundOff": "Suara nonaktif"
   },
   "fairness": {
     "title": "Verifikasi keadilan",
