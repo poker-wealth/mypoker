@@ -31,7 +31,7 @@
     "colStatus": "स्थिति",
     "quickJoin": "तुरंत जुड़ें",
     "createPrivate": "निजी टेबल बनाएँ",
-    "noTables": "कोई मेल खाती टेबल नहीं",
+    "noTables": "अभी कोई टेबल खुली नहीं है",
     "noTablesBlurb": "कोई और स्टेक आज़माएँ।",
     "tabNotMapped": "अभी कॉन्फ़िगर नहीं",
     "tab": {
@@ -46,7 +46,11 @@
       "waiting": "प्रतीक्षा",
       "full": "भरा",
       "unavailable": "बंद"
-    }
+    },
+    "wait": "प्रतीक्षा",
+    "open": "खुला",
+    "onlyOpen": "केवल खाली सीट वाली टेबल",
+    "createSoon": "निजी टेबल अभी उपलब्ध नहीं हैं"
   },
   "games": {
     "searchPlaceholder": "गेम खोजें",
