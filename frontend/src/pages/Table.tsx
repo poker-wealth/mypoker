@@ -21,6 +21,8 @@ import { useSettings, useUpdateSettings } from '@/api/hooks';
 import { haptic } from '@/lib/telegram';
 import { ChallengeModal } from '@/components/poker/ChallengeModal';
 
+import { feltFor } from '@/components/games/registry';
+
 /**
  * The table screen.
  *
@@ -88,6 +90,7 @@ function LiveTable({ tableId }: { tableId: string }) {
   const seated = snapshot?.yourSeat != null;
   const mySeat = snapshot?.seats.find((s) => s.isYou);
   const playersReady = snapshot?.seats.filter((s) => s.status !== 'sittingout').length ?? 0;
+  const Felt = feltFor(tableId);
 
   return (
     <div
@@ -106,11 +109,15 @@ function LiveTable({ tableId }: { tableId: string }) {
       />
 
       <div className="flex flex-1 items-center px-3 relative">
-        <PokerTable
-          state={view}
-          {...(seated ? {} : { onSit: (seatIndex: number): void => setBuyInFor(seatIndex) })}
-          onChallenge={(playerId) => live.challenge(playerId)}
-        />
+        {Felt ? (
+          <Felt snapshot={snapshot} onCommand={(cmd) => live.command(cmd)} />
+        ) : (
+          <PokerTable
+            state={view}
+            {...(seated ? {} : { onSit: (seatIndex: number): void => setBuyInFor(seatIndex) })}
+            onChallenge={(playerId) => live.challenge(playerId)}
+          />
+        )}
         
         {/* Floating Chat Toggle Button */}
         <button
