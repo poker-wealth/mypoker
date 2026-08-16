@@ -9,6 +9,7 @@ import { buildAgentRouter } from './agent-routes';
 import { buildAdminRouter } from './admin-routes';
 import { buildMeRouter } from './me-routes';
 import { createRedEnvelopeRouter } from './red-envelope-routes';
+import { buildInternalRouter } from './internal-routes';
 import { mountLiveTables } from '../live/mount';
 import { defaultTables } from '../live/server';
 import type { LobbyService } from '../lobby';
@@ -38,6 +39,9 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
   app.use('/agent', buildAgentRouter(config));
   // Admin. Guarded to role 'ops' inside the router; deliberately NOT a product tab.
   app.use('/admin', buildAdminRouter(config));
+  // Service-to-service. Guarded by the shared internal secret, never a player
+  // token — this is financial-core asking, not a browser.
+  app.use('/internal', buildInternalRouter(config));
   // Public payout rates — open by design; the numbers exist to be checked.
   app.get('/fairness/rtp', (_req, res) => {
     void fetch(`${config.financialCoreUrl}/api/v1/fairness/rtp`)

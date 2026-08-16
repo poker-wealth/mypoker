@@ -28,6 +28,21 @@ export function tronApiKey(): string {
   return process.env.TRON_API_KEY ?? '';
 }
 
+/**
+ * The network as a player should see it on a receipt.
+ *
+ * Derived from the configured endpoint rather than hardcoded, so a testnet
+ * deployment cannot email someone a receipt that reads like mainnet. A
+ * deposit confirmation is a document people keep and forward to support;
+ * "TRC-20" alone, sent from Nile, would have them believing real funds moved.
+ */
+export function networkLabel(): string {
+  const url = tronApiUrl();
+  if (url.includes('nile')) return 'TRON Nile testnet (TRC-20)';
+  if (url.includes('shasta')) return 'TRON Shasta testnet (TRC-20)';
+  return 'TRON (TRC-20)';
+}
+
 /** The token contract the platform currently accepts (mainnet USDT by default). */
 export function usdtContract(): string {
   const v = process.env.USDT_TRC20_CONTRACT?.trim();
