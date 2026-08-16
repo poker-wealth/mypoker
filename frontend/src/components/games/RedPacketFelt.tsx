@@ -22,7 +22,7 @@ interface RedPacketRound {
 }
 
 export interface RedPacketFeltProps {
-  snapshot?: TableSnapshot;
+  snapshot?: TableSnapshot | null;
   onCommand?: (cmd: TableCommand) => void;
 }
 

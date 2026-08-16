@@ -26,7 +26,7 @@ interface NiuNiuRoundState {
 }
 
 export interface NiuNiuFeltProps {
-  snapshot?: TableSnapshot;
+  snapshot?: TableSnapshot | null;
   onCommand?: (cmd: TableCommand) => void;
 }
 
