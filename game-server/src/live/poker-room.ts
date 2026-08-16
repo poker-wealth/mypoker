@@ -2,6 +2,7 @@ import { EventBus } from '../core/event-bus';
 import type { FinancialCoreClient } from '../core/financial-core-client';
 import { FakeChainClient } from '../fairness';
 import type { ChainClient } from '../fairness';
+import type { RoundNotary } from '../fairness/round-notary';
 import { TexasGame } from '../games/texas/texas-game';
 import { variant, type PokerVariant } from '../games/texas/variants';
 import type { Action, SeatPublic, Street } from '../games/texas/betting';
@@ -105,6 +106,9 @@ export interface PokerRoomDeps {
   /** The ONLY route money takes. Play chips today, the Financial Core tomorrow. */
   fc: FinancialCoreClient;
   chain?: ChainClient;
+  /** Notarizes each settled round (hash → Merkle batch → on-chain). Absent → hands still play,
+   *  they just aren't published for verification (e.g. the standalone dev table server with no DB). */
+  notary?: RoundNotary;
 }
 
 export interface RoomClient {
@@ -185,6 +189,7 @@ export class PokerRoom implements LiveRoom {
   private readonly directory: PlayerDirectory;
   private readonly fc: FinancialCoreClient;
   private readonly chainClient: ChainClient;
+  private readonly notary: RoundNotary | undefined;
   private readonly spec: PokerVariant;
 
   private readonly seats: (RoomSeat | null)[];
@@ -200,6 +205,8 @@ export class PokerRoom implements LiveRoom {
 
   private phase: RoomPhase = 'WAITING';
   private game: TexasGame | undefined;
+  /** Device-generated client seeds players have supplied, applied to each hand's deal (§ provable fairness). */
+  private readonly pendingClientSeeds = new Map<string, string>();
   private handNumber = 0;
   private buttonSeat = -1;
   private actionDeadline: number | null = null;
@@ -248,6 +255,7 @@ export class PokerRoom implements LiveRoom {
     this.directory = deps.directory;
     this.fc = deps.fc;
     this.chainClient = deps.chain ?? new FakeChainClient();
+    this.notary = deps.notary;
     this.spec = variant(config.variantId);
     this.seats = Array.from({ length: config.maxSeats }, () => null);
     this.handFc = {
@@ -403,9 +411,18 @@ export class PokerRoom implements LiveRoom {
       case 'answer_challenge':
         this.answerChallenge(playerId, cmd.passed, cmd.responseMs);
         break;
+      case 'set_client_seed':
+        this.setClientSeed(playerId, cmd.seed);
+        break;
       default:
         throw new RoomError('unknown command');
     }
+  }
+
+  /** A seated player supplies their device-generated client seed; it feeds every subsequent deal. */
+  private setClientSeed(playerId: string, seed: string): void {
+    if (!this.hasSeated(playerId)) throw new RoomError('take a seat before setting a client seed');
+    this.pendingClientSeeds.set(playerId, seed.toLowerCase());
   }
 
   private async sit(
@@ -648,6 +665,12 @@ export class PokerRoom implements LiveRoom {
       this.chainClient,
     );
     for (const seat of players) await game.seatPlayer(seat.playerId, seat.stack);
+    // Feed each player's own client seed into this deal before it commits (provable fairness). A seat
+    // that never supplied one falls back to a server seed inside the engine.
+    for (const seat of players) {
+      const seed = this.pendingClientSeeds.get(seat.playerId);
+      if (seed) game.setClientSeed(seat.playerId, seed);
+    }
     await game.startHand(buttonIndex);
 
     this.game = game;
@@ -726,6 +749,10 @@ export class PokerRoom implements LiveRoom {
       this.message = this.describeResult(result);
     }
 
+    // Publish the round for verification — hash it, persist it, queue it on-chain. Fire-and-forget,
+    // off the hand's path (a chain/DB hiccup must never delay the showdown).
+    this.notarizeRound(game);
+
     this.phase = 'SHOWDOWN';
     this.push();
     this.showdownTimer = setTimeout(() => {
@@ -755,6 +782,32 @@ export class PokerRoom implements LiveRoom {
     this.maybeStartHand();
   }
 
+  /**
+   * Publish a settled round for provable-fairness verification — off the critical path, never throws
+   * into the hand. The `cards` bound into the round hash are the FULL deck derived from finalSeed,
+   * which is exactly what the verifier re-derives and checks (step 4/5).
+   */
+  private notarizeRound(game: TexasGame): void {
+    const notary = this.notary;
+    if (!notary) return;
+    const round = game.roundInfo();
+    if (!round) return;
+    const cards = this.spec.deckFor(round.finalSeed);
+    void notary
+      .notarize({
+        roundId: round.roundId,
+        serverCommit: round.serverCommit,
+        serverSeed: round.serverSeed,
+        allClientSeeds: round.allClientSeeds,
+        seatedClientSeeds: round.seats,
+        futureBlockHash: round.futureBlockHash,
+        finalSeed: round.finalSeed,
+        cards,
+        timestamp: Date.now(),
+      })
+      .catch((err) => console.error('[notary] round not notarized:', (err as Error).message));
+  }
+
   /** Give a seat's chips back and empty the chair. */
   private async releaseSeat(index: number): Promise<void> {
     const seat = this.seats[index];
@@ -766,24 +819,7 @@ export class PokerRoom implements LiveRoom {
 
   // ── Snapshots ───────────────────────────────────────────────────────────────
 
-  /** The table as `playerId` is allowed to see it. Their hole cards; nobody else's. */
-  /**
-   * The insurance offer for one viewer, or null.
-   *
-   * Eligibility is the engine's rule (exactly two all-in, board of 3 or 4), and
-   * it is asked rather than re-derived here — a second definition of "when
-   * insurance applies" would drift from the one the underwriter uses.
-   *
-   * Returns null for everyone except the two all-in players. A spectator or a
-   * folded seat seeing an offer would leak that two people are all-in before the
-   * table shows it.
-   *
-   * PLACEHOLDER RESERVE. The pool balances below are fixed figures, not the real
-   * INSURANCE and REINSURANCE accounts in financial-core. Quoting against a made
-   * up reserve is fine on a testnet staging build and NOT fine against real
-   * money: this must read the live pools before insurance is enabled for real
-   * funds, or the platform can underwrite more than it holds.
-   */
+  /** The four pool account ids for this table, by tier. */
   private jackpotAccountIds(): { mini: string; minor: string; major: string; grand: string } {
     const id = this.config.id;
     return { mini: `jp:${id}:mini`, minor: `jp:${id}:minor`, major: `jp:${id}:major`, grand: `jp:${id}:grand` };
@@ -820,10 +856,13 @@ export class PokerRoom implements LiveRoom {
     if (winnerProfit > 0) this.jackpot().inject(Math.round(winnerProfit * CHIPS_TO_MICROS));
 
     const seatIds = [...req.winners, ...req.losers].map((p) => p.playerAccountId);
-    const hits = this.jackpot().onRoundSettled({
+    const engine = this.jackpot();
+    const now = Date.now();
+    const wasFrozen = engine.isFrozen();
+    const hits = engine.onRoundSettled({
       roundId: req.roundId,
       seed: this.game?.roundInfo()?.finalSeed ?? req.roundId,
-      now: Date.now(),
+      now,
       candidates: seatIds.map((playerId) => ({
         playerId,
         baseWeight: 1,
@@ -831,6 +870,16 @@ export class PokerRoom implements LiveRoom {
         associated: false,
       })),
     });
+
+    // CB3 edge — the engine froze THIS round (three jackpots inside an hour on this table, a farming
+    // signature). It has already stopped paying locally; report it to FC so the freeze lands in the
+    // append-only security_log and pages ops. Fire-and-forget: a reporting hiccup must never disturb
+    // settlement, and the local freeze already holds regardless of whether the alert gets through.
+    if (!wasFrozen && engine.isFrozen() && this.fc.reportJackpotAnomaly) {
+      void this.fc
+        .reportJackpotAnomaly({ tableId: this.config.id, triggersLastHour: engine.triggersLastHour(now) })
+        .catch((err) => console.error('[room] CB3 anomaly report to FC failed:', err));
+    }
 
     const pools = this.jackpotAccountIds();
     for (const hit of hits) {
@@ -904,6 +953,23 @@ export class PokerRoom implements LiveRoom {
     return this.reserve;
   }
 
+  /**
+   * The insurance offer for one viewer, or null.
+   *
+   * Eligibility is the engine's rule (exactly two all-in, board of 3 or 4), and
+   * it is asked rather than re-derived here — a second definition of "when
+   * insurance applies" would drift from the one the underwriter uses.
+   *
+   * Returns null for everyone except the two all-in players. A spectator or a
+   * folded seat seeing an offer would leak that two people are all-in before the
+   * table shows it.
+   *
+   * Quotes are arithmetic on the LIVE pool (`currentReserve`), never a fixed
+   * figure. Every way that read can fail — no reserve yet, a stale one, an
+   * unreadable financial-core, a pool of zero — ends at no offer rather than at
+   * a guess, which is also how §4's auto-disable rule is enforced: a reserve
+   * under threshold cannot produce a quote.
+   */
   private insuranceFor(playerId: string, engine: EnginePublicState | null): InsuranceOffer | null {
     if (!engine || this.phase !== 'IN_HAND') return null;
 
@@ -947,6 +1013,7 @@ export class PokerRoom implements LiveRoom {
     return { ...result.quote, expiresInSeconds: 10 };
   }
 
+  /** The table as `playerId` is allowed to see it. Their hole cards; nobody else's. */
   snapshotFor(playerId: string): TableSnapshot {
     const live = this.phase === 'IN_HAND' || this.phase === 'SHOWDOWN';
     const engine = live && this.game ? (this.game.getPublicState(playerId) as EnginePublicState) : null;

@@ -28,6 +28,7 @@
     "start:tables": "node -e \"require('dotenv').config();require('./dist/live/server').startFromEnv()\""
   },
   "dependencies": {
+    "@noble/curves": "^1.9.7",
     "bcrypt": "^6.0.0",
     "dotenv": "^16.4.7",
     "express": "^5.2.1",

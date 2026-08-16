@@ -76,6 +76,16 @@ export interface FinancialCoreClient {
   /** Insurance reserve facts for one system (PLATFORM or a leagueId).
    *  Optional for the same reason; a room without it offers no insurance. */
   insuranceReserve?(ownerId: string): Promise<InsuranceReserveFacts>;
+  /** Report a table's jackpot anomaly (CB3) so FC records it in the append-only security_log and
+   *  pages ops. The engine has already frozen the table locally; this is the alert side.
+   *  Optional so demo/test fakes need not implement it. */
+  reportJackpotAnomaly?(req: JackpotAnomalyReport): Promise<void>;
+}
+
+export interface JackpotAnomalyReport {
+  tableId: string;
+  /** Triggers observed on this table in the last hour — the CB3 metric (freezes at ≥3). */
+  triggersLastHour: number;
 }
 
 export interface InsuranceReserveFacts {
@@ -180,6 +190,10 @@ export class HttpFinancialCoreClient implements FinancialCoreClient {
       }
     }
     return result;
+  }
+
+  async reportJackpotAnomaly(req: JackpotAnomalyReport): Promise<void> {
+    await this.post('/internal/circuit-breakers/cb3', req);
   }
 
   async settleTableHand(

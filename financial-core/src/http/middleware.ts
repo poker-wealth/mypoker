@@ -11,6 +11,7 @@ import {
 } from '../wallet/errors';
 import { alertOps } from '../lib/alert';
 import { LeagueError } from '../league/league-store';
+import { LeagueFundingError } from '../league/league-funding';
 import { AgentError } from '../agent/agent-store';
 
 // Attach the verified scope to the request (leagueId comes ONLY from here, never the body).
@@ -98,6 +99,17 @@ export function errorHandler(
     return;
   }
   if (err instanceof LeagueError) {
+    res.status(409).json({ error: err.message });
+    return;
+  }
+  // Same reasoning, and it was missed: every league-funding refusal — the 24h
+  // cash-out cooldown, "request is not awaiting approval", "request is
+  // REJECTED, not approvable" — was falling through to the 500 below. Two
+  // things were wrong with that. The caller got `internal_error` instead of the
+  // reason, so an admin who hit the cooldown could not be told to come back in
+  // six hours; and every ordinary refusal fired an ops alert, which is how a
+  // pager gets ignored.
+  if (err instanceof LeagueFundingError) {
     res.status(409).json({ error: err.message });
     return;
   }

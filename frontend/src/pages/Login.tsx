@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mail, Phone, Lock, ChevronLeft, User, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, ChevronLeft, User, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useSession } from '@/store/session';
 import { GoogleAuthButton } from '@/components/GoogleAuthButton';
@@ -11,7 +11,6 @@ export function Login() {
   const { signInWithEmail, signUpWithEmail } = useSession();
   
   const [view, setView] = useState<'initial' | 'login' | 'signup'>('initial');
-  const [authMode, setAuthMode] = useState<'email' | 'phone'>('email');
   
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -112,23 +111,19 @@ export function Login() {
                     </h2>
                   </div>
 
-                  {/* Toggle between Email and Phone mode */}
-                  <div className="flex rounded-lg border border-border bg-black/30 p-0.5 text-xs font-medium">
-                    <button
-                      type="button"
-                      onClick={() => setAuthMode('email')}
-                      className={`px-2.5 py-1 rounded-md transition-colors ${authMode === 'email' ? 'bg-brand text-white font-bold' : 'text-dim hover:text-text'}`}
-                    >
-                      Email
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAuthMode('phone')}
-                      className={`px-2.5 py-1 rounded-md transition-colors ${authMode === 'phone' ? 'bg-brand text-white font-bold' : 'text-dim hover:text-text'}`}
-                    >
-                      Phone
-                    </button>
-                  </div>
+                  {/* The Email/Phone toggle is gone. It changed the label, the
+                      icon and the placeholder — and then asked for a PASSWORD.
+                      Nobody who taps "Phone" expects to invent a password; they
+                      expect an SMS code, and there is no OTP flow behind it.
+
+                      Removed rather than built, per SAMUEL.md's "either build
+                      the real OTP flow or remove the phone option so nothing
+                      misleads a user": real OTP needs an SMS provider, which is
+                      an owner dependency nobody has arranged.
+
+                      The backend still matches on phone (auth/user-store.ts), so
+                      when OTP is funded this comes back as a real second method
+                      rather than a relabelled first one. */}
                 </div>
 
                 <form onSubmit={handleAuth} className="flex flex-col gap-3.5">
@@ -154,19 +149,19 @@ export function Login() {
 
                   <div className="space-y-1">
                     <label className="text-xs font-semibold text-dim ml-1">
-                      {authMode === 'email' ? 'Email Address' : 'Phone Number'}
+                      Email Address
                     </label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 grid w-10 place-items-center text-dim">
-                        {authMode === 'email' ? <Mail size={16} /> : <Phone size={16} />}
+                        <Mail size={16} />
                       </div>
                       <input
-                        type={authMode === 'email' ? 'email' : 'tel'}
+                        type="email"
                         required
                         value={identifier}
                         onChange={(e) => setIdentifier(e.target.value)}
                         className="h-11 w-full rounded-xl border border-border bg-black/40 pl-10 pr-4 text-sm text-text placeholder:text-dim focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
-                        placeholder={authMode === 'email' ? 'you@example.com' : '+1 (555) 000-0000'}
+                        placeholder="you@example.com"
                       />
                     </div>
                   </div>

@@ -83,8 +83,15 @@ describe('full-game regression — money is conserved in every game', () => {
     g.placeBet('p2', 'banker', 100);
     g.placeBet('p3', 'player', 50);
     await g.start();
-    // A tie can leave every net at zero — only assert conservation when money actually moved.
-    if (captured.length) expectConserved(captured[0]!, 'baccarat');
+    // A tie (~9.5% of deals) pays player/banker bets zero, so every net is zero
+    // — and the game still SENDS the settlement, just an empty one. Guarding on
+    // "was a request sent" is therefore not enough: this test failed roughly one
+    // run in ten for exactly that reason. Assert conservation only when the hand
+    // actually moved money.
+    const req = captured[0];
+    if (req && (req.winners.length > 0 || req.losers.length > 0)) {
+      expectConserved(req, 'baccarat');
+    }
   });
 
   it('San Zhang (player-banked)', async () => {
@@ -126,7 +133,12 @@ describe('full-game regression — money is conserved in every game', () => {
     g.placeBet('p3', 'COWBOY', 100);
     await g.freeze();
     await g.start();
-    if (captured.length) expectConserved(captured[0]!, 'cowboy-beauty'); // a tie voids the round
+    // Same shape as Baccarat: a tie voids the round, which may reach us as no
+    // request OR as an empty one. Either way there is no conservation to check.
+    const req = captured[0];
+    if (req && (req.winners.length > 0 || req.losers.length > 0)) {
+      expectConserved(req, 'cowboy-beauty');
+    }
   });
 
   it('Lottery (pari-mutuel)', async () => {

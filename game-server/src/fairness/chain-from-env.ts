@@ -3,7 +3,9 @@ import type { ChainClient } from './chain';
 import { FakeChainClient } from './chain';
 import { SolanaChainClient, keypairFromJson, addressOf } from './solana-client';
 import { ResilientChainClient } from './resilient-chain';
-import { FakeNotary } from './notary';
+import { FakeNotary, type NotaryClient } from './notary';
+import { PolygonChainClient, httpEvmRpc } from './polygon-client';
+import { Rfc3161Notary } from './rfc3161-notary';
 
 /**
  * The chain client the process should actually use, decided once at boot.
@@ -53,9 +55,21 @@ export function chainClientFromEnv(env: NodeJS.ProcessEnv = process.env): ChainC
   const keypair = keypairFromJson(json);
 
   console.log(`[chain] Solana notary active — ${rpcUrl} as ${addressOf(keypair)}`);
-  return new ResilientChainClient(
-    new SolanaChainClient(rpcUrl, keypair),
-    new UnconfiguredChain('polygon'),
-    new FakeNotary(),
-  );
+
+  // L2 — Polygon, when a funded notary key + RPC are configured; else the decline stub, so the ladder
+  // simply skips to L3. Off the critical path, and a fallback anyway, so a bad config degrades safely.
+  const polyUrl = env.POLYGON_RPC_URL?.trim();
+  const polyKey = env.POLYGON_NOTARY_KEY?.trim();
+  const polygon: ChainClient =
+    polyUrl && polyKey
+      ? new PolygonChainClient(httpEvmRpc(polyUrl), polyKey, Number(env.POLYGON_CHAIN_ID ?? 137))
+      : new UnconfiguredChain('polygon');
+  console.log(`[chain] L2 Polygon: ${polyUrl && polyKey ? 'active' : 'unconfigured (degrades to L3)'}`);
+
+  // L3 — a real RFC 3161 TSA when configured; else the deterministic dev notary.
+  const tsaUrl = env.RFC3161_TSA_URL?.trim();
+  const notary: NotaryClient = tsaUrl ? new Rfc3161Notary(tsaUrl) : new FakeNotary();
+  console.log(`[chain] L3 RFC-3161: ${tsaUrl ? `active (${tsaUrl})` : 'dev notary'}`);
+
+  return new ResilientChainClient(new SolanaChainClient(rpcUrl, keypair), polygon, notary);
 }

@@ -4,7 +4,8 @@ import { WithdrawalNotFoundError } from '../wallet/errors';
 import { WithdrawalModel } from './withdrawal.model';
 import { broadcastWithdrawal, rollbackWithdrawal } from './withdrawal-state-machine';
 import { signAndBroadcastTransfer, usdtToUnits, type SignerConfig } from './tron-signer';
-import { hotWalletKey, tronApiUrl, tronApiKey, usdtContract, withdrawalFeeLimitSun } from '../config/chain';
+import { signerFromEnv } from './signer-from-env';
+import { tronApiUrl, tronApiKey, usdtContract, withdrawalFeeLimitSun } from '../config/chain';
 
 /**
  * The on-chain leg of a withdrawal: turn an APPROVED withdrawal (funds already held in clearing) into
@@ -13,15 +14,13 @@ import { hotWalletKey, tronApiUrl, tronApiKey, usdtContract, withdrawalFeeLimitS
  * reviewable, and so the hot key is only imported here.
  */
 
-/** Build the signer config from the environment. Throws if no hot-wallet key is provisioned yet. */
+/** Build the signer config from the environment. Throws if no key backend is provisioned yet. */
 export function signerConfigFromEnv(): SignerConfig {
-  const key = hotWalletKey();
-  if (!key) throw new Error('TRON_HOT_WALLET_KEY is not set — withdrawals cannot be broadcast');
   return {
     apiUrl: tronApiUrl(),
     apiKey: tronApiKey(),
     contractAddress: usdtContract(),
-    privateKeyHex: key,
+    signer: signerFromEnv(),
     feeLimitSun: withdrawalFeeLimitSun(),
   };
 }

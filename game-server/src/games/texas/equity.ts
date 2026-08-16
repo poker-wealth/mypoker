@@ -1,5 +1,5 @@
 import { standardDeck } from '../../fairness/shuffle';
-import { evaluateBest, compareHands } from './hand-evaluator';
+import { scoreStandard } from './equity-fast';
 
 /**
  * Hand equity by exhaustive enumeration of the cards still to come.
@@ -49,15 +49,27 @@ export function computeEquity(
   let ties = 0;
   let losses = 0;
   let total = 0;
+  // Reused 7-card hands: hole + board are fixed, so we push the runout, evaluate, then truncate back —
+  // instead of spreading three fresh arrays per runout (990× on the flop). bestRankStandard is the
+  // allocation-free equivalent of evaluateBest under standard rules, proven byte-identical in
+  // equity-fast.test.ts. Together these took the flop quote from ~1.3s (event-loop-blocking) to <30ms.
+  const handA = [insured[0]!, insured[1]!, ...board];
+  const handB = [opponent[0]!, opponent[1]!, ...board];
+  const baseLen = 2 + board.length;
   for (const runout of combinations(remaining, toCome)) {
-    const fullBoard = [...board, ...runout];
-    const a = evaluateBest([...insured, ...fullBoard]);
-    const b = evaluateBest([...opponent, ...fullBoard]);
-    const cmp = compareHands(a, b);
-    if (cmp > 0) wins++;
-    else if (cmp < 0) losses++;
+    for (let k = 0; k < runout.length; k++) {
+      handA.push(runout[k]!);
+      handB.push(runout[k]!);
+    }
+    // Packed integer scores that total-order exactly as compareHands — no per-runout object/array.
+    const sa = scoreStandard(handA);
+    const sb = scoreStandard(handB);
+    if (sa > sb) wins++;
+    else if (sa < sb) losses++;
     else ties++;
     total++;
+    handA.length = baseLen;
+    handB.length = baseLen;
   }
   return { wins, ties, losses, total, lossProbability: total === 0 ? 0 : losses / total };
 }

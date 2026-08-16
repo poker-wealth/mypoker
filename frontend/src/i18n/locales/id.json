@@ -30,8 +30,8 @@
     "colBuyIn": "Buy-in",
     "colStatus": "Status",
     "quickJoin": "Gabung cepat",
-    "createPrivate": "Buat meja privat",
-    "noTables": "Tidak ada meja yang cocok",
+    "createPrivate": "BUAT MEJA PRIBADI",
+    "noTables": "Belum ada meja yang terbuka",
     "noTablesBlurb": "Coba level taruhan lain.",
     "tabNotMapped": "Belum dikonfigurasi",
     "tab": {
@@ -46,7 +46,11 @@
       "waiting": "Tunggu",
       "full": "Penuh",
       "unavailable": "Tutup"
-    }
+    },
+    "wait": "TUNGGU",
+    "open": "BUKA",
+    "onlyOpen": "Hanya meja dengan kursi kosong",
+    "createSoon": "Meja pribadi belum tersedia"
   },
   "games": {
     "searchPlaceholder": "Cari game",
@@ -242,7 +246,9 @@
     "notifyPromos": "Promosi",
     "about": "Tentang",
     "signInToSync": "Masuk untuk menyinkronkan preferensi Anda",
-    "account": "Akun"
+    "account": "Akun",
+    "soundOn": "Suara aktif",
+    "soundOff": "Suara nonaktif"
   },
   "fairness": {
     "title": "Verifikasi keadilan",

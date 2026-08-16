@@ -251,6 +251,8 @@ export const tableCommandSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('challenge'), targetId: z.string() }),
   /** Answer a challenge. */
   z.object({ kind: z.literal('answer_challenge'), passed: z.boolean(), responseMs: z.number().nonnegative() }),
+  /** Supply your own device-generated client seed (32 bytes hex) — your entropy for the shuffle. */
+  z.object({ kind: z.literal('set_client_seed'), seed: z.string().regex(/^[0-9a-f]{64}$/i) }),
 ]);
 
 export type TableCommand = z.infer<typeof tableCommandSchema>;

@@ -30,8 +30,8 @@
     "colBuyIn": "Buy-in",
     "colStatus": "Status",
     "quickJoin": "Quick join",
-    "createPrivate": "Create private table",
-    "noTables": "No tables match",
+    "createPrivate": "CREATE PRIVATE TABLE",
+    "noTables": "No tables open right now",
     "noTablesBlurb": "Try a different stake level.",
     "tabNotMapped": "Not configured yet",
     "tab": {
@@ -46,7 +46,11 @@
       "waiting": "Wait",
       "full": "Full",
       "unavailable": "Closed"
-    }
+    },
+    "wait": "WAIT",
+    "open": "OPEN",
+    "onlyOpen": "Only tables with a free seat",
+    "createSoon": "Private tables are not available yet"
   },
   "games": {
     "searchPlaceholder": "Search games",
@@ -242,7 +246,9 @@
     "notifyPromos": "Promotions",
     "about": "About",
     "account": "Account",
-    "signInToSync": "Sign in to sync your preferences"
+    "signInToSync": "Sign in to sync your preferences",
+    "soundOn": "Sound on",
+    "soundOff": "Sound off"
   },
   "fairness": {
     "title": "Fairness verification",

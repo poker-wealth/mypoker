@@ -88,7 +88,7 @@ describe('DouDiZhuGame — play & pass', () => {
   it('the landlord leads with a legal play; opponents can pass back', async () => {
     const g = await toPlay();
     const lead = [g.handOf('p0')![0]!]; // a single is always legal
-    g.play('p0', lead);
+    await g.play('p0', lead);
     expect(g.getTurn()).toBe('p1');
     await g.pass('p1');
     await g.pass('p2');
@@ -97,8 +97,10 @@ describe('DouDiZhuGame — play & pass', () => {
 
   it('rejects out-of-turn, not-in-hand, and leading-pass', async () => {
     const g = await toPlay();
-    expect(() => g.play('p1', [g.handOf('p1')![0]!])).toThrow(InvalidActionError); // not their turn
-    expect(() => g.play('p0', ['ZZ'])).toThrow(InvalidActionError); // card not in hand
+    // play is async now (it settles), so an illegal move REJECTS rather than
+    // throwing synchronously.
+    await expect(g.play('p1', [g.handOf('p1')![0]!])).rejects.toThrow(InvalidActionError);
+    await expect(g.play('p0', ['ZZ'])).rejects.toThrow(InvalidActionError); // card not in hand
     await expect(g.pass('p0')).rejects.toThrow(/cannot pass when leading/); // leader can't pass
   });
 });

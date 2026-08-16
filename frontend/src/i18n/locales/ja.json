@@ -31,7 +31,7 @@
     "colStatus": "状態",
     "quickJoin": "クイック参加",
     "createPrivate": "プライベートテーブル作成",
-    "noTables": "条件に合うテーブルがありません",
+    "noTables": "現在オープン中のテーブルはありません",
     "noTablesBlurb": "別のステークをお試しください。",
     "tabNotMapped": "まだ設定されていません",
     "tab": {
@@ -46,7 +46,11 @@
       "waiting": "待機",
       "full": "満席",
       "unavailable": "利用不可"
-    }
+    },
+    "wait": "待機",
+    "open": "参加可",
+    "onlyOpen": "空席のあるテーブルのみ",
+    "createSoon": "プライベートテーブルはまだ利用できません"
   },
   "games": {
     "searchPlaceholder": "ゲームを検索",
@@ -242,7 +246,9 @@
     "notifyPromos": "プロモーション",
     "about": "情報",
     "signInToSync": "ログインすると設定が同期されます",
-    "account": "アカウント"
+    "account": "アカウント",
+    "soundOn": "サウンド オン",
+    "soundOff": "サウンド オフ"
   },
   "fairness": {
     "title": "公平性の検証",

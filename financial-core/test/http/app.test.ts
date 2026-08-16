@@ -13,6 +13,9 @@ import { startTestDb, stopTestDb, clearCollections, ensureIndexes } from '../db-
 
 const INTERNAL_SECRET = 'test-internal-secret';
 const JWT_SECRET = 'test-jwt-secret';
+// A real, checksum-valid TRON address — /me/withdrawals now rejects malformed ones (§3.6 address
+// hygiene) before any state is created, so the old placeholder 'TXaddr' can no longer be used.
+const VALID_ADDRESS = 'TYgJ95nhTefUuoTYxEHvVCrfYvroGrSuSU';
 
 let server: Server;
 let base: string;
@@ -38,6 +41,9 @@ describe('Financial Core HTTP API (/api/v1)', () => {
   beforeAll(async () => {
     process.env.INTERNAL_API_SECRET = INTERNAL_SECRET;
     process.env.JWT_SECRET = JWT_SECRET;
+    // Disable the 48h address cooldown for the API tests: they register an address and withdraw to it
+    // in the same run. The cooldown itself is covered directly in withdrawal-address.test.ts.
+    process.env.WITHDRAWAL_ADDRESS_COOLDOWN_MS = '0';
     await startTestDb();
     await ensureIndexes(
       AccountModel,
@@ -109,8 +115,11 @@ describe('Financial Core HTTP API (/api/v1)', () => {
     expect(balRes.status).toBe(200);
     expect(await balRes.json()).toMatchObject({ playerId: 'p-api', available: '500.000000' });
 
-    // Player requests a withdrawal.
-    const wRes = await post('/me/withdrawals', { amount: '200', address: 'TXaddr' }, playerToken('p-api'));
+    // Player registers a withdrawal address (§3.6 — payouts go only to the registered address), then
+    // requests a withdrawal to it. Cooldown is disabled above, so it is withdrawable immediately.
+    const reg = await post('/me/withdrawal-address', { address: VALID_ADDRESS }, playerToken('p-api'));
+    expect(reg.status).toBe(200);
+    const wRes = await post('/me/withdrawals', { amount: '200', address: VALID_ADDRESS }, playerToken('p-api'));
     expect(wRes.status).toBe(201);
     expect(await wRes.json()).toMatchObject({ state: 'REQUESTED' });
   });
@@ -136,14 +145,17 @@ describe('Financial Core HTTP API (/api/v1)', () => {
     const bad = await post('/internal/buy-ins', { playerAccountId: 'x' }, internal); // missing amount
     expect(bad.status).toBe(400);
 
-    // Overdraft withdrawal → 409.
-    const res = await post('/me/withdrawals', { amount: '999', address: 'TXaddr' }, playerToken('broke'));
+    // Overdraft withdrawal → 409. Register the address first so the request passes the §3.6 address
+    // gate and reaches the balance check (the point under test) rather than being rejected at 400.
+    await post('/me/withdrawal-address', { address: VALID_ADDRESS }, playerToken('broke'));
+    const res = await post('/me/withdrawals', { amount: '999', address: VALID_ADDRESS }, playerToken('broke'));
     expect(res.status).toBe(409);
   });
 
   it('runs the internal settlement endpoint', async () => {
-    // Fund a winner account directly, create treasury + jackpot pools, then settle.
-    const winner = await AccountModel.create({
+    // Fund a winner account directly, create treasury + jackpot pools, then settle. The settlement
+    // route resolves the winner by playerId (owner_id) → account, so the body passes 'w', not the _id.
+    await AccountModel.create({
       accountType: 'PLAYER',
       ownerId: 'w',
       availableBalance: Decimal128.fromString('1000'),
@@ -160,7 +172,7 @@ describe('Financial Core HTTP API (/api/v1)', () => {
       {
         roundId: 'r-api-1',
         tableType: 'PLATFORM',
-        winnerAccountId: winner._id,
+        winnerAccountId: 'w',
         winnerProfit: '1000',
         rake: '50',
         jackpotAccounts: pools,
@@ -182,8 +194,10 @@ describe('Financial Core HTTP API (/api/v1)', () => {
           lockedBalance: Decimal128.fromString(lockedAmt),
         })
       )._id;
-    const p0 = await mk('tp0', '1000');
-    const p1 = await mk('tp1', '1000');
+    // Fund each seat's locked balance; the route resolves parties by playerId (owner_id) → account,
+    // so the body passes the owner ids ('tp0'/'tp1'), not the account _ids.
+    await mk('tp0', '1000');
+    await mk('tp1', '1000');
     await AccountModel.create({ accountType: 'TREASURY', ownerId: 'PLATFORM' });
     const pool = async (t: string): Promise<string> =>
       (await AccountModel.create({ accountType: t, ownerId: 'tt' }))._id;
@@ -193,8 +207,8 @@ describe('Financial Core HTTP API (/api/v1)', () => {
       {
         roundId: 'rt-1',
         tableType: 'PLATFORM',
-        losers: [{ playerAccountId: p1, amount: '1000' }],
-        winners: [{ playerAccountId: p0, amount: '950' }],
+        losers: [{ playerAccountId: 'tp1', amount: '1000' }],
+        winners: [{ playerAccountId: 'tp0', amount: '950' }],
         rake: '50',
         jackpot: { mini: '0', minor: '0', major: '0', grand: '0' },
         jackpotAccounts: {

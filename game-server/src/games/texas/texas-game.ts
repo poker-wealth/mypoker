@@ -70,6 +70,8 @@ export class TexasGame extends BaseGame<TexasPhase, Action, TexasGameEvents> {
   readonly maxPlayers = 9;
 
   private readonly table: Seat[] = [];
+  /** Device-generated client seeds a player has supplied, applied to each subsequent hand. */
+  private readonly clientSeeds = new Map<string, string>();
   private readonly cfg: TexasGameConfig;
   private readonly chain: ChainClient;
   private hand: TexasHand | undefined;
@@ -101,6 +103,23 @@ export class TexasGame extends BaseGame<TexasPhase, Action, TexasGameEvents> {
     this.table.push({ id: playerId, stack: chips });
   }
 
+  /**
+   * A player supplies their own device-generated client seed for their entropy contribution to the
+   * shuffle (provable fairness — the platform must not choose the randomness a player relies on).
+   * Applied to every subsequent hand until changed; a seat that supplies nothing falls back to a
+   * server-generated seed (until every client supplies one). Either way the seed used is published in
+   * roundInfo() for verification. Must be 32 bytes of hex.
+   */
+  setClientSeed(playerId: string, seed: string): void {
+    if (!this.table.some((s) => s.id === playerId)) {
+      throw new InvalidActionError('not seated at this table');
+    }
+    if (!/^[0-9a-f]{64}$/i.test(seed)) {
+      throw new InvalidActionError('client seed must be 32 bytes of hex');
+    }
+    this.clientSeeds.set(playerId, seed.toLowerCase());
+  }
+
   /** Begin a hand with the currently seated players (BaseGame contract). */
   async start(_players: string[]): Promise<void> {
     await this.startHand(this.handCounter % Math.max(1, this.table.length));
@@ -112,9 +131,10 @@ export class TexasGame extends BaseGame<TexasPhase, Action, TexasGameEvents> {
 
     const roundId = `${this.roomId}-h${++this.handCounter}`;
     const { serverSeed, serverCommit } = generateServerCommitment();
-    const seats: SeatedClientSeed[] = this.table.map((_, i) => ({
+    // A player's supplied seed is their entropy; only if they gave none does the server generate one.
+    const seats: SeatedClientSeed[] = this.table.map((seat, i) => ({
       seatOrder: i,
-      clientSeed: generateClientSeed(),
+      clientSeed: this.clientSeeds.get(seat.id) ?? generateClientSeed(),
     }));
     const allClientSeeds = mergeClientSeeds(seats);
     const target = (await this.chain.getLatestBlockNumber()) + 1;

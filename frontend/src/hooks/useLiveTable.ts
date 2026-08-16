@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { TableSocket, type SocketStatus } from '@/api/tableSocket';
 import { TABLES_URL, TABLES_WS_URL } from '@/config';
 import { useSession } from '@/store/session';
+import { deviceClientSeed } from '@/lib/clientSeed';
 import type { LiveSeat, TableCommand, TableSnapshot } from '@/lib/liveTable';
 import type { Seat, SeatStatus, Street, TableState } from '@/lib/table';
 import type { PokerAction } from '@/components/poker/ActionBar';
@@ -156,6 +157,9 @@ export function useLiveTable(tableId: string): LiveTable {
         ...(player?.displayName ? { name: player.displayName.slice(0, 24) } : {}),
         ...(player?.photoUrl ? { avatarUrl: player.photoUrl } : {}),
       });
+      // Register this device's own client seed the moment we're seated, so every deal from here uses
+      // the player's entropy, not the server's. Stable per device; published back in the round data.
+      send({ kind: 'set_client_seed', seed: deviceClientSeed() });
     },
     [send, player?.displayName, player?.photoUrl],
   );

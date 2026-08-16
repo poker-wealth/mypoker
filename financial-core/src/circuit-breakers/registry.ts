@@ -3,9 +3,15 @@
  * for ALL SEVEN is implemented and tested in `breakers.ts` (evaluateCB1..CB7). Enforcement status:
  *   - CB6 — LIVE inline in transfer() (every fund movement) + standalone checker.
  *   - CB4, CB5 — LIVE, evaluated against the real withdrawals collection.
+ *   - CB1, CB2 — LIVE, evaluated on every insurance reserve read.
  *   - CB7 — logic complete; fires once the on-chain tx feed is wired.
- *   - CB1, CB2, CB3 — logic complete; fire once insurance/jackpot data feeds land.
+ *   - CB3 — logic complete; fires once the jackpot data feed lands.
  * Each trip writes a security_log entry and an ops alert.
+ *
+ * `status` is not decoration. The admin Overview renders a 'planned' breaker as
+ * "not running", so a stale entry here either advertises protection that is
+ * absent or conceals protection that is present. CB1 and CB2 sat at 'planned'
+ * after their feed landed, which is the second of those.
  */
 
 export interface CircuitBreaker {
@@ -24,16 +30,16 @@ export const CIRCUIT_BREAKERS: readonly CircuitBreaker[] = [
     name: 'Insurance pool level',
     trigger: 'INSURANCE balance < threshold (Platform $10k / League $1k)',
     action: 'Disable insurance sales (existing policies still pay out)',
-    status: 'planned',
-    activatesAt: 'Insurance milestone',
+    // Live: evaluated on every reserve read in wallet/insurance-reserve.ts.
+    status: 'live',
   },
   {
     id: 'CB2',
     name: 'Daily payout rate',
     trigger: "Today's INSURANCE→PLAYER total > 15% of INSURANCE balance",
     action: 'Suspend insurance for 24h',
-    status: 'planned',
-    activatesAt: 'Insurance milestone',
+    // Live: same reserve read as CB1.
+    status: 'live',
   },
   {
     id: 'CB3',

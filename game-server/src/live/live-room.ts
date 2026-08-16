@@ -1,6 +1,7 @@
 import type { PlayerDirectory } from './players';
 import type { FinancialCoreClient } from '../core/financial-core-client';
 import type { ChainClient } from '../fairness';
+import type { RoundNotary } from '../fairness/round-notary';
 import type { TableCommand, TableSnapshot, TableSummary } from './room-state';
 import type { GameId } from '../lobby/game-catalog';
 
@@ -26,6 +27,9 @@ export interface RoomDeps {
   /** The ONLY route money takes (iron rule #3): play chips in dev, the real ledger in production. */
   fc: FinancialCoreClient;
   chain?: ChainClient;
+  /** Notarizes settled rounds (hash → Merkle batch → on-chain). Present only where a DB is connected
+   *  to persist proofs (the folded gateway); absent on the standalone dev table server. */
+  notary?: RoundNotary;
 }
 
 /** The contract `TableHub` drives, and the one thing every game's live room must satisfy. */

@@ -2,6 +2,22 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tansta
 import { fetchSettings, patchSettings, type PlayerSettings, type SettingsPatch } from './settings';
 import { fetchReputation } from './reputation';
 import { fetchJackpot, fetchJackpotHistory } from './jackpot';
+import {
+  fetchOpsOverview,
+  searchPlayers,
+  fetchPlayerDetail,
+  fetchAdminAlerts,
+  fetchAdminLeagues,
+  fetchLeagueFunding,
+  requestTopUp,
+  requestCashOut,
+  approveFunding,
+  rejectFunding,
+  executeFunding,
+  fetchWithdrawalQueue,
+  approveWithdrawal,
+  rejectWithdrawal,
+} from './admin';
 import { fetchVip } from './vip';
 import { fetchMyLeagues, fetchLeagues, createLeagueApi, joinLeagueApi } from './leagues';
 import { fetchNotifications, markNotificationsRead, type NotificationPage } from './notifications';
@@ -436,4 +452,138 @@ export function useWithdraw() {
     // appear in the withdrawals list immediately.
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['wallet'] }),
   });
+}
+
+/**
+ * Admin overview. Short stale time — an operator refreshing this screen is
+ * usually reacting to something, and a cached figure would answer the previous
+ * question. Not retried: a 404 here means the caller is not ops, and retrying
+ * a permission answer just repeats it.
+ */
+export function useOpsOverview() {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery({
+    queryKey: ['admin', 'overview', playerId],
+    queryFn: fetchOpsOverview,
+    enabled: Boolean(playerId),
+    staleTime: 10_000,
+    refetchInterval: 30_000,
+    retry: false,
+  });
+}
+
+/** Admin player search. Debounced by the caller; not retried (404 = not ops). */
+export function usePlayerSearch(q: string) {
+  return useQuery({
+    queryKey: ['admin', 'players', q],
+    queryFn: () => searchPlayers(q),
+    enabled: q.trim().length >= 2,
+    staleTime: 15_000,
+    retry: false,
+  });
+}
+
+/** One player's detail, for the admin drawer. */
+export function usePlayerDetail(playerId: string | null) {
+  return useQuery({
+    queryKey: ['admin', 'player', playerId],
+    queryFn: () => fetchPlayerDetail(playerId!),
+    enabled: Boolean(playerId),
+    staleTime: 10_000,
+    retry: false,
+  });
+}
+
+/**
+ * Admin alerts.
+ *
+ * Polled every 5 seconds, which is the spec's budget rather than a guess:
+ * "trigger CB6 (non-whitelist flow attempt) -> alert appears in admin panel
+ * within 5 seconds". Kept polling while the tab is backgrounded would be
+ * wasteful, so refetchIntervalInBackground stays off — an operator not looking
+ * at the screen is not waiting on it.
+ */
+export function useAdminAlerts() {
+  return useQuery({
+    queryKey: ['admin', 'alerts'],
+    queryFn: fetchAdminAlerts,
+    staleTime: 0,
+    refetchInterval: 5_000,
+    retry: false,
+  });
+}
+
+/** Admin league list. Balances move on settlement, so a short window is fine. */
+export function useAdminLeagues() {
+  return useQuery({
+    queryKey: ['admin', 'leagues'],
+    queryFn: fetchAdminLeagues,
+    staleTime: 15_000,
+    retry: false,
+  });
+}
+
+/** Outstanding league funding requests. */
+export function useLeagueFunding() {
+  return useQuery({
+    queryKey: ['admin', 'league-funding'],
+    queryFn: fetchLeagueFunding,
+    staleTime: 5_000,
+    retry: false,
+  });
+}
+
+/**
+ * Every league money action, sharing one invalidation.
+ *
+ * All five refresh both the request queue and the league balances, because an
+ * execution changes both and an admin watching one should not have to guess
+ * whether the other moved.
+ */
+export function useLeagueFundingActions() {
+  const queryClient = useQueryClient();
+  const after = (): void => {
+    void queryClient.invalidateQueries({ queryKey: ['admin', 'league-funding'] });
+    void queryClient.invalidateQueries({ queryKey: ['admin', 'leagues'] });
+  };
+
+  return {
+    topUp: useMutation({ mutationFn: requestTopUp, onSuccess: after }),
+    cashOut: useMutation({ mutationFn: requestCashOut, onSuccess: after }),
+    approve: useMutation({ mutationFn: approveFunding, onSuccess: after }),
+    reject: useMutation({
+      mutationFn: ({ id, reason }: { id: string; reason: string }) => rejectFunding(id, reason),
+      onSuccess: after,
+    }),
+    execute: useMutation({ mutationFn: executeFunding, onSuccess: after }),
+  };
+}
+
+/** The withdrawal review queue. Polled — money is waiting on it. */
+export function useWithdrawalQueue() {
+  return useQuery({
+    queryKey: ['admin', 'withdrawals'],
+    queryFn: fetchWithdrawalQueue,
+    staleTime: 5_000,
+    refetchInterval: 15_000,
+    retry: false,
+  });
+}
+
+export function useWithdrawalActions() {
+  const queryClient = useQueryClient();
+  // The queue and the overview both count pending withdrawals; approving one
+  // must not leave the other saying otherwise.
+  const after = (): void => {
+    void queryClient.invalidateQueries({ queryKey: ['admin', 'withdrawals'] });
+    void queryClient.invalidateQueries({ queryKey: ['admin', 'overview'] });
+  };
+
+  return {
+    approve: useMutation({ mutationFn: approveWithdrawal, onSuccess: after }),
+    reject: useMutation({
+      mutationFn: ({ id, reason }: { id: string; reason: string }) => rejectWithdrawal(id, reason),
+      onSuccess: after,
+    }),
+  };
 }

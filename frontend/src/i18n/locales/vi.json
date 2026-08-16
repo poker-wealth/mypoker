@@ -30,8 +30,8 @@
     "colBuyIn": "Tiền vào",
     "colStatus": "Trạng thái",
     "quickJoin": "Vào nhanh",
-    "createPrivate": "Tạo bàn riêng",
-    "noTables": "Không có bàn phù hợp",
+    "createPrivate": "TẠO BÀN RIÊNG",
+    "noTables": "Hiện không có bàn nào mở",
     "noTablesBlurb": "Thử mức cược khác.",
     "tabNotMapped": "Chưa được cấu hình",
     "tab": {
@@ -46,7 +46,11 @@
       "waiting": "Chờ",
       "full": "Đầy",
       "unavailable": "Đóng"
-    }
+    },
+    "wait": "CHỜ",
+    "open": "MỞ",
+    "onlyOpen": "Chỉ bàn còn chỗ trống",
+    "createSoon": "Bàn riêng chưa khả dụng"
   },
   "games": {
     "searchPlaceholder": "Tìm trò chơi",
@@ -242,7 +246,9 @@
     "notifyPromos": "Khuyến mãi",
     "about": "Giới thiệu",
     "signInToSync": "Đăng nhập để đồng bộ tùy chọn của bạn",
-    "account": "Tài khoản"
+    "account": "Tài khoản",
+    "soundOn": "Bật âm thanh",
+    "soundOff": "Tắt âm thanh"
   },
   "fairness": {
     "title": "Xác minh công bằng",
