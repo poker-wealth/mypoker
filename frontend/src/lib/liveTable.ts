@@ -127,4 +127,5 @@ export type TableCommand =
   | { kind: 'buyIn'; amount: number }
   | { kind: 'chat'; message: string }
   | { kind: 'challenge'; targetId: string }
-  | { kind: 'answer_challenge'; passed: boolean; responseMs: number };
+  | { kind: 'answer_challenge'; passed: boolean; responseMs: number }
+  | { kind: 'set_client_seed'; seed: string };
