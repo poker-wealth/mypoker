@@ -25,7 +25,8 @@ export type GameId =
   | 'red-packet'
   | 'cowboy-beauty'
   | 'lottery'
-  | 'slots';
+  | 'slots'
+  | 'texas-cowboy';
 
 export type FairnessTier = 'PROVABLE' | 'VENDOR_ATTESTED';
 
@@ -56,6 +57,7 @@ export const GAME_CATALOG: Readonly<Record<GameId, GameSpec>> = {
   'cowboy-beauty': { id: 'cowboy-beauty', name: 'Cowboy & Beauty', minPlayers: 2, maxPlayers: 50, fairness: 'PROVABLE' },
   lottery: { id: 'lottery', name: 'Lottery', minPlayers: 2, maxPlayers: 10_000, fairness: 'PROVABLE' },
   slots: { id: 'slots', name: 'Slots', minPlayers: 1, maxPlayers: 1, fairness: 'PROVABLE' },
+  'texas-cowboy': { id: 'texas-cowboy', name: 'Texas Cowboy', minPlayers: 1, maxPlayers: 100, fairness: 'PROVABLE' },
 };
 
 export const GAME_IDS = Object.keys(GAME_CATALOG) as GameId[];

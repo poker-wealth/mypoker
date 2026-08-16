@@ -9,7 +9,7 @@ import { chainClientFromEnv } from '../fairness/chain-from-env';
 import { MerkleRoundNotary, type RoundNotary } from '../fairness/round-notary';
 import { MongoMerkleStore, getRoundFairness } from '../fairness/round-store';
 import { verifyToken } from '../gateway/tokens';
-import type { PokerRoomConfig } from './poker-room';
+import type { LiveTableConfig } from './live-room';
 
 /**
  * Build the live-table hub, open its tables, and register its HTTP routes (`/api/live/*`) on `app`.
@@ -27,7 +27,7 @@ export interface MountLiveOptions {
   jwtSecret: string;
   financialCore?: { baseUrl: string; internalSecret: string };
   chipsFile?: string;
-  tables: PokerRoomConfig[];
+  tables: LiveTableConfig[];
   logSockets?: boolean;
   /** Notarize settled rounds on-chain. Requires a connected DB to persist proofs — enable only where
    *  the process has one (the folded gateway), not the standalone table server. */

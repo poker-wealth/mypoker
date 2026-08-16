@@ -8,3 +8,4 @@ export {
   type DdzGameConfig,
   type DdzGameEvents,
 } from './dou-di-zhu-game';
+export * from './match';

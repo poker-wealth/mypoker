@@ -1,7 +1,8 @@
 import express, { type Express, type Request, type Response } from 'express';
 import { createServer, type Server } from 'node:http';
 import type { DevPlayers } from './players';
-import { DEFAULT_ROOM, type PokerRoomConfig } from './poker-room';
+import { DEFAULT_ROOM } from './poker-room';
+import type { LiveTableConfig } from './live-room';
 import type { TableHub } from './table-hub';
 import { mountLiveTables } from './mount';
 
@@ -32,7 +33,7 @@ export interface TableServerConfig {
   financialCore?: { baseUrl: string; internalSecret: string };
   /** Origins allowed to call the HTTP API. Empty means "any" (fine for a token-guarded read). */
   corsOrigins: string[];
-  tables: PokerRoomConfig[];
+  tables: LiveTableConfig[];
   /** Log every socket's fate. On by default: "it won't connect" is otherwise unanswerable. */
   logSockets?: boolean;
 }
@@ -49,17 +50,18 @@ export interface TableServer {
 }
 
 /**
- * The tables a fresh deployment opens. Both seat six, matching the table artwork.
+ * The tables a fresh deployment opens — one per catalogued game.
  *
  * Stakes are in chips; 1 chip = ₮0.01 (v5.9 spec: amounts are integer cents). So the ₮0.10/0.20
  * table below has 10/20-chip blinds and a 2,000-chip (₮20) buy-in.
  */
-export function defaultTables(): PokerRoomConfig[] {
+export function defaultTables(): LiveTableConfig[] {
   return [
-    { ...DEFAULT_ROOM, id: 'texas', name: "Hold'em · ₮0.10/0.20" },
+    { ...DEFAULT_ROOM, id: 'texas', game: 'texas', name: "Hold'em · ₮0.10/0.20" },
     {
       ...DEFAULT_ROOM,
       id: 'texas-high',
+      game: 'texas',
       name: "Hold'em · ₮0.50/1",
       smallBlind: 50,
       bigBlind: 100,
@@ -67,10 +69,21 @@ export function defaultTables(): PokerRoomConfig[] {
       maxBuyIn: 20_000,
       rake: { bps: 500, cap: 3_000, noFlopNoDrop: true },
     },
+
     // Poker variants — same PokerRoom, same real-money rail; a variant only changes the deck,
     // hole-card count and scoring (see games/texas/variants.ts).
     { ...DEFAULT_ROOM, id: 'short-deck', game: 'short-deck', variantId: 'short-deck', name: 'Short Deck · ₮0.10/0.20' },
     { ...DEFAULT_ROOM, id: 'omaha', game: 'omaha', variantId: 'omaha', name: 'Omaha · ₮0.10/0.20' },
+    { id: 'baccarat', name: 'Baccarat · Player Banked', game: 'baccarat', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 8, rakeBps: 500, tiePayout: 8 },
+    { id: 'niu-niu', name: 'Niu Niu · Player Banked', game: 'niu-niu', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 6, rakeBps: 500 },
+    { id: 'san-zhang', name: 'San Zhang · Player Banked', game: 'san-zhang', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 6, rakeBps: 500 },
+    { id: 'red-packet', name: 'Red Packet Minesweeper', game: 'red-packet', size: 25, mineCount: 5, minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 8, rakeBps: 500 },
+    { id: 'cowboy-beauty', name: 'Cowboy & Beauty', game: 'cowboy-beauty', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 8, rakeBps: 500 },
+    { id: 'dou-di-zhu', name: 'Dou Di Zhu · Fight the Landlord', game: 'dou-di-zhu', baseStake: 100, minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 3, rakeBps: 500 },
+    { id: 'lottery', name: 'Lottery Draw', game: 'lottery', range: 10, minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 8, rakeBps: 500 },
+    { id: 'slots', name: 'Classic Slots', game: 'slots', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 6, commissionBps: 500 },
+    // The rake is required, not decorative: without it every settlement amount comes out NaN.
+    { id: 'texas-cowboy', name: 'Texas Cowboy', game: 'texas-cowboy', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 100, rakeBps: 500 },
   ];
 }
 

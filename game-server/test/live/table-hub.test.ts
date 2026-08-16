@@ -121,6 +121,7 @@ describe('TableHub — two people, one table, over the wire', () => {
     hub.addTable({
       ...DEFAULT_ROOM,
       id: 't1',
+      game: 'texas',
       name: 'Wire table',
       maxSeats: 6,
       handStartDelayMs: 10,

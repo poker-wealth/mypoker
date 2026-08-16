@@ -35,6 +35,8 @@ export interface LiveSeat {
   isDealer: boolean;
   isWinner: boolean;
   isYou: boolean;
+  /** This chair is played by the house AI (practice tables). Absent means a person is sitting there. */
+  isBot?: boolean;
   /** Card strings you're allowed to see; `null` is a face-down card. */
   cards: (Card | null)[];
   lastAction?: string;
@@ -62,6 +64,17 @@ export interface TableSnapshot {
   handId: string | null;
   handNumber: number;
   street: LiveStreet | null;
+  /**
+   * A game-specific sub-phase inside `IN_HAND` — Dou Di Zhu sends `BIDDING` / `PLAYING`. Games
+   * without stages omit it. Decides which controls to show, never anything about money.
+   */
+  stage?: string;
+  /**
+   * Public, game-specific round state for felts that need more than the shared shape — Texas
+   * Cowboy's two hands, its markets and its betting window. Each felt narrows it to its own type.
+   * Mirrors `gameState` in game-server/src/live/room-state.ts.
+   */
+  gameState?: unknown;
   pot: number;
   board: Card[];
   seats: LiveSeat[];
@@ -118,10 +131,29 @@ export interface TableSummary {
   phase: RoomPhase;
 }
 
+/**
+ * A move, in whatever vocabulary the game speaks.
+ *
+ * Poker sends `fold` / `check` / `call` / `raise`; the other games send their own verbs (`play`,
+ * `pass`, `bid-2`, `claim-banker`, `spin`, a baccarat bet spot, a minesweeper cell…). Mirrors
+ * `betActionSchema` in game-server/src/live/room-state.ts — in particular `cards` belongs HERE,
+ * inside the action, not beside it on the command: the wire schema strips anything else and the
+ * room would see a play with no cards in it.
+ */
+export interface TableAction {
+  type: 'fold' | 'check' | 'call' | 'raise' | (string & {});
+  amount?: number;
+  /** 1x / 2x / 5x — the stake multiplier, or a bid for the bank. */
+  multiplier?: number;
+  /** The card combination, for games where a move is cards (Dou Di Zhu). */
+  cards?: string[];
+  selection?: string;
+}
+
 export type TableCommand =
   | { kind: 'sit'; seat: number; buyIn: number }
   | { kind: 'stand' }
-  | { kind: 'act'; action: { type: 'fold' | 'check' | 'call' | 'raise'; amount?: number } }
+  | { kind: 'act'; action: TableAction }
   | { kind: 'sitOut' }
   | { kind: 'sitIn' }
   | { kind: 'buyIn'; amount: number }

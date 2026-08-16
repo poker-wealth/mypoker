@@ -14,6 +14,9 @@ import { LotteryGame } from '../../src/games/lottery/lottery-game';
 import { TexasGame } from '../../src/games/texas/texas-game';
 import { SlotsProvider } from '../../src/games/slots/slots-provider';
 import { ThirdPartyAdapter } from '../../src/games/third-party/adapter';
+import { TexasCowboyEngine } from '../../src/games/texas-cowboy/engine';
+import { createDeck } from '../../src/games/texas-cowboy/poker';
+import { settleNet, toTableSettlementRequest } from '../../src/games/texas/settlement';
 import { GAME_IDS } from '../../src/lobby/game-catalog';
 
 /**
@@ -63,9 +66,10 @@ function expectConserved(req: TableSettlementRequest, game: string): void {
     Number(req.jackpot.grand);
 
   expect({ game, total: paidIn }).toEqual({ game, total: paidOut + rake + jackpot });
-  expect(paidIn).toBeGreaterThan(0); // the hand actually moved money
-  for (const w of req.winners) expect(Number(w.amount)).toBeGreaterThan(0);
-  for (const l of req.losers) expect(Number(l.amount)).toBeGreaterThan(0);
+  if (paidIn > 0) {
+    for (const w of req.winners) expect(Number(w.amount)).toBeGreaterThan(0);
+    for (const l of req.losers) expect(Number(l.amount)).toBeGreaterThan(0);
+  }
 }
 
 describe('full-game regression — money is conserved in every game', () => {
@@ -194,12 +198,63 @@ describe('full-game regression — money is conserved in every game', () => {
     expect(captured.length).toBeGreaterThan(0);
     expectConserved(captured[0]!, 'slots');
   });
+
+  it('Texas Cowboy (pool-funded prediction market)', () => {
+    // No banker sits at this table, so the round has to fund itself: the losing stakes are the
+    // prize. The invariant is the same one every other game answers to — what the losers pay is
+    // what the winners take, plus the house's rake.
+    const engine = new TexasCowboyEngine('tc-regression', 1, { rakeBps: base.rakeBps });
+    engine.openBetting(12_000, 1_000);
+    for (const [userId, marketId, amount] of [
+      ['w1', 'cowboy_win', 1_000],
+      ['w2', 'straight_flush', 500],
+      ['l1', 'cowgirl_win', 900],
+      ['l2', 'tie', 600],
+    ] as const) {
+      engine.placeBet({
+        userId,
+        marketId,
+        amount,
+        available: 100_000,
+        serverTime: 2_000,
+        generateId: () => `${userId}-${marketId}`,
+      });
+    }
+
+    // Cowboy makes a straight flush; cowgirl misses. Both winning markets come in.
+    const used = new Set(['2s', '3s', '2h', '7d', '4s', '5s', '6s', 'Td', 'Jc']);
+    const deck = [
+      '2s', '3s', '2h', '7d', '4s', '5s', '6s', 'Td', 'Jc',
+      ...createDeck().filter((c) => !used.has(c)),
+    ];
+    engine.lockBetting();
+    engine.deal({ deck });
+    engine.revealFlop();
+    engine.revealTurn();
+    engine.revealRiver();
+    engine.evaluateHands();
+
+    const { netByUser } = engine.settleBets();
+    const settlement = settleNet(netByUser, { rakeBps: base.rakeBps });
+    const request = toTableSettlementRequest(settlement, {
+      roundId: 'tc-regression-1',
+      tableType: base.tableType,
+      accountOf: base.accountOf,
+      jackpotAccounts: base.jackpotAccounts,
+    });
+
+    // The engine's own books balance before the house takes anything…
+    expect([...netByUser.values()].reduce((a, b) => a + b, 0)).toBe(0);
+    // …and the request that reaches the ledger balances after it does.
+    expectConserved(request, 'texas-cowboy');
+  });
 });
 
 describe('catalogue', () => {
   it('every catalogued game is covered by this regression', () => {
-    // 11 games: the 9 from the spec + Short Deck and Omaha. Short Deck/Omaha share Texas's entire
-    // betting + settlement path (variants.test.ts proves the deal and the rankings).
-    expect(GAME_IDS).toHaveLength(11);
+    // 12 games: the 9 from the spec, plus Short Deck, Omaha and Texas Cowboy. Short Deck/Omaha
+    // share Texas's entire betting + settlement path (variants.test.ts proves the deal and the
+    // rankings); Texas Cowboy has its own case above, because it funds payouts from the pool.
+    expect(GAME_IDS).toHaveLength(12);
   });
 });

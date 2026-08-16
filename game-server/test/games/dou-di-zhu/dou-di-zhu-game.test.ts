@@ -104,3 +104,65 @@ describe('DouDiZhuGame — play & pass', () => {
     await expect(g.pass('p0')).rejects.toThrow(/cannot pass when leading/); // leader can't pass
   });
 });
+
+describe('DouDiZhuGame — settlement & roundId counter', () => {
+  it('increments roundId counter and triggers FC settlement on finish', async () => {
+    let capturedReq: any = null;
+    const testFc: FinancialCoreClient = {
+      async buyIn() {},
+      async release() {},
+      async settleRound(req) {
+        return { roundId: req.roundId, sequence: [], amounts: { jackpot: '0', rake: '0', payout: '0' }, accounts: {}, hash: '' };
+      },
+      async settleTableHand(req) {
+        capturedReq = req;
+        return { roundId: req.roundId, applied: true };
+      },
+    };
+
+    const g = new DouDiZhuGame('ddz-table', testFc, new EventBus(), new FakeChainClient(), cfg);
+    await g.start(players);
+    g.bid('p0', 3);
+    g.bid('p1', 0);
+    g.bid('p2', 0);
+
+    // Empty landlord's hand card by card to finish game
+    const landlordCards = [...g.handOf('p0')!];
+    for (let i = 0; i < landlordCards.length; i++) {
+      const card = landlordCards[i]!;
+      g.play('p0', [card]);
+      if (i < landlordCards.length - 1) {
+        await g.pass('p1');
+        await g.pass('p2');
+      }
+    }
+
+    expect(g.getWinner()).toBe('p0');
+    expect(capturedReq).toBeDefined();
+    expect(capturedReq.roundId).toBe('ddz-table-d1');
+
+    // Hand 2 counter increment check
+    await g.start(players);
+    g.bid('p0', 3);
+    g.bid('p1', 0);
+    g.bid('p2', 0);
+    const hand2Cards = [...g.handOf('p0')!];
+    for (let i = 0; i < hand2Cards.length; i++) {
+      const card = hand2Cards[i]!;
+      g.play('p0', [card]);
+      if (i < hand2Cards.length - 1) {
+        await g.pass('p1');
+        await g.pass('p2');
+      }
+    }
+    expect(capturedReq.roundId).toBe('ddz-table-d2');
+
+    // Conservation check
+    const paidIn = capturedReq.losers.reduce((a: number, l: any) => a + Number(l.amount), 0);
+    const paidOut = capturedReq.winners.reduce((a: number, w: any) => a + Number(w.amount), 0);
+    const rake = Number(capturedReq.rake);
+    const jackpot = Number(capturedReq.jackpot.mini) + Number(capturedReq.jackpot.minor) + Number(capturedReq.jackpot.major) + Number(capturedReq.jackpot.grand);
+    expect(paidIn).toBe(paidOut + rake + jackpot);
+  });
+});
+

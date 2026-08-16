@@ -40,6 +40,7 @@ export interface LiveTable {
   topUp: (amount: number) => void;
   challenge: (targetId: string) => void;
   answerChallenge: (passed: boolean, responseMs: number) => void;
+  command: (cmd: TableCommand) => void;
   socket: TableSocket | null;
 }
 
@@ -56,6 +57,7 @@ const EMPTY_VIEW: TableState = {
 };
 
 export function useLiveTable(tableId: string): LiveTable {
+  const queryClient = useQueryClient();
   const token = useSession((s) => s.token);
   const player = useSession((s) => s.player);
   const sessionStatus = useSession((s) => s.status);
@@ -76,7 +78,6 @@ export function useLiveTable(tableId: string): LiveTable {
   const socketRef = useRef<TableSocket | null>(null);
   /** Latest snapshot, readable from callbacks without re-creating them on every push. */
   const latest = useRef<TableSnapshot | null>(null);
-  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!token) {
@@ -183,6 +184,7 @@ export function useLiveTable(tableId: string): LiveTable {
     topUp: useCallback((amount: number) => send({ kind: 'buyIn', amount }), [send]),
     challenge: useCallback((targetId: string) => send({ kind: 'challenge', targetId }), [send]),
     answerChallenge: useCallback((passed: boolean, responseMs: number) => send({ kind: 'answer_challenge', passed, responseMs }), [send]),
+    command: useCallback((cmd: TableCommand) => send(cmd), [send]),
     socket: socketRef.current,
   };
 }

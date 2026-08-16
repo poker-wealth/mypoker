@@ -14,6 +14,7 @@ interface ButtonProps {
   full?: boolean;
   disabled?: boolean;
   className?: string;
+  type?: 'button' | 'submit' | 'reset';
 }
 
 const base =
@@ -41,9 +42,11 @@ export function Button({
   full,
   disabled,
   className,
+  type,
 }: ButtonProps) {
   return (
     <motion.button
+      type={type}
       whileTap={{ scale: 0.96 }}
       disabled={disabled}
       onClick={() => {

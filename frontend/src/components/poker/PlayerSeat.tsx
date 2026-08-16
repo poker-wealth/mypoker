@@ -29,10 +29,23 @@ const AVATAR = 'size-[56px] sm:size-[62px]';
 
 export function PlayerSeat({ seat, align = 'bottom', onSit, onClick, accent = 'var(--accent)' }: PlayerSeatProps) {
   if (seat.status === 'empty') {
+    // An empty chair only invites you to sit when sitting is actually on offer. Once you are
+    // seated (or watching a table you cannot join) `onSit` is absent, and a ring of "+ SIT HERE"
+    // buttons that do nothing is just noise on the felt. `onClick` is the challenge handler and
+    // never sits anyone down, so it does not count.
+    if (!onSit) {
+      return (
+        <div
+          className={cn(AVATAR, 'rounded-full border border-dashed border-white/15 bg-black/20')}
+          aria-hidden
+        />
+      );
+    }
+
     return (
       <motion.button
         whileTap={{ scale: 0.93 }}
-        onClick={onSit || onClick}
+        onClick={onSit ?? onClick}
         className={cn(
           AVATAR,
           'grid place-items-center rounded-full border-[1.5px] border-dashed text-[0.6rem] font-black leading-tight tracking-wider backdrop-blur-md transition-all hover:opacity-100 shadow-md',
@@ -67,25 +80,38 @@ export function PlayerSeat({ seat, align = 'bottom', onSit, onClick, accent = 'v
       )}
       onClick={onClick}
     >
-      {/* Hole cards, fanned out behind the avatar */}
+      {/* Hole cards, fanned out behind the avatar.
+          The fan is derived from how many cards there are, not hard-coded to two: Omaha deals four
+          and they have to spread across the same seat rather than stack on top of each other. */}
       {!folded && seat.cards.length > 0 && (
         <div
           className={cn(
-            'absolute left-1/2 z-0 flex -translate-x-1/2 -space-x-4',
-            isTop ? 'top-[70%]' : 'bottom-[70%]',
+            'absolute left-1/2 flex -translate-x-1/2',
+            seat.isHero ? 'z-30 bottom-[95%]' : 'z-0',
+            seat.isHero
+              ? (seat.cards.length > 2 ? '-space-x-2' : 'space-x-1')
+              : (seat.cards.length > 2 ? '-space-x-5' : '-space-x-4'),
+            !seat.isHero && (isTop ? 'top-[70%]' : 'bottom-[70%]'),
           )}
         >
-          {seat.cards.map((c, i) => (
-            <div
-              key={i}
-              className={cn(
-                'drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]',
-                i === 0 ? '-rotate-[9deg]' : 'rotate-[9deg] translate-y-0.5',
-              )}
-            >
-              <PlayingCard card={c} faceDown={!c} size="sm" index={i} />
-            </div>
-          ))}
+          {seat.cards.map((c, i) => {
+            // −1 … 1 across the fan: the outer cards tilt away and sit a touch lower, the way a
+            // held hand curves. A single card stays upright.
+            const spread = seat.cards.length > 1 ? (i / (seat.cards.length - 1)) * 2 - 1 : 0;
+            return (
+              <div
+                key={i}
+                className="drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]"
+                style={{
+                  transform: seat.isHero
+                    ? `rotate(${spread * 4}deg) translateY(${Math.abs(spread) * 1}px)`
+                    : `rotate(${spread * 9}deg) translateY(${Math.abs(spread) * 2}px)`,
+                }}
+              >
+                <PlayingCard card={c} faceDown={!c} size={seat.isHero ? 'md' : 'sm'} index={i} />
+              </div>
+            );
+          })}
         </div>
       )}
 

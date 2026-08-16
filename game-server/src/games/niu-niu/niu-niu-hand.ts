@@ -26,6 +26,28 @@ export interface NiuRank {
   multiplier: number;
   /** Highest card rank, for breaking equal-strength ties. */
   highCard: number;
+  /** That card's suit, for when the ranks tie too. */
+  highSuit: number;
+}
+
+/**
+ * Suit order for the last tie-break: ♣ < ♦ < ♥ < ♠.
+ *
+ * Two hands of the same strength and the same top rank are otherwise a dead heat, which used to be
+ * awarded to the banker by default — a quiet edge to whoever holds the bank. Suits decide it.
+ */
+export const SUIT_ORDER: Readonly<Record<string, number>> = { c: 1, d: 2, h: 3, s: 4 };
+
+/** The best card in a hand: highest rank, then highest suit. */
+function topCard(parsed: { rank: number; suit: string }[]): { rank: number; suit: number } {
+  let best = { rank: 0, suit: 0 };
+  for (const card of parsed) {
+    const suit = SUIT_ORDER[card.suit] ?? 0;
+    if (card.rank > best.rank || (card.rank === best.rank && suit > best.suit)) {
+      best = { rank: card.rank, suit };
+    }
+  }
+  return best;
 }
 
 /** Payout multiplier by strength (house-configurable; these are common defaults). */
@@ -69,7 +91,7 @@ export function evaluateNiu(cards: readonly string[]): NiuRank {
   const ranks = parsed.map((c) => c.rank);
   const points = ranks.map(niuPoints);
   const total = points.reduce((a, b) => a + b, 0);
-  const highCard = Math.max(...ranks);
+  const top = topCard(parsed);
 
   const counts = new Map<number, number>();
   for (const r of ranks) counts.set(r, (counts.get(r) ?? 0) + 1);
@@ -87,11 +109,35 @@ export function evaluateNiu(cards: readonly string[]): NiuRank {
     strength = bull === 0 ? NiuStrength.NiuNiu : bull; // 0 → Niu Niu (10); else 1..9
   } else strength = NiuStrength.NoBull;
 
-  return { strength, multiplier: NIU_MULTIPLIERS[strength] ?? 1, highCard };
+  return { strength, multiplier: NIU_MULTIPLIERS[strength] ?? 1, highCard: top.rank, highSuit: top.suit };
 }
 
-/** > 0 if a beats b, < 0 if b beats a, 0 if a genuine tie (the game awards ties to the banker). */
+/**
+ * > 0 if a beats b, < 0 if b beats a.
+ *
+ * Strength, then the top card's rank, then its suit. Comparing rank alone left genuine ties, and a
+ * tie is awarded to the banker — a standing edge to whoever holds the bank. Suits settle it.
+ */
 export function compareNiu(a: NiuRank, b: NiuRank): number {
   if (a.strength !== b.strength) return a.strength - b.strength;
-  return a.highCard - b.highCard;
+  if (a.highCard !== b.highCard) return a.highCard - b.highCard;
+  return a.highSuit - b.highSuit;
+}
+
+/** What to call this hand on the felt — "Niu 7", "Five Small", "No Bull". */
+export function describeNiu(rank: NiuRank): string {
+  switch (rank.strength) {
+    case NiuStrength.NoBull:
+      return 'No Bull';
+    case NiuStrength.NiuNiu:
+      return 'Niu Niu';
+    case NiuStrength.Bomb:
+      return 'Bomb';
+    case NiuStrength.FiveFlowers:
+      return 'Five Flowers';
+    case NiuStrength.FiveSmall:
+      return 'Five Small';
+    default:
+      return `Niu ${rank.strength}`;
+  }
 }

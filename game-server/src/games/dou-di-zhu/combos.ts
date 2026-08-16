@@ -122,6 +122,46 @@ export function classifyPlay(ranks: readonly number[]): Combo | null {
   return null;
 }
 
+/**
+ * A play together with the cards that make it.
+ *
+ * `classifyPlay` works in rank values because that is all comparison needs. A UI, an AI and a
+ * replay all need to know WHICH cards were played, so this is the card-level view: the same
+ * classification, plus the cards and the shape of the thing (how long the run is, what is hanging
+ * off it).
+ */
+export interface Combination extends Combo {
+  cards: string[];
+  /** Consecutive groups in the core — 3 for a three-triple airplane, 1 for a plain pair. */
+  coreLength: number;
+  /** What is attached to the core, for airplanes and triples. */
+  attachmentType: 'NONE' | 'SINGLES' | 'PAIRS';
+}
+
+const ATTACHMENTS: Partial<Record<ComboType, 'SINGLES' | 'PAIRS'>> = {
+  [ComboType.TripleOne]: 'SINGLES',
+  [ComboType.TripleTwo]: 'PAIRS',
+  [ComboType.AirplaneSingles]: 'SINGLES',
+  [ComboType.AirplanePairs]: 'PAIRS',
+  [ComboType.FourTwoSingles]: 'SINGLES',
+  [ComboType.FourTwoPairs]: 'PAIRS',
+};
+
+/** Classify actual cards, keeping them with the result. Null when they form no legal play. */
+export function classifyCards(
+  cards: readonly string[],
+  rankOf: (card: string) => number,
+): Combination | null {
+  const combo = classifyPlay(cards.map(rankOf));
+  if (!combo) return null;
+  return {
+    ...combo,
+    cards: [...cards],
+    coreLength: combo.length,
+    attachmentType: ATTACHMENTS[combo.type] ?? 'NONE',
+  };
+}
+
 /** Can `next` legally beat `prev`? */
 export function beats(prev: Combo, next: Combo): boolean {
   if (next.type === ComboType.Rocket) return true;
