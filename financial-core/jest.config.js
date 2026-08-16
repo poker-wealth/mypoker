@@ -7,12 +7,22 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/test/setup.ts'],
   // mongodb-memory-server can need a moment to download the binary on first run.
   testTimeout: 60000,
-  // Every integration file boots its OWN MongoMemoryReplSet (see test/db-helper.ts).
-  // At Jest's default worker count that is one replica set per core, and the
-  // elections thrash hard enough to blow the 60s timeout — settlement, the
-  // slowest and least skippable suite, is the one that loses. Capping is also
-  // simply faster here: 49s at 2 workers against 73s uncapped.
-  maxWorkers: 2,
+  // Every integration file boots its OWN MongoMemoryReplSet (see test/db-helper.ts),
+  // so concurrency here means concurrent replica sets, and their elections thrash
+  // hard enough to blow the 60s timeout. Whichever suite is heaviest loses: it was
+  // settlement at the default worker count, then the HTTP suite once the auth and
+  // TRON work added three more replica sets at 2 workers.
+  //
+  // Serialised is not the slow option, it is the fast one — the contention costs
+  // more than the parallelism wins:
+  //   default workers  73s, failing
+  //   2 workers       100s, failing (28 suites)
+  //   1 worker         84s, green
+  //
+  // The real fix is a shared replica set across suites rather than one each; until
+  // then this is deterministic, and a green suite that takes 84s beats a flaky one
+  // that takes 100s.
+  maxWorkers: 1,
   clearMocks: true,
   collectCoverageFrom: ['src/**/*.ts', '!src/index.ts'],
 };

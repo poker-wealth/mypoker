@@ -65,7 +65,7 @@
     "sectionArcade": "街机游戏",
     "sectionQuick": "快速游戏",
     "more": "更多",
-    "tableCount": "{{count}} 张牌桌",
+    "tableCount": "{{count}} 张桌",
     "noneInCategory": "此分类暂无游戏",
     "tryAnother": "请尝试其他搜索词。",
     "filter": {
@@ -148,7 +148,13 @@
     "signOut": "退出登录",
     "buildLine": "MYPOKER · 测试版本 · v0.1",
     "noHands": "还没有牌局记录",
-    "noHandsBlurb": "加入牌桌，您的战绩将显示在这里。"
+    "noHandsBlurb": "加入牌桌，您的战绩将显示在这里。",
+    "personalInfo": "个人资料",
+    "vipMembership": "VIP 会员",
+    "checkPrivileges": "查看特权",
+    "inviteFriends": "邀请好友",
+    "earnRewards": "赚取奖励",
+    "messageCenter": "消息中心"
   },
   "wallet": {
     "totalBalance": "总余额",
@@ -180,7 +186,11 @@
     "insufficient": "Amount exceeds your available balance.",
     "invalidAddress": "That is not a valid TRON address.",
     "availableToWithdraw": "Available: {{amount}}",
-    "withdrawalsTitle": "Withdrawals"
+    "withdrawalsTitle": "Withdrawals",
+    "showBalance": "显示余额",
+    "hideBalance": "隐藏余额",
+    "detail": "明细",
+    "availableSplit": "可用 {{available}} · 游戏中 {{locked}}"
   },
   "table": {
     "fold": "弃牌",

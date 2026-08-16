@@ -6,7 +6,7 @@ import { motion } from 'motion/react';
 import { Segmented } from '@/components/ui/Segmented';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { GameTile } from '@/components/GameTile';
-import { GAMES, type GameCategory } from '@/lib/games';
+import { visibleGames, type GameCategory, type GameDef } from '@/lib/games';
 import { useLobbyGames } from '@/api/hooks';
 import { formatMicros } from '@/api/lobby';
 
@@ -21,18 +21,29 @@ export function Games() {
   const [q, setQ] = useState('');
 
   const lobby = useLobbyGames();
-  const jackpot = lobby.data ? `$ ${formatMicros(lobby.data.totalJackpot)}` : '$ 0.00';
+  // Null, not '$ 0.00', while the lobby is still answering — a zero jackpot is
+  // a claim about the pools, and it is the wrong one.
+  const jackpot = lobby.data ? `$ ${formatMicros(lobby.data.totalJackpot)}` : null;
+
+  // Live figures per game, keyed by id. The tiles take their table count and
+  // jackpot from here; nothing on this screen comes from the static catalog
+  // except artwork, names and categories.
+  const live = new Map((lobby.data?.games ?? []).map((g) => [g.gameId, g]));
 
   const query = q.trim().toLowerCase();
-  
-  // Group games by category
+
+  // visibleGames(), NOT GAMES: the launch gate (HIDDEN_GAMES, withheld on
+  // Victor's instruction) lives in that filter, and iterating the raw list
+  // here rendered withheld games as tappable tiles that navigated to real
+  // tables. An audit caught this page as the one map site bypassing the gate.
+  const games = visibleGames();
   const grouped = {
-    poker: GAMES.filter(g => g.category === 'poker'),
-    card: GAMES.filter(g => g.category === 'card'),
-    quick: GAMES.filter(g => g.category === 'quick' || g.category === 'arcade'),
+    poker: games.filter(g => g.category === 'poker'),
+    card: games.filter(g => g.category === 'card'),
+    quick: games.filter(g => g.category === 'quick' || g.category === 'arcade'),
   };
 
-  const getShown = (list: typeof GAMES) => {
+  const getShown = (list: GameDef[]) => {
     return list.filter((g) => {
       const inCat = cat === 'all' || g.category === cat;
       const localised = t(`gameNames.${g.id}`, { defaultValue: g.name }).toLowerCase();
@@ -81,7 +92,10 @@ export function Games() {
             </div>
           ) : (
             <div className="mt-0.5 text-[2.2rem] font-black leading-none tracking-tight tabular-nums text-yellow-400 drop-shadow-sm">
-              {jackpot}
+              {/* Em dash when the lobby failed — a hero that renders empty
+                  looks broken, and "$ 0.00" would claim there is nothing to
+                  win. Unknown is neither. */}
+              {jackpot ?? '—'}
             </div>
           )}
         </div>
@@ -106,7 +120,13 @@ export function Games() {
             <h2 className="mb-3 text-xs font-bold text-white tracking-wider">POKER GAMES</h2>
             <div className="grid grid-cols-3 gap-2">
               {getShown(grouped.poker).map((g) => (
-                <GameTile key={g.id} game={g} onClick={() => navigate(`/table/${g.id}`)} />
+                <GameTile
+                  key={g.id}
+                  game={g}
+                  tables={live.get(g.id)?.tables}
+                  jackpot={live.get(g.id)?.jackpot}
+                  onClick={() => navigate(`/table/${g.id}`)}
+                />
               ))}
             </div>
           </section>
@@ -117,7 +137,13 @@ export function Games() {
             <h2 className="mb-3 text-xs font-bold text-white tracking-wider">CARD GAMES</h2>
             <div className="grid grid-cols-3 gap-2">
               {getShown(grouped.card).map((g) => (
-                <GameTile key={g.id} game={g} onClick={() => navigate(`/table/${g.id}`)} />
+                <GameTile
+                  key={g.id}
+                  game={g}
+                  tables={live.get(g.id)?.tables}
+                  jackpot={live.get(g.id)?.jackpot}
+                  onClick={() => navigate(`/table/${g.id}`)}
+                />
               ))}
             </div>
           </section>
@@ -128,13 +154,19 @@ export function Games() {
             <h2 className="mb-3 text-xs font-bold text-white tracking-wider">QUICK GAMES</h2>
             <div className="grid grid-cols-3 gap-2">
               {getShown(grouped.quick).map((g) => (
-                <GameTile key={g.id} game={g} onClick={() => navigate(`/table/${g.id}`)} />
+                <GameTile
+                  key={g.id}
+                  game={g}
+                  tables={live.get(g.id)?.tables}
+                  jackpot={live.get(g.id)?.jackpot}
+                  onClick={() => navigate(`/table/${g.id}`)}
+                />
               ))}
             </div>
           </section>
         )}
         
-        {getShown(GAMES).length === 0 && (
+        {getShown(games).length === 0 && (
           <div className="rounded-(--radius-app) border border-border bg-surface py-10 text-center text-sm text-dim">
             {t('games.noMatch', { query: q })}
           </div>

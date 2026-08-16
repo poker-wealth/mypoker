@@ -533,7 +533,7 @@ export class PokerRoom implements LiveRoom {
 
     for (const [viewerId, clients] of this.viewers.entries()) {
       const isSpectator = !this.seatOf(viewerId);
-      const sendEvent = () => {
+      const sendEvent = (): void => {
         for (const client of clients) {
           client.sendEvent('chat_message', eventData);
         }
@@ -1107,7 +1107,7 @@ export class PokerRoom implements LiveRoom {
       const snap = this.snapshotFor(viewerId);
       const isSpectator = !this.seatOf(viewerId);
 
-      const sendSnapshot = () => {
+      const sendSnapshot = (): void => {
         for (const client of clients) client.sendSnapshot(snap);
       };
 

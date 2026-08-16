@@ -148,7 +148,13 @@
     "signOut": "Sign out",
     "buildLine": "MYPOKER · staging build · v0.1",
     "noHands": "No hands played yet",
-    "noHandsBlurb": "Join a table and your record starts here."
+    "noHandsBlurb": "Join a table and your record starts here.",
+    "personalInfo": "Personal Info",
+    "vipMembership": "VIP Membership",
+    "checkPrivileges": "Check Privileges",
+    "inviteFriends": "Invite Friends",
+    "earnRewards": "Earn Rewards",
+    "messageCenter": "Message Center"
   },
   "wallet": {
     "totalBalance": "Total Balance",
@@ -180,7 +186,11 @@
     "insufficient": "Amount exceeds your available balance.",
     "invalidAddress": "That is not a valid TRON address.",
     "availableToWithdraw": "Available: {{amount}}",
-    "withdrawalsTitle": "Withdrawals"
+    "withdrawalsTitle": "Withdrawals",
+    "showBalance": "Show balance",
+    "hideBalance": "Hide balance",
+    "detail": "Detail",
+    "availableSplit": "{{available}} available · {{locked}} in play"
   },
   "table": {
     "fold": "Fold",

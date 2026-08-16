@@ -148,7 +148,13 @@
     "signOut": "Keluar",
     "buildLine": "MYPOKER · versi staging · v0.1",
     "noHands": "Belum ada ronde dimainkan",
-    "noHandsBlurb": "Gabung ke meja dan rekor Anda dimulai di sini."
+    "noHandsBlurb": "Gabung ke meja dan rekor Anda dimulai di sini.",
+    "personalInfo": "Info Pribadi",
+    "vipMembership": "Keanggotaan VIP",
+    "checkPrivileges": "Lihat Hak Istimewa",
+    "inviteFriends": "Undang Teman",
+    "earnRewards": "Dapatkan Hadiah",
+    "messageCenter": "Pusat Pesan"
   },
   "wallet": {
     "totalBalance": "Total Saldo",
@@ -180,7 +186,11 @@
     "insufficient": "Amount exceeds your available balance.",
     "invalidAddress": "That is not a valid TRON address.",
     "availableToWithdraw": "Available: {{amount}}",
-    "withdrawalsTitle": "Withdrawals"
+    "withdrawalsTitle": "Withdrawals",
+    "showBalance": "Tampilkan saldo",
+    "hideBalance": "Sembunyikan saldo",
+    "detail": "Detail",
+    "availableSplit": "Tersedia {{available}} · Di meja {{locked}}"
   },
   "table": {
     "fold": "Lipat",

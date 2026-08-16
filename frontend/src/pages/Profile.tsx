@@ -1,85 +1,78 @@
 import { useState } from 'react';
-import { ShieldCheck, History, Settings, LifeBuoy, Send, Wallet, LogOut, Languages, Spade, Bell, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ListRow } from '@/components/ui/ListRow';
-import { Badge } from '@/components/ui/Badge';
+import {
+  Settings as SettingsIcon,
+  ChevronRight,
+  Eye,
+  EyeOff,
+  User,
+  Crown,
+  ShieldCheck,
+  UserPlus,
+  Bell,
+  LifeBuoy,
+  SlidersHorizontal,
+  LogOut,
+  Send,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { LanguageSheet } from '@/components/LanguageSheet';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { ErrorState } from '@/components/ui/ErrorState';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { useSession } from '@/store/session';
-import { useStats, useReputation } from '@/api/hooks';
-import { errorKey } from '@/api/errors';
-import { moneyFromDecimal } from '@/lib/money';
-import { isTelegram } from '@/lib/telegram';
+import { LanguageSheet } from '@/components/LanguageSheet';
 import { GoogleAuthButton } from '@/components/GoogleAuthButton';
-import { LANGUAGES } from '@/i18n/languages';
+import { useSession } from '@/store/session';
+import { useBalance, useVip, useUnreadCount } from '@/api/hooks';
+import { moneyFromDecimal } from '@/lib/money';
+import { isTelegram, haptic } from '@/lib/telegram';
+import { SUPPORT_URL } from '@/config';
+import { toast } from '@/store/toast';
+import { cn } from '@/lib/cn';
 
+/**
+ * Me — the account hub, built to the owner's mockup.
+ *
+ * Every figure on this screen is read from the server. The mockup carries
+ * placeholder values (a 12,345.67 balance, "Lv. 28", a 68% bar, 12 unread) and
+ * none of them are reproduced: a design document's numbers rendered as a
+ * player's balance is the same failure as the fabricated VPIP/PFR stats the
+ * Data tab had, and it is worse here because this screen is about money.
+ *
+ * Two places where the mockup asks for something that does not exist:
+ *
+ *   "Lv. 28" — there is no player level or XP system in any spec document; the
+ *   only progression the platform actually has is the VIP ladder, which is
+ *   earned by effective volume. So the bar is kept and bound to real VIP
+ *   progress, and it is labelled with the tier it is really showing rather than
+ *   a level nobody computes.
+ *
+ *   "≈ $12,345.67" under a USDT balance implies a conversion. Balances are
+ *   USD-denominated micro-units already, so a second line repeating the same
+ *   number in another currency would be theatre. That line shows the
+ *   available / in-play split instead, which is real and worth knowing before
+ *   you try to withdraw.
+ */
 export function Profile() {
   const navigate = useNavigate();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { player, status, error, signIn, signOut } = useSession();
   const signedIn = status === 'authenticated' && player !== null;
   const [languageOpen, setLanguageOpen] = useState(false);
-  const stats = useStats();
-
-  const currentLanguage =
-    LANGUAGES.find((l) => l.code === i18n.resolvedLanguage)?.label ?? '';
 
   return (
-    <div className="space-y-4">
-      {/* Identity */}
-      <div className="flex items-center gap-3 rounded-(--radius-app) border border-border bg-surface p-4">
-        {signedIn && player.photoUrl ? (
-          <img
-            src={player.photoUrl}
-            alt=""
-            className="size-14 shrink-0 rounded-full object-cover"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <div
-            className="grid size-14 shrink-0 place-items-center rounded-full text-lg font-black text-white"
-            style={{ backgroundImage: 'var(--brand-gradient)' }}
-          >
-            {signedIn ? player.displayName.charAt(0).toUpperCase() : 'M'}
-          </div>
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-semibold">
-            {signedIn ? player.displayName : t('account.guest')}
-          </div>
-          <div className="truncate text-xs text-dim">
-            {signedIn
-              ? player.username
-                ? `@${player.username}`
-                : t('account.id', { id: player.playerId })
-              : t('account.notSignedIn')}
-          </div>
-        </div>
-        <button onClick={() => signedIn && navigate('/vip')} disabled={!signedIn}>
-          <Badge tone="brand">{t('account.vip', { tier: signedIn ? player.vipTier : 0 })}</Badge>
-        </button>
-      </div>
+    <div className="space-y-4 pb-2">
+      <Identity signedIn={signedIn} onSettings={() => navigate('/settings')} />
 
-      {/* Sign-in CTA — hidden once signed in */}
+      {signedIn && <BalanceCard />}
+
       {!signedIn && (
-        <div className="rounded-(--radius-app) border border-brand/30 bg-brand/5 p-4 space-y-3">
+        <div className="space-y-3 rounded-(--radius-app) border border-brand/30 bg-brand/5 p-4">
           <div>
-            <div className="text-sm font-semibold">
-              {isTelegram() ? t('account.signInTitle') : 'Sign in to save your progress'}
-            </div>
-            <div className="mt-1 text-xs text-dim">
-              {isTelegram()
-                ? t('account.signInBlurb')
-                : 'Sign in with your Google account on the web to track stats, access your wallet, and save game progress.'}
+            <div className="text-sm font-semibold">{t('account.signInTitle')}</div>
+            <div className="mt-1 text-xs leading-relaxed text-dim">
+              {t('account.signInBlurb')}
             </div>
           </div>
-          {status === 'error' && error && (
-            <div className="text-xs text-danger">{error}</div>
-          )}
+          {status === 'error' && error && <div className="text-xs text-danger">{error}</div>}
           {isTelegram() ? (
             <Button full onClick={() => void signIn()} disabled={status === 'authenticating'}>
               <Send size={17} />
@@ -93,103 +86,11 @@ export function Profile() {
         </div>
       )}
 
-      {/* Stats — real, from the ledger. Signed out, this section is simply absent
-          rather than showing zeros that would read as a real record of no wins. */}
-      {signedIn && (
-        <section>
-          {stats.isPending && (
-            <div className="grid grid-cols-3 gap-3">
-              {[0, 1, 2].map((i) => (
-                <div
-                  key={i}
-                  className="rounded-(--radius-app) border border-border bg-surface px-2 py-3"
-                >
-                  <Skeleton className="mx-auto h-6 w-14" />
-                  <Skeleton className="mx-auto mt-2 h-2.5 w-10" />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {stats.isError && (
-            <div className="rounded-(--radius-app) border border-border bg-surface">
-              {/* Translated copy, not error.message — the raw text is a
-                  diagnostic ("Expected JSON from /me/stats but got text/html")
-                  that tells a player nothing except that something is broken in
-                  a way that sounds like their fault. It goes to the console. */}
-              <ErrorState message={t(errorKey(stats.error))} onRetry={() => void stats.refetch()} />
-            </div>
-          )}
-
-          {/* A new player has real zeros, but three of them read as a record of
-              losing rather than as never having played. Say which it is. */}
-          {stats.isSuccess && stats.data.handsPlayed === 0 && (
-            <div className="rounded-(--radius-app) border border-border bg-surface">
-              <EmptyState
-                icon={Spade}
-                title={t('account.noHands')}
-                description={t('account.noHandsBlurb')}
-                action={{ label: t('nav.lobby'), onClick: () => navigate('/') }}
-              />
-            </div>
-          )}
-
-          {stats.isSuccess && stats.data.handsPlayed > 0 && (
-            <div className="grid grid-cols-3 gap-3">
-              <StatTile label={t('account.statHands')} value={String(stats.data.handsPlayed)} />
-              <StatTile
-                label={t('account.statWinRate')}
-                // Null, not 0, when nothing has been played — '0%' would read as
-                // "you have lost every hand" rather than "you haven't played".
-                value={stats.data.winRate === null ? '—' : `${stats.data.winRate}%`}
-              />
-              <StatTile
-                label={t('account.statBiggestWin')}
-                value={moneyFromDecimal(stats.data.biggestWin)}
-              />
-            </div>
-          )}
-        </section>
-      )}
-
-      {signedIn && <ReputationRow />}
-
-      {/* Menu */}
-      <div className="divide-y divide-border overflow-hidden rounded-(--radius-app) border border-border bg-surface">
-        {/* Wallet is no longer a tab — this is its entry point. */}
-        <ListRow title={t('account.wallet')} leading={<Wallet size={18} className="text-brand" />} onClick={() => navigate('/wallet')} />
-        <ListRow
-          title={t('account.fairness')}
-          leading={<ShieldCheck size={18} className="text-accent" />}
-          onClick={() => navigate('/fairness')}
-        />
-        <ListRow
-          title={t('notifications.title')}
-          leading={<Bell size={18} className="text-brand" />}
-          onClick={() => navigate('/notifications')}
-        />
-        <ListRow
-          title={t('agent.title')}
-          leading={<TrendingUp size={18} className="text-success" />}
-          onClick={() => navigate('/agent')}
-        />
-        <ListRow title={t('account.history')} leading={<History size={18} className="text-dim" />} onClick={() => navigate('/data')} />
-        <ListRow
-          title={t('account.language')}
-          subtitle={currentLanguage}
-          leading={<Languages size={18} className="text-dim" />}
-          onClick={() => setLanguageOpen(true)}
-        />
-        <ListRow
-          title={t('account.settings')}
-          leading={<Settings size={18} className="text-dim" />}
-          onClick={() => navigate('/settings')}
-        />
-        <ListRow title={t('account.support')} leading={<LifeBuoy size={18} className="text-dim" />} onClick={() => {}} />
-        {signedIn && (
-          <ListRow title={t('account.signOut')} leading={<LogOut size={18} className="text-dim" />} onClick={signOut} />
-        )}
-      </div>
+      <Menu
+        signedIn={signedIn}
+        onLanguage={() => setLanguageOpen(true)}
+        onSignOut={signOut}
+      />
 
       <div className="pt-1 text-center text-[0.66rem] text-dim">{t('account.buildLine')}</div>
 
@@ -198,66 +99,329 @@ export function Profile() {
   );
 }
 
-function StatTile({ label, value }: { label: string; value: string }) {
+// ── Identity ─────────────────────────────────────────────────────────────────
+
+function Identity({ signedIn, onSettings }: { signedIn: boolean; onSettings: () => void }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const player = useSession((s) => s.player);
+  const vip = useVip();
+
   return (
-    <div className="rounded-(--radius-app) border border-border bg-surface px-2 py-3 text-center">
-      <div className="text-lg font-black tabular-nums">{value}</div>
-      <div className="mt-0.5 text-[0.66rem] text-dim">{label}</div>
-    </div>
+    <section>
+      <div className="flex items-center justify-between px-1 pb-3">
+        <span className="text-sm font-bold">{t('nav.account')}</span>
+        <button
+          onClick={onSettings}
+          className="rounded-lg p-1.5 text-dim active:bg-surface-2"
+          aria-label={t('account.settings')}
+        >
+          <SettingsIcon size={18} />
+        </button>
+      </div>
+
+      <button
+        onClick={() => signedIn && navigate('/settings')}
+        disabled={!signedIn}
+        className="flex w-full items-center gap-3 text-left"
+      >
+        {signedIn && player?.photoUrl ? (
+          <img
+            src={player.photoUrl}
+            alt=""
+            className="size-16 shrink-0 rounded-full object-cover"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div
+            className="grid size-16 shrink-0 place-items-center rounded-full text-xl font-black text-white"
+            style={{ backgroundImage: 'var(--brand-gradient)' }}
+          >
+            {signedIn && player ? player.displayName.charAt(0).toUpperCase() : 'M'}
+          </div>
+        )}
+
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-base font-bold">
+            {signedIn && player ? player.displayName : t('account.guest')}
+          </div>
+
+          <div className="mt-1 flex items-center gap-1.5">
+            {signedIn && vip.isSuccess && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.6rem] font-black text-white"
+                style={{ backgroundImage: 'var(--brand-gradient)' }}
+              >
+                <Crown size={9} />
+                {vip.data.tier}
+              </span>
+            )}
+            <span className="truncate text-[0.66rem] text-dim">
+              {signedIn && player
+                ? t('account.id', { id: player.playerId })
+                : t('account.notSignedIn')}
+            </span>
+          </div>
+        </div>
+
+        {signedIn && <ChevronRight size={18} className="shrink-0 text-dim" />}
+      </button>
+
+      {signedIn && <VipProgress />}
+    </section>
   );
 }
 
 /**
- * Reputation, on the profile.
+ * The mockup's level bar, bound to the progression that actually exists.
  *
- * Deliberately free of any language implying consequence for funds. The spec's
- * wording is unusually direct — a reputation score affecting a withdrawal is a
- * critical failure — and copy is where that leaks first: "restricted", "limited",
- * "blocked", even a red warning icon next to a low score, all invite the player
- * to believe their money is at stake. So a low band is stated plainly and the
- * line underneath says what it actually governs, which is tables and chat.
+ * Shows the current VIP tier and how far through it the player is by effective
+ * volume — the same figures the VIP page derives, from the same endpoint, so
+ * the two screens can never disagree.
  */
-function ReputationRow() {
+function VipProgress() {
   const { t } = useTranslation();
-  const rep = useReputation();
+  const navigate = useNavigate();
+  const vip = useVip();
 
-  if (rep.isPending) {
-    return (
-      <div className="rounded-(--radius-app) border border-border bg-surface p-4">
-        <Skeleton className="h-3 w-24" />
-        <Skeleton className="mt-2 h-6 w-16" />
-      </div>
-    );
-  }
-  // Silent on failure. Reputation is context, not something the player came for,
-  // and an error card here would loom larger than the feature it is reporting.
-  if (!rep.isSuccess) return null;
+  if (vip.isPending) return <Skeleton className="mt-3 h-8 w-full rounded-lg" />;
+  if (!vip.isSuccess) return null;
 
-  const { score, band, roundsToAdvance } = rep.data;
-  const tone =
-    band === 'EXCELLENT' || band === 'GOOD'
-      ? 'text-success'
-      : band === 'AVERAGE'
-        ? 'text-text'
-        : 'text-dim';
+  const { title, progressPct, next } = vip.data;
 
   return (
-    <div className="rounded-(--radius-app) border border-border bg-surface p-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="text-xs font-bold uppercase tracking-wide text-dim">
-          {t('reputation.title')}
+    <button onClick={() => navigate('/vip')} className="mt-3 block w-full text-left">
+      <div className="flex items-center gap-2">
+        <span className="shrink-0 text-xs font-bold">{title}</span>
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
+          <div
+            className="h-full rounded-full transition-[width] duration-500"
+            style={{
+              width: `${next ? progressPct : 100}%`,
+              backgroundImage: 'var(--brand-gradient)',
+            }}
+          />
+        </div>
+        {/* At the top tier there is no "next", so a percentage would be
+            meaningless — say so instead of showing 100%. */}
+        <span className="shrink-0 text-[0.66rem] tabular-nums text-dim">
+          {next ? `${progressPct}%` : t('vip.topTier')}
         </span>
-        <span className="text-[0.66rem] text-dim">{t(`reputation.band.${band}`)}</span>
       </div>
-      <div className={`mt-1 text-2xl font-black tabular-nums ${tone}`}>{score}</div>
+    </button>
+  );
+}
 
-      {roundsToAdvance > 0 && (
-        <div className="mt-2 text-[0.66rem] text-dim">
-          {t('reputation.toAdvance', { count: roundsToAdvance })}
+// ── Balance ──────────────────────────────────────────────────────────────────
+
+function BalanceCard() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const balance = useBalance();
+  // Hiding is per-session and deliberately not persisted: it protects against
+  // someone glancing over a shoulder now, not against the device itself.
+  const [hidden, setHidden] = useState(false);
+
+  const masked = '••••••';
+
+  return (
+    <section className="rounded-(--radius-app) border border-border bg-surface p-4">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[0.66rem] font-semibold uppercase tracking-wide text-dim">
+          {t('wallet.totalBalance')}
+        </span>
+        <button
+          onClick={() => {
+            haptic('light');
+            setHidden((v) => !v);
+          }}
+          className="rounded-lg p-1 text-dim active:bg-surface-2"
+          aria-label={hidden ? t('wallet.showBalance') : t('wallet.hideBalance')}
+        >
+          {hidden ? <EyeOff size={15} /> : <Eye size={15} />}
+        </button>
+      </div>
+
+      <div className="mt-1 flex items-baseline justify-between gap-3">
+        {balance.isPending ? (
+          <Skeleton className="h-9 w-40" />
+        ) : balance.isSuccess ? (
+          <span className="truncate text-3xl font-black tabular-nums">
+            {hidden ? masked : moneyFromDecimal(balance.data.total, { decimals: 2 })}
+          </span>
+        ) : (
+          // Never a zero on failure: "0.00" is a balance, and telling someone
+          // their money is gone because a request failed is unforgivable here.
+          <span className="text-3xl font-black text-dim">—</span>
+        )}
+
+        <button
+          onClick={() => navigate('/wallet')}
+          className="flex shrink-0 items-center gap-0.5 text-[0.7rem] font-semibold text-dim"
+        >
+          {t('wallet.detail')}
+          <ChevronRight size={13} />
+        </button>
+      </div>
+
+      {/* The split, not a currency conversion — see the note at the top. */}
+      {balance.isSuccess && !hidden && (
+        <div className="mt-0.5 text-[0.66rem] tabular-nums text-dim">
+          {t('wallet.availableSplit', {
+            available: moneyFromDecimal(balance.data.available, { decimals: 2 }),
+            locked: moneyFromDecimal(balance.data.locked, { decimals: 2 }),
+          })}
         </div>
       )}
 
-      <p className="mt-2 text-[0.66rem] leading-relaxed text-dim">{t('reputation.scope')}</p>
+      <div className="mt-3 grid grid-cols-2 gap-3">
+        <Button
+          className="bg-success text-success-fg hover:bg-success/90"
+          onClick={() => navigate('/wallet?action=deposit')}
+        >
+          {t('wallet.deposit')}
+        </Button>
+        <Button variant="secondary" onClick={() => navigate('/wallet?action=withdraw')}>
+          {t('wallet.withdraw')}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+// ── Menu ─────────────────────────────────────────────────────────────────────
+
+function Menu({
+  signedIn,
+  onLanguage,
+  onSignOut,
+}: {
+  signedIn: boolean;
+  onLanguage: () => void;
+  onSignOut: () => void;
+}) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const unread = useUnreadCount();
+
+  return (
+    <div className="divide-y divide-border overflow-hidden rounded-(--radius-app) border border-border bg-surface">
+      <Row
+        icon={<User size={17} className="text-dim" />}
+        title={t('account.personalInfo')}
+        onClick={() => navigate('/settings')}
+      />
+      <Row
+        icon={<Crown size={17} className="text-jackpot" />}
+        title={t('account.vipMembership')}
+        hint={t('account.checkPrivileges')}
+        hintTone="jackpot"
+        onClick={() => navigate('/vip')}
+      />
+      {/* Provably-fair verification is not on the mockup, but it is the
+          platform's headline promise and a spec'd screen — burying it behind
+          Settings would make "Fair. On-Chain. Always." something a player
+          cannot actually check. */}
+      <Row
+        icon={<ShieldCheck size={17} className="text-accent" />}
+        title={t('account.fairness')}
+        onClick={() => navigate('/fairness')}
+      />
+      <Row
+        icon={<UserPlus size={17} className="text-dim" />}
+        title={t('account.inviteFriends')}
+        hint={t('account.earnRewards')}
+        hintTone="success"
+        onClick={() => navigate('/agent')}
+      />
+      <Row
+        icon={<Bell size={17} className="text-brand" />}
+        title={t('account.messageCenter')}
+        // Absent at zero rather than a "0" chip — a badge means "something is
+        // waiting for you", and one that is always there stops meaning it.
+        badge={unread.isSuccess && unread.data > 0 ? unread.data : undefined}
+        onClick={() => navigate('/notifications')}
+      />
+      <Row
+        icon={<LifeBuoy size={17} className="text-dim" />}
+        title={t('account.support')}
+        onClick={() => {
+          // The toast branch matters: with SUPPORT_URL unset (no VITE_SUPPORT_URL,
+          // no bot name) a bare `if` made this a silent no-op — the exact dead
+          // control this task existed to remove, back under default config.
+          // Settings has always had the toast; Profile now matches it.
+          if (SUPPORT_URL) {
+            window.open(SUPPORT_URL, '_blank', 'noopener');
+          } else {
+            toast.info(t('account.supportConnecting', { defaultValue: 'Connecting to support...' }));
+          }
+        }}
+      />
+      <Row
+        icon={<SlidersHorizontal size={17} className="text-dim" />}
+        title={t('account.settings')}
+        onClick={() => navigate('/settings')}
+      />
+      <Row
+        icon={<SettingsIcon size={17} className="text-dim" />}
+        title={t('account.language')}
+        onClick={onLanguage}
+      />
+      {signedIn && (
+        <Row
+          icon={<LogOut size={17} className="text-dim" />}
+          title={t('account.signOut')}
+          onClick={onSignOut}
+        />
+      )}
     </div>
+  );
+}
+
+function Row({
+  icon,
+  title,
+  hint,
+  hintTone,
+  badge,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  hint?: string;
+  hintTone?: 'jackpot' | 'success';
+  badge?: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={() => {
+        haptic('light');
+        onClick();
+      }}
+      className="flex w-full items-center gap-3 px-4 py-3.5 text-left active:bg-surface-2"
+    >
+      <span className="shrink-0">{icon}</span>
+      <span className="min-w-0 flex-1 truncate text-sm">{title}</span>
+
+      {hint && (
+        <span
+          className={cn(
+            'shrink-0 text-[0.7rem] font-semibold',
+            hintTone === 'success' ? 'text-success' : 'text-jackpot',
+          )}
+        >
+          {hint}
+        </span>
+      )}
+
+      {badge !== undefined && (
+        <span className="grid min-w-[1.15rem] shrink-0 place-items-center rounded-full bg-danger px-1 text-[0.6rem] font-black text-white">
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
+
+      <ChevronRight size={16} className="shrink-0 text-dim" />
+    </button>
   );
 }

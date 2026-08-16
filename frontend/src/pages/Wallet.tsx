@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ArrowDownLeft, ArrowUpRight, Info, Copy, Loader2 } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
@@ -29,8 +30,13 @@ export function Wallet() {
   const { t } = useTranslation();
   const balance = useBalance();
   const txns = useTransactions();
-  const [depositOpen, setDepositOpen] = useState(false);
-  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  // Deep link from the Me tab's DEPOSIT / WITHDRAW buttons, so those land on
+  // the sheet they name rather than on the wallet's front page. Read once as
+  // the initial state: re-reading would reopen the sheet every time the player
+  // closed it while the query string was still in the URL.
+  const [params] = useSearchParams();
+  const [depositOpen, setDepositOpen] = useState(params.get('action') === 'deposit');
+  const [withdrawOpen, setWithdrawOpen] = useState(params.get('action') === 'withdraw');
 
   return (
     <div className="space-y-4">

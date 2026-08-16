@@ -148,7 +148,13 @@
     "signOut": "ログアウト",
     "buildLine": "MYPOKER · ステージング版 · v0.1",
     "noHands": "まだプレイ履歴がありません",
-    "noHandsBlurb": "テーブルに参加すると、ここに記録が表示されます。"
+    "noHandsBlurb": "テーブルに参加すると、ここに記録が表示されます。",
+    "personalInfo": "個人情報",
+    "vipMembership": "VIP メンバーシップ",
+    "checkPrivileges": "特典を見る",
+    "inviteFriends": "友達を招待",
+    "earnRewards": "報酬を獲得",
+    "messageCenter": "メッセージセンター"
   },
   "wallet": {
     "totalBalance": "総残高",
@@ -180,7 +186,11 @@
     "insufficient": "Amount exceeds your available balance.",
     "invalidAddress": "That is not a valid TRON address.",
     "availableToWithdraw": "Available: {{amount}}",
-    "withdrawalsTitle": "Withdrawals"
+    "withdrawalsTitle": "Withdrawals",
+    "showBalance": "残高を表示",
+    "hideBalance": "残高を隠す",
+    "detail": "明細",
+    "availableSplit": "利用可能 {{available}}・プレイ中 {{locked}}"
   },
   "table": {
     "fold": "フォールド",

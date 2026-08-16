@@ -148,7 +148,13 @@
     "signOut": "ออกจากระบบ",
     "buildLine": "MYPOKER · เวอร์ชันทดสอบ · v0.1",
     "noHands": "ยังไม่ได้เล่นตาไหน",
-    "noHandsBlurb": "เข้าร่วมโต๊ะแล้วสถิติของคุณจะแสดงที่นี่"
+    "noHandsBlurb": "เข้าร่วมโต๊ะแล้วสถิติของคุณจะแสดงที่นี่",
+    "personalInfo": "ข้อมูลส่วนตัว",
+    "vipMembership": "สมาชิก VIP",
+    "checkPrivileges": "ดูสิทธิพิเศษ",
+    "inviteFriends": "ชวนเพื่อน",
+    "earnRewards": "รับรางวัล",
+    "messageCenter": "ศูนย์ข้อความ"
   },
   "wallet": {
     "totalBalance": "ยอดเงินรวม",
@@ -180,7 +186,11 @@
     "insufficient": "Amount exceeds your available balance.",
     "invalidAddress": "That is not a valid TRON address.",
     "availableToWithdraw": "Available: {{amount}}",
-    "withdrawalsTitle": "Withdrawals"
+    "withdrawalsTitle": "Withdrawals",
+    "showBalance": "แสดงยอดเงิน",
+    "hideBalance": "ซ่อนยอดเงิน",
+    "detail": "รายละเอียด",
+    "availableSplit": "ใช้ได้ {{available}} · อยู่ในเกม {{locked}}"
   },
   "table": {
     "fold": "หมอบ",
