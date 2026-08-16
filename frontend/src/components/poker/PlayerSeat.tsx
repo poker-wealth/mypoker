@@ -86,10 +86,12 @@ export function PlayerSeat({ seat, align = 'bottom', onSit, onClick, accent = 'v
       {!folded && seat.cards.length > 0 && (
         <div
           className={cn(
-            'absolute left-1/2 z-0 flex -translate-x-1/2',
-            // Four cards need a tighter overlap to stay inside the seat's footprint.
-            seat.cards.length > 2 ? '-space-x-5' : '-space-x-4',
-            isTop ? 'top-[70%]' : 'bottom-[70%]',
+            'absolute left-1/2 flex -translate-x-1/2',
+            seat.isHero ? 'z-30 bottom-[95%]' : 'z-0',
+            seat.isHero
+              ? (seat.cards.length > 2 ? '-space-x-2' : 'space-x-1')
+              : (seat.cards.length > 2 ? '-space-x-5' : '-space-x-4'),
+            !seat.isHero && (isTop ? 'top-[70%]' : 'bottom-[70%]'),
           )}
         >
           {seat.cards.map((c, i) => {
@@ -100,9 +102,13 @@ export function PlayerSeat({ seat, align = 'bottom', onSit, onClick, accent = 'v
               <div
                 key={i}
                 className="drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]"
-                style={{ transform: `rotate(${spread * 9}deg) translateY(${Math.abs(spread) * 2}px)` }}
+                style={{
+                  transform: seat.isHero
+                    ? `rotate(${spread * 4}deg) translateY(${Math.abs(spread) * 1}px)`
+                    : `rotate(${spread * 9}deg) translateY(${Math.abs(spread) * 2}px)`,
+                }}
               >
-                <PlayingCard card={c} faceDown={!c} size="sm" index={i} />
+                <PlayingCard card={c} faceDown={!c} size={seat.isHero ? 'md' : 'sm'} index={i} />
               </div>
             );
           })}
