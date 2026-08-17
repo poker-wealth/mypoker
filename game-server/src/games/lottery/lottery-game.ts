@@ -3,6 +3,7 @@ import { EventBus } from '../../core/event-bus';
 import type { FinancialCoreClient, JackpotAccounts } from '../../core/financial-core-client';
 import {
   computeFinalSeed,
+  awaitFutureBlockHash,
   generateClientSeed,
   generateServerCommitment,
   mergeClientSeeds,
@@ -121,7 +122,7 @@ export class LotteryGame extends BaseGame<LotteryPhase, LotteryAction, LotteryGa
       clientSeed: generateClientSeed(),
     }));
     const target = (await this.chain.getLatestBlockNumber()) + 1;
-    const futureBlockHash = await this.chain.getBlockHash(target);
+    const futureBlockHash = await awaitFutureBlockHash(this.chain, target);
     const finalSeed = computeFinalSeed(
       serverSeed,
       mergeClientSeeds(seats),

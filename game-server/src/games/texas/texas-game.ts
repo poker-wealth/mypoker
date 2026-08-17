@@ -6,6 +6,7 @@ import {
   generateClientSeed,
   mergeClientSeeds,
   computeFinalSeed,
+  awaitFutureBlockHash,
   type ChainClient,
   type SeatedClientSeed,
 } from '../../fairness';
@@ -138,7 +139,7 @@ export class TexasGame extends BaseGame<TexasPhase, Action, TexasGameEvents> {
     }));
     const allClientSeeds = mergeClientSeeds(seats);
     const target = (await this.chain.getLatestBlockNumber()) + 1;
-    const futureBlockHash = await this.chain.getBlockHash(target);
+    const futureBlockHash = await awaitFutureBlockHash(this.chain, target);
     const finalSeed = computeFinalSeed(serverSeed, allClientSeeds, futureBlockHash, roundId);
 
     this.round = {
