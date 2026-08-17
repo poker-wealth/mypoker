@@ -55,6 +55,7 @@ import type {
   TableSummary,
 } from './room-state';
 import { newChatterState, evaluateChat, recordMessage, type ChatterState } from '../social/chat';
+import { evaluateVoice, recordVoice } from '../social/voice';
 import { newTargetState, evaluateChallenge, recordPrompt, recordResult, type TargetState } from '../players/peer-challenge';
 
 /**
@@ -405,6 +406,9 @@ export class PokerRoom implements LiveRoom {
       case 'chat':
         this.chat(playerId, cmd.message);
         break;
+      case 'voice':
+        this.voice(playerId, cmd.clip, cmd.durationMs, cmd.mime);
+        break;
       case 'challenge':
         this.challenge(playerId, cmd.targetId);
         break;
@@ -496,6 +500,69 @@ export class PokerRoom implements LiveRoom {
     seat.sittingOut = value;
     this.push();
     if (!value) this.maybeStartHand();
+  }
+
+  /**
+   * Relay a voice note to the table.
+   *
+   * Deliberately a MIRROR of chat() — same gate, same spectator delay, same
+   * broadcast shape — because a voice note is a chat message that happens to be
+   * audio. The clip is relayed and never stored: nothing is written to disk or
+   * to the database, so there is no retention policy to get wrong, no bucket to
+   * leave public, and nothing to hand over when a player asks to be forgotten.
+   * A clip exists in the room only for as long as it takes to fan out.
+   *
+   * The spectator delay applies here for the same reason it applies to text: a
+   * spectator relaying the table to a seated friend must always be relaying the
+   * past, and a voice note is a faster channel for that than typing.
+   */
+  private voice(playerId: string, clip: string, durationMs: number, mime: string): void {
+    let state = this.chatters.get(playerId);
+    if (!state) {
+      state = newChatterState();
+      this.chatters.set(playerId, state);
+    }
+    const player = this.directory.find(playerId);
+    if (!player) return;
+
+    const isSpectator = !this.seatOf(playerId);
+    const decision = evaluateVoice(state, {
+      reputationScore: player.reputationScore,
+      isSpectator,
+      durationMs,
+      clip,
+      mime,
+      now: Date.now(),
+    });
+
+    // Thrown, exactly like a denied chat message: the hub catches it and answers
+    // this one player. A refused voice note is an ordinary outcome — it must
+    // never disturb the hand or any other seat.
+    if (!decision.ok) throw new RoomError(`Voice denied: ${decision.reason}`);
+
+    recordVoice(state, Date.now());
+
+    const eventData = {
+      id: crypto.randomUUID(),
+      senderId: playerId,
+      senderName: player.displayName,
+      clip,
+      durationMs,
+      mime,
+      timestamp: Date.now(),
+    };
+
+    for (const [viewerId, clients] of this.viewers.entries()) {
+      const viewerIsSpectator = !this.seatOf(viewerId);
+      const sendEvent = (): void => {
+        for (const client of clients) client.sendEvent('voice_message', eventData);
+      };
+      if (viewerIsSpectator && this.config.spectatorDelayMs > 0) {
+        setTimeout(sendEvent, this.config.spectatorDelayMs);
+      } else {
+        sendEvent();
+      }
+    }
   }
 
   private chat(playerId: string, message: string): void {

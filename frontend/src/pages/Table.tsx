@@ -60,7 +60,7 @@ function LiveTable({ tableId }: { tableId: string }) {
   const [chatOpen, setChatOpen] = useState(false);
   const [challengePrompt, setChallengePrompt] = useState<string | null>(null);
 
-  const { messages, sendChat } = useTableChat(live.socket);
+  const { messages, sendChat, sendVoice } = useTableChat(live.socket);
 
   // Hook into socket events to show challenge modal
   useEffect(() => {
@@ -149,9 +149,12 @@ function LiveTable({ tableId }: { tableId: string }) {
                 transition={{ type: 'spring', damping: 25, stiffness: 200 }}
                 className="absolute top-0 right-0 bottom-0 w-72 z-40 shadow-2xl overflow-hidden border-l border-border bg-surface/95 backdrop-blur-md"
               >
-                <ChatBox 
-                  messages={messages} 
-                  onSend={sendChat} 
+                <ChatBox
+                  messages={messages}
+                  onSend={sendChat}
+                  // Spectators cannot chat (§10.1) and so cannot voice either —
+                  // withholding the button matches what the server would refuse.
+                  {...(live.watching ? {} : { onSendVoice: sendVoice })}
                   disabled={status !== 'ready' || live.watching}
                   placeholder={live.watching ? "Spectators cannot chat" : "Say something..."}
                 />

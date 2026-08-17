@@ -218,7 +218,18 @@
     "tableDesign": "टेबल डिज़ाइन",
     "demoSubtitle": "{{game}} डेमो · हाथ {{hand}} · ब्लाइंड्स {{blinds}}",
     "signingIn": "साइन इन हो रहा है…",
-    "signInToSit": "बैठने के लिए साइन इन करें"
+    "signInToSit": "बैठने के लिए साइन इन करें",
+    "voiceHold": "वॉइस नोट रिकॉर्ड करने के लिए दबाए रखें",
+    "voiceRecording": "रिकॉर्ड हो रहा है… भेजने के लिए छोड़ें",
+    "voicePlay": "वॉइस नोट चलाएँ, {{seconds}} सेकंड",
+    "voiceUnplayable": "चला नहीं सकते",
+    "voiceExpired": "वॉइस नोट समाप्त हो गया",
+    "chatDisabled": "चैट बंद है",
+    "microphoneDenied": "माइक्रोफ़ोन की अनुमति नहीं मिली",
+    "recordingUnsupported": "यह ब्राउज़र ऑडियो रिकॉर्ड नहीं कर सकता",
+    "recordingTooShort": "भेजने के लिए थोड़ा और दबाए रखें",
+    "recordingTooLong": "रिकॉर्डिंग भेजने के लिए बहुत बड़ी है",
+    "recordingFailed": "वह रिकॉर्डिंग नहीं भेजी जा सकी"
   },
   "a11y": {
     "toggleTheme": "थीम बदलें",

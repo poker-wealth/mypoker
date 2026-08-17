@@ -218,7 +218,18 @@
     "tableDesign": "ดีไซน์โต๊ะ",
     "demoSubtitle": "{{game}} เดโม · ตาที่ {{hand}} · เบลนด์ {{blinds}}",
     "signingIn": "กำลังเข้าสู่ระบบ…",
-    "signInToSit": "เข้าสู่ระบบเพื่อนั่งโต๊ะ"
+    "signInToSit": "เข้าสู่ระบบเพื่อนั่งโต๊ะ",
+    "voiceHold": "กดค้างเพื่อบันทึกเสียง",
+    "voiceRecording": "กำลังบันทึก… ปล่อยเพื่อส่ง",
+    "voicePlay": "เล่นข้อความเสียง {{seconds}} วินาที",
+    "voiceUnplayable": "เล่นไม่ได้",
+    "voiceExpired": "ข้อความเสียงหมดอายุแล้ว",
+    "chatDisabled": "ปิดการแชท",
+    "microphoneDenied": "การเข้าถึงไมโครโฟนถูกปฏิเสธ",
+    "recordingUnsupported": "เบราว์เซอร์นี้บันทึกเสียงไม่ได้",
+    "recordingTooShort": "กดค้างนานขึ้นอีกนิดเพื่อส่ง",
+    "recordingTooLong": "ไฟล์เสียงใหญ่เกินไป",
+    "recordingFailed": "ส่งเสียงนี้ไม่สำเร็จ"
   },
   "a11y": {
     "toggleTheme": "สลับธีม",

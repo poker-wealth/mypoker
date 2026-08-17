@@ -1,23 +1,51 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, MessageSquareOff } from 'lucide-react';
+import { Send, MessageSquareOff, Mic } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import type { ChatMessage } from '@/hooks/useTableChat';
+import { useVoiceRecorder, type VoiceClip } from '@/hooks/useVoiceRecorder';
+import { VoiceNote } from './VoiceNote';
 import { useSession } from '@/store/session';
+import { toast } from '@/store/toast';
 
 export function ChatBox({
   messages,
   onSend,
+  onSendVoice,
   disabled = false,
   placeholder = "Say something..."
 }: {
   messages: ChatMessage[];
   onSend: (text: string) => void;
+  /** Omitted where voice does not belong (e.g. a read-only transcript). */
+  onSendVoice?: (clip: VoiceClip) => void;
   disabled?: boolean;
   placeholder?: string;
 }) {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const { player } = useSession();
+  const { t } = useTranslation();
+  const voice = useVoiceRecorder();
+
+  // Recorder problems surface as a toast and are cleared, so the same failure
+  // can be reported again next time rather than sticking as permanent state.
+  useEffect(() => {
+    if (!voice.error) return;
+    toast.error(t(`table.${voice.error}`));
+    voice.clearError();
+  }, [voice, t]);
+
+  /**
+   * Release: stop, and send only if a usable clip came back.
+   *
+   * Every failure path inside the recorder resolves null and reports itself, so
+   * there is nothing to catch here and nothing that can reach the table.
+   */
+  const endHold = async (): Promise<void> => {
+    const clip = await voice.stop();
+    if (clip && onSendVoice) onSendVoice(clip);
+  };
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -58,17 +86,32 @@ export function ChatBox({
                     {msg.senderName}
                   </span>
                 )}
-                <div 
-                  className={`rounded-xl px-2.5 py-1.5 break-words max-w-[85%] shadow-sm ${
-                    msg.isSystem 
-                      ? 'bg-surface-2 text-dim italic px-3 text-[0.65rem] rounded-full' 
-                      : isMe 
-                        ? 'bg-brand/20 border border-brand/30 text-brand-fg' 
-                        : 'bg-surface-2 border border-border text-text'
-                  }`}
-                >
-                  {msg.text}
-                </div>
+                {msg.voice ? (
+                  <VoiceNote
+                    clip={msg.voice.clip}
+                    durationMs={msg.voice.durationMs}
+                    mime={msg.voice.mime}
+                    mine={isMe}
+                  />
+                ) : msg.text === undefined ? (
+                  // Its audio was trimmed to keep memory bounded. Say that,
+                  // rather than rendering an empty bubble.
+                  <div className="rounded-full bg-surface-2 px-3 py-1 text-[0.65rem] italic text-dim">
+                    {t('table.voiceExpired')}
+                  </div>
+                ) : (
+                  <div
+                    className={`rounded-xl px-2.5 py-1.5 break-words max-w-[85%] shadow-sm ${
+                      msg.isSystem
+                        ? 'bg-surface-2 text-dim italic px-3 text-[0.65rem] rounded-full'
+                        : isMe
+                          ? 'bg-brand/20 border border-brand/30 text-brand-fg'
+                          : 'bg-surface-2 border border-border text-text'
+                    }`}
+                  >
+                    {msg.text}
+                  </div>
+                )}
               </div>
             );
           })
@@ -80,14 +123,49 @@ export function ChatBox({
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={disabled ? "Chat is disabled" : placeholder}
-          disabled={disabled}
+          placeholder={
+            voice.recording ? t('table.voiceRecording') : disabled ? t('table.chatDisabled') : placeholder
+          }
+          disabled={disabled || voice.recording}
           maxLength={200}
-          className="flex-1 rounded-full border border-border bg-bg/50 px-3 py-1.5 text-[0.8rem] text-text placeholder:text-dim focus:border-brand focus:outline-none"
+          className="flex-1 rounded-full border border-border bg-bg/50 px-3 py-1.5 text-[0.8rem] text-text placeholder:text-dim focus:border-brand focus:outline-none disabled:opacity-60"
         />
+
+        {/* Press and hold. Shown only where voice is wired and the browser can
+            actually record — an inert microphone is the dead control this
+            project has been removing, not adding. */}
+        {onSendVoice && voice.supported && (
+          <button
+            type="button"
+            disabled={disabled}
+            aria-label={t('table.voiceHold')}
+            onPointerDown={(e) => { e.preventDefault(); voice.start(); }}
+            onPointerUp={(e) => { e.preventDefault(); void endHold(); }}
+            // Dragging off the button, or the browser stealing the pointer,
+            // must not leave the microphone open forever.
+            onPointerLeave={() => { if (voice.recording) void endHold(); }}
+            onPointerCancel={() => voice.cancel()}
+            onContextMenu={(e) => e.preventDefault()} // long-press menu on mobile
+            className={`relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors ${
+              voice.recording
+                ? 'border-danger bg-danger/20 text-danger'
+                : 'border-border bg-bg/50 text-dim hover:text-text'
+            } disabled:opacity-40 touch-none select-none`}
+          >
+            <Mic size={15} />
+            {voice.recording && (
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 rounded-full border-2 border-danger"
+                style={{ clipPath: `inset(${(1 - voice.progress) * 100}% 0 0 0)` }}
+              />
+            )}
+          </button>
+        )}
+
         <Button
           size="sm"
-          disabled={!input.trim() || disabled} 
+          disabled={!input.trim() || disabled || voice.recording}
           className="rounded-full px-3"
         >
           {disabled ? <MessageSquareOff size={15} /> : <Send size={15} />}
