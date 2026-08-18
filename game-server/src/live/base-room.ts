@@ -311,6 +311,17 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
       `[room ${this.config.id}] round failed to settle — table returned to WAITING, nothing paid or reversed:`,
       err,
     );
+    // Surface it. A settlement failure is a money fault; left as a console line a RECURRING ledger
+    // fault stays quiet. Report it so it lands in FC's append-only security_log and pages ops. Fire-
+    // and-forget, exactly like the CB3 anomaly report — the recovery below must not wait on the alert.
+    if (this.fc.reportSettlementFailure) {
+      void this.fc
+        .reportSettlementFailure({
+          tableId: this.config.id,
+          reason: err instanceof Error ? err.message : String(err),
+        })
+        .catch((e) => console.error(`[room ${this.config.id}] settlement-failure report to FC failed:`, e));
+    }
     this.phase = 'WAITING';
     this.actionDeadline = null;
     this.push();

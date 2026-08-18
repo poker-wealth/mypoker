@@ -1,4 +1,5 @@
 import { SecurityLogModel } from '../security/security-log.model';
+import { alertOps } from '../lib/alert';
 
 /**
  * Recent security-log entries, for the admin Alerts screen (SAMUEL.md task 3,
@@ -18,6 +19,27 @@ export interface SecurityEvent {
   /** e.g. CIRCUIT_BREAKER_CB6, ILLEGAL_FUND_FLOW, NON_OFFICIAL_CONTRACT_DEPOSIT */
   event: string;
   detail: Record<string, unknown>;
+}
+
+/**
+ * Record a table hand that FAILED to settle, and page ops.
+ *
+ * The game-server catches a settlement throw, returns the table to WAITING WITHOUT inventing any
+ * correction (settleTableHand is atomic — a throw moved no money), and reports the failure here. A
+ * settlement failure is a money fault: left as a console line a recurring ledger fault stays quiet,
+ * which is exactly what a money platform cannot have. Mirrors the CB3 anomaly path — write the
+ * append-only record first (the post-save hook mirrors it to syslog), then alert.
+ */
+export async function recordSettlementFailure(
+  tableId: string,
+  reason: string,
+  roundId?: string,
+): Promise<void> {
+  await SecurityLogModel.create([{ event: 'SETTLEMENT_FAILURE', detail: { tableId, roundId, reason } }]);
+  await alertOps(
+    `Settlement failed on table ${tableId}${roundId ? ` (round ${roundId})` : ''}: ${reason}`,
+    { tableId, roundId, reason },
+  );
 }
 
 export async function getSecurityEvents(limit = 100): Promise<SecurityEvent[]> {

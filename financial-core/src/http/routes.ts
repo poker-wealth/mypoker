@@ -43,7 +43,7 @@ import {
 import { getInsuranceReserve } from '../wallet/insurance-reserve';
 import { getOpsOverview } from '../ops/overview';
 import { getAdminPlayerDetail, getPlayerBalances } from '../ops/player-detail';
-import { getSecurityEvents } from '../ops/security-events';
+import { getSecurityEvents, recordSettlementFailure } from '../ops/security-events';
 import { getWithdrawalQueue } from '../ops/withdrawal-queue';
 import { getLeagueOverview } from '../ops/league-overview';
 import {
@@ -1503,6 +1503,25 @@ export function buildRouter(): Router {
       const { tableId, triggersLastHour } = cb3Body.parse(req.body);
       const event = await evaluateCB3(tableId, triggersLastHour);
       res.json(event);
+    }),
+  );
+
+  // ── Settlement-failure report (internal) ─────────────────────────────────
+  // The game-server returns a table to WAITING when a hand fails to settle (nothing paid or reversed
+  // — settleTableHand is atomic). It reports the failure here so a recurring ledger fault lands in the
+  // append-only security_log and pages ops, instead of staying a console line on the game node.
+  const settlementFailureBody = z.object({
+    tableId: z.string().min(1),
+    reason: z.string().min(1).max(500),
+    roundId: z.string().min(1).optional(),
+  });
+  r.post(
+    '/internal/settlement-failure',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { tableId, reason, roundId } = settlementFailureBody.parse(req.body);
+      await recordSettlementFailure(tableId, reason, roundId);
+      res.json({ recorded: true });
     }),
   );
 

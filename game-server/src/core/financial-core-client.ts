@@ -80,12 +80,24 @@ export interface FinancialCoreClient {
    *  pages ops. The engine has already frozen the table locally; this is the alert side.
    *  Optional so demo/test fakes need not implement it. */
   reportJackpotAnomaly?(req: JackpotAnomalyReport): Promise<void>;
+  /** Report a table hand that failed to settle so FC records it in the append-only security_log and
+   *  pages ops. The room has already returned the table to WAITING without moving money; this is the
+   *  alert side. Optional so demo/test fakes need not implement it. */
+  reportSettlementFailure?(req: SettlementFailureReport): Promise<void>;
 }
 
 export interface JackpotAnomalyReport {
   tableId: string;
   /** Triggers observed on this table in the last hour — the CB3 metric (freezes at ≥3). */
   triggersLastHour: number;
+}
+
+export interface SettlementFailureReport {
+  tableId: string;
+  /** Why the settlement failed — the caught error's message. */
+  reason: string;
+  /** The round that failed, when the caller knows it. */
+  roundId?: string;
 }
 
 export interface InsuranceReserveFacts {
@@ -194,6 +206,10 @@ export class HttpFinancialCoreClient implements FinancialCoreClient {
 
   async reportJackpotAnomaly(req: JackpotAnomalyReport): Promise<void> {
     await this.post('/internal/circuit-breakers/cb3', req);
+  }
+
+  async reportSettlementFailure(req: SettlementFailureReport): Promise<void> {
+    await this.post('/internal/settlement-failure', req);
   }
 
   async settleTableHand(
