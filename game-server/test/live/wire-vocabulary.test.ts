@@ -31,6 +31,7 @@ const REAL_COMMANDS: Array<[string, unknown]> = [
   ['dou di zhu · pass the auction', { kind: 'act', action: { type: 'bid-0' } }],
   ['dou di zhu · play a combination', { kind: 'act', action: { type: 'play', cards: ['3s', '3h'] } }],
   ['dou di zhu · pass the trick', { kind: 'act', action: { type: 'pass' } }],
+  ['texas cowboy · back a market', { kind: 'act', action: { type: 'bet', amount: 100, selection: 'cowboy_win' } }],
   ['slots · spin', { kind: 'act', action: { type: 'spin', amount: 100 } }],
   ['practice · AI difficulty', { kind: 'act', action: { type: 'ai-hard' } }],
 ];
@@ -48,6 +49,18 @@ describe('the wire speaks every game', () => {
       action: { type: 'bet', amount: 100, multiplier: 5 },
     });
     expect(parsed.success && parsed.data.kind === 'act' && parsed.data.action.multiplier).toBe(5);
+  });
+
+  it('keeps the market selection, without which a Texas Cowboy bet has nothing to back', () => {
+    // Stripped here, the room sees a stake with no market and answers "missing market
+    // selection" — which is what made that game unplayable over the socket.
+    const parsed = tableCommandSchema.safeParse({
+      kind: 'act',
+      action: { type: 'bet', amount: 100, selection: 'royal_flush' },
+    });
+    expect(parsed.success && parsed.data.kind === 'act' && parsed.data.action.selection).toBe(
+      'royal_flush',
+    );
   });
 
   it('keeps the played cards, which belong INSIDE the action', () => {
