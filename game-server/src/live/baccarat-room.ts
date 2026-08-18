@@ -200,9 +200,23 @@ export class BaccaratRoom extends BaseLiveRoom<BaccaratRoomConfig, RoomSeat> {
       handNumber: this.handNumber,
       street: null,
       pot: this.occupiedSeats().reduce((sum, s) => sum + s.bet, 0),
-      board: result && this.phase === 'SHOWDOWN'
-        ? [...result.playerCards, '|', ...result.bankerCards]
-        : [],
+      /**
+       * Both hands, kept apart.
+       *
+       * `board` used to carry them as one array with a '|' shoved between, which the felt then
+       * drew as a card face reading "|". A baccarat felt has to show two hands and two totals, so
+       * they travel in `gameState` where they can be told apart.
+       */
+      board: [],
+      gameState: {
+        revealed: Boolean(result) && this.phase === 'SHOWDOWN',
+        playerCards: result?.playerCards ?? [],
+        bankerCards: result?.bankerCards ?? [],
+        playerTotal: result?.playerTotal ?? null,
+        bankerTotal: result?.bankerTotal ?? null,
+        outcome: result?.outcome ?? null,
+        tiePayout: this.config.tiePayout,
+      },
       seats: this.seats.map((s, idx) => {
         if (!s) {
           return {
