@@ -56,7 +56,7 @@ import type {
 } from './room-state';
 import { newChatterState, evaluateChat, recordMessage, type ChatterState } from '../social/chat';
 import { newTargetState, evaluateChallenge, recordPrompt, recordResult, type TargetState } from '../players/peer-challenge';
-import { decisionTimeGate } from '../players/anti-bot';
+import { decisionTimeGate, doubleConfirmGate } from '../players/anti-bot';
 
 /**
  * PokerRoom — a real table that real people sit down at.
@@ -107,6 +107,13 @@ export interface PokerRoomConfig extends LiveTableConfig {
    * trusted context (tests, the AI) is never gated. It gates the action, never accuses the player.
    */
   minDecisionMs?: number;
+  /**
+   * Anti-bot double-confirm (§8.3): a major commitment (all-in) must be confirmed by a SECOND action
+   * at least 1s after the first — two clicks a bot fires instantly, a human does not. Opt-in and
+   * OFF by default: the first all-in only ARMS (it does not execute), so enabling it requires the
+   * client to show a "tap again to confirm" prompt and re-send. Leave off until that UI ships.
+   */
+  requireDoubleConfirm?: boolean;
 }
 
 export interface PokerRoomDeps {
@@ -223,6 +230,8 @@ export class PokerRoom implements LiveRoom {
   private actionDeadline: number | null = null;
   /** When the current player's turn began (for the anti-bot decision-time gate). */
   private turnStartedAt: number | null = null;
+  /** First-click time of an as-yet-unconfirmed major (all-in) action, per player (double-confirm). */
+  private readonly pendingMajorConfirm = new Map<string, number>();
   private winners: number[] = [];
   /**
    * Trigger logic for this table's four pools (spec: pools are PER TABLE —
@@ -635,6 +644,21 @@ export class PokerRoom implements LiveRoom {
       const gate = decisionTimeGate(Date.now() - this.turnStartedAt, complexBoard, this.config.minDecisionMs);
       if (!gate.ok) throw new RoomError(gate.reason);
     }
+    // Anti-bot double-confirm (§8.3): an all-in must be confirmed by a SECOND action ≥1s later. The
+    // first click ARMS (does not execute); the client shows "tap again to confirm" and re-sends.
+    if (this.config.requireDoubleConfirm && this.isAllInAction(action)) {
+      const armedAt = this.pendingMajorConfirm.get(playerId);
+      const now = Date.now();
+      if (armedAt === undefined) {
+        this.pendingMajorConfirm.set(playerId, now);
+        this.message = 'Confirm all-in — tap again';
+        this.push();
+        return; // armed; await the confirming second action
+      }
+      this.pendingMajorConfirm.delete(playerId);
+      const confirm = doubleConfirmGate(armedAt, now);
+      if (!confirm.ok) throw new RoomError(confirm.reason); // second click too fast — bot signature
+    }
     await this.applyAction(playerId, action, this.describeAction(action));
     // The action passed to the bots — play their turns before handing the table back.
   }
@@ -738,6 +762,15 @@ export class PokerRoom implements LiveRoom {
     this.actionTimer = undefined;
     this.actionDeadline = null;
     this.turnStartedAt = null;
+    // A turn ended (acted or timed out) — drop any un-confirmed all-in arm so it can't carry over.
+    this.pendingMajorConfirm.clear();
+  }
+
+  /** An all-in raise — the major commitment the double-confirm gate guards. */
+  private isAllInAction(action: Action): boolean {
+    if (action.type !== 'raise' || !this.game) return false;
+    const legal = this.game.legalActions();
+    return legal?.maxRaiseTo != null && (action.amount ?? 0) >= legal.maxRaiseTo;
   }
 
   /** The clock ran out: check if it's free, otherwise fold. A missing player is also sat out. */
