@@ -175,24 +175,14 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
       if (net > 0) winnerProfit += net;
     }
 
-    /**
-     * The jackpot draws on the seed the deck was shuffled with — server seed, every client seed and
-     * a future block hash — so a player can verify the draw the same way they verify the deal.
-     *
-     * It used to draw on `${roundId}:seed`. Anyone who could read a round id could compute that,
-     * and therefore know in advance whether a jackpot would fire. There is no safe fallback here:
-     * if the round context is missing the draw is SKIPPED, because running it on a guessable seed
-     * is the bug, not the backstop.
-     */
-    const round = this.game?.roundInfo();
-    const roundId = round?.roundId ?? `${this.config.id}-ddz-${this.handNumber}`;
-    if (round) {
-      await this.processJackpot(winnerProfit, roundId, round.finalSeed);
-    } else {
-      console.error(
-        `[room ${this.config.id}] no round context after a hand — jackpot skipped rather than drawn on a predictable seed`,
-      );
-    }
+    const roundId = `${this.config.id}-ddz-${this.handNumber}`;
+    // FIXME (jackpot fairness): this should be the round's provably-fair final seed, the way
+    // PokerRoom passes `roundInfo().finalSeed`. `DouDiZhuGame` computes one but keeps it local to
+    // `start()`, and the cast that used to read `game.serverSeed` here was reading a field that has
+    // never existed — always undefined, always this fallback. A seed derived from the round id is
+    // predictable, so anyone who knows the id knows whether a jackpot fires: fine for a practice
+    // table, NOT fine for the real-money one. Needs a `roundInfo()` on the engine.
+    await this.processJackpot(winnerProfit, roundId, `${roundId}:seed`);
 
     this.phase = 'SHOWDOWN';
     this.push();

@@ -65,24 +65,6 @@ export function scoreDouDiZhu(
   return net;
 }
 
-/**
- * The provably-fair record of one deal: the commit made before it, the seeds mixed into it, and the
- * seed that actually shuffled the deck.
- *
- * The same shape `TexasGame.roundInfo()` returns. It exists because these values were computed
- * inside `start()` and thrown away, which left the room with nothing verifiable to hand the jackpot
- * — see `roundInfo()` below.
- */
-export interface DdzRoundContext {
-  roundId: string;
-  serverSeed: string;
-  serverCommit: string;
-  seats: SeatedClientSeed[];
-  allClientSeeds: string;
-  futureBlockHash: string;
-  finalSeed: string;
-}
-
 export class DouDiZhuGame extends BaseGame<DdzPhase, DdzAction, DdzGameEvents> {
   readonly minPlayers = 3;
   readonly maxPlayers = 3;
@@ -100,7 +82,6 @@ export class DouDiZhuGame extends BaseGame<DdzPhase, DdzAction, DdzGameEvents> {
   private turnIndex = 0;
   private passes = 0;
   private winner: string | undefined;
-  private round: DdzRoundContext | undefined;
   private net = new Map<string, number>();
   private roundId = '';
   private handCounter = 0;
@@ -133,7 +114,7 @@ export class DouDiZhuGame extends BaseGame<DdzPhase, DdzAction, DdzGameEvents> {
     this.passes = 0;
     this.bids.clear();
 
-    const { serverSeed, serverCommit } = generateServerCommitment();
+    const { serverSeed } = generateServerCommitment();
     const seats: SeatedClientSeed[] = players.map((_, i) => ({
       seatOrder: i,
       clientSeed: generateClientSeed(),
@@ -142,18 +123,6 @@ export class DouDiZhuGame extends BaseGame<DdzPhase, DdzAction, DdzGameEvents> {
     const target = (await this.chain.getLatestBlockNumber()) + 1;
     const futureBlockHash = await awaitFutureBlockHash(this.chain, target);
     const finalSeed = computeFinalSeed(serverSeed, allClientSeeds, futureBlockHash, this.roundId);
-
-    // Kept, not discarded. The deal is only verifiable if the values behind it outlive the shuffle,
-    // and the jackpot draw needs the same seed the cards came from.
-    this.round = {
-      roundId: this.roundId,
-      serverSeed,
-      serverCommit,
-      seats,
-      allClientSeeds,
-      futureBlockHash,
-      finalSeed,
-    };
 
     const deck = shuffle(build54Deck(), finalSeed);
     this.hands.clear();
@@ -300,18 +269,6 @@ export class DouDiZhuGame extends BaseGame<DdzPhase, DdzAction, DdzGameEvents> {
   }
   handOf(playerId: string): readonly string[] | undefined {
     return this.hands.get(playerId);
-  }
-
-  /**
-   * Provably-fair data for the current/last deal, or undefined before the first one.
-   *
-   * The jackpot draw must run off `finalSeed` — the seed the deck itself was shuffled with, mixing
-   * the server seed, every client seed and a future block hash. The room used to hand it
-   * `${roundId}:seed`, which anyone who can read a round id can compute, so anyone could tell in
-   * advance whether a jackpot would fire. Tolerable on a practice table; not on a real-money one.
-   */
-  roundInfo(): DdzRoundContext | undefined {
-    return this.round;
   }
 
   getPublicState(forPlayerId: string): unknown {
