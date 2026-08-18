@@ -69,6 +69,7 @@ import {
   discoverLeagues,
   putLeagueSettings,
   leaguesWithDueRakeChange,
+  membershipOf,
 } from '../league/league-store';
 import {
   createAgent,
@@ -1348,6 +1349,25 @@ export function buildRouter(): Router {
       );
     }),
   );
+  /**
+   * One player's role in one league, or null.
+   *
+   * The gateway needs this to decide whether a caller may open a league room,
+   * and it must come from here rather than the request: a caller claiming to
+   * administer someone else's league is the attack that endpoint exists to
+   * refuse. Null rather than 404 for a non-member — "not a member" is a normal
+   * answer, and the gateway turns it into the 404 a stranger should see.
+   */
+  r.get(
+    '/internal/leagues/:leagueId/members/:playerId',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json({
+        role: await membershipOf(String(req.params.leagueId), String(req.params.playerId)),
+      });
+    }),
+  );
+
   r.get(
     '/internal/leagues/due-rake-changes',
     internalAuth,
