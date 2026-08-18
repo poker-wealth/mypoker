@@ -80,7 +80,24 @@ export const GAMES: GameDef[] = [
  * those screens are finished and verified end-to-end — each sits, bets, settles through the ledger
  * and pays the right rake. Putting a game in here is a launch decision, so taking one out is too.
  */
-export const HIDDEN_GAMES: ReadonlySet<string> = new Set<GameId>([]);
+export const HIDDEN_GAMES: ReadonlySet<string> = new Set<GameId>([
+  // WITHHELD ON A REAL-MONEY FAIRNESS BUG, not because the games are unfinished.
+  //
+  // Every room below still draws its jackpot on `${roundId}:seed` instead of the round's real
+  // provably-fair seed. A round id is not a secret, so anyone who can read one can work out in
+  // advance whether a jackpot fires and on which tier. Dou Di Zhu had the same bug and was fixed;
+  // these are the rest of them.
+  //
+  // Victor's call (18 Aug 2026): off sale until each one feeds its real seed to processJackpot.
+  // Put back as each is fixed — the entry goes when the room does, not in one batch at the end.
+  'baccarat',
+  'cowboy-beauty',
+  'lottery',
+  'niu-niu',
+  'red-packet',
+  'san-zhang',
+  'slots',
+]);
 
 /** The catalog minus anything not yet on sale. Use for anything player-facing. */
 export const visibleGames = (): GameDef[] => GAMES.filter((g) => !HIDDEN_GAMES.has(g.id));
