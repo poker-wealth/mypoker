@@ -6,6 +6,7 @@ import {
   generateClientSeed,
   mergeClientSeeds,
   computeFinalSeed,
+  awaitFutureBlockHash,
   shuffledDeck,
   type ChainClient,
   type SeatedClientSeed,
@@ -124,7 +125,7 @@ export class BaccaratGame extends BaseGame<BaccaratPhase, BaccaratAction, Baccar
     }));
     const allClientSeeds = mergeClientSeeds(seats);
     const target = (await this.chain.getLatestBlockNumber()) + 1;
-    const futureBlockHash = await this.chain.getBlockHash(target);
+    const futureBlockHash = await awaitFutureBlockHash(this.chain, target);
     const finalSeed = computeFinalSeed(serverSeed, allClientSeeds, futureBlockHash, this.roundId);
 
     this.result = playBaccarat(shuffledDeck(finalSeed));

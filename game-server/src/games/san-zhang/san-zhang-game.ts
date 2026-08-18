@@ -6,6 +6,7 @@ import {
   generateClientSeed,
   mergeClientSeeds,
   computeFinalSeed,
+  awaitFutureBlockHash,
   shuffledDeck,
   type ChainClient,
   type SeatedClientSeed,
@@ -101,7 +102,7 @@ export class SanZhangGame extends BaseGame<SanZhangPhase, SanZhangAction, SanZha
     }));
     const allClientSeeds = mergeClientSeeds(seats);
     const target = (await this.chain.getLatestBlockNumber()) + 1;
-    const futureBlockHash = await this.chain.getBlockHash(target);
+    const futureBlockHash = await awaitFutureBlockHash(this.chain, target);
     const finalSeed = computeFinalSeed(serverSeed, allClientSeeds, futureBlockHash, this.roundId);
 
     // Deal 3 cards to each participant (banker first), in fixed order.

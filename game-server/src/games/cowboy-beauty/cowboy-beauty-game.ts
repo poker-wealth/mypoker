@@ -6,6 +6,7 @@ import {
   generateClientSeed,
   mergeClientSeeds,
   computeFinalSeed,
+  awaitFutureBlockHash,
   shuffledDeck,
   type ChainClient,
   type SeatedClientSeed,
@@ -130,7 +131,7 @@ export class CowboyBeautyGame extends BaseGame<CowboyPhase, CowboyAction, Cowboy
       clientSeed: generateClientSeed(),
     }));
     // The deciding hash comes from the block pinned at freeze — mined after betting closed.
-    const futureBlockHash = await this.chain.getBlockHash(this.drawBlock);
+    const futureBlockHash = await awaitFutureBlockHash(this.chain, this.drawBlock);
     const finalSeed = computeFinalSeed(
       serverSeed,
       mergeClientSeeds(seats),

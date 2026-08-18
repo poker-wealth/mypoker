@@ -13,6 +13,7 @@ export {
 export { standardDeck, shuffle, shuffledDeck } from './shuffle';
 export { MerkleTree, type ProofNode } from './merkle';
 export { FakeChainClient, type ChainClient, type CommitRootArgs } from './chain';
+export { awaitFutureBlockHash, type FutureBlockOptions } from './future-block';
 export { FakeNotary, type NotaryClient } from './notary';
 export { ChainHealthMonitor, type ChainHealthOptions } from './chain-health';
 export {

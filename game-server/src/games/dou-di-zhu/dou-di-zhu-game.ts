@@ -6,6 +6,7 @@ import {
   generateClientSeed,
   mergeClientSeeds,
   computeFinalSeed,
+  awaitFutureBlockHash,
   shuffle,
   type ChainClient,
   type SeatedClientSeed,
@@ -139,7 +140,7 @@ export class DouDiZhuGame extends BaseGame<DdzPhase, DdzAction, DdzGameEvents> {
     }));
     const allClientSeeds = mergeClientSeeds(seats);
     const target = (await this.chain.getLatestBlockNumber()) + 1;
-    const futureBlockHash = await this.chain.getBlockHash(target);
+    const futureBlockHash = await awaitFutureBlockHash(this.chain, target);
     const finalSeed = computeFinalSeed(serverSeed, allClientSeeds, futureBlockHash, this.roundId);
 
     // Kept, not discarded. The deal is only verifiable if the values behind it outlive the shuffle,

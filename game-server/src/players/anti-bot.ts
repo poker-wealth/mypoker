@@ -54,9 +54,13 @@ export type ActionGate = { ok: true } | { ok: false; reason: string };
  * On a complex board (someone is all-in), a decision faster than 3s is rejected — no human reads a
  * multi-way all-in that fast. This gates the ACTION; it does not itself accuse the player.
  */
-export function decisionTimeGate(elapsedMs: number, complexBoard: boolean): ActionGate {
-  if (complexBoard && elapsedMs < MIN_DECISION_MS_COMPLEX) {
-    return { ok: false, reason: `decision under ${MIN_DECISION_MS_COMPLEX}ms on a complex board` };
+export function decisionTimeGate(
+  elapsedMs: number,
+  complexBoard: boolean,
+  minMs: number = MIN_DECISION_MS_COMPLEX,
+): ActionGate {
+  if (complexBoard && elapsedMs < minMs) {
+    return { ok: false, reason: `decision under ${minMs}ms on a complex board` };
   }
   return { ok: true };
 }
