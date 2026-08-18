@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Sheet } from '@/components/ui/Sheet';
 import { toast } from '@/lib/toast';
+import { useConfirmSheet } from '@/components/ui/ConfirmSheet';
 import { useAdminLeagues, useLeagueFunding, useLeagueFundingActions } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
 import { moneyFromDecimal } from '@/lib/money';
@@ -205,10 +206,12 @@ function RequestSheet({ action, onClose }: { action: PendingAction | null; onClo
 function FundingQueue() {
   const queue = useLeagueFunding();
   const { approve, reject, execute } = useLeagueFundingActions();
+  const { confirm, prompt, sheet: confirmSheet } = useConfirmSheet();
 
   if (!queue.isSuccess || queue.data.requests.length === 0) return null;
 
   return (
+    <>
     <section>
       <h2 className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-dim">
         Awaiting review
@@ -262,14 +265,21 @@ function FundingQueue() {
                   <Button
                     variant="ghost"
                     className="flex-1"
-                    onClick={() => {
-                      const reason = window.prompt('Why is this refused?');
-                      if (!reason) return;
-                      reject.mutate(
-                        { id: r._id, reason },
-                        { onSuccess: () => toast.success('Rejected.') },
-                      );
-                    }}
+                    onClick={() =>
+                      void (async () => {
+                        const reason = await prompt({
+                          title: 'Refuse funding request',
+                          confirmLabel: 'Refuse',
+                          danger: true,
+                          withInput: { label: 'Reason', placeholder: 'why this is refused', required: true },
+                        });
+                        if (!reason) return;
+                        reject.mutate(
+                          { id: r._id, reason },
+                          { onSuccess: () => toast.success('Rejected.') },
+                        );
+                      })()
+                    }
                   >
                     Reject
                   </Button>
@@ -278,15 +288,29 @@ function FundingQueue() {
               {r.state === 'APPROVED' && (
                 <Button
                   full
-                  onClick={() => {
-                    // The only button on this screen that moves money, so it is
-                    // the only one that asks twice.
-                    if (!window.confirm(`Move ${moneyFromDecimal(r.amount)} now? This writes to the ledger.`)) return;
-                    execute.mutate(r._id, {
-                      onSuccess: () => toast.success('Executed. The ledger has been written.'),
-                      onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
-                    });
-                  }}
+                  onClick={() =>
+                    void (async () => {
+                      // The only button on this screen that moves money, so it is
+                      // the only one that asks twice.
+                      const ok = await confirm({
+                        title: 'Execute funding',
+                        confirmLabel: 'Move the money',
+                        danger: true,
+                        body: (
+                          <>
+                            Move <strong className="text-text">{moneyFromDecimal(r.amount)}</strong> now?
+                            <br />
+                            This writes to the ledger.
+                          </>
+                        ),
+                      });
+                      if (!ok) return;
+                      execute.mutate(r._id, {
+                        onSuccess: () => toast.success('Executed. The ledger has been written.'),
+                        onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+                      });
+                    })()
+                  }
                 >
                   Execute
                 </Button>
@@ -296,6 +320,8 @@ function FundingQueue() {
         ))}
       </ul>
     </section>
+    {confirmSheet}
+    </>
   );
 }
 

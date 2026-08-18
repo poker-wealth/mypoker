@@ -7,6 +7,7 @@ import { Sheet } from '@/components/ui/Sheet';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { useConfirmSheet } from '@/components/ui/ConfirmSheet';
 import { useWithdrawalQueue, useWithdrawalActions } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
 import { moneyFromDecimal } from '@/lib/money';
@@ -130,7 +131,7 @@ export function AdminWithdrawals() {
                       {w.vipTier}
                     </span>
                     {Number(w.amount) > SECOND_APPROVAL_THRESHOLD && (
-                      <ShieldAlert size={12} className="shrink-0 text-jackpot" />
+                      <ShieldAlert size={12} className="shrink-0 text-danger" />
                     )}
                   </div>
                   <div className="truncate font-mono text-[0.6rem] text-dim">{w.address}</div>
@@ -171,21 +172,34 @@ function ReviewSheet({
   onClose: () => void;
 }) {
   const { approve, reject } = useWithdrawalActions();
+  const { confirm, prompt, sheet: confirmSheet } = useConfirmSheet();
   const busy = approve.isPending || reject.isPending;
   if (!withdrawal) return null;
 
   const isLarge = Number(withdrawal.amount) > SECOND_APPROVAL_THRESHOLD;
   const alreadySigned = withdrawal.approvals.length > 0;
 
-  const onApprove = (): void => {
+  const onApprove = async (): Promise<void> => {
+    // The figure and the destination, not "are you sure" — someone who has
+    // clicked through fifty of these needs the amount in front of them.
     if (
       isLarge &&
-      !window.confirm(
-        `${moneyFromDecimal(withdrawal.amount)} to ${withdrawal.address}.\n\n` +
-          (alreadySigned
-            ? 'This is the SECOND approval — it releases the funds.'
-            : 'This records your approval. A second administrator must also approve before any money moves.'),
-      )
+      !(await confirm({
+        title: 'Approve withdrawal',
+        confirmLabel: alreadySigned ? 'Release funds' : 'Record approval',
+        danger: alreadySigned,
+        body: (
+          <>
+            <strong className="text-text">{moneyFromDecimal(withdrawal.amount)}</strong> to{' '}
+            <span className="break-all font-mono">{withdrawal.address}</span>
+            <br />
+            <br />
+            {alreadySigned
+              ? 'This is the SECOND approval — it releases the funds.'
+              : 'This records your approval. A second administrator must also approve before any money moves.'}
+          </>
+        ),
+      }))
     ) {
       return;
     }
@@ -206,6 +220,7 @@ function ReviewSheet({
   };
 
   return (
+    <>
     <Sheet open onClose={onClose} title="Review withdrawal">
       <div className="space-y-3 py-1">
         <div>
@@ -235,8 +250,14 @@ function ReviewSheet({
           </div>
         )}
 
+        {/*
+          Warn tone, not gold. SAMUEL.md reserves the jackpot token for
+          jackpots, admin included — a V1 audit caught the same slip in
+          Alerts.tsx. Gold here would read as a celebration on the one
+          screen where the whole point is that money is about to leave.
+        */}
         {isLarge && (
-          <div className="rounded-lg bg-jackpot/10 px-3 py-2 text-[0.66rem] leading-relaxed text-jackpot">
+          <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[0.66rem] leading-relaxed text-danger">
             Over ₮10,000 — two administrators must approve. The server enforces this; it is not
             only a prompt.
           </div>
@@ -244,27 +265,35 @@ function ReviewSheet({
 
         {withdrawal.state === 'REQUESTED' && (
           <div className="flex gap-2">
-            <Button className="flex-1" disabled={busy} onClick={onApprove}>
+            <Button className="flex-1" disabled={busy} onClick={() => void onApprove()}>
               Approve
             </Button>
             <Button
               variant="ghost"
               className="flex-1"
               disabled={busy}
-              onClick={() => {
-                const reason = window.prompt('Why is this refused? The player is not told.');
-                if (!reason) return;
-                reject.mutate(
-                  { id: withdrawal.withdrawalId, reason },
-                  {
-                    onSuccess: () => {
-                      toast.success('Refused. Any hold has been released.');
-                      onClose();
+              onClick={() =>
+                void (async () => {
+                  const reason = await prompt({
+                    title: 'Refuse withdrawal',
+                    body: 'The player is not told the reason.',
+                    confirmLabel: 'Refuse',
+                    danger: true,
+                    withInput: { label: 'Reason', placeholder: 'why this is refused', required: true },
+                  });
+                  if (!reason) return;
+                  reject.mutate(
+                    { id: withdrawal.withdrawalId, reason },
+                    {
+                      onSuccess: () => {
+                        toast.success('Refused. Any hold has been released.');
+                        onClose();
+                      },
+                      onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
                     },
-                    onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
-                  },
-                );
-              }}
+                  );
+                })()
+              }
             >
               Reject
             </Button>
@@ -279,6 +308,8 @@ function ReviewSheet({
         )}
       </div>
     </Sheet>
+    {confirmSheet}
+    </>
   );
 }
 
