@@ -224,6 +224,16 @@ export const betActionSchema = z.object({
   multiplier: z.number().int().positive().optional(),
   /** For card games like Dou Dizhu: the played card combination. */
   cards: z.array(z.string()).optional(),
+  /**
+   * Which market a stake is on, for games that bet on named outcomes rather than a seat — Texas
+   * Cowboy's `cowboy_win`, `two_pair`, `royal_flush` and the rest.
+   *
+   * Missing from here until now, which made Texas Cowboy unplayable over the socket: the felt sent
+   * it, the room required it, and zod stripped it in between, so every bet came back "missing
+   * market selection". The room still decides whether the market exists and is open — this only
+   * lets the field reach it.
+   */
+  selection: z.string().max(40).optional(),
 });
 
 export const tableCommandSchema = z.discriminatedUnion('kind', [
