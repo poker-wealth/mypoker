@@ -67,6 +67,9 @@ import {
   leaveLeague,
   leaguesFor,
   discoverLeagues,
+  putLeagueSettings,
+  leaguesWithDueRakeChange,
+  membershipOf,
 } from '../league/league-store';
 import {
   createAgent,
@@ -1302,6 +1305,83 @@ export function buildRouter(): Router {
     internalAuth,
     asyncHandler(async (_req: Request, res: Response) => {
       res.json({ leagues: await getLeagueOverview() });
+    }),
+  );
+
+  /**
+   * League settings FACTS — read and write (§2 self-service).
+   *
+   * No band check and no transition logic here: the platform min/max and the
+   * 7-day rake transition are RULES, applied in game-server before it calls
+   * this. Two copies of a rake band would eventually give two answers.
+   */
+  const leagueSettingsBody = z.object({
+    settings: z.object({
+      rakeBps: z.number().int().nonnegative().max(10_000),
+      tableHours: z.number().int().positive().max(24),
+      buyIn: z.number().int().nonnegative(),
+      spectatorsAllowed: z.boolean(),
+    }),
+    pendingRakeChange: z
+      .object({
+        rakeBps: z.number().int().nonnegative().max(10_000),
+        /** Epoch ms. Set by the platform; this only stores it. */
+        effectiveAt: z.number().int().positive(),
+      })
+      .nullable(),
+  });
+  r.put(
+    '/internal/leagues/:leagueId/settings',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const body = leagueSettingsBody.parse(req.body);
+      res.json(
+        await putLeagueSettings(
+          String(req.params.leagueId),
+          body.settings,
+          body.pendingRakeChange
+            ? {
+                rakeBps: body.pendingRakeChange.rakeBps,
+                effectiveAt: new Date(body.pendingRakeChange.effectiveAt),
+              }
+            : null,
+        ),
+      );
+    }),
+  );
+  /**
+   * One player's role in one league, or null.
+   *
+   * The gateway needs this to decide whether a caller may open a league room,
+   * and it must come from here rather than the request: a caller claiming to
+   * administer someone else's league is the attack that endpoint exists to
+   * refuse. Null rather than 404 for a non-member — "not a member" is a normal
+   * answer, and the gateway turns it into the 404 a stranger should see.
+   */
+  r.get(
+    '/internal/leagues/:leagueId/members/:playerId',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      res.json({
+        role: await membershipOf(String(req.params.leagueId), String(req.params.playerId)),
+      });
+    }),
+  );
+
+  r.get(
+    '/internal/leagues/due-rake-changes',
+    internalAuth,
+    asyncHandler(async (_req: Request, res: Response) => {
+      const due = await leaguesWithDueRakeChange(new Date());
+      res.json({
+        leagues: due.map((d) => ({
+          ...d,
+          pendingRakeChange: {
+            rakeBps: d.pendingRakeChange.rakeBps,
+            effectiveAt: d.pendingRakeChange.effectiveAt.toISOString(),
+          },
+        })),
+      });
     }),
   );
 

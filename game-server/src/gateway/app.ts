@@ -11,6 +11,7 @@ import { buildMeRouter } from './me-routes';
 import { createRedEnvelopeRouter } from './red-envelope-routes';
 import { buildInternalRouter } from './internal-routes';
 import { mountLiveTables } from '../live/mount';
+import { buildLeagueTableRouter } from './league-table-routes';
 import { defaultTables } from '../live/server';
 import type { LobbyService } from '../lobby';
 
@@ -70,6 +71,14 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
       notarize: true,
     });
     app.locals.tableHub = mounted.hub;
+
+    // League private rooms (v5.9 §2). Mounted here rather than beside the other
+    // league routes because it needs the hub and the lobby, which only exist
+    // once live tables are mounted — and a create-table endpoint with nowhere to
+    // open a table would 500 rather than refuse.
+    if (lobby) {
+      app.use('/leagues', buildLeagueTableRouter(config, { hub: mounted.hub, lobby }));
+    }
   }
 
   app.use((_req: Request, res: Response) => {
