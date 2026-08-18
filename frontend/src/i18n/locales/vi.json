@@ -156,7 +156,8 @@
     "checkPrivileges": "Xem đặc quyền",
     "inviteFriends": "Mời bạn bè",
     "earnRewards": "Nhận thưởng",
-    "messageCenter": "Trung tâm tin nhắn"
+    "messageCenter": "Trung tâm tin nhắn",
+    "supportConnecting": "Đang kết nối bộ phận hỗ trợ…"
   },
   "wallet": {
     "totalBalance": "Tổng số dư",

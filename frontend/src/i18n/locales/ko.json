@@ -156,7 +156,8 @@
     "checkPrivileges": "혜택 보기",
     "inviteFriends": "친구 초대",
     "earnRewards": "보상 받기",
-    "messageCenter": "메시지 센터"
+    "messageCenter": "메시지 센터",
+    "supportConnecting": "고객 지원에 연결하는 중…"
   },
   "wallet": {
     "totalBalance": "총 잔액",

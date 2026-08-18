@@ -156,7 +156,8 @@
     "checkPrivileges": "特典を見る",
     "inviteFriends": "友達を招待",
     "earnRewards": "報酬を獲得",
-    "messageCenter": "メッセージセンター"
+    "messageCenter": "メッセージセンター",
+    "supportConnecting": "サポートに接続しています…"
   },
   "wallet": {
     "totalBalance": "総残高",

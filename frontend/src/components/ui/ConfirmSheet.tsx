@@ -36,7 +36,7 @@ interface ConfirmRequest {
   danger?: boolean;
 }
 
-type Pending = ConfirmRequest & { resolve: (value: string | boolean | null) => void };
+type Pending = ConfirmRequest & { resolve: (value: string | boolean | null) => void; done?: boolean };
 
 export function useConfirmSheet(): {
   confirm: (req: ConfirmRequest) => Promise<boolean>;
@@ -45,24 +45,42 @@ export function useConfirmSheet(): {
 } {
   const [pending, setPending] = useState<Pending | null>(null);
   const [value, setValue] = useState('');
-  // A ref as well as state: settle() runs from a click handler and from the
-  // backdrop, and both must resolve exactly one promise even if React batches.
-  const settled = useRef(false);
+  // The CURRENT request, as a ref: settle() must resolve exactly one promise
+  // even from stale closures (queued clicks, backdrop + button in one batch).
+  // Settlement state lives ON the request object, not in a shared flag — a
+  // shared flag let a stale closure from a superseded confirm mark the NEW
+  // one as settled, wedging it.
+  const current = useRef<Pending | null>(null);
 
-  const open = useCallback((req: ConfirmRequest): Promise<string | boolean | null> => {
-    settled.current = false;
-    setValue('');
-    return new Promise((resolve) => setPending({ ...req, resolve }));
+  const settleReq = useCallback((req: Pending | null, result: string | boolean | null): void => {
+    if (!req || req.done) return;
+    req.done = true;
+    req.resolve(result);
+    if (current.current === req) {
+      current.current = null;
+      setPending(null);
+    }
   }, []);
 
-  const settle = useCallback(
-    (result: string | boolean | null): void => {
-      if (settled.current) return;
-      settled.current = true;
-      pending?.resolve(result);
-      setPending(null);
+  const open = useCallback(
+    (req: ConfirmRequest): Promise<string | boolean | null> => {
+      // A confirm opened while another is pending supersedes it — and the
+      // superseded one must SETTLE (as cancelled), never dangle: an awaiting
+      // handler whose promise is silently dropped hangs forever.
+      settleReq(current.current, null);
+      setValue('');
+      return new Promise((resolve) => {
+        const next: Pending = { ...req, resolve };
+        current.current = next;
+        setPending(next);
+      });
     },
-    [pending],
+    [settleReq],
+  );
+
+  const settle = useCallback(
+    (result: string | boolean | null): void => settleReq(pending, result),
+    [pending, settleReq],
   );
 
   const confirm = useCallback(
@@ -83,7 +101,7 @@ export function useConfirmSheet(): {
 
   const sheet = pending ? (
     // Cancel on backdrop dismiss — the safe answer for a money action is "no".
-    <Sheet open onClose={() => settle(needsInput ? null : false)} title={pending.title}>
+    <Sheet open elevated onClose={() => settle(needsInput ? null : false)} title={pending.title}>
       <div className="space-y-3 px-4 py-3">
         {pending.body && <div className="text-[0.72rem] leading-relaxed text-dim">{pending.body}</div>}
 
