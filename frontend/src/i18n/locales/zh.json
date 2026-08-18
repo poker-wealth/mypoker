@@ -14,7 +14,8 @@
     "seeAll": "查看全部",
     "sampleData": "示例数据",
     "loading": "加载中…",
-    "retry": "重试"
+    "retry": "重试",
+    "cancel": "取消"
   },
   "lobby": {
     "dailyJackpot": "每日彩池",
@@ -123,7 +124,8 @@
     "noRounds": "该时间段内没有牌局",
     "noRoundsBlurb": "试试更长的时间段，或加入牌桌。",
     "loadMore": "加载更多",
-    "signInToSee": "登录后查看您的记录"
+    "signInToSee": "登录后查看您的记录",
+    "playDistribution": "游戏分布"
   },
   "account": {
     "guest": "游客",
@@ -190,7 +192,13 @@
     "showBalance": "显示余额",
     "hideBalance": "隐藏余额",
     "detail": "明细",
-    "availableSplit": "可用 {{available}} · 游戏中 {{locked}}"
+    "availableSplit": "可用 {{available}} · 游戏中 {{locked}}",
+    "addressSaved": "提现地址已保存",
+    "addressFailed": "无法保存该地址",
+    "saveAddress": "保存地址",
+    "changeAddress": "更改",
+    "addressCooldownNote": "提现只能发送到此地址。更改后需等待 48 小时才能使用。",
+    "addressLocked": "此地址将于 {{when}} 开放提现"
   },
   "table": {
     "fold": "弃牌",

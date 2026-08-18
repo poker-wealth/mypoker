@@ -43,6 +43,8 @@ import {
   fetchWithdrawals,
   requestWithdrawal,
   type WithdrawRequest,
+  fetchWithdrawalAddress,
+  saveWithdrawalAddress,
 } from './wallet';
 import { fetchLobbyGames, fetchTables, type TableFilter } from './lobby';
 import { useSession } from '@/store/session';
@@ -441,6 +443,32 @@ export function useWithdrawals(limit = 50) {
     queryFn: () => fetchWithdrawals(limit),
     enabled: Boolean(playerId),
     staleTime: 10_000,
+  });
+}
+
+/**
+ * The registered withdrawal address (§3.6).
+ *
+ * Fetched before the withdraw form is usable at all: financial-core refuses
+ * every withdrawal until an address exists, so a form that does not know
+ * whether one is set can only produce a 403 the player cannot act on.
+ */
+export function useWithdrawalAddress() {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery({
+    queryKey: ['wallet', 'withdrawal-address', playerId],
+    queryFn: fetchWithdrawalAddress,
+    enabled: Boolean(playerId),
+  });
+}
+
+export function useSetWithdrawalAddress() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (address: string) => saveWithdrawalAddress(address),
+    // Invalidate the whole wallet key: the address gates withdrawals, so the
+    // form's usable state changes with it.
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['wallet'] }),
   });
 }
 

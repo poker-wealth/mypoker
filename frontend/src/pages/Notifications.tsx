@@ -133,7 +133,7 @@ export function Notifications() {
               disabled={list.isFetchingNextPage}
               onClick={() => void list.fetchNextPage()}
             >
-              {list.isFetchingNextPage ? t('states.loading') : t('data.loadMore')}
+              {list.isFetchingNextPage ? t('common.loading') : t('data.loadMore')}
             </Button>
           )}
         </>

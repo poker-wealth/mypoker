@@ -14,7 +14,8 @@
     "seeAll": "Xem tất cả",
     "sampleData": "Dữ liệu mẫu",
     "loading": "Đang tải…",
-    "retry": "Thử lại"
+    "retry": "Thử lại",
+    "cancel": "Hủy"
   },
   "lobby": {
     "dailyJackpot": "Jackpot hằng ngày",
@@ -123,7 +124,8 @@
     "noRounds": "Không có ván nào trong kỳ này",
     "noRoundsBlurb": "Thử khoảng thời gian dài hơn, hoặc tham gia một bàn.",
     "loadMore": "Tải thêm",
-    "signInToSee": "Đăng nhập để xem thành tích của bạn"
+    "signInToSee": "Đăng nhập để xem thành tích của bạn",
+    "playDistribution": "Phân bổ lượt chơi"
   },
   "account": {
     "guest": "Khách",
@@ -190,7 +192,13 @@
     "showBalance": "Hiện số dư",
     "hideBalance": "Ẩn số dư",
     "detail": "Chi tiết",
-    "availableSplit": "Khả dụng {{available}} · Đang chơi {{locked}}"
+    "availableSplit": "Khả dụng {{available}} · Đang chơi {{locked}}",
+    "addressSaved": "Đã lưu địa chỉ rút tiền",
+    "addressFailed": "Không thể lưu địa chỉ đó",
+    "saveAddress": "Lưu địa chỉ",
+    "changeAddress": "Thay đổi",
+    "addressCooldownNote": "Rút tiền chỉ đến địa chỉ này. Thay đổi sẽ bắt đầu thời gian chờ 48 giờ.",
+    "addressLocked": "Rút tiền đến địa chỉ này mở vào {{when}}"
   },
   "table": {
     "fold": "Bỏ bài",

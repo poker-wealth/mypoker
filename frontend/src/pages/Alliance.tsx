@@ -284,7 +284,7 @@ function CreateSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
         </label>
 
         <Button full disabled={name.trim().length < 2 || create.isPending} onClick={submit}>
-          {create.isPending ? t('states.loading') : t('alliance.create')}
+          {create.isPending ? t('common.loading') : t('alliance.create')}
         </Button>
       </div>
     </Sheet>

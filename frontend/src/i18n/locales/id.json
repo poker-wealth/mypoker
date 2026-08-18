@@ -14,7 +14,8 @@
     "seeAll": "Lihat semua",
     "sampleData": "Data contoh",
     "loading": "Memuat…",
-    "retry": "Coba lagi"
+    "retry": "Coba lagi",
+    "cancel": "Batal"
   },
   "lobby": {
     "dailyJackpot": "Jackpot Harian",
@@ -123,7 +124,8 @@
     "noRounds": "Tidak ada ronde pada periode ini",
     "noRoundsBlurb": "Coba periode lebih panjang, atau gabung ke meja.",
     "loadMore": "Muat lebih banyak",
-    "signInToSee": "Masuk untuk melihat rekor Anda"
+    "signInToSee": "Masuk untuk melihat rekor Anda",
+    "playDistribution": "Distribusi permainan"
   },
   "account": {
     "guest": "Tamu",
@@ -190,7 +192,13 @@
     "showBalance": "Tampilkan saldo",
     "hideBalance": "Sembunyikan saldo",
     "detail": "Detail",
-    "availableSplit": "Tersedia {{available}} · Di meja {{locked}}"
+    "availableSplit": "Tersedia {{available}} · Di meja {{locked}}",
+    "addressSaved": "Alamat penarikan disimpan",
+    "addressFailed": "Tidak dapat menyimpan alamat itu",
+    "saveAddress": "Simpan alamat",
+    "changeAddress": "Ubah",
+    "addressCooldownNote": "Penarikan hanya ke alamat ini. Mengubahnya memulai jeda 48 jam.",
+    "addressLocked": "Penarikan ke alamat ini dibuka {{when}}"
   },
   "table": {
     "fold": "Lipat",

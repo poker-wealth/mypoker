@@ -14,7 +14,8 @@
     "seeAll": "すべて見る",
     "sampleData": "サンプルデータ",
     "loading": "読み込み中…",
-    "retry": "再試行"
+    "retry": "再試行",
+    "cancel": "キャンセル"
   },
   "lobby": {
     "dailyJackpot": "デイリージャックポット",
@@ -123,7 +124,8 @@
     "noRounds": "この期間のラウンドはありません",
     "noRoundsBlurb": "期間を広げるか、テーブルに参加してみてください。",
     "loadMore": "もっと読み込む",
-    "signInToSee": "ログインすると記録が表示されます"
+    "signInToSee": "ログインすると記録が表示されます",
+    "playDistribution": "プレイ分布"
   },
   "account": {
     "guest": "ゲスト",
@@ -190,7 +192,13 @@
     "showBalance": "残高を表示",
     "hideBalance": "残高を隠す",
     "detail": "明細",
-    "availableSplit": "利用可能 {{available}}・プレイ中 {{locked}}"
+    "availableSplit": "利用可能 {{available}}・プレイ中 {{locked}}",
+    "addressSaved": "出金先アドレスを保存しました",
+    "addressFailed": "アドレスを保存できませんでした",
+    "saveAddress": "アドレスを保存",
+    "changeAddress": "変更",
+    "addressCooldownNote": "出金はこのアドレスにのみ送られます。変更すると48時間の保留期間が始まります。",
+    "addressLocked": "このアドレスへの出金は {{when}} に開始されます"
   },
   "table": {
     "fold": "フォールド",

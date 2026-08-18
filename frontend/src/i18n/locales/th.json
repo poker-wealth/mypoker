@@ -14,7 +14,8 @@
     "seeAll": "ดูทั้งหมด",
     "sampleData": "ข้อมูลตัวอย่าง",
     "loading": "กำลังโหลด…",
-    "retry": "ลองอีกครั้ง"
+    "retry": "ลองอีกครั้ง",
+    "cancel": "ยกเลิก"
   },
   "lobby": {
     "dailyJackpot": "แจ็กพอตประจำวัน",
@@ -123,7 +124,8 @@
     "noRounds": "ไม่มีตาในช่วงเวลานี้",
     "noRoundsBlurb": "ลองเลือกช่วงเวลาที่ยาวขึ้น หรือเข้าร่วมโต๊ะ",
     "loadMore": "โหลดเพิ่ม",
-    "signInToSee": "เข้าสู่ระบบเพื่อดูสถิติของคุณ"
+    "signInToSee": "เข้าสู่ระบบเพื่อดูสถิติของคุณ",
+    "playDistribution": "การกระจายการเล่น"
   },
   "account": {
     "guest": "ผู้เยี่ยมชม",
@@ -190,7 +192,13 @@
     "showBalance": "แสดงยอดเงิน",
     "hideBalance": "ซ่อนยอดเงิน",
     "detail": "รายละเอียด",
-    "availableSplit": "ใช้ได้ {{available}} · อยู่ในเกม {{locked}}"
+    "availableSplit": "ใช้ได้ {{available}} · อยู่ในเกม {{locked}}",
+    "addressSaved": "บันทึกที่อยู่ถอนเงินแล้ว",
+    "addressFailed": "ไม่สามารถบันทึกที่อยู่นี้",
+    "saveAddress": "บันทึกที่อยู่",
+    "changeAddress": "เปลี่ยน",
+    "addressCooldownNote": "การถอนเงินจะส่งไปยังที่อยู่นี้เท่านั้น การเปลี่ยนแปลงจะเริ่มระยะรอ 48 ชั่วโมง",
+    "addressLocked": "การถอนไปยังที่อยู่นี้จะเปิด {{when}}"
   },
   "table": {
     "fold": "หมอบ",

@@ -75,3 +75,25 @@ export const requestWithdrawal = (
   body: WithdrawRequest,
 ): Promise<{ withdrawalId: string; state: WithdrawalState }> =>
   api.post<{ withdrawalId: string; state: WithdrawalState }>('/me/withdrawals', body);
+
+/**
+ * The player's REGISTERED withdrawal address (§3.6).
+ *
+ * Withdrawals may only go to this address, and changing it starts a 48h
+ * cooldown before the new one may be used — so a stolen session cannot
+ * immediately redirect funds to an attacker. `withdrawableAt` is when the
+ * current address becomes usable; until then financial-core refuses.
+ */
+export interface WithdrawalAddress {
+  configured: boolean;
+  address?: string;
+  updatedAt?: string;
+  /** ISO timestamp — withdrawals to this address open at this moment. */
+  withdrawableAt?: string;
+}
+
+export const fetchWithdrawalAddress = (): Promise<WithdrawalAddress> =>
+  api.get<WithdrawalAddress>('/me/withdrawal-address');
+
+export const saveWithdrawalAddress = (address: string): Promise<WithdrawalAddress> =>
+  api.post<WithdrawalAddress>('/me/withdrawal-address', { address });

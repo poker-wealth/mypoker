@@ -14,7 +14,8 @@
     "seeAll": "See all",
     "sampleData": "Sample data",
     "loading": "Loading…",
-    "retry": "Retry"
+    "retry": "Retry",
+    "cancel": "Cancel"
   },
   "lobby": {
     "dailyJackpot": "Daily Jackpot",
@@ -123,7 +124,8 @@
     "noRounds": "No rounds in this period",
     "noRoundsBlurb": "Try a longer period, or join a table.",
     "loadMore": "Load more",
-    "signInToSee": "Sign in to see your records"
+    "signInToSee": "Sign in to see your records",
+    "playDistribution": "Play distribution"
   },
   "account": {
     "guest": "Guest Player",
@@ -190,7 +192,13 @@
     "showBalance": "Show balance",
     "hideBalance": "Hide balance",
     "detail": "Detail",
-    "availableSplit": "{{available}} available · {{locked}} in play"
+    "availableSplit": "{{available}} available · {{locked}} in play",
+    "addressSaved": "Withdrawal address saved",
+    "addressFailed": "Couldn't save that address",
+    "saveAddress": "Save address",
+    "changeAddress": "Change",
+    "addressCooldownNote": "Withdrawals can only go to this address. Changing it starts a 48-hour hold before it can be used.",
+    "addressLocked": "Withdrawals to this address open {{when}}"
   },
   "table": {
     "fold": "Fold",

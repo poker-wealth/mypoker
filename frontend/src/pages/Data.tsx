@@ -176,7 +176,7 @@ export function Data() {
                   disabled={history.isFetchingNextPage}
                   onClick={() => void history.fetchNextPage()}
                 >
-                  {history.isFetchingNextPage ? t('states.loading') : t('data.loadMore')}
+                  {history.isFetchingNextPage ? t('common.loading') : t('data.loadMore')}
                 </Button>
               </div>
             )}
