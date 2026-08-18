@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { amountOnly } from '@/lib/money';
 import { useTranslation } from 'react-i18next';
 import { Bell, Trophy, Wallet, Megaphone, Crown, Info } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -32,6 +33,22 @@ const ICONS: Record<NotificationKind, { icon: LucideIcon; tone: string }> = {
   JACKPOT: { icon: Crown, tone: 'text-jackpot' },
   SYSTEM: { icon: Info, tone: 'text-dim' },
 };
+
+/**
+ * Format the params a notification carries for display.
+ *
+ * `amount` arrives as the ledger's six-decimal string ('500.000000'). The
+ * templates place their own currency mark, so only the number is formatted
+ * here — see amountOnly(). Every other param passes through untouched.
+ */
+function displayParams(
+  params: Record<string, string | number> | undefined,
+): Record<string, string | number> {
+  if (!params) return {};
+  const out: Record<string, string | number> = { ...params };
+  if (typeof out.amount === 'string') out.amount = amountOnly(out.amount);
+  return out;
+}
 
 export function Notifications() {
   const { t } = useTranslation();
@@ -109,7 +126,7 @@ export function Notifications() {
                     <div className={cn('text-sm', n.read ? 'text-dim' : 'font-semibold')}>
                       {/* defaultValue so an unknown key from a newer server
                           renders as something rather than the key itself. */}
-                      {t(n.titleKey, { ...n.params, defaultValue: n.titleKey })}
+                      {t(n.titleKey, { ...displayParams(n.params), defaultValue: n.titleKey })}
                     </div>
                     <div className="mt-0.5 text-[0.66rem] text-dim">
                       {new Date(n.createdAt).toLocaleString(undefined, {
@@ -133,7 +150,7 @@ export function Notifications() {
               disabled={list.isFetchingNextPage}
               onClick={() => void list.fetchNextPage()}
             >
-              {list.isFetchingNextPage ? t('states.loading') : t('data.loadMore')}
+              {list.isFetchingNextPage ? t('common.loading') : t('data.loadMore')}
             </Button>
           )}
         </>

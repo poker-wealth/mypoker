@@ -12,6 +12,8 @@ import {
   useTransactions,
   useWithdrawals,
   useWithdraw,
+  useWithdrawalAddress,
+  useSetWithdrawalAddress,
 } from '@/api/hooks';
 import { ApiError } from '@/api/client';
 import { toast } from '@/lib/toast';
@@ -196,27 +198,64 @@ function WithdrawSheet({
   const { t } = useTranslation();
   const withdrawals = useWithdrawals();
   const withdraw = useWithdraw();
+  const registered = useWithdrawalAddress();
+  const saveAddress = useSetWithdrawalAddress();
   const [amount, setAmount] = useState('');
   const [address, setAddress] = useState('');
+  const [changing, setChanging] = useState(false);
+
+  // §3.6: withdrawals go ONLY to the registered address, and only once its 48h
+  // cooldown has elapsed. Both facts have to be on screen before the player
+  // types an amount — financial-core refuses otherwise, and a form that does
+  // not know this can only produce a 403 with nothing the player can do.
+  const reg = registered.data;
+  const openAt = reg?.withdrawableAt ? new Date(reg.withdrawableAt) : null;
+  const inCooldown = openAt !== null && openAt.getTime() > Date.now();
+  const canWithdraw = Boolean(reg?.configured) && !inCooldown;
+  const needsAddress = !reg?.configured || changing;
+
+  const submitAddress = (): void => {
+    const next = address.trim();
+    if (!next) return;
+    saveAddress.mutate(next, {
+      onSuccess: () => {
+        toast.success(t('wallet.addressSaved'));
+        setAddress('');
+        setChanging(false);
+      },
+      onError: (e) =>
+        toast.error(
+          e instanceof ApiError && e.status === 400
+            ? t('wallet.invalidAddress')
+            : t('wallet.addressFailed'),
+        ),
+    });
+  };
 
   const submit = (): void => {
-    if (!amount.trim() || !address.trim()) return;
+    if (!amount.trim() || !reg?.address) return;
     withdraw.mutate(
-      { amount: amount.trim(), address: address.trim() },
+      // The address is the REGISTERED one, never a typed one — sending anything
+      // else is refused, and offering a free-text field would invite exactly
+      // the mistake the rule exists to prevent.
+      { amount: amount.trim(), address: reg.address },
       {
         onSuccess: () => {
           toast.success(t('wallet.withdrawRequested'));
           setAmount('');
-          setAddress('');
         },
         onError: (e) => {
-          // 409 = over available balance; 400 = bad address. Show the specific one.
+          // 403 is the §3.6 refusal (no address, or still in cooldown) and it
+          // carries a message worth showing verbatim — it names the moment
+          // withdrawals open. It used to fall through to a generic failure.
           const msg =
-            e instanceof ApiError && e.status === 409
-              ? t('wallet.insufficient')
-              : e instanceof ApiError && e.status === 400
-                ? t('wallet.invalidAddress')
-                : t('wallet.withdrawFailed');
+            e instanceof ApiError && e.status === 403
+              ? e.message
+              : e instanceof ApiError && e.status === 409
+                ? t('wallet.insufficient')
+                : e instanceof ApiError && e.status === 400
+                  ? t('wallet.invalidAddress')
+                  : t('wallet.withdrawFailed');
           toast.error(msg);
         },
       },
@@ -241,17 +280,59 @@ function WithdrawSheet({
           />
         </label>
 
-        <label className="block">
-          <span className="text-xs font-semibold text-dim">{t('wallet.addressLabel')}</span>
-          <input
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            placeholder="T…"
-            className="mt-1 w-full rounded-(--radius-app) border border-border bg-surface px-3 py-2.5 font-mono text-sm text-text placeholder:text-dim focus:border-brand focus:outline-none"
-          />
-        </label>
+        {/* The registered address (§3.6). Either register one, or see the one
+            on file — never a free-text field, because anything else is refused
+            and offering the box invites the mistake the rule exists to stop. */}
+        {needsAddress ? (
+          <div className="space-y-2">
+            <label className="block">
+              <span className="text-xs font-semibold text-dim">{t('wallet.addressLabel')}</span>
+              <input
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="T…"
+                className="mt-1 w-full rounded-(--radius-app) border border-border bg-surface px-3 py-2.5 font-mono text-sm text-text placeholder:text-dim focus:border-brand focus:outline-none"
+              />
+            </label>
+            <p className="text-[0.68rem] leading-snug text-dim">{t('wallet.addressCooldownNote')}</p>
+            <div className="flex gap-2">
+              <Button full disabled={saveAddress.isPending || !address.trim()} onClick={submitAddress}>
+                {saveAddress.isPending && <Loader2 size={16} className="animate-spin" />}
+                {t('wallet.saveAddress')}
+              </Button>
+              {changing && (
+                <Button full variant="secondary" onClick={() => { setChanging(false); setAddress(''); }}>
+                  {t('common.cancel')}
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-(--radius-app) border border-border bg-surface px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-dim">{t('wallet.addressLabel')}</span>
+              <button
+                type="button"
+                onClick={() => setChanging(true)}
+                className="text-[0.68rem] font-semibold text-brand hover:underline"
+              >
+                {t('wallet.changeAddress')}
+              </button>
+            </div>
+            <div className="mt-1 truncate font-mono text-sm text-text">{reg?.address}</div>
+            {inCooldown && openAt && (
+              <div className="mt-1.5 text-[0.68rem] text-warn">
+                {t('wallet.addressLocked', { when: openAt.toLocaleString() })}
+              </div>
+            )}
+          </div>
+        )}
 
-        <Button full disabled={withdraw.isPending || !amount.trim() || !address.trim()} onClick={submit}>
+        <Button
+          full
+          disabled={withdraw.isPending || !amount.trim() || !canWithdraw}
+          onClick={submit}
+        >
           {withdraw.isPending && <Loader2 size={16} className="animate-spin" />}
           {t('wallet.submitWithdraw')}
         </Button>

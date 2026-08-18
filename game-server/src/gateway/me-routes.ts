@@ -87,6 +87,15 @@ export function buildMeRouter(config: GatewayConfig): Router {
   r.get('/transactions', (req, res) => void forwardTo(config, req, res, '/me/transactions'));
   r.get('/withdrawals', (req, res) => void forwardTo(config, req, res, '/me/withdrawals'));
   r.post('/withdrawals', (req, res) => void forwardTo(config, req, res, '/me/withdrawals'));
+  // The REGISTERED withdrawal address (§3.6). Withdrawals may only go to this
+  // address, and changing it starts a 48h cooldown — so a stolen session cannot
+  // immediately redirect funds. Both halves must be proxied or the rule becomes
+  // unusable rather than protective: financial-core refuses every withdrawal
+  // until an address exists, and without these routes the app has no way to
+  // register one. (It had none: withdrawals returned 403 with nothing a player
+  // could do about it.)
+  r.get('/withdrawal-address', (req, res) => void forwardTo(config, req, res, '/me/withdrawal-address'));
+  r.post('/withdrawal-address', (req, res) => void forwardTo(config, req, res, '/me/withdrawal-address'));
   // Reputation and VIP: financial-core returns FACTS (rounds, findings, volume)
   // and the canonical rules in src/players/ turn them into a score, band, tier
   // and progress HERE — one home for the rules, so a second copy cannot drift.

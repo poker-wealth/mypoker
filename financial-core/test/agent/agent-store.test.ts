@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
@@ -76,11 +77,17 @@ describe('referral links', () => {
     await createAgent({ agentId: AGENT_A, rateBps: 3000 });
   });
 
-  it('mints a link of UUID + 32-char salt', async () => {
+  it('mints a link that fits a Telegram deep link', async () => {
     const link = await createReferralLink(AGENT_A);
-    // 36 chars of UUID plus 32 of hex salt.
-    expect(link).toHaveLength(68);
-    expect(link.slice(36)).toMatch(/^[0-9a-f]{32}$/);
+
+    // This assertion used to read `toHaveLength(68)` — it described what the
+    // generator happened to emit rather than what a referral link has to be,
+    // so it passed happily while every link produced was unusable. The real
+    // requirement is Telegram's: `?start=` takes 1–64 chars of [A-Za-z0-9_-],
+    // and 68 was four too many.
+    expect(link.length).toBeLessThanOrEqual(64);
+    expect(link).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(link.length).toBeGreaterThanOrEqual(32); // unguessable
   });
 
   it('mints distinct links every time', async () => {
@@ -279,5 +286,48 @@ describe('setSubAgentRate — B’s rate is set and owned by A (§13.1)', () => 
 
   it('refuses an unknown sub-agent', async () => {
     await expect(setSubAgentRate(AGENT_A, 'nobody', 2000)).rejects.toThrow(AgentError);
+  });
+});
+
+/**
+ * A referral link is handed to Telegram as a deep-link `start` parameter:
+ *
+ *     https://t.me/<bot>?start=<linkId>
+ *
+ * Telegram limits that parameter to 64 characters drawn from [A-Za-z0-9_-].
+ * An id that breaks either rule produces a link that simply does not open —
+ * and it fails at the moment an agent shares it with someone, which is the
+ * furthest possible point from anywhere it would be noticed.
+ *
+ * The generator produced 68 characters (`randomUUID()` + 16 bytes of hex)
+ * until this test existed, so every referral link ever created was unusable.
+ */
+describe('referral link ids fit a Telegram deep link', () => {
+  /** Telegram Bot API: deep-link parameter, 1–64 chars, A-Z a-z 0-9 _ - */
+  const TELEGRAM_START_MAX = 64;
+
+  it('creates ids Telegram will accept', async () => {
+    const agentId = `agent-${randomUUID()}`;
+    await createAgent({ agentId, rateBps: 500 });
+
+    // Several, because the id is random and a length bug can be intermittent
+    // when it depends on an encoding whose output length varies.
+    for (let i = 0; i < 25; i++) {
+      const linkId = await createReferralLink(agentId, `link-${i}`);
+      expect(linkId.length).toBeLessThanOrEqual(TELEGRAM_START_MAX);
+      expect(linkId).toMatch(/^[A-Za-z0-9_-]+$/);
+      // Long enough to be unguessable: a short id is a link anyone can forge
+      // their way into someone else's downline with.
+      expect(linkId.length).toBeGreaterThanOrEqual(32);
+    }
+  });
+
+  it('gives every link a distinct id', async () => {
+    const agentId = `agent-${randomUUID()}`;
+    await createAgent({ agentId, rateBps: 500 });
+    const ids = await Promise.all(
+      Array.from({ length: 20 }, (_, i) => createReferralLink(agentId, `dup-${i}`)),
+    );
+    expect(new Set(ids).size).toBe(ids.length);
   });
 });
