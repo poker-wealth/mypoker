@@ -26,6 +26,16 @@ export interface RoundFairnessDoc {
   cards: string[];
   timestamp: number;
   roundHash: string;
+  /**
+   * Which committed rule version this hand ran under (queue #12).
+   *
+   * Stored beside the round, NOT folded into `roundHash` — that hash is the
+   * v6.0 verifier's contract, and adding an input would stop every already
+   * notarized round from verifying. Optional because rounds notarized before
+   * this existed have no version to report, and a fabricated one would be
+   * worse than an absent one.
+   */
+  ruleVersion?: string;
   // Filled when the batch is committed on-chain:
   merkleProof?: ProofNode[];
   merkleRoot?: string;
@@ -38,6 +48,7 @@ export interface RoundFairnessDoc {
 const schema = new Schema<RoundFairnessDoc>(
   {
     _id: { type: String },
+    ruleVersion: { type: String, default: null, index: true },
     serverCommit: { type: String, required: true },
     serverSeed: { type: String, required: true },
     allClientSeeds: { type: String, required: true },

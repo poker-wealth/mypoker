@@ -312,12 +312,16 @@
     "provableBlurb": "กติกาเป็นของเรา และทุกตาตรวจสอบได้",
     "vendorAttested": "ผู้ให้บริการรับรอง",
     "vendorBlurb": "ผู้ให้บริการภายนอกเป็นเจ้าของกติกา ผลลัพธ์แต่ละครั้งมีลายเซ็น แต่พิสูจน์ไม่ได้ว่าตารางจ่ายเงินไม่ถูกแก้ไข",
-    "ratesPending": "ยังไม่แสดงอัตราการจ่ายที่เผยแพร่ อัตราจะมีความหมายก็ต่อเมื่อกติกาเบื้องหลังถูกผูกมัดบนเชนและมีการกำกับเวอร์ชัน — ก่อนหน้านั้นมันเป็นเพียงตัวเลขที่เรากล่าวอ้างถึงตัวเอง ซึ่งเป็นสิ่งที่หน้านี้มีไว้เพื่อหลีกเลี่ยง",
     "actualRate": "อัตราคืนจริง {{rate}}% จาก {{count}} ตา",
     "theoreticalRate": "ระบุไว้ {{rate}}%",
     "ownSeedUnchecked": "ข้อมูลรอบนี้ไม่มีซีดของคุณ ขั้นตอนนี้จึงตรวจสอบเพียงความสอดคล้องของรายการซีดเท่านั้น ไม่ได้ตรวจว่าซีดของคุณอยู่ในนั้นที่ตำแหน่งของคุณหรือไม่",
     "notAnchored": "รูทของชุดนี้ยังไม่ถูกบันทึกบนเชน 6a (พิสูจน์) ตรวจสอบในเครื่องแล้ว ส่วน 6b (บันทึกถาวร) จะตรวจได้เมื่อบันทึกเสร็จ",
-    "viewOnChain": "ตรวจรูทบน Solana Explorer (6b)"
+    "viewOnChain": "ตรวจรูทบน Solana Explorer (6b)",
+    "rulesAnchored": "On-chain",
+    "rulesPublished": "Published",
+    "rulesAnchoredBlurb": "These rates were earned under rule version {{when}}-committed on-chain. The commitment predates every hand that cites it, so the rules could not be changed after the fact.",
+    "rulesPublishedBlurb": "The rule version is fixed and every hand records it, but the on-chain commitment has not landed yet. Verify a hand step-by-step in the meantime.",
+    "rulesAbsent": "The rule version behind these rates is unavailable right now, so no claim is made about it."
   },
   "reputation": {
     "title": "ชื่อเสียง",

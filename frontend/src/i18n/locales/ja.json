@@ -312,12 +312,16 @@
     "provableBlurb": "ルールは当社が保有し、全ラウンドを検証できます",
     "vendorAttested": "ベンダー保証",
     "vendorBlurb": "ルールは外部提供元が保有します。各結果には署名がありますが、配当表が変更されていないことは証明できません",
-    "ratesPending": "公開ペイアウト率はまだ表示していません。その根拠となるルールがオンチェーンにコミットされ、バージョン管理されて初めて率に意味が生まれます。それまでは当社が自らについて主張する数値にすぎず、本ページはまさにそれを避けるために存在します。",
     "actualRate": "実績還元率 {{rate}}%（{{count}} ラウンド）",
     "theoreticalRate": "公称 {{rate}}%",
     "ownSeedUnchecked": "このラウンドのデータにあなたのシードが含まれていないため、このステップではシード一覧の整合性のみを検証しました。あなた自身のシードが自席に含まれているかは未検証です。",
     "notAnchored": "このバッチのルートはまだチェーンに記録されていません。6a（証明）はローカルで検証済み。6b（恒久記録）は公証後に確認可能になります。",
-    "viewOnChain": "Solana Explorer でルートを確認（6b）"
+    "viewOnChain": "Solana Explorer でルートを確認（6b）",
+    "rulesAnchored": "On-chain",
+    "rulesPublished": "Published",
+    "rulesAnchoredBlurb": "These rates were earned under rule version {{when}}-committed on-chain. The commitment predates every hand that cites it, so the rules could not be changed after the fact.",
+    "rulesPublishedBlurb": "The rule version is fixed and every hand records it, but the on-chain commitment has not landed yet. Verify a hand step-by-step in the meantime.",
+    "rulesAbsent": "The rule version behind these rates is unavailable right now, so no claim is made about it."
   },
   "reputation": {
     "title": "信頼度",

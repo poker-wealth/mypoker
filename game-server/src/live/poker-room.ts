@@ -60,6 +60,7 @@ import { newTargetState, evaluateChallenge, recordPrompt, recordResult, type Tar
 import { decisionTimeGate, doubleConfirmGate } from '../players/anti-bot';
 import { BehaviorTracker } from '../players/behavior-tracker';
 import type { BehaviorStatus } from '../jackpot/weights';
+import { ruleVersionFor } from '../fairness/rule-version';
 
 /**
  * PokerRoom — a real table that real people sit down at.
@@ -219,6 +220,8 @@ export class PokerRoom implements LiveRoom {
   private readonly fc: FinancialCoreClient;
   private readonly chainClient: ChainClient;
   private readonly notary: RoundNotary | undefined;
+  /** Content hash of this table's payout rules (queue #12 rule-version stamp). */
+  private readonly ruleVersion: string;
   private readonly spec: PokerVariant;
 
   private readonly seats: (RoomSeat | null)[];
@@ -291,6 +294,14 @@ export class PokerRoom implements LiveRoom {
     this.fc = deps.fc;
     this.chainClient = deps.chain ?? new FakeChainClient();
     this.notary = deps.notary;
+    // Fixed for the room's lifetime: its rake and jackpot rate are config, and
+    // a table cannot change the rules mid-session.
+    this.ruleVersion = ruleVersionFor({
+      gameId: config.variantId,
+      rakeBps: config.rake.bps,
+      jackpotBps: 50,
+      paytable: { rakeCap: config.rake.cap, noFlopNoDrop: config.rake.noFlopNoDrop ? 1 : 0 },
+    });
     this.spec = variant(config.variantId);
     this.seats = Array.from({ length: config.maxSeats }, () => null);
     this.handFc = {
@@ -981,6 +992,11 @@ export class PokerRoom implements LiveRoom {
         finalSeed: round.finalSeed,
         cards,
         timestamp: Date.now(),
+        // The rules THIS table actually ran under, not the platform defaults.
+        // A league or promotional table with a different rake produces a
+        // different version, which is the point: the stamp describes the hand
+        // that was played, not the one we assumed.
+        ruleVersion: this.ruleVersion,
       })
       .catch((err) => console.error('[notary] round not notarized:', (err as Error).message));
   }

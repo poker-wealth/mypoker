@@ -312,12 +312,16 @@
     "provableBlurb": "We own the rules, and every round is verifiable",
     "vendorAttested": "Vendor-attested",
     "vendorBlurb": "An outside supplier owns the rules; each result is signed, but their paytable cannot be proven unchanged",
-    "ratesPending": "Published payout rates are not shown yet. A rate is only meaningful once the rules behind it are committed on-chain and versioned — until then it would be a number we assert about ourselves, which is what this page exists to avoid.",
     "actualRate": "Actual return {{rate}}% over {{count}} rounds",
     "theoreticalRate": "stated {{rate}}%",
     "ownSeedUnchecked": "This round data carries no seed of yours, so this step checked only that the seed list is consistent — not that your own seed is in it at your seat.",
     "notAnchored": "This batch’s root has not been anchored on-chain yet. 6a (the proof) is verified locally; 6b (the permanent record) becomes checkable once notarization runs.",
-    "viewOnChain": "Check the root on Solana Explorer (6b)"
+    "viewOnChain": "Check the root on Solana Explorer (6b)",
+    "rulesAnchored": "On-chain",
+    "rulesPublished": "Published",
+    "rulesAnchoredBlurb": "These rates were earned under rule version {{when}}-committed on-chain. The commitment predates every hand that cites it, so the rules could not be changed after the fact.",
+    "rulesPublishedBlurb": "The rule version is fixed and every hand records it, but the on-chain commitment has not landed yet. Verify a hand step-by-step in the meantime.",
+    "rulesAbsent": "The rule version behind these rates is unavailable right now, so no claim is made about it."
   },
   "reputation": {
     "title": "Reputation",

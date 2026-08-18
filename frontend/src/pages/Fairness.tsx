@@ -6,6 +6,7 @@ import { verifyRound,
   explorerUrl, type RoundVerificationData, type VerificationResult, type StepId } from '@/lib/fairness';
 import { cn } from '@/lib/cn';
 import { useLobbyGames, useRtp } from '@/api/hooks';
+import type { RuleStamp as RuleStampType } from '@/api/fairnessFeed';
 import { HIDDEN_GAMES, visibleGames } from '@/lib/games';
 import sampleRound from '@/lib/__fixtures__/round-vector.json';
 
@@ -336,10 +337,67 @@ function GameFairnessList() {
           );
         })}
       </ul>
-      <p className="mt-2 px-1 text-[0.66rem] leading-relaxed text-dim">
-        {t('fairness.ratesPending')}
-      </p>
+      <RuleStamp stamp={rtp.data?.rules ?? null} />
     </section>
+  );
+}
+
+/**
+ * The rule-version stamp (feature queue #12) — what makes a published rate mean
+ * anything.
+ *
+ * Three states, and the difference between them is the point:
+ *
+ *   ANCHORED     the rules were hashed and committed on-chain, with a timestamp
+ *                that precedes every hand citing that version. A player can
+ *                check the chain themselves.
+ *   PUBLISHED    the version is fixed and every round records it, but the chain
+ *                write has not landed. Weaker, and said so plainly.
+ *   ABSENT       an older server, or the commitment could not be read. No claim
+ *                is made at all.
+ *
+ * Rendering all three the same way would undo the feature: the whole reason this
+ * page withheld its rates for so long was to avoid asserting more than it could
+ * show.
+ */
+function RuleStamp({ stamp }: { stamp: RuleStampType | null }) {
+  const { t } = useTranslation();
+
+  if (!stamp) {
+    return (
+      <p className="mt-2 px-1 text-[0.66rem] leading-relaxed text-dim">
+        {t('fairness.rulesAbsent')}
+      </p>
+    );
+  }
+
+  const short = `${stamp.version.slice(0, 8)}…${stamp.version.slice(-6)}`;
+  const anchored = Boolean(stamp.chainTx);
+
+  return (
+    <div className="mt-2 rounded-(--radius-app) border border-border bg-surface px-3 py-2.5">
+      <div className="flex items-center gap-2">
+        <span
+          className={cn(
+            'shrink-0 rounded-full px-2 py-0.5 text-[0.58rem] font-bold uppercase tracking-wide',
+            anchored ? 'bg-success/15 text-success' : 'bg-surface-2 text-dim',
+          )}
+        >
+          {anchored ? t('fairness.rulesAnchored') : t('fairness.rulesPublished')}
+        </span>
+        <code className="min-w-0 flex-1 truncate font-mono text-[0.62rem] text-dim">{short}</code>
+      </div>
+      <p className="mt-1.5 text-[0.64rem] leading-relaxed text-dim">
+        {anchored
+          ? t('fairness.rulesAnchoredBlurb', {
+              when: stamp.committedAt ? new Date(stamp.committedAt).toLocaleDateString() : '—',
+            })
+          : t('fairness.rulesPublishedBlurb')}
+      </p>
+      {stamp.chainTx && (
+        <div className="mt-1 truncate font-mono text-[0.58rem] text-accent">{stamp.chainTx}</div>
+      )}
+    </div>
   );
 }
 

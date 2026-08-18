@@ -312,12 +312,16 @@
     "provableBlurb": "规则由我们掌握，每一局均可验证",
     "vendorAttested": "供应商背书",
     "vendorBlurb": "规则由外部供应商掌握；每个结果均有签名，但无法证明其赔付表未被更改",
-    "ratesPending": "暂不显示已公布的赔付率。只有当其背后的规则在链上承诺并版本化后，赔付率才有意义——在此之前，它只是我们对自己的单方面声明，而这正是本页面要避免的。",
     "actualRate": "实际返还率 {{rate}}%（{{count}} 局）",
     "theoreticalRate": "标称 {{rate}}%",
     "ownSeedUnchecked": "本局数据未包含你的种子，因此本步骤仅验证了种子列表的一致性，未验证你本人的种子是否在其中、且位于你的座位。",
     "notAnchored": "该批次的根尚未上链存证。6a（证明路径）已在本地验证；6b（链上永久记录）待存证完成后可查。",
-    "viewOnChain": "在 Solana Explorer 查验根哈希（6b）"
+    "viewOnChain": "在 Solana Explorer 查验根哈希（6b）",
+    "rulesAnchored": "On-chain",
+    "rulesPublished": "Published",
+    "rulesAnchoredBlurb": "These rates were earned under rule version {{when}}-committed on-chain. The commitment predates every hand that cites it, so the rules could not be changed after the fact.",
+    "rulesPublishedBlurb": "The rule version is fixed and every hand records it, but the on-chain commitment has not landed yet. Verify a hand step-by-step in the meantime.",
+    "rulesAbsent": "The rule version behind these rates is unavailable right now, so no claim is made about it."
   },
   "reputation": {
     "title": "信誉",

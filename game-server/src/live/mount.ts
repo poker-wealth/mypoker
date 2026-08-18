@@ -7,6 +7,7 @@ import { FcPlayerDirectory } from './fc-directory';
 import { HttpFinancialCoreClient, type FinancialCoreClient } from '../core/financial-core-client';
 import { chainClientFromEnv } from '../fairness/chain-from-env';
 import { MerkleRoundNotary, type RoundNotary } from '../fairness/round-notary';
+import { ensureRuleCommitment } from '../fairness/rule-commitment';
 import { MongoMerkleStore, getRoundFairness } from '../fairness/round-store';
 import { verifyToken } from '../gateway/tokens';
 import type { LiveTableConfig } from './live-room';
@@ -75,6 +76,17 @@ export function mountLiveTables(app: Express, opts: MountLiveOptions): MountedLi
   const notary: RoundNotary | undefined = opts.notarize
     ? new MerkleRoundNotary(chain, new MongoMerkleStore(), { flushIntervalMs: 30_000 })
     : undefined;
+
+  // Anchor the payout rules before any hand cites them (queue #12). Idempotent
+  // on the version hash, so this is a no-op on every boot after the first with
+  // unchanged rules. Fire-and-forget with its own catch: an unreachable chain
+  // must not stop the tables from opening — hands stay verifiable step-by-step,
+  // and the RTP feed reports the missing anchor rather than implying one.
+  if (opts.notarize) {
+    void ensureRuleCommitment(chain).catch((err) =>
+      console.error('[rules] rule manifest not committed:', err),
+    );
+  }
 
   const hub = new TableHub(
     { directory, fc, chain, ...(notary ? { notary } : {}) },
