@@ -292,6 +292,30 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
     }
   }
 
+  /**
+   * A round that blew up must not take the table with it.
+   *
+   * `resolveRound` runs the settlement, and anything in there can throw — the ledger refusing, a
+   * jackpot pool failing to open, a bug. When it did, nothing reset `phase`, so the room sat in
+   * IN_HAND for good: players stood up, the seats emptied, and it still reported a hand in progress
+   * with nobody to act. Only restarting the process cleared it. That is how a single settlement
+   * error became four dead tables — see the jackpot-pool-owner fix in financial-core.
+   *
+   * Recovery is deliberately narrow. It puts the table back to WAITING so the next hand can start,
+   * and it does NOT touch a stack or reverse anything: `fc.settleTableHand` is atomic, so a throw
+   * from it means no money moved, and a throw AFTER it means money moved and the mirrored stacks
+   * are already correct. Either way, inventing a correction here would be the actual disaster.
+   */
+  protected abandonRound(err: unknown): void {
+    console.error(
+      `[room ${this.config.id}] round failed to settle — table returned to WAITING, nothing paid or reversed:`,
+      err,
+    );
+    this.phase = 'WAITING';
+    this.actionDeadline = null;
+    this.push();
+  }
+
   protected occupiedSeats(): TSeat[] {
     return this.seats.filter((s): s is TSeat => s !== null);
   }

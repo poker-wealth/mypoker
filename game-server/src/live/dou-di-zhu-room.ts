@@ -161,28 +161,42 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
   }
 
   private async resolveRound(): Promise<void> {
-    const grossNets = this.game.getNet();
-    const settlement = settleNet(grossNets, { rakeBps: this.config.rakeBps });
-    const netDeltas = new Map<string, number>();
-    for (const l of settlement.losers) netDeltas.set(l.playerId, -l.amount);
-    for (const w of settlement.winners) netDeltas.set(w.playerId, w.amount);
+    // Anything from here on can throw — the ledger refusing, a jackpot pool failing to open.
+    // If it does, the table goes back to WAITING rather than sitting in IN_HAND forever. See
+    // `abandonRound`: nothing is paid or reversed, only the room is made playable again.
+    try {
+      const grossNets = this.game.getNet();
+      const settlement = settleNet(grossNets, { rakeBps: this.config.rakeBps });
+      const netDeltas = new Map<string, number>();
+      for (const l of settlement.losers) netDeltas.set(l.playerId, -l.amount);
+      for (const w of settlement.winners) netDeltas.set(w.playerId, w.amount);
 
-    let winnerProfit = 0;
-    for (const s of this.occupiedSeats()) {
-      const net = netDeltas.get(s.playerId) ?? 0;
-      s.net = net;
-      s.stack += net;
-      if (net > 0) winnerProfit += net;
+      let winnerProfit = 0;
+      for (const s of this.occupiedSeats()) {
+        const net = netDeltas.get(s.playerId) ?? 0;
+        s.net = net;
+        s.stack += net;
+        if (net > 0) winnerProfit += net;
+      }
+
+      const roundId = `${this.config.id}-ddz-${this.handNumber}`;
+      // FIXME (jackpot fairness): this should be the round's provably-fair final seed, the way
+      // PokerRoom passes `roundInfo().finalSeed`. `DouDiZhuGame` computes one but keeps it local to
+      // `start()`, and the cast that used to read `game.serverSeed` here was reading a field that has
+      // never existed — always undefined, always this fallback. A seed derived from the round id is
+      // predictable, so anyone who knows the id knows whether a jackpot fires: fine for a practice
+      // table, NOT fine for the real-money one. Needs a `roundInfo()` on the engine.
+      await this.processJackpot(winnerProfit, roundId, `${roundId}:seed`);
+
+    } catch (err) {
+      this.abandonRound(err);
+      // WAITING is not enough on its own: nothing else deals the next hand, so the table would
+      // sit idle with players in their seats. Give it the same beat a showdown gets, then try.
+      this.showdownTimer = setTimeout(() => {
+        void this.enqueue(() => this.maybeStartRound());
+      }, this.config.showdownDelayMs ?? 5_000);
+      return;
     }
-
-    const roundId = `${this.config.id}-ddz-${this.handNumber}`;
-    // FIXME (jackpot fairness): this should be the round's provably-fair final seed, the way
-    // PokerRoom passes `roundInfo().finalSeed`. `DouDiZhuGame` computes one but keeps it local to
-    // `start()`, and the cast that used to read `game.serverSeed` here was reading a field that has
-    // never existed — always undefined, always this fallback. A seed derived from the round id is
-    // predictable, so anyone who knows the id knows whether a jackpot fires: fine for a practice
-    // table, NOT fine for the real-money one. Needs a `roundInfo()` on the engine.
-    await this.processJackpot(winnerProfit, roundId, `${roundId}:seed`);
 
     this.phase = 'SHOWDOWN';
     this.push();
