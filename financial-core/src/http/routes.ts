@@ -96,6 +96,31 @@ import { openApiSpec } from './openapi';
 const money = z.string().min(1);
 const accountId = z.string().min(1);
 
+/** The four jackpot tiers, as they appear inside a pool id. */
+const JACKPOT_TIERS = new Set(['mini', 'minor', 'major', 'grand']);
+
+/**
+ * Which table a jackpot pool belongs to, read out of the pool id.
+ *
+ * The game server names its pools `jp:<tier>:<table>` (see `tableJackpotAccounts`). This used to
+ * take `split(':')[1]`, which is the TIER, so every table's pools were created owned by "mini".
+ * Two consequences, both bad:
+ *
+ *   - the pools were not per-table at all — every table shared one owner; and
+ *   - `accounts` is uniquely indexed on (accountType, ownerId, scope), so the SECOND table ever to
+ *     settle tried to insert a different `_id` under the same key, hit a duplicate-key error, and
+ *     took the whole settlement down with it. The room was left stuck mid-hand, forever.
+ *
+ * Tolerates either ordering by picking the segment that is not a tier name, so a pool id written
+ * the other way round (`jp:<table>:<tier>`, as the old comment here claimed) still resolves. An id
+ * of an unrecognised shape falls back to the round id, which is at least traceable.
+ */
+export function jackpotPoolOwner(poolId: string, fallback: string): string {
+  const [prefix, ...rest] = poolId.split(':');
+  if (prefix !== 'jp' || rest.length === 0) return fallback;
+  return rest.find((part) => part.length > 0 && !JACKPOT_TIERS.has(part)) ?? fallback;
+}
+
 /** All FC HTTP endpoints under /api/v1. */
 export function buildRouter(): Router {
   const r = Router();
@@ -937,11 +962,7 @@ export function buildRouter(): Router {
       const b = tableSettleBody.parse(req.body);
       // The pools must exist before the injection credits them — transfer()
       // throws AccountNotFoundError otherwise, failing the whole settlement.
-      // The owning table is read from the pool id itself (`jp:<table>:mini`) —
-      // round ids use dashes, so splitting THEM on ':' yielded the whole round
-      // id as an owner. Unknown id shapes fall back to the round id, which is
-      // at least traceable.
-      const tableOwner = b.jackpotAccounts.mini.split(':')[1] || b.roundId;
+      const tableOwner = jackpotPoolOwner(b.jackpotAccounts.mini, b.roundId);
       await ensureJackpotAccounts(tableOwner, b.jackpotAccounts);
       // The rake destination (TREASURY / LEAGUE_INVENTORY) must exist before settlement credits it —
       // on a fresh DB it does not, so ensure it here (like the jackpot pools above).
