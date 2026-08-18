@@ -42,6 +42,28 @@ interface LeagueDoc {
   description?: string;
   /** Invite-only leagues never appear in discovery. */
   inviteOnly: boolean;
+  /**
+   * The league's self-service settings (§2, 16-milestone plan). FACTS only —
+   * the platform min/max band that bounds them, and the decision about which
+   * rake is in force during a transition, are RULES and live in game-server
+   * (`src/league/league.ts`), the same facts/rules split as reputation and VIP.
+   *
+   * Absent on leagues created before settings existed; the gateway supplies
+   * platform defaults rather than inventing a rake here.
+   */
+  settings?: {
+    rakeBps: number;
+    tableHours: number;
+    buyIn: number;
+    spectatorsAllowed: boolean;
+  };
+  /**
+   * A rake change accepted but not yet in force. The doc requires a 7-day
+   * transition "enforced by platform (cannot apply early)", so `effectiveAt` is
+   * stored rather than recomputed — a restart must not restart the clock, and
+   * must not let a league shorten it by asking again either.
+   */
+  pendingRakeChange?: { rakeBps: number; effectiveAt: Date };
   createdAt: Date;
 }
 
@@ -61,6 +83,28 @@ const leagueSchema = new Schema<LeagueDoc>(
     ownerId: { type: String, required: true, index: true },
     description: { type: String },
     inviteOnly: { type: Boolean, default: false },
+    settings: {
+      type: new Schema(
+        {
+          rakeBps: { type: Number, required: true },
+          tableHours: { type: Number, required: true },
+          buyIn: { type: Number, required: true },
+          spectatorsAllowed: { type: Boolean, required: true },
+        },
+        { _id: false },
+      ),
+      default: undefined,
+    },
+    pendingRakeChange: {
+      type: new Schema(
+        {
+          rakeBps: { type: Number, required: true },
+          effectiveAt: { type: Date, required: true },
+        },
+        { _id: false },
+      ),
+      default: undefined,
+    },
   },
   { timestamps: { createdAt: true, updatedAt: false }, collection: 'leagues' },
 );
@@ -78,6 +122,13 @@ const membershipSchema = new Schema<MembershipDoc>(
 export const LeagueModel = model<LeagueDoc>('League', leagueSchema);
 export const MembershipModel = model<MembershipDoc>('LeagueMembership', membershipSchema);
 
+export interface LeagueSettingsFacts {
+  rakeBps: number;
+  tableHours: number;
+  buyIn: number;
+  spectatorsAllowed: boolean;
+}
+
 export interface League {
   leagueId: string;
   name: string;
@@ -86,6 +137,10 @@ export interface League {
   inviteOnly: boolean;
   memberCount: number;
   createdAt: string;
+  /** Null when this league has never set them; the caller applies platform defaults. */
+  settings: LeagueSettingsFacts | null;
+  /** A rake change not yet in force. `effectiveAt` is an ISO timestamp. */
+  pendingRakeChange: { rakeBps: number; effectiveAt: string } | null;
 }
 
 const membershipId = (leagueId: string, playerId: string): string => `${leagueId}:${playerId}`;
@@ -145,7 +200,78 @@ export async function getLeague(leagueId: string): Promise<League | null> {
     inviteOnly: doc.inviteOnly,
     memberCount,
     createdAt: doc.createdAt.toISOString(),
+    settings: doc.settings
+      ? {
+          rakeBps: doc.settings.rakeBps,
+          tableHours: doc.settings.tableHours,
+          buyIn: doc.settings.buyIn,
+          spectatorsAllowed: doc.settings.spectatorsAllowed,
+        }
+      : null,
+    pendingRakeChange: doc.pendingRakeChange
+      ? {
+          rakeBps: doc.pendingRakeChange.rakeBps,
+          effectiveAt: doc.pendingRakeChange.effectiveAt.toISOString(),
+        }
+      : null,
   };
+}
+
+/**
+ * Store a league's settings and any rake change still in transition.
+ *
+ * FACTS ONLY. This writes what it is given and validates nothing about the rake:
+ * the platform min/max band and the 7-day transition are RULES, and they are
+ * applied in game-server before this is called — the same split the codebase
+ * uses for reputation and VIP. Putting a band check here as well would give two
+ * answers to what a league may charge, and the two would drift.
+ *
+ * `pendingRakeChange: null` clears a transition (a league reverting, or the
+ * change having been folded in).
+ */
+export async function putLeagueSettings(
+  leagueId: string,
+  settings: LeagueSettingsFacts,
+  pendingRakeChange: { rakeBps: number; effectiveAt: Date } | null,
+): Promise<League> {
+  const res = await LeagueModel.updateOne(
+    { _id: leagueId },
+    pendingRakeChange
+      ? { $set: { settings, pendingRakeChange } }
+      : { $set: { settings }, $unset: { pendingRakeChange: '' } },
+  );
+  if (res.matchedCount === 0) throw new LeagueError(`no such league: ${leagueId}`);
+  return (await getLeague(leagueId))!;
+}
+
+/**
+ * Leagues whose scheduled rake change is now due.
+ *
+ * Indexed on nothing in particular because the population is small and this runs
+ * on a timer, not per hand. Returns the raw pending change so the caller can
+ * re-check it against the CURRENT band before folding it in — a rate that was
+ * legal when requested may not be legal when it lands.
+ */
+export async function leaguesWithDueRakeChange(
+  now: Date,
+): Promise<{ leagueId: string; settings: LeagueSettingsFacts | null; pendingRakeChange: { rakeBps: number; effectiveAt: Date } }[]> {
+  const docs = await LeagueModel.find({ 'pendingRakeChange.effectiveAt': { $lte: now } }).lean();
+  return docs
+    .filter((d): d is typeof d & { pendingRakeChange: { rakeBps: number; effectiveAt: Date } } =>
+      Boolean(d.pendingRakeChange),
+    )
+    .map((d) => ({
+      leagueId: d._id,
+      settings: d.settings
+        ? {
+            rakeBps: d.settings.rakeBps,
+            tableHours: d.settings.tableHours,
+            buyIn: d.settings.buyIn,
+            spectatorsAllowed: d.settings.spectatorsAllowed,
+          }
+        : null,
+      pendingRakeChange: d.pendingRakeChange,
+    }));
 }
 
 /** Join. Idempotent — a double tap must not create a second membership. */

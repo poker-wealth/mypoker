@@ -5,6 +5,13 @@
  * A league is AUTONOMOUS over: rake rate (within a platform min/max), table hours, buy-in
  * requirements, and whether spectating is allowed.
  *
+ * The rake rate is autonomous but NOT immediate. The 16-milestone plan: "Rake rate change: 7-day
+ * transition period enforced by platform (cannot apply early)", with the acceptance test spelled out
+ * as "attempt to apply rake change immediately -> rejected, scheduled for +7 days". So a rake change
+ * is scheduled, never applied on the spot, and the platform — not the league — holds the clock. The
+ * reason is players: someone sitting at a table chose to sit down at a known rake, and a league that
+ * could raise it mid-session would be changing the price after the sale.
+ *
  * The platform keeps FINAL, NON-NEGOTIABLE risk control: account bans after confirmed collusion,
  * freezing funds on abnormal withdrawals, and the anti-bot single-table limit. §2.1 is explicit that
  * a league may NOT contract out of these ("no soft-play-among-friends exemption"), so the override is
@@ -28,6 +35,33 @@ export interface LeagueSettings {
   spectatorsAllowed: boolean;
 }
 
+/**
+ * The platform-enforced waiting period on a rake change (16-milestone plan, W-league §self-service).
+ * Not a league setting — a league cannot shorten it, which is the entire point of "enforced by
+ * platform (cannot apply early)".
+ */
+export const RAKE_CHANGE_TRANSITION_DAYS = 7;
+const RAKE_CHANGE_TRANSITION_MS = RAKE_CHANGE_TRANSITION_DAYS * 24 * 60 * 60 * 1000;
+
+/** A rake change that has been accepted but is not yet in force. */
+export interface PendingRakeChange {
+  rakeBps: number;
+  /** Epoch ms. The platform sets this; nothing a league sends can move it earlier. */
+  effectiveAt: number;
+}
+
+/**
+ * A league's settings plus any rake change still in its transition period.
+ *
+ * Modelled as one value rather than two so a caller cannot read the settings and forget the pending
+ * change — the bug that shape invites is charging the old rake after the new one came into force.
+ */
+export interface LeagueSettingsState {
+  /** In force right now. */
+  settings: LeagueSettings;
+  pendingRakeChange: PendingRakeChange | null;
+}
+
 export class LeagueRuleError extends Error {
   constructor(message: string) {
     super(message);
@@ -48,6 +82,93 @@ export function validateSettings(policy: PlatformLeaguePolicy, s: LeagueSettings
   if (s.buyIn < policy.minBuyIn || s.buyIn > policy.maxBuyIn) {
     throw new LeagueRuleError('buy-in is outside the platform range');
   }
+}
+
+// ── Rake-rate transition (7 days, platform-enforced) ─────────────────────────
+
+/**
+ * Accept a settings change from a league.
+ *
+ * Everything except the rake takes effect at once — the doc only puts a transition on the rate.
+ * A changed rake is validated NOW (an out-of-band rate is refused outright, never parked in a
+ * queue to fail later) and scheduled for +7 days.
+ *
+ * Two details that decide whether the rule is enforceable rather than decorative:
+ *
+ *   RE-REQUESTING RESTARTS THE CLOCK. Otherwise a league schedules 3% for next Tuesday, then
+ *   re-requests 3% on Monday and argues the transition is nearly served. Each request is a new
+ *   change and waits its own 7 days.
+ *
+ *   REVERTING CANCELS. Asking for the rate already in force means the league changed its mind, so
+ *   the pending change is dropped rather than "scheduled" — scheduling a no-op would leave a
+ *   phantom change that later overwrites a real one.
+ */
+export function requestSettingsChange(
+  policy: PlatformLeaguePolicy,
+  state: LeagueSettingsState,
+  next: LeagueSettings,
+  now: number,
+): { state: LeagueSettingsState; rakeScheduledFor: number | null } {
+  validateSettings(policy, next);
+
+  // Non-rake settings apply immediately; the rake in force does NOT change here.
+  const applied: LeagueSettings = { ...next, rakeBps: state.settings.rakeBps };
+
+  if (next.rakeBps === state.settings.rakeBps) {
+    return { state: { settings: applied, pendingRakeChange: null }, rakeScheduledFor: null };
+  }
+
+  const effectiveAt = now + RAKE_CHANGE_TRANSITION_MS;
+  return {
+    state: { settings: applied, pendingRakeChange: { rakeBps: next.rakeBps, effectiveAt } },
+    rakeScheduledFor: effectiveAt,
+  };
+}
+
+/**
+ * The settings actually in force at `now`, with a due rake change folded in.
+ *
+ * Read-only: it does not mutate or promote anything, so it is safe to call on every hand. Callers
+ * that need the promotion persisted use `promoteDueRakeChange`.
+ */
+export function effectiveSettings(
+  state: LeagueSettingsState,
+  now: number,
+  policy?: PlatformLeaguePolicy,
+): LeagueSettings {
+  const p = state.pendingRakeChange;
+  if (!p || now < p.effectiveAt) return { ...state.settings };
+  // If the platform narrowed its band during the transition, the scheduled rate is no longer legal
+  // and the OLD rate stands. A league must not acquire an out-of-band rake by having asked for it
+  // back when it was allowed.
+  if (policy && (p.rakeBps < policy.minRakeBps || p.rakeBps > policy.maxRakeBps)) {
+    return { ...state.settings };
+  }
+  return { ...state.settings, rakeBps: p.rakeBps };
+}
+
+/**
+ * Fold a due rake change into the settings, for persisting.
+ *
+ * Returns the same state untouched when nothing is due, so a caller can write unconditionally and a
+ * no-op costs one comparison. A change that has become illegal is DROPPED, not applied — see above.
+ */
+export function promoteDueRakeChange(
+  state: LeagueSettingsState,
+  now: number,
+  policy?: PlatformLeaguePolicy,
+): { state: LeagueSettingsState; promoted: boolean; dropped: boolean } {
+  const p = state.pendingRakeChange;
+  if (!p || now < p.effectiveAt) return { state, promoted: false, dropped: false };
+
+  if (policy && (p.rakeBps < policy.minRakeBps || p.rakeBps > policy.maxRakeBps)) {
+    return { state: { ...state, pendingRakeChange: null }, promoted: false, dropped: true };
+  }
+  return {
+    state: { settings: { ...state.settings, rakeBps: p.rakeBps }, pendingRakeChange: null },
+    promoted: true,
+    dropped: false,
+  };
 }
 
 // ── Platform risk control — non-negotiable (§2.1) ─────────────────────────────
@@ -87,25 +208,45 @@ export function assertNoRiskControlExemption(requestedExemptions: readonly strin
 }
 
 export class League {
-  private settings: LeagueSettings;
+  private state: LeagueSettingsState;
 
   constructor(
     readonly leagueId: string,
     readonly policy: PlatformLeaguePolicy,
     settings: LeagueSettings,
+    pendingRakeChange: PendingRakeChange | null = null,
   ) {
     validateSettings(policy, settings);
-    this.settings = settings;
+    this.state = { settings, pendingRakeChange };
   }
 
-  getSettings(): LeagueSettings {
-    return { ...this.settings };
+  /** The settings in force at `now`, with a due rake change folded in. */
+  getSettings(now: number = Date.now()): LeagueSettings {
+    return effectiveSettings(this.state, now, this.policy);
   }
 
-  /** A league may change its own settings — still inside platform bounds. */
-  updateSettings(next: LeagueSettings): void {
-    validateSettings(this.policy, next);
-    this.settings = next;
+  /** The full state, including any change still in transition — for persisting. */
+  getState(): LeagueSettingsState {
+    return { settings: { ...this.state.settings }, pendingRakeChange: this.state.pendingRakeChange };
+  }
+
+  /**
+   * A league may change its own settings — inside platform bounds, and a rake change waits.
+   *
+   * This used to assign `next` wholesale, which applied a new rake the instant it was asked for. The
+   * doc forbids exactly that: "attempt to apply rake change immediately -> rejected, scheduled for
+   * +7 days". Returns when the new rate lands, or null when the rake was untouched, so a caller can
+   * tell the league what actually happened instead of implying the change is live.
+   */
+  updateSettings(next: LeagueSettings, now: number = Date.now()): { rakeScheduledFor: number | null } {
+    const result = requestSettingsChange(this.policy, this.state, next, now);
+    this.state = result.state;
+    return { rakeScheduledFor: result.rakeScheduledFor };
+  }
+
+  /** Any rake change not yet in force. */
+  getPendingRakeChange(): PendingRakeChange | null {
+    return this.state.pendingRakeChange;
   }
 
   /** League rake goes 100% to League Inventory — never the platform Treasury. */

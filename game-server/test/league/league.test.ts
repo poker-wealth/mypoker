@@ -39,9 +39,19 @@ describe('league autonomy — bounded by the platform', () => {
 
   it('a league may change its own settings, still within bounds', () => {
     const league = new League('lg1', policy, ok);
-    league.updateSettings({ ...ok, rakeBps: 300, spectatorsAllowed: false });
-    expect(league.getSettings().rakeBps).toBe(300);
-    expect(() => league.updateSettings({ ...ok, rakeBps: 999 })).toThrow(LeagueRuleError);
+    const now = 1_700_000_000_000;
+
+    // Non-rake settings apply at once.
+    league.updateSettings({ ...ok, rakeBps: 300, spectatorsAllowed: false }, now);
+    expect(league.getSettings(now).spectatorsAllowed).toBe(false);
+
+    // The rake does NOT. This assertion used to read `toBe(300)` — it pinned the
+    // behaviour the doc forbids ("attempt to apply rake change immediately ->
+    // rejected, scheduled for +7 days"), so it passed for as long as the rule
+    // was broken and would only have failed once someone fixed it.
+    expect(league.getSettings(now).rakeBps).toBe(ok.rakeBps);
+
+    expect(() => league.updateSettings({ ...ok, rakeBps: 999 }, now)).toThrow(LeagueRuleError);
   });
 
   it('league rake goes 100% to League Inventory, never the platform', () => {
