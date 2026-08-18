@@ -226,7 +226,18 @@
     "tableDesign": "Desain meja",
     "demoSubtitle": "Demo {{game}} · Ronde {{hand}} · Blind {{blinds}}",
     "signingIn": "Sedang masuk…",
-    "signInToSit": "Masuk untuk duduk"
+    "signInToSit": "Masuk untuk duduk",
+    "voiceHold": "Tahan untuk merekam pesan suara",
+    "voiceRecording": "Merekam… lepas untuk kirim",
+    "voicePlay": "Putar pesan suara, {{seconds}} detik",
+    "voiceUnplayable": "Tidak bisa diputar",
+    "voiceExpired": "Pesan suara kedaluwarsa",
+    "chatDisabled": "Obrolan dinonaktifkan",
+    "microphoneDenied": "Akses mikrofon ditolak",
+    "recordingUnsupported": "Peramban ini tidak bisa merekam audio",
+    "recordingTooShort": "Tahan sedikit lebih lama untuk mengirim",
+    "recordingTooLong": "Rekaman terlalu besar untuk dikirim",
+    "recordingFailed": "Tidak dapat mengirim rekaman itu"
   },
   "a11y": {
     "toggleTheme": "Ganti tema",

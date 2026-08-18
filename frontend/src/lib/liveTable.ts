@@ -158,6 +158,8 @@ export type TableCommand =
   | { kind: 'sitIn' }
   | { kind: 'buyIn'; amount: number }
   | { kind: 'chat'; message: string }
+  /** A recorded voice note: base64 audio, its length, and its container. */
+  | { kind: 'voice'; clip: string; durationMs: number; mime: string }
   | { kind: 'challenge'; targetId: string }
   | { kind: 'answer_challenge'; passed: boolean; responseMs: number }
   | { kind: 'set_client_seed'; seed: string };

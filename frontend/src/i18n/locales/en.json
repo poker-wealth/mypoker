@@ -226,7 +226,18 @@
     "tableDesign": "Table design",
     "demoSubtitle": "{{game}} demo · Hand {{hand}} · Blinds {{blinds}}",
     "signingIn": "Signing you in…",
-    "signInToSit": "Sign in to take a seat"
+    "signInToSit": "Sign in to take a seat",
+    "voiceHold": "Hold to record a voice note",
+    "voiceRecording": "Recording… release to send",
+    "voicePlay": "Play voice note, {{seconds}} seconds",
+    "voiceUnplayable": "Can't play",
+    "voiceExpired": "Voice note expired",
+    "chatDisabled": "Chat is disabled",
+    "microphoneDenied": "Microphone access was denied",
+    "recordingUnsupported": "This browser can't record audio",
+    "recordingTooShort": "Hold a little longer to send a voice note",
+    "recordingTooLong": "That recording was too large to send",
+    "recordingFailed": "Couldn't send that recording"
   },
   "a11y": {
     "toggleTheme": "Toggle theme",

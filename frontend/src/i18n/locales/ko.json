@@ -226,7 +226,18 @@
     "tableDesign": "테이블 디자인",
     "demoSubtitle": "{{game}} 데모 · 핸드 {{hand}} · 블라인드 {{blinds}}",
     "signingIn": "로그인 중…",
-    "signInToSit": "로그인하고 착석하기"
+    "signInToSit": "로그인하고 착석하기",
+    "voiceHold": "길게 눌러 음성 녹음",
+    "voiceRecording": "녹음 중… 놓으면 전송",
+    "voicePlay": "음성 재생, {{seconds}}초",
+    "voiceUnplayable": "재생할 수 없음",
+    "voiceExpired": "음성이 만료되었습니다",
+    "chatDisabled": "채팅이 비활성화되었습니다",
+    "microphoneDenied": "마이크 접근이 거부되었습니다",
+    "recordingUnsupported": "이 브라우저는 녹음을 지원하지 않습니다",
+    "recordingTooShort": "조금 더 길게 눌러 주세요",
+    "recordingTooLong": "녹음이 너무 커서 보낼 수 없습니다",
+    "recordingFailed": "녹음을 보내지 못했습니다"
   },
   "a11y": {
     "toggleTheme": "테마 전환",

@@ -226,7 +226,18 @@
     "tableDesign": "牌桌样式",
     "demoSubtitle": "{{game}} 演示 · 第 {{hand}} 局 · 盲注 {{blinds}}",
     "signingIn": "正在登录…",
-    "signInToSit": "登录后即可入座"
+    "signInToSit": "登录后即可入座",
+    "voiceHold": "按住录制语音",
+    "voiceRecording": "录音中…松开发送",
+    "voicePlay": "播放语音，{{seconds}} 秒",
+    "voiceUnplayable": "无法播放",
+    "voiceExpired": "语音已过期",
+    "chatDisabled": "聊天已关闭",
+    "microphoneDenied": "麦克风访问被拒绝",
+    "recordingUnsupported": "此浏览器无法录音",
+    "recordingTooShort": "请按住久一点再发送语音",
+    "recordingTooLong": "录音过大，无法发送",
+    "recordingFailed": "无法发送该录音"
   },
   "a11y": {
     "toggleTheme": "切换主题",

@@ -257,6 +257,22 @@ export const tableCommandSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('buyIn'), amount: z.number().int().positive() }),
   /** Send a chat message to the room. */
   z.object({ kind: z.literal('chat'), message: z.string().max(200) }),
+  /**
+   * Send a voice note to the room — a short recorded clip, base64.
+   *
+   * The length bound here is a cheap structural guard so a hostile client
+   * cannot make the room decode megabytes before the real cap runs; the
+   * meaningful limit is MAX_VOICE_BYTES on the DECODED audio, checked in
+   * social/voice.ts. Base64 is 4 chars per 3 bytes, so this bound sits just
+   * above 24KB of audio and still far below the 64KB frame limit that would
+   * otherwise close the socket mid-hand.
+   */
+  z.object({
+    kind: z.literal('voice'),
+    clip: z.string().min(1).max(34_000),
+    durationMs: z.number().int().positive(),
+    mime: z.string().max(40),
+  }),
   /** Challenge a peer. */
   z.object({ kind: z.literal('challenge'), targetId: z.string() }),
   /** Answer a challenge. */

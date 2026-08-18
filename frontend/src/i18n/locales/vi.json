@@ -226,7 +226,18 @@
     "tableDesign": "Kiểu bàn",
     "demoSubtitle": "{{game}} thử · Ván {{hand}} · Tiền mù {{blinds}}",
     "signingIn": "Đang đăng nhập…",
-    "signInToSit": "Đăng nhập để ngồi vào bàn"
+    "signInToSit": "Đăng nhập để ngồi vào bàn",
+    "voiceHold": "Giữ để ghi âm",
+    "voiceRecording": "Đang ghi… thả để gửi",
+    "voicePlay": "Phát tin nhắn thoại, {{seconds}} giây",
+    "voiceUnplayable": "Không phát được",
+    "voiceExpired": "Tin nhắn thoại đã hết hạn",
+    "chatDisabled": "Trò chuyện đã tắt",
+    "microphoneDenied": "Quyền truy cập micro bị từ chối",
+    "recordingUnsupported": "Trình duyệt này không ghi âm được",
+    "recordingTooShort": "Giữ lâu hơn một chút để gửi",
+    "recordingTooLong": "Bản ghi quá lớn để gửi",
+    "recordingFailed": "Không gửi được bản ghi đó"
   },
   "a11y": {
     "toggleTheme": "Đổi giao diện",
