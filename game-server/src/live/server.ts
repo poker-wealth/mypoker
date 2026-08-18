@@ -5,6 +5,7 @@ import { DEFAULT_ROOM } from './poker-room';
 import type { LiveTableConfig } from './live-room';
 import type { TableHub } from './table-hub';
 import { mountLiveTables } from './mount';
+import { bankerMinimumFor } from './niu-niu-room';
 
 /**
  * The live table service — HTTP for the table list, WebSocket for the game.
@@ -75,7 +76,10 @@ export function defaultTables(): LiveTableConfig[] {
     { ...DEFAULT_ROOM, id: 'short-deck', game: 'short-deck', variantId: 'short-deck', name: 'Short Deck · ₮0.10/0.20' },
     { ...DEFAULT_ROOM, id: 'omaha', game: 'omaha', variantId: 'omaha', name: 'Omaha · ₮0.10/0.20' },
     { id: 'baccarat', name: 'Baccarat · Player Banked', game: 'baccarat', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 8, rakeBps: 500, tiePayout: 8 },
-    { id: 'niu-niu', name: 'Niu Niu · Player Banked', game: 'niu-niu', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 6, rakeBps: 500 },
+    // The buy-in is DERIVED from the exposure rule, not picked: whoever holds the bank must be able
+    // to cover every other seat staking the minimum and all of them turning over Five Small (6x).
+    // At ₮1,000 the guard refused the second bettor and the table looked broken.
+    { id: 'niu-niu', name: 'Niu Niu · Player Banked', game: 'niu-niu', minBuyIn: bankerMinimumFor(6, 100), maxBuyIn: 50_000, maxSeats: 6, rakeBps: 500 },
     { id: 'san-zhang', name: 'San Zhang · Player Banked', game: 'san-zhang', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 6, rakeBps: 500 },
     { id: 'red-packet', name: 'Red Packet Minesweeper', game: 'red-packet', size: 25, mineCount: 5, minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 8, rakeBps: 500 },
     { id: 'cowboy-beauty', name: 'Cowboy & Beauty', game: 'cowboy-beauty', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 8, rakeBps: 500 },

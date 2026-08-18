@@ -60,7 +60,22 @@ const BET_MULTIPLIERS = [1, 2, 5];
  * The best hand on the ladder pays six times (Five Small), so that is what the bank must be able to
  * cover on every bet in front of it — the stake alone is not the exposure.
  */
-const MAX_HAND_MULTIPLIER = 6;
+export const MAX_HAND_MULTIPLIER = 6;
+
+/**
+ * The smallest stack that can hold the bank at a full table without the guard refusing bets.
+ *
+ * The exposure rule is the iron guard: a banker who cannot cover the payout is refused, because
+ * the alternative is the platform quietly making up the shortfall. So the minimum has to be big
+ * enough for the worst case a full table can present — every other seat staking the minimum, all
+ * of them turning over Five Small.
+ *
+ * At six seats and a ₮100 stake that is ₮3,000, not the ₮1,000 the table opened with — which is
+ * why a second bettor used to be refused outright and the table looked broken.
+ */
+export function bankerMinimumFor(seats: number, minStake: number): number {
+  return Math.max(0, seats - 1) * minStake * MAX_HAND_MULTIPLIER;
+}
 
 /**
  * Niu Niu / Bull Bull — one game, one table, real chips.
