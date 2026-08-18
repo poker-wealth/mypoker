@@ -68,7 +68,22 @@ describe('BaccaratRoom — Live Room Integration', () => {
 
     const snap = room.snapshotFor(alice);
     expect(snap.phase).toBe('SHOWDOWN');
-    expect(snap.board.length).toBeGreaterThan(0);
+    /**
+     * The hands travel in `gameState`, one per side.
+     *
+     * This used to read `board.length > 0`, back when both hands were flattened into that array
+     * with a '|' between them — which the felt then drew as a card face reading "|". Asserting them
+     * apart is also a better check: it catches one side arriving empty, which the flat array could
+     * not distinguish.
+     */
+    const round = snap.gameState as {
+      playerCards: string[];
+      bankerCards: string[];
+      outcome: string | null;
+    };
+    expect(round.playerCards.length).toBeGreaterThan(0);
+    expect(round.bankerCards.length).toBeGreaterThan(0);
+    expect(round.outcome).not.toBeNull();
 
     // Verify ledger-level money conservation including rake sink
     expect(players.totalChips() + bank.sinkTotal()).toBe(startingTotal);

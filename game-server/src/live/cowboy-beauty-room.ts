@@ -203,7 +203,20 @@ export class CowboyBeautyRoom extends BaseLiveRoom<CowboyBeautyRoomConfig, RoomS
       handNumber: this.handNumber,
       street: null,
       pot: this.occupiedSeats().reduce((sum, s) => sum + s.bet, 0),
-      board: cards && this.phase === 'SHOWDOWN' ? [cards.cowboy, cards.beauty] : [],
+      board: [],
+      /**
+       * A parimutuel round: what each side is holding and what it currently pays. Those two
+       * numbers are the entire game — a player picks a side by reading them — and neither was
+       * reaching the felt, which showed only the two cards after the fact.
+       */
+      gameState: {
+        pools: this.game.getPools(),
+        oddsBps: this.game.getOddsBps(),
+        revealed: Boolean(cards) && this.phase === 'SHOWDOWN',
+        cowboyCard: cards?.cowboy ?? null,
+        beautyCard: cards?.beauty ?? null,
+        winner: winner ?? null,
+      },
       seats: this.seats.map((s, idx) => {
         if (!s) {
           return {

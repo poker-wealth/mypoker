@@ -73,10 +73,14 @@ export const GAMES: GameDef[] = [
  * A launch gate, not a deletion: entries keep art and translations, so
  * releasing one is deleting an id from this set.
  */
-export const HIDDEN_GAMES: ReadonlySet<string> = new Set<GameId>([
-  'baccarat',
-  'cowboy-beauty',
-]);
+/**
+ * Games withheld from the lobby.
+ *
+ * Empty now: baccarat and cowboy-beauty were held back "until their table screens are ready", and
+ * those screens are finished and verified end-to-end — each sits, bets, settles through the ledger
+ * and pays the right rake. Putting a game in here is a launch decision, so taking one out is too.
+ */
+export const HIDDEN_GAMES: ReadonlySet<string> = new Set<GameId>([]);
 
 /** The catalog minus anything not yet on sale. Use for anything player-facing. */
 export const visibleGames = (): GameDef[] => GAMES.filter((g) => !HIDDEN_GAMES.has(g.id));
