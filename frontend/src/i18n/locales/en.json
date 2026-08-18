@@ -319,7 +319,7 @@
     "viewOnChain": "Check the root on Solana Explorer (6b)",
     "rulesAnchored": "On-chain",
     "rulesPublished": "Published",
-    "rulesAnchoredBlurb": "These rates were earned under rule version {{when}}-committed on-chain. The commitment predates every hand that cites it, so the rules could not be changed after the fact.",
+    "rulesAnchoredBlurb": "These rates were earned under a rule version committed on-chain on {{when}}. The commitment predates every hand that cites it, so the rules could not be changed after the fact.",
     "rulesPublishedBlurb": "The rule version is fixed and every hand records it, but the on-chain commitment has not landed yet. Verify a hand step-by-step in the meantime.",
     "rulesAbsent": "The rule version behind these rates is unavailable right now, so no claim is made about it."
   },

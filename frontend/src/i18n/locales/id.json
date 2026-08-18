@@ -318,10 +318,10 @@
     "notAnchored": "Root batch ini belum ditautkan ke chain. 6a (bukti) diverifikasi lokal; 6b (catatan permanen) dapat diperiksa setelah notarisasi berjalan.",
     "viewOnChain": "Periksa root di Solana Explorer (6b)",
     "rulesAnchored": "On-chain",
-    "rulesPublished": "Published",
-    "rulesAnchoredBlurb": "These rates were earned under rule version {{when}}-committed on-chain. The commitment predates every hand that cites it, so the rules could not be changed after the fact.",
-    "rulesPublishedBlurb": "The rule version is fixed and every hand records it, but the on-chain commitment has not landed yet. Verify a hand step-by-step in the meantime.",
-    "rulesAbsent": "The rule version behind these rates is unavailable right now, so no claim is made about it."
+    "rulesPublished": "Dipublikasikan",
+    "rulesAnchoredBlurb": "Rasio ini dihasilkan di bawah versi aturan yang dikomit on-chain pada {{when}}. Komitmen itu mendahului setiap tangan yang merujuknya, sehingga aturan tidak bisa diubah setelahnya.",
+    "rulesPublishedBlurb": "Versi aturan sudah tetap dan setiap tangan mencatatnya, tetapi komitmen on-chain belum selesai. Sementara itu, Anda dapat memverifikasi tangan langkah demi langkah.",
+    "rulesAbsent": "Versi aturan di balik rasio ini sedang tidak tersedia, jadi tidak ada klaim yang dibuat."
   },
   "reputation": {
     "title": "Reputasi",

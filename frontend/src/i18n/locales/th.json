@@ -317,11 +317,11 @@
     "ownSeedUnchecked": "ข้อมูลรอบนี้ไม่มีซีดของคุณ ขั้นตอนนี้จึงตรวจสอบเพียงความสอดคล้องของรายการซีดเท่านั้น ไม่ได้ตรวจว่าซีดของคุณอยู่ในนั้นที่ตำแหน่งของคุณหรือไม่",
     "notAnchored": "รูทของชุดนี้ยังไม่ถูกบันทึกบนเชน 6a (พิสูจน์) ตรวจสอบในเครื่องแล้ว ส่วน 6b (บันทึกถาวร) จะตรวจได้เมื่อบันทึกเสร็จ",
     "viewOnChain": "ตรวจรูทบน Solana Explorer (6b)",
-    "rulesAnchored": "On-chain",
-    "rulesPublished": "Published",
-    "rulesAnchoredBlurb": "These rates were earned under rule version {{when}}-committed on-chain. The commitment predates every hand that cites it, so the rules could not be changed after the fact.",
-    "rulesPublishedBlurb": "The rule version is fixed and every hand records it, but the on-chain commitment has not landed yet. Verify a hand step-by-step in the meantime.",
-    "rulesAbsent": "The rule version behind these rates is unavailable right now, so no claim is made about it."
+    "rulesAnchored": "บนเชน",
+    "rulesPublished": "เผยแพร่แล้ว",
+    "rulesAnchoredBlurb": "อัตราจ่ายเหล่านี้เกิดขึ้นภายใต้เวอร์ชันกติกาที่คอมมิตบนเชนเมื่อ {{when}} การคอมมิตเกิดก่อนทุกมือที่อ้างอิงถึง จึงไม่สามารถแก้กติกาย้อนหลังได้",
+    "rulesPublishedBlurb": "เวอร์ชันกติกาถูกตรึงไว้และทุกมือจะบันทึกไว้ แต่การคอมมิตบนเชนยังไม่เสร็จสิ้น ระหว่างนี้สามารถตรวจสอบมือแบบทีละขั้นตอนได้",
+    "rulesAbsent": "ขณะนี้ไม่สามารถดูเวอร์ชันกติกาเบื้องหลังอัตราจ่ายเหล่านี้ได้ จึงไม่มีการยืนยันใด ๆ"
   },
   "reputation": {
     "title": "ชื่อเสียง",

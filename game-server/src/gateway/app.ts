@@ -10,7 +10,7 @@ import { buildAdminRouter } from './admin-routes';
 import { buildMeRouter } from './me-routes';
 import { createRedEnvelopeRouter } from './red-envelope-routes';
 import { buildInternalRouter } from './internal-routes';
-import { currentRuleManifest } from '../fairness/rule-version';
+import { currentRuleManifest, ruleVersionFor } from '../fairness/rule-version';
 import { ruleCommitment } from '../fairness/rule-commitment';
 import { mountLiveTables } from '../live/mount';
 import { buildLeagueTableRouter } from './league-table-routes';
@@ -83,7 +83,14 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
         rules: {
           version: manifest.version,
           manifestRevision: manifest.manifestRevision,
-          games: manifest.games,
+          // Each game carries ITS OWN version — the hash a default table of
+          // that game stamps on its rounds. This is the join the audit found
+          // missing: the manifest version alone could never equal any round's
+          // stamp, so the published stamp was uncheckable. Now: round says Y →
+          // find the game entry with version Y (or fetch /fairness/rules/Y for
+          // a custom table) → re-hash the entry → Y. Anchored via the same
+          // commitment store.
+          games: manifest.games.map((g) => ({ ...g, version: ruleVersionFor(g) })),
           // Null txId = the rules are published but not yet anchored on-chain.
           // The UI must say which, and never imply the stronger claim.
           chainTx: commitment?.txId ?? null,
@@ -92,6 +99,38 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
       });
     })();
   });
+  // The preimage behind one rule version — what a round's stamp actually
+  // hashes. Public for the same reason the rates are: the number exists to be
+  // checked. 404 for an unknown version is honest (nothing was committed under
+  // that hash), and the response carries the chain tx so the ordering claim —
+  // rules anchored BEFORE the hands that cite them — is independently checkable.
+  app.get('/fairness/rules/:version', (req: Request, res: Response) => {
+    void (async (): Promise<void> => {
+      const version = String(req.params.version ?? '');
+      if (!/^[0-9a-f]{64}$/.test(version)) {
+        res.status(400).json({ error: 'a rule version is a 64-char hex digest' });
+        return;
+      }
+      try {
+        const commitment = await ruleCommitment(version);
+        if (!commitment) {
+          res.status(404).json({ error: 'unknown rule version' });
+          return;
+        }
+        res.json({
+          version: commitment._id,
+          manifestRevision: commitment.manifestRevision,
+          manifest: commitment.manifest,
+          chainTx: commitment.txId,
+          committedAt: commitment.committedAt,
+        });
+      } catch (err) {
+        console.error('[rules] commitment lookup failed:', err);
+        res.status(503).json({ error: 'rule store unavailable' });
+      }
+    })();
+  });
+
   // Optional so auth-only deployments (and the auth tests) don't have to stand
   // up a lobby they never read.
   // Config passed so the lobby can resolve a league context; without it the

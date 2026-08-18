@@ -11,6 +11,10 @@ export interface GameRtp {
 /** Payout-affecting rules for one game, as committed. */
 export interface GameRules {
   gameId: string;
+  /** This entry's own version hash — what a default table of this game stamps
+   *  on its rounds. Match a round's stamp against these; a custom table's
+   *  version resolves via GET /fairness/rules/:version instead. */
+  version?: string;
   rakeBps: number;
   jackpotBps: number;
   paytable: Record<string, number>;

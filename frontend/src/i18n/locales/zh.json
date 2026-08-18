@@ -317,11 +317,11 @@
     "ownSeedUnchecked": "本局数据未包含你的种子，因此本步骤仅验证了种子列表的一致性，未验证你本人的种子是否在其中、且位于你的座位。",
     "notAnchored": "该批次的根尚未上链存证。6a（证明路径）已在本地验证；6b（链上永久记录）待存证完成后可查。",
     "viewOnChain": "在 Solana Explorer 查验根哈希（6b）",
-    "rulesAnchored": "On-chain",
-    "rulesPublished": "Published",
-    "rulesAnchoredBlurb": "These rates were earned under rule version {{when}}-committed on-chain. The commitment predates every hand that cites it, so the rules could not be changed after the fact.",
-    "rulesPublishedBlurb": "The rule version is fixed and every hand records it, but the on-chain commitment has not landed yet. Verify a hand step-by-step in the meantime.",
-    "rulesAbsent": "The rule version behind these rates is unavailable right now, so no claim is made about it."
+    "rulesAnchored": "已上链",
+    "rulesPublished": "已公布",
+    "rulesAnchoredBlurb": "这些赔率是在 {{when}} 已上链提交的规则版本下产生的。该承诺早于所有引用它的牌局，因此规则无法事后更改。",
+    "rulesPublishedBlurb": "规则版本已固定，每手牌都会记录它，但链上提交尚未完成。在此期间可逐手验证牌局。",
+    "rulesAbsent": "目前无法获取这些赔率背后的规则版本，因此不作任何声明。"
   },
   "reputation": {
     "title": "信誉",

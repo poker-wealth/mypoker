@@ -7,7 +7,8 @@ import { FcPlayerDirectory } from './fc-directory';
 import { HttpFinancialCoreClient, type FinancialCoreClient } from '../core/financial-core-client';
 import { chainClientFromEnv } from '../fairness/chain-from-env';
 import { MerkleRoundNotary, type RoundNotary } from '../fairness/round-notary';
-import { ensureRuleCommitment } from '../fairness/rule-commitment';
+import type { LiveRoom } from './live-room';
+import { ensureRuleCommitment, ensureGameRuleCommitment } from '../fairness/rule-commitment';
 import { MongoMerkleStore, getRoundFairness } from '../fairness/round-store';
 import { verifyToken } from '../gateway/tokens';
 import type { LiveTableConfig } from './live-room';
@@ -88,6 +89,21 @@ export function mountLiveTables(app: Express, opts: MountLiveOptions): MountedLi
     );
   }
 
+  const anchorTableRules = (room: LiveRoom): void => {
+    // Anchor THIS table's rule version — the hash its rounds will actually
+    // stamp. The manifest anchor above covers platform defaults; a table on a
+    // custom rake (a league room) stamps a different version, and a stamp whose
+    // preimage is anchored nowhere is an opaque hash nobody can check — the
+    // audit's central finding against the first cut of this feature.
+    // Idempotent per version; fire-and-forget, same fail-soft rules as above.
+    if (!opts.notarize) return;
+    const info = (room as { getRuleInfo?: () => { rules: Parameters<typeof ensureGameRuleCommitment>[1] } }).getRuleInfo?.();
+    if (!info) return; // non-poker rooms do not notarize rounds
+    void ensureGameRuleCommitment(chain, info.rules).catch((err) =>
+      console.error('[rules] table rules not committed:', err),
+    );
+  };
+
   const hub = new TableHub(
     { directory, fc, chain, ...(notary ? { notary } : {}) },
     verifyPlayerToken,
@@ -99,7 +115,7 @@ export function mountLiveTables(app: Express, opts: MountLiveOptions): MountedLi
           console.log(`  [socket] ${event.type}${who}${why}`);
         },
   );
-  for (const table of opts.tables) hub.addTable(table);
+  for (const table of opts.tables) anchorTableRules(hub.addTable(table));
 
   app.get('/api/live/tables', (_req: Request, res: Response) => {
     res.json({ tables: hub.tables() });

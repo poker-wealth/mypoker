@@ -60,6 +60,57 @@ export interface RuleManifest {
 const MANIFEST_REVISION = 1;
 
 /**
+ * The platform-default poker rake. Lives HERE (not in poker-room.ts) so the
+ * manifest can use it without importing from live/ — poker-room imports this
+ * module, and the reverse edge would be a cycle. `DEFAULT_ROOM` spreads it, so
+ * there is exactly one copy of the default and the published manifest can never
+ * silently disagree with the table that runs it.
+ */
+export const DEFAULT_POKER_RAKE = { bps: 500, cap: 600, noFlopNoDrop: true } as const;
+
+/** The four jackpot tiers' payout-affecting numbers, shared by every poker game. */
+function pokerJackpotPaytable(): Record<string, number> {
+  return Object.fromEntries(
+    (Object.keys(TIER_CONFIG) as (keyof typeof TIER_CONFIG)[]).flatMap((tier) => [
+      [`jackpot.${tier}.injectionBps`, TIER_CONFIG[tier].injectionBps],
+      [`jackpot.${tier}.payoutBps`, TIER_CONFIG[tier].payoutBps],
+    ]),
+  );
+}
+
+/**
+ * The payout-affecting rules of ONE live poker table, in exactly the shape the
+ * manifest publishes for that game.
+ *
+ * This shared constructor is the fix for the audit's central finding: the room
+ * used to hash `{rakeCap, noFlopNoDrop}` while the manifest hashed the jackpot
+ * splits — same game, two incompatible hashings, so the version the feed
+ * published could never equal the version any round stamped, and the round's
+ * stamp was an opaque hash nobody could re-derive. Built through ONE function,
+ * a default table's version IS the published per-game version, and a custom
+ * table's version re-derives from its config the same way.
+ */
+export function pokerTableRules(cfg: {
+  variantId: 'texas' | 'short-deck' | 'omaha';
+  // noFlopNoDrop optional to match RakeConfig: unset means false, and the two
+  // must hash identically because they ARE the same rule.
+  rake: { bps: number; cap: number; noFlopNoDrop?: boolean | undefined };
+}): GameRules {
+  return {
+    gameId: cfg.variantId,
+    rakeBps: cfg.rake.bps,
+    // The rate the jackpot engine actually injects at — imported, not a
+    // literal, so the stamp cannot silently diverge from the engine.
+    jackpotBps: INJECTION_BPS,
+    paytable: {
+      ...pokerJackpotPaytable(),
+      rakeCap: cfg.rake.cap,
+      noFlopNoDrop: cfg.rake.noFlopNoDrop ? 1 : 0,
+    },
+  };
+}
+
+/**
  * Default rake, in basis points, per game.
  *
  * These mirror the values the live rooms are configured with (`DEFAULT_ROOM.rake`
@@ -87,20 +138,6 @@ const DEFAULT_RAKE_BPS: Readonly<Record<string, number>> = {
 const PAYTABLES: Readonly<Record<string, Readonly<Record<string, number>>>> = {
   // Baccarat's tie bet pays 8:1 (the room's configured `tiePayout`).
   baccarat: { tiePayout: 8 },
-  // The four jackpot tiers: how the 0.5% injection is split between them, and
-  // what share of a pool each pays on a trigger. Both decide what a winner
-  // receives, so both belong in the manifest.
-  ...Object.fromEntries(
-    ['texas', 'short-deck', 'omaha'].map((id) => [
-      id,
-      Object.fromEntries(
-        (Object.keys(TIER_CONFIG) as (keyof typeof TIER_CONFIG)[]).flatMap((tier) => [
-          [`jackpot.${tier}.injectionBps`, TIER_CONFIG[tier].injectionBps],
-          [`jackpot.${tier}.payoutBps`, TIER_CONFIG[tier].payoutBps],
-        ]),
-      ),
-    ]),
-  ),
 };
 
 /**
@@ -120,15 +157,23 @@ function canonical(value: unknown): string {
 
 /** The rules currently in force, with their content hash. */
 export function currentRuleManifest(): RuleManifest {
+  const POKER = new Set(['texas', 'short-deck', 'omaha']);
   const games: GameRules[] = (Object.keys(GAME_CATALOG) as GameId[])
     .slice()
     .sort()
-    .map((gameId) => ({
-      gameId,
-      rakeBps: DEFAULT_RAKE_BPS[gameId] ?? 0,
-      jackpotBps: INJECTION_BPS,
-      paytable: PAYTABLES[gameId] ?? {},
-    }));
+    .map((gameId) =>
+      POKER.has(gameId)
+        ? pokerTableRules({
+            variantId: gameId as 'texas' | 'short-deck' | 'omaha',
+            rake: DEFAULT_POKER_RAKE,
+          })
+        : {
+            gameId,
+            rakeBps: DEFAULT_RAKE_BPS[gameId] ?? 0,
+            jackpotBps: INJECTION_BPS,
+            paytable: PAYTABLES[gameId] ?? {},
+          },
+    );
 
   const body = { manifestRevision: MANIFEST_REVISION, games };
   const version = createHash('sha256').update(canonical(body)).digest('hex');

@@ -1,6 +1,6 @@
 import mongoose, { Schema, type Model } from 'mongoose';
 import type { ChainClient } from './chain';
-import { currentRuleManifest, type RuleManifest } from './rule-version';
+import { currentRuleManifest, ruleVersionFor, type RuleManifest } from './rule-version';
 
 /**
  * Publish the rule manifest on-chain, once per version.
@@ -75,15 +75,47 @@ export async function ensureRuleCommitment(
     console.error('[rules] could not anchor the rule manifest on-chain:', err);
   }
 
+  // Two audit findings live in this update's shape:
+  //   - `txId` is written only when the anchor SUCCEEDED. Two instances booting
+  //     together could otherwise race: A anchors, B's chain call fails, B's
+  //     unconditional `$set {txId: null}` erased A's good anchor until the next
+  //     boot re-anchored — a third chain tx to fix a self-inflicted wound.
+  //   - `committedAt` is stamped when the ANCHOR lands, not when the row was
+  //     first inserted. A row created by a failed boot and anchored a day later
+  //     used to display the insert date as its on-chain commit date — a small
+  //     lie in the one field whose entire job is honesty about timing.
   await M.updateOne(
     { _id: manifest.version },
-    {
-      $set: { manifestRevision: manifest.manifestRevision, manifest, txId },
-      $setOnInsert: { committedAt: new Date() },
-    },
+    txId
+      ? { $set: { manifestRevision: manifest.manifestRevision, manifest, txId, committedAt: new Date() } }
+      : {
+          $set: { manifestRevision: manifest.manifestRevision, manifest },
+          $setOnInsert: { txId: null, committedAt: new Date() },
+        },
     { upsert: true },
   );
   return (await M.findById(manifest.version).lean<RuleCommitmentDoc>())!;
+}
+
+/**
+ * Anchor ONE table's rules — the single-game manifest whose hash is exactly the
+ * version that table stamps on its rounds.
+ *
+ * This closes the loop the audit found open: rounds stamped a version that was
+ * never anchored and whose preimage nothing published, so a player could not
+ * re-derive it, let alone check its chain timestamp. A single-game manifest is
+ * just a RuleManifest with one entry, so the storage, idempotency and fail-soft
+ * behaviour are all the code above.
+ */
+export async function ensureGameRuleCommitment(
+  chain: ChainClient,
+  rules: RuleManifest['games'][number],
+): Promise<RuleCommitmentDoc> {
+  return ensureRuleCommitment(chain, {
+    version: ruleVersionFor(rules),
+    manifestRevision: currentRuleManifest().manifestRevision,
+    games: [rules],
+  });
 }
 
 /** The commitment for one version, or null if that version was never committed. */

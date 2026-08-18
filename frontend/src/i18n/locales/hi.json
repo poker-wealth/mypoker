@@ -317,11 +317,11 @@
     "ownSeedUnchecked": "इस राउंड के डेटा में आपका सीड नहीं है, इसलिए इस चरण में केवल सीड सूची की संगति जाँची गई — यह नहीं कि आपका सीड आपकी सीट पर उसमें मौजूद है।",
     "notAnchored": "इस बैच का रूट अभी चेन पर दर्ज नहीं हुआ है। 6a (प्रूफ़) स्थानीय रूप से सत्यापित है; 6b (स्थायी रिकॉर्ड) नोटरीकरण के बाद जाँचा जा सकेगा।",
     "viewOnChain": "Solana Explorer पर रूट जाँचें (6b)",
-    "rulesAnchored": "On-chain",
-    "rulesPublished": "Published",
-    "rulesAnchoredBlurb": "These rates were earned under rule version {{when}}-committed on-chain. The commitment predates every hand that cites it, so the rules could not be changed after the fact.",
-    "rulesPublishedBlurb": "The rule version is fixed and every hand records it, but the on-chain commitment has not landed yet. Verify a hand step-by-step in the meantime.",
-    "rulesAbsent": "The rule version behind these rates is unavailable right now, so no claim is made about it."
+    "rulesAnchored": "ऑन-चेन",
+    "rulesPublished": "प्रकाशित",
+    "rulesAnchoredBlurb": "ये दरें उस नियम संस्करण के तहत दर्ज हुई हैं जो {{when}} को ऑन-चेन कमिट किया गया था। कमिट उसे उद्धृत करने वाले हर हाथ से पहले का है, इसलिए नियम बाद में बदले नहीं जा सकते।",
+    "rulesPublishedBlurb": "नियम संस्करण तय है और हर हाथ उसे दर्ज करता है, लेकिन ऑन-चेन कमिट अभी पूरा नहीं हुआ है। तब तक किसी भी हाथ को चरण-दर-चरण सत्यापित किया जा सकता है।",
+    "rulesAbsent": "इन दरों के पीछे का नियम संस्करण अभी उपलब्ध नहीं है, इसलिए कोई दावा नहीं किया जाता।"
   },
   "reputation": {
     "title": "प्रतिष्ठा",

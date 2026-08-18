@@ -60,7 +60,7 @@ import { newTargetState, evaluateChallenge, recordPrompt, recordResult, type Tar
 import { decisionTimeGate, doubleConfirmGate } from '../players/anti-bot';
 import { BehaviorTracker } from '../players/behavior-tracker';
 import type { BehaviorStatus } from '../jackpot/weights';
-import { ruleVersionFor } from '../fairness/rule-version';
+import { ruleVersionFor, pokerTableRules, DEFAULT_POKER_RAKE } from '../fairness/rule-version';
 
 /**
  * PokerRoom — a real table that real people sit down at.
@@ -211,7 +211,7 @@ export const DEFAULT_ROOM: Omit<PokerRoomConfig, 'id' | 'name'> = {
   // §8.3 anti-bot: real tables reject an all-in decision faster than 3s. Tests that build their own
   // config (not spreading this default) leave it unset and are never gated.
   minDecisionMs: 3000,
-  rake: { bps: 500, cap: 600, noFlopNoDrop: true },
+  rake: { ...DEFAULT_POKER_RAKE }, // one copy of the default — see rule-version.ts
 };
 
 export class PokerRoom implements LiveRoom {
@@ -222,6 +222,14 @@ export class PokerRoom implements LiveRoom {
   private readonly notary: RoundNotary | undefined;
   /** Content hash of this table's payout rules (queue #12 rule-version stamp). */
   private readonly ruleVersion: string;
+
+  /** The rules behind this table's stamp, for anchoring/publishing at mount. */
+  getRuleInfo(): { version: string; rules: ReturnType<typeof pokerTableRules> } {
+    return {
+      version: this.ruleVersion,
+      rules: pokerTableRules({ variantId: this.config.variantId, rake: this.config.rake }),
+    };
+  }
   private readonly spec: PokerVariant;
 
   private readonly seats: (RoomSeat | null)[];
@@ -296,12 +304,14 @@ export class PokerRoom implements LiveRoom {
     this.notary = deps.notary;
     // Fixed for the room's lifetime: its rake and jackpot rate are config, and
     // a table cannot change the rules mid-session.
-    this.ruleVersion = ruleVersionFor({
-      gameId: config.variantId,
-      rakeBps: config.rake.bps,
-      jackpotBps: 50,
-      paytable: { rakeCap: config.rake.cap, noFlopNoDrop: config.rake.noFlopNoDrop ? 1 : 0 },
-    });
+    // Through the SAME constructor the published manifest uses, so a default
+    // table's stamp equals the per-game version the feed publishes, and a
+    // custom table's stamp re-derives from its config identically. The audit
+    // caught the previous version hashing a different shape here — a stamp the
+    // feed could never match and nobody could re-derive.
+    this.ruleVersion = ruleVersionFor(
+      pokerTableRules({ variantId: config.variantId, rake: config.rake }),
+    );
     this.spec = variant(config.variantId);
     this.seats = Array.from({ length: config.maxSeats }, () => null);
     this.handFc = {

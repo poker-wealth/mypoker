@@ -1,4 +1,5 @@
-import { currentRuleManifest, ruleVersionFor, type GameRules } from '../../src/fairness/rule-version';
+import { currentRuleManifest, ruleVersionFor, pokerTableRules, DEFAULT_POKER_RAKE, type GameRules } from '../../src/fairness/rule-version';
+import { INJECTION_BPS } from '../../src/jackpot/tiers';
 
 /**
  * The rule-version stamp (queue #12).
@@ -81,5 +82,48 @@ describe('the manifest describes every game', () => {
 
   it('is a 64-character hex digest', () => {
     expect(currentRuleManifest().version).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+describe('the stamp a table writes matches the version the feed publishes', () => {
+  // The audit's central finding against the first cut: the room hashed
+  // {rakeCap, noFlopNoDrop} while the manifest hashed jackpot splits — same
+  // game, two incompatible hashings, so the published version could never
+  // equal any round's stamp and the stamp was uncheckable. Both sides now go
+  // through pokerTableRules(); these tests pin that they cannot drift apart
+  // again without failing loudly.
+  it('a default table stamps exactly the published per-game version', () => {
+    const published = currentRuleManifest().games.find((g) => g.gameId === 'texas')!;
+    const stamped = pokerTableRules({ variantId: 'texas', rake: DEFAULT_POKER_RAKE });
+    expect(ruleVersionFor(stamped)).toBe(ruleVersionFor(published));
+  });
+
+  it('stamps the jackpot rate the engine actually injects at, not a literal', () => {
+    expect(
+      pokerTableRules({ variantId: 'texas', rake: DEFAULT_POKER_RAKE }).jackpotBps,
+    ).toBe(INJECTION_BPS);
+  });
+
+  it('a custom-rake table stamps a different version, deterministically', () => {
+    const custom = { variantId: 'texas' as const, rake: { bps: 300, cap: 600, noFlopNoDrop: true } };
+    const v = ruleVersionFor(pokerTableRules(custom));
+    expect(v).not.toBe(ruleVersionFor(pokerTableRules({ variantId: 'texas', rake: DEFAULT_POKER_RAKE })));
+    expect(v).toBe(ruleVersionFor(pokerTableRules(custom)));
+  });
+
+  it('the rake cap and no-flop-no-drop are now part of the version', () => {
+    // They decide what a winner receives; the audit noted the manifest omitted
+    // them by its own standard.
+    const base = pokerTableRules({ variantId: 'texas', rake: DEFAULT_POKER_RAKE });
+    const capped = pokerTableRules({ variantId: 'texas', rake: { ...DEFAULT_POKER_RAKE, cap: 601 } });
+    const noDrop = pokerTableRules({ variantId: 'texas', rake: { ...DEFAULT_POKER_RAKE, noFlopNoDrop: false } });
+    expect(ruleVersionFor(capped)).not.toBe(ruleVersionFor(base));
+    expect(ruleVersionFor(noDrop)).not.toBe(ruleVersionFor(base));
+  });
+
+  it('an unset noFlopNoDrop hashes as false — they are the same rule', () => {
+    const unset = pokerTableRules({ variantId: 'texas', rake: { bps: 500, cap: 600 } });
+    const explicit = pokerTableRules({ variantId: 'texas', rake: { bps: 500, cap: 600, noFlopNoDrop: false } });
+    expect(ruleVersionFor(unset)).toBe(ruleVersionFor(explicit));
   });
 });
