@@ -76,6 +76,17 @@ export class SlotsProvider implements ThirdPartyProvider {
     return this.sessionSeed;
   }
 
+  /**
+   * The seed a single round was generated from — the same value `spin()` derives the reels from.
+   *
+   * Exposed for the jackpot draw. The room used to hand the jackpot `${roundId}:seed`, which any
+   * player can reproduce from a round id, so a jackpot was predictable before it fired. This is
+   * derived from the session seed, which stays secret until the session ends, so it is not.
+   */
+  roundSeed(roundId: string): string {
+    return createHmac('sha256', this.sessionSeed).update(roundId).digest('hex');
+  }
+
   async playRound(req: RoundRequest): Promise<SignedRoundResult> {
     const reels = spin(this.sessionSeed, req.roundId);
     const payout = req.wager * multiplierOf(reels);

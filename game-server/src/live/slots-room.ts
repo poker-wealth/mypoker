@@ -21,6 +21,8 @@ interface RoomSeat extends BaseRoomSeat {
 
 export class SlotsRoom extends BaseLiveRoom<SlotsRoomConfig, RoomSeat> {
   private readonly adapter: ThirdPartyAdapter;
+  /** Kept so the jackpot can draw on the seed a spin was actually generated from. */
+  private readonly provider: SlotsProvider;
 
   constructor(config: SlotsRoomConfig, deps: RoomDeps) {
     super(config, deps);
@@ -33,6 +35,7 @@ export class SlotsRoom extends BaseLiveRoom<SlotsRoomConfig, RoomSeat> {
 
     const secret = config.secret ?? process.env.SLOTS_PROVIDER_SECRET ?? 'slots-live-secret';
     const provider = new SlotsProvider(secret);
+    this.provider = provider;
 
     this.adapter = new ThirdPartyAdapter(this.fc, {
       provider,
@@ -83,7 +86,10 @@ export class SlotsRoom extends BaseLiveRoom<SlotsRoomConfig, RoomSeat> {
     seat.stack += receipt.net;
 
     if (receipt.net > 0) {
-      await this.processJackpot(receipt.net, roundId, `${roundId}:seed`);
+      // The jackpot draws on the seed the spin itself came from — HMAC(sessionSeed, roundId),
+      // the same value the reels are derived from. It used to draw on a seed built from the
+      // round id, which any player can reproduce, so a jackpot was predictable before it fired.
+      await this.processJackpot(receipt.net, roundId, this.provider.roundSeed(roundId));
     }
 
     this.phase = 'SHOWDOWN';

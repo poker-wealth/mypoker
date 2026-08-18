@@ -83,6 +83,12 @@ export class LotteryGame extends BaseGame<LotteryPhase, LotteryAction, LotteryGa
   private winningNumber: number | undefined;
   private net = new Map<string, number>();
   private readonly roundId: string;
+  /**
+   * The seed this round was actually generated from — server seed, every client seed and a
+   * future block hash, mixed. Kept rather than dropped so the jackpot can draw on it: the room
+   * used to fall back to a seed derived from the round id, which any player can reproduce.
+   */
+  private lastFinalSeed: string | undefined;
 
   constructor(
     roomId: string,
@@ -129,6 +135,7 @@ export class LotteryGame extends BaseGame<LotteryPhase, LotteryAction, LotteryGa
       futureBlockHash,
       this.roundId,
     );
+    this.lastFinalSeed = finalSeed;
 
     this.winningNumber = drawNumber(finalSeed, this.cfg.range);
     this.net = resolveDraw(this.tickets, this.winningNumber);
@@ -177,5 +184,9 @@ export class LotteryGame extends BaseGame<LotteryPhase, LotteryAction, LotteryGa
       yourNet: this.net.get(forPlayerId) ?? null,
       winningNumber: this.sm.is('DRAWN') ? this.winningNumber : null,
     };
+  }
+  /** The round's provably-fair seed, or undefined before the first round. */
+  roundSeed(): string | undefined {
+    return this.lastFinalSeed;
   }
 }
