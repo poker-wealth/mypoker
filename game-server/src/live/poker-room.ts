@@ -56,6 +56,7 @@ import type {
 } from './room-state';
 import { newChatterState, evaluateChat, recordMessage, type ChatterState } from '../social/chat';
 import { newTargetState, evaluateChallenge, recordPrompt, recordResult, type TargetState } from '../players/peer-challenge';
+import { decisionTimeGate } from '../players/anti-bot';
 
 /**
  * PokerRoom — a real table that real people sit down at.
@@ -99,6 +100,13 @@ export interface PokerRoomConfig extends LiveTableConfig {
    */
   spectatorDelayMs: number;
   rake: RakeConfig;
+  /**
+   * Anti-bot hard gate (§8.3): the minimum think-time, in ms, before an action is accepted on a
+   * COMPLEX board (someone all-in). An action faster than this is rejected — no human reads a
+   * multi-way all-in that fast. Opt-in per table (real tables set 3000); absent/0 disables it, so a
+   * trusted context (tests, the AI) is never gated. It gates the action, never accuses the player.
+   */
+  minDecisionMs?: number;
 }
 
 export interface PokerRoomDeps {
@@ -181,6 +189,9 @@ export const DEFAULT_ROOM: Omit<PokerRoomConfig, 'id' | 'name'> = {
   // per-hour caps are P1 table-flow work and are tracked there.
   disconnectGraceMs: 20_000,
   spectatorDelayMs: 5_000,
+  // §8.3 anti-bot: real tables reject an all-in decision faster than 3s. Tests that build their own
+  // config (not spreading this default) leave it unset and are never gated.
+  minDecisionMs: 3000,
   rake: { bps: 500, cap: 600, noFlopNoDrop: true },
 };
 
@@ -210,6 +221,8 @@ export class PokerRoom implements LiveRoom {
   private handNumber = 0;
   private buttonSeat = -1;
   private actionDeadline: number | null = null;
+  /** When the current player's turn began (for the anti-bot decision-time gate). */
+  private turnStartedAt: number | null = null;
   private winners: number[] = [];
   /**
    * Trigger logic for this table's four pools (spec: pools are PER TABLE —
@@ -614,6 +627,14 @@ export class PokerRoom implements LiveRoom {
     if (this.phase !== 'IN_HAND' || !this.game) throw new RoomError('no hand in progress');
     this.requireSeat(playerId);
     if (this.toActPlayer() !== playerId) throw new RoomError('not your turn');
+    // Anti-bot hard gate (§8.3): on a complex board (someone all-in) an action faster than this
+    // table's minimum think-time is rejected — inhuman speed reading a multi-way all-in. Opt-in via
+    // config.minDecisionMs (real tables enforce; trusted contexts leave it off). Gates the action only.
+    if (this.config.minDecisionMs && this.turnStartedAt !== null) {
+      const complexBoard = this.game.handSeats().some((s) => s.status === 'allin');
+      const gate = decisionTimeGate(Date.now() - this.turnStartedAt, complexBoard, this.config.minDecisionMs);
+      if (!gate.ok) throw new RoomError(gate.reason);
+    }
     await this.applyAction(playerId, action, this.describeAction(action));
     // The action passed to the bots — play their turns before handing the table back.
   }
@@ -704,6 +725,7 @@ export class PokerRoom implements LiveRoom {
     this.clearActionClock();
     const toAct = this.toActPlayer();
     if (!toAct) return;
+    this.turnStartedAt = Date.now();
     this.actionDeadline = Date.now() + this.config.actionTimeoutMs;
     this.actionTimer = setTimeout(() => {
       this.actionTimer = undefined;
@@ -715,6 +737,7 @@ export class PokerRoom implements LiveRoom {
     if (this.actionTimer) clearTimeout(this.actionTimer);
     this.actionTimer = undefined;
     this.actionDeadline = null;
+    this.turnStartedAt = null;
   }
 
   /** The clock ran out: check if it's free, otherwise fold. A missing player is also sat out. */
