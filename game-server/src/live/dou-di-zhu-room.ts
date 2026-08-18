@@ -161,37 +161,50 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
   }
 
   private async resolveRound(): Promise<void> {
-    const grossNets = this.game.getNet();
-    const settlement = settleNet(grossNets, { rakeBps: this.config.rakeBps });
-    const netDeltas = new Map<string, number>();
-    for (const l of settlement.losers) netDeltas.set(l.playerId, -l.amount);
-    for (const w of settlement.winners) netDeltas.set(w.playerId, w.amount);
+    // Anything from here on can throw — the ledger refusing, a jackpot pool failing to open.
+    // If it does, the table goes back to WAITING rather than sitting in IN_HAND forever. See
+    // `abandonRound`: nothing is paid or reversed, only the room is made playable again.
+    try {
+      const grossNets = this.game.getNet();
+      const settlement = settleNet(grossNets, { rakeBps: this.config.rakeBps });
+      const netDeltas = new Map<string, number>();
+      for (const l of settlement.losers) netDeltas.set(l.playerId, -l.amount);
+      for (const w of settlement.winners) netDeltas.set(w.playerId, w.amount);
 
-    let winnerProfit = 0;
-    for (const s of this.occupiedSeats()) {
-      const net = netDeltas.get(s.playerId) ?? 0;
-      s.net = net;
-      s.stack += net;
-      if (net > 0) winnerProfit += net;
-    }
+      let winnerProfit = 0;
+      for (const s of this.occupiedSeats()) {
+        const net = netDeltas.get(s.playerId) ?? 0;
+        s.net = net;
+        s.stack += net;
+        if (net > 0) winnerProfit += net;
+      }
 
-    /**
-     * The jackpot draws on the seed the deck was shuffled with — server seed, every client seed and
-     * a future block hash — so a player can verify the draw the same way they verify the deal.
-     *
-     * It used to draw on `${roundId}:seed`. Anyone who could read a round id could compute that,
-     * and therefore know in advance whether a jackpot would fire. There is no safe fallback here:
-     * if the round context is missing the draw is SKIPPED, because running it on a guessable seed
-     * is the bug, not the backstop.
-     */
-    const round = this.game?.roundInfo();
-    const roundId = round?.roundId ?? `${this.config.id}-ddz-${this.handNumber}`;
-    if (round) {
-      await this.processJackpot(winnerProfit, roundId, round.finalSeed);
-    } else {
-      console.error(
-        `[room ${this.config.id}] no round context after a hand — jackpot skipped rather than drawn on a predictable seed`,
-      );
+      /**
+       * The jackpot draws on the seed the deck was shuffled with — server seed, every client seed
+       * and a future block hash — so a player can verify the draw the same way they verify the deal.
+       *
+       * It used to draw on `${roundId}:seed`. Anyone who could read a round id could compute that,
+       * and therefore know in advance whether a jackpot would fire. There is no safe fallback here:
+       * if the round context is missing the draw is SKIPPED, because running it on a guessable seed
+       * is the bug, not the backstop.
+       */
+      const round = this.game?.roundInfo();
+      const roundId = round?.roundId ?? `${this.config.id}-ddz-${this.handNumber}`;
+      if (round) {
+        await this.processJackpot(winnerProfit, roundId, round.finalSeed);
+      } else {
+        console.error(
+          `[room ${this.config.id}] no round context after a hand — jackpot skipped rather than drawn on a predictable seed`,
+        );
+      }
+    } catch (err) {
+      this.abandonRound(err);
+      // WAITING is not enough on its own: nothing else deals the next hand, so the table would
+      // sit idle with players in their seats. Give it the same beat a showdown gets, then try.
+      this.showdownTimer = setTimeout(() => {
+        void this.enqueue(() => this.maybeStartRound());
+      }, this.config.showdownDelayMs ?? 5_000);
+      return;
     }
 
     this.phase = 'SHOWDOWN';

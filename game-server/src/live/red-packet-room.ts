@@ -158,29 +158,43 @@ export class RedPacketRoom extends BaseLiveRoom<RedPacketRoomConfig, RoomSeat> {
       return;
     }
 
-    this.game.setBanker(banker.playerId);
-    for (const b of bettors) {
-      this.game.placeBet(b.playerId, b.cell!, b.bet);
+    // Anything from here on can throw — the ledger refusing, a jackpot pool failing to open.
+    // If it does, the table goes back to WAITING rather than sitting in IN_HAND forever. See
+    // `abandonRound`: nothing is paid or reversed, only the room is made playable again.
+    try {
+      this.game.setBanker(banker.playerId);
+      for (const b of bettors) {
+        this.game.placeBet(b.playerId, b.cell!, b.bet);
+      }
+
+      await this.game.start();
+
+      const grossNets = this.game.getNet();
+      const settlement = settleNet(grossNets, { rakeBps: this.config.rakeBps });
+      const netDeltas = new Map<string, number>();
+      for (const l of settlement.losers) netDeltas.set(l.playerId, -l.amount);
+      for (const w of settlement.winners) netDeltas.set(w.playerId, w.amount);
+
+      let winnerProfit = 0;
+      for (const s of this.occupiedSeats()) {
+        const net = netDeltas.get(s.playerId) ?? 0;
+        s.net = net;
+        s.stack += net;
+        if (net > 0) winnerProfit += net;
+      }
+
+      const roundId = `${this.config.id}-rp-${this.handNumber}`;
+      await this.processJackpot(winnerProfit, roundId, `${roundId}:seed`);
+
+    } catch (err) {
+      this.abandonRound(err);
+      // WAITING is not enough on its own: nothing else deals the next hand, so the table would
+      // sit idle with players in their seats. Give it the same beat a showdown gets, then try.
+      this.showdownTimer = setTimeout(() => {
+        void this.enqueue(() => this.maybeStartRound());
+      }, this.config.showdownDelayMs ?? 5_000);
+      return;
     }
-
-    await this.game.start();
-
-    const grossNets = this.game.getNet();
-    const settlement = settleNet(grossNets, { rakeBps: this.config.rakeBps });
-    const netDeltas = new Map<string, number>();
-    for (const l of settlement.losers) netDeltas.set(l.playerId, -l.amount);
-    for (const w of settlement.winners) netDeltas.set(w.playerId, w.amount);
-
-    let winnerProfit = 0;
-    for (const s of this.occupiedSeats()) {
-      const net = netDeltas.get(s.playerId) ?? 0;
-      s.net = net;
-      s.stack += net;
-      if (net > 0) winnerProfit += net;
-    }
-
-    const roundId = `${this.config.id}-rp-${this.handNumber}`;
-    await this.processJackpot(winnerProfit, roundId, `${roundId}:seed`);
 
     this.phase = 'SHOWDOWN';
     this.push();
