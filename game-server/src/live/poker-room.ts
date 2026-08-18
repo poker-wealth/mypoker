@@ -58,6 +58,8 @@ import { newChatterState, evaluateChat, recordMessage, type ChatterState } from 
 import { evaluateVoice, recordVoice } from '../social/voice';
 import { newTargetState, evaluateChallenge, recordPrompt, recordResult, type TargetState } from '../players/peer-challenge';
 import { decisionTimeGate, doubleConfirmGate } from '../players/anti-bot';
+import { BehaviorTracker } from '../players/behavior-tracker';
+import type { BehaviorStatus } from '../jackpot/weights';
 
 /**
  * PokerRoom — a real table that real people sit down at.
@@ -233,6 +235,8 @@ export class PokerRoom implements LiveRoom {
   private turnStartedAt: number | null = null;
   /** First-click time of an as-yet-unconfirmed major (all-in) action, per player (double-confirm). */
   private readonly pendingMajorConfirm = new Map<string, number>();
+  /** Per-seat anti-bot behaviour, accumulated across the session (§8.3). Feeds jackpot weighting. */
+  private readonly behavior = new Map<string, BehaviorTracker>();
   private winners: number[] = [];
   /**
    * Trigger logic for this table's four pools (spec: pools are PER TABLE —
@@ -726,8 +730,46 @@ export class PokerRoom implements LiveRoom {
       const confirm = doubleConfirmGate(armedAt, now);
       if (!confirm.ok) throw new RoomError(confirm.reason); // second click too fast — bot signature
     }
+    // Anti-bot signal collection (§8.3): record this decision's timing and sizing for the seat's
+    // behaviour score. It only ever reads state and appends a sample — a collector must never disturb
+    // a hand, so a fault here is swallowed rather than allowed to interrupt play.
+    this.recordBehavior(playerId, action);
     await this.applyAction(playerId, action, this.describeAction(action));
     // The action passed to the bots — play their turns before handing the table back.
+  }
+
+  /**
+   * Record one decision's anti-bot signals for the seat: how long it took (from the turn starting)
+   * and, for a raise, its size as a fraction of the pot. Never gates, bans or blocks — it only feeds
+   * `behaviorStatusFor()`, which weights jackpot candidates.
+   */
+  private recordBehavior(playerId: string, action: Action): void {
+    if (this.turnStartedAt === null) return;
+    try {
+      const now = Date.now();
+      let betRatio: number | null = null;
+      if (action.type === 'raise' && action.amount != null) {
+        const pot = (this.game?.getPublicState(playerId) as EnginePublicState | undefined)?.pot ?? 0;
+        if (pot > 0) betRatio = action.amount / pot;
+      }
+      let tracker = this.behavior.get(playerId);
+      if (!tracker) {
+        tracker = new BehaviorTracker();
+        this.behavior.set(playerId, tracker);
+      }
+      tracker.record({ reactionMs: now - this.turnStartedAt, betRatio, at: now });
+    } catch {
+      /* signal collection must never break a hand */
+    }
+  }
+
+  /**
+   * The seat's current anti-bot behaviour status for jackpot weighting (jackpot/weights.ts): NORMAL
+   * until the accumulated score crosses the human-review threshold, then FLAGGED — half jackpot
+   * weight, never a ban (§8.3). The jackpot candidate builder reads this in place of a stubbed NORMAL.
+   */
+  behaviorStatusFor(playerId: string): BehaviorStatus {
+    return this.behavior.get(playerId)?.status(Date.now()) ?? 'NORMAL';
   }
 
   // ── The hand loop ───────────────────────────────────────────────────────────
@@ -937,6 +979,7 @@ export class PokerRoom implements LiveRoom {
     if (!seat) return;
     this.clearAwayTimers(seat);
     if (seat.stack > 0) await this.fc.release(seat.playerId, String(seat.stack));
+    this.behavior.delete(seat.playerId); // the seat's behaviour session ends when they leave
     this.seats[index] = null;
   }
 
