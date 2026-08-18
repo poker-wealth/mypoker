@@ -138,6 +138,18 @@ describe('table shape is validated before a room is opened', () => {
     expect(plan.spectatorsAllowed).toBe(false);
   });
 
+  it('clamps the buy-in headroom to the platform bound', () => {
+    // buyIn * 10 is a product default; the audit showed it sailing past
+    // policy.maxBuyIn (buyIn 1,000,000 → table max 10,000,000 with the bound
+    // at 1,000,000).
+    const rich: LeagueSettingsState = {
+      settings: { ...settings, buyIn: 5_000 },
+      pendingRakeChange: null,
+    };
+    const plan = planLeagueRoom(actor('OWNER'), rich, policy, input, T0);
+    expect(plan.maxBuyIn).toBe(policy.maxBuyIn); // 50,000 clamped to 10,000
+  });
+
   it('gives every room a distinct id', () => {
     const ids = new Set(
       Array.from({ length: 20 }, () => planLeagueRoom(actor('OWNER'), state, policy, input, T0).tableId),

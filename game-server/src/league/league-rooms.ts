@@ -139,9 +139,12 @@ export function planLeagueRoom(
     variantId: input.variantId,
     smallBlind: input.smallBlind,
     bigBlind: input.bigBlind,
-    // Buy-in is a league setting, expressed in currency; the table wants a range.
+    // Buy-in is a league setting, expressed in currency; the table wants a
+    // range. The 10x headroom is a product default (the spec sets only the
+    // minimum), CLAMPED to the platform bound — the audit showed buyIn * 10
+    // sailing past policy.maxBuyIn.
     minBuyIn: buyIn,
-    maxBuyIn: buyIn * 10,
+    maxBuyIn: Math.min(buyIn * 10, policy.maxBuyIn),
     maxSeats: input.maxSeats,
     rakeBps: settings.rakeBps,
     spectatorsAllowed: settings.spectatorsAllowed,

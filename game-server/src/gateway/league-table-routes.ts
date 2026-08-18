@@ -38,6 +38,12 @@ import { LeagueRuleError, type LeagueSettingsState, type PlatformLeaguePolicy } 
  * doc gives league rake no cap at all.
  */
 
+/**
+ * Flipped when PokerRoom can settle a league hand to League Inventory. Until
+ * then this route refuses to open tables — see the AUDIT STOP in the handler.
+ */
+const LEAGUE_SETTLEMENT_WIRED = false;
+
 /** Defaults if unset. Wide enough to be permissive; the point is that they are configurable. */
 const DEFAULT_POLICY: PlatformLeaguePolicy = {
   minRakeBps: 0,
@@ -60,13 +66,20 @@ export function platformLeaguePolicyFromEnv(env = process.env): PlatformLeaguePo
     }
     return n;
   };
-  return {
+  const p = {
     minRakeBps: num('LEAGUE_MIN_RAKE_BPS', DEFAULT_POLICY.minRakeBps),
     maxRakeBps: num('LEAGUE_MAX_RAKE_BPS', DEFAULT_POLICY.maxRakeBps),
     maxTableHours: num('LEAGUE_MAX_TABLE_HOURS', DEFAULT_POLICY.maxTableHours),
     minBuyIn: num('LEAGUE_MIN_BUY_IN', DEFAULT_POLICY.minBuyIn),
     maxBuyIn: num('LEAGUE_MAX_BUY_IN', DEFAULT_POLICY.maxBuyIn),
   };
+  // An inverted band (min > max) makes every rake invalid — every league table
+  // un-openable with a message that blames the league. Loud fallback instead.
+  if (p.minRakeBps > p.maxRakeBps || p.minBuyIn > p.maxBuyIn) {
+    console.error('[league] platform policy band is inverted; using defaults', p);
+    return { ...DEFAULT_POLICY };
+  }
+  return p;
 }
 
 const createBody = z.object({
@@ -77,12 +90,27 @@ const createBody = z.object({
   name: z.string().trim().min(1).max(40).optional(),
 });
 
-/** What financial-core reports about a league, as far as this route needs. */
-interface LeagueFacts {
-  leagueId: string;
-  settings: { rakeBps: number; tableHours: number; buyIn: number; spectatorsAllowed: boolean } | null;
-  pendingRakeChange: { rakeBps: number; effectiveAt: string } | null;
-}
+/**
+ * What financial-core reports, VALIDATED rather than cast. The audit showed a
+ * 200 with an unexpected shape flowing through blind casts: a missing role
+ * became a 403 instead of a 404, and a NaN rake would have sailed through
+ * band checks (NaN compares false against both bounds).
+ */
+const membershipShape = z.object({ role: z.enum(['OWNER', 'ADMIN', 'MEMBER']).nullable() });
+const leagueFactsShape = z.object({
+  leagueId: z.string().min(1),
+  settings: z
+    .object({
+      rakeBps: z.number().int().min(0).max(10_000),
+      tableHours: z.number().int().positive(),
+      buyIn: z.number().int().nonnegative(),
+      spectatorsAllowed: z.boolean(),
+    })
+    .nullable(),
+  pendingRakeChange: z
+    .object({ rakeBps: z.number().int().min(0).max(10_000), effectiveAt: z.string().min(1) })
+    .nullable(),
+});
 
 export function buildLeagueTableRouter(
   config: GatewayConfig,
@@ -124,19 +152,33 @@ export function buildLeagueTableRouter(
       // Membership comes from financial-core, which owns leagues — never from the
       // request. A caller claiming to be an admin of someone else's league is the
       // whole attack this endpoint has to refuse.
-      const membership = await internal<{ role: 'OWNER' | 'ADMIN' | 'MEMBER' | null }>(
+      const membershipRaw = await internal<unknown>(
         `/internal/leagues/${encodeURIComponent(leagueId)}/members/${encodeURIComponent(playerId)}`,
       );
-      if (!membership) {
+      if (!membershipRaw) {
         res.status(502).json({ error: 'league service unavailable' });
         return;
       }
+      const membershipParsed = membershipShape.safeParse(membershipRaw);
+      if (!membershipParsed.success) {
+        console.error('[league-tables] membership response malformed:', membershipRaw);
+        res.status(502).json({ error: 'league service unavailable' });
+        return;
+      }
+      const membership = membershipParsed.data;
 
-      const facts = await internal<LeagueFacts>(`/leagues/${encodeURIComponent(leagueId)}`);
-      if (!facts) {
+      const factsRaw = await internal<unknown>(`/leagues/${encodeURIComponent(leagueId)}`);
+      if (!factsRaw) {
         res.status(502).json({ error: 'league service unavailable' });
         return;
       }
+      const factsParsed = leagueFactsShape.safeParse(factsRaw);
+      if (!factsParsed.success) {
+        console.error('[league-tables] league facts malformed:', factsRaw);
+        res.status(502).json({ error: 'league service unavailable' });
+        return;
+      }
+      const facts = factsParsed.data;
 
       // A league that has never chosen settings cannot open a table on invented
       // numbers — it has to pick a rake first, deliberately.
@@ -145,14 +187,17 @@ export function buildLeagueTableRouter(
         return;
       }
 
+      // Date.parse of a malformed timestamp is NaN, and `now < NaN` is false —
+      // which would count the pending change as DUE and open the table on a
+      // not-yet-effective rate, the exact thing "cannot apply early" forbids.
+      // A pending change whose date cannot be read is treated as never due.
+      const pendingAt = facts.pendingRakeChange ? Date.parse(facts.pendingRakeChange.effectiveAt) : NaN;
       const state: LeagueSettingsState = {
         settings: facts.settings,
-        pendingRakeChange: facts.pendingRakeChange
-          ? {
-              rakeBps: facts.pendingRakeChange.rakeBps,
-              effectiveAt: Date.parse(facts.pendingRakeChange.effectiveAt),
-            }
-          : null,
+        pendingRakeChange:
+          facts.pendingRakeChange && Number.isFinite(pendingAt)
+            ? { rakeBps: facts.pendingRakeChange.rakeBps, effectiveAt: pendingAt }
+            : null,
       };
 
       const actor: LeagueRoomActor = { playerId, leagueId, role: membership.role };
@@ -172,9 +217,25 @@ export function buildLeagueTableRouter(
         throw err;
       }
 
+      // AUDIT STOP: the room class cannot yet settle a league hand correctly —
+      // PokerRoom hardcodes tableType PLATFORM at hand start, so rake from this
+      // table would route to the TREASURY, not League Inventory, violating
+      // v5.9's "rake 100% to League Inventory". Until the room grows a league
+      // mode (money-path work, paired with Victor), opening a table here would
+      // move real money to the wrong owner — so we refuse, loudly and honestly,
+      // instead of opening a table that lies about where its rake goes.
+      if (!LEAGUE_SETTLEMENT_WIRED) {
+        res.status(503).json({
+          error: 'league tables are not yet connected to league settlement',
+        });
+        return;
+      }
+
       // Open the room, then publish it to the lobby. This order matters: a table
       // listed but not running is a row players can tap into and find nothing,
-      // whereas a room running but briefly unlisted is merely invisible.
+      // whereas a room running but briefly unlisted is merely invisible. If the
+      // lobby listing fails after the room opened, the room is running but
+      // unlisted — withdraw it rather than leave a ghost.
       deps.hub.addTable({
         ...DEFAULT_ROOM,
         id: plan.tableId,
@@ -186,21 +247,32 @@ export function buildLeagueTableRouter(
         minBuyIn: plan.minBuyIn,
         maxBuyIn: plan.maxBuyIn,
         maxSeats: plan.maxSeats,
-        rake: { bps: plan.rakeBps, cap: 0, noFlopNoDrop: true },
+        // NO CAP on league rake — the doc gives league rake a band, not a cap.
+        // computeRake applies `cap` as an unconditional Math.min, so the audit
+        // caught the previous `cap: 0` raking exactly ZERO on every hand: the
+        // one number that means "cap at nothing" is the ceiling itself.
+        rake: { bps: plan.rakeBps, cap: Number.MAX_SAFE_INTEGER, noFlopNoDrop: true },
         tableType: 'LEAGUE',
         leagueId: plan.leagueId,
       });
 
-      deps.lobby.addTable({
-        id: plan.tableId,
-        gameId: plan.variantId,
-        stakes: plan.bigBlind,
-        players: 0,
-        jackpot: 0,
-        buyInBB: Math.max(1, Math.floor(plan.minBuyIn / plan.bigBlind)),
-        tableType: 'LEAGUE',
-        leagueId: plan.leagueId,
-      });
+      try {
+        deps.lobby.addTable({
+          id: plan.tableId,
+          gameId: plan.variantId,
+          stakes: plan.bigBlind,
+          players: 0,
+          jackpot: 0,
+          buyInBB: Math.max(1, Math.floor(plan.minBuyIn / plan.bigBlind)),
+          tableType: 'LEAGUE',
+          leagueId: plan.leagueId,
+        });
+      } catch (err) {
+        deps.lobby.removeTable(plan.tableId);
+        console.error('[league-tables] lobby listing failed; table withdrawn:', err);
+        res.status(500).json({ error: 'could not open the table' });
+        return;
+      }
 
       res.status(201).json({
         tableId: plan.tableId,
@@ -216,7 +288,12 @@ export function buildLeagueTableRouter(
         rakeDestination: plan.rakeDestination,
         spectatorsAllowed: plan.spectatorsAllowed,
       });
-    })();
+    })().catch((err) => {
+      // Nothing in here may become an unhandled rejection: that hangs the
+      // request AND (Node default) kills the process — every live table on it.
+      console.error('[league-tables] create failed:', err);
+      if (!res.headersSent) res.status(500).json({ error: 'could not open the table' });
+    });
   });
 
   return r;
