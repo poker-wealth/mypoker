@@ -401,7 +401,10 @@
     "jackpot": "แจ็กพอต! คุณชนะ ₮{{amount}}",
     "vipUp": "คุณถึงระดับ {{tier}} แล้ว",
     "addressChanged": "ที่อยู่ถอนเงินของคุณถูกเปลี่ยน",
-    "promo": "{{text}}"
+    "promo": "{{text}}",
+    "depositCredited": "เติมเงิน ₮{{amount}} เข้าบัญชีแล้ว",
+    "withdrawalRequested": "ส่งคำขอถอน ₮{{amount}} แล้ว",
+    "withdrawalSent": "ส่งการถอน ₮{{amount}} แล้ว"
   },
   "agent": {
     "title": "ศูนย์ตัวแทน",

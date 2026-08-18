@@ -401,7 +401,10 @@
     "jackpot": "Jackpot! Anda menang ₮{{amount}}",
     "vipUp": "Anda mencapai {{tier}}",
     "addressChanged": "Alamat penarikan Anda telah diubah",
-    "promo": "{{text}}"
+    "promo": "{{text}}",
+    "depositCredited": "Setoran ₮{{amount}} telah masuk",
+    "withdrawalRequested": "Penarikan ₮{{amount}} telah diminta",
+    "withdrawalSent": "Penarikan ₮{{amount}} telah dikirim"
   },
   "agent": {
     "title": "Pusat Agen",

@@ -69,3 +69,25 @@ export const count = (n: number): string => n.toLocaleString();
  */
 export const percent = (value: string | null, decimals = 1): string =>
   value === null ? '—' : `${Number(value).toFixed(decimals)}%`;
+
+/**
+ * The NUMBER part of a ledger decimal string, formatted for display — no symbol.
+ *
+ * For strings that already sit inside a translated sentence carrying its own
+ * currency mark, like `notifications.deposit`: "Deposit of ₮{{amount}} credited".
+ * financial-core sends six decimals ('500.000000') because that is the ledger's
+ * precision; showing a player "₮500.000000" reads like a bug in the amount
+ * rather than a faithful figure, and prepending another ₮ via moneyFromDecimal
+ * would render "₮₮500.00".
+ *
+ * Display only — the ledger string remains the truth, and nothing here is ever
+ * fed back into a calculation.
+ */
+export function amountOnly(value: string, decimals = 2): string {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return value;
+  return n.toLocaleString(undefined, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}

@@ -401,7 +401,10 @@
     "jackpot": "Jackpot! Bạn thắng ₮{{amount}}",
     "vipUp": "Bạn đã đạt {{tier}}",
     "addressChanged": "Địa chỉ rút tiền của bạn đã thay đổi",
-    "promo": "{{text}}"
+    "promo": "{{text}}",
+    "depositCredited": "Đã ghi có khoản nạp ₮{{amount}}",
+    "withdrawalRequested": "Đã yêu cầu rút ₮{{amount}}",
+    "withdrawalSent": "Đã gửi khoản rút ₮{{amount}}"
   },
   "agent": {
     "title": "Trung tâm Đại lý",

@@ -401,7 +401,10 @@
     "jackpot": "Jackpot! You won ₮{{amount}}",
     "vipUp": "You reached {{tier}}",
     "addressChanged": "Your withdrawal address was changed",
-    "promo": "{{text}}"
+    "promo": "{{text}}",
+    "depositCredited": "Deposit of ₮{{amount}} credited",
+    "withdrawalRequested": "Withdrawal of ₮{{amount}} requested",
+    "withdrawalSent": "Withdrawal of ₮{{amount}} sent"
   },
   "agent": {
     "title": "Agent Center",

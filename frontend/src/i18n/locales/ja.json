@@ -401,7 +401,10 @@
     "jackpot": "ジャックポット！₮{{amount}} を獲得",
     "vipUp": "{{tier}} に到達しました",
     "addressChanged": "出金アドレスが変更されました",
-    "promo": "{{text}}"
+    "promo": "{{text}}",
+    "depositCredited": "₮{{amount}} の入金が反映されました",
+    "withdrawalRequested": "₮{{amount}} の出金を受け付けました",
+    "withdrawalSent": "₮{{amount}} の出金を送信しました"
   },
   "agent": {
     "title": "エージェントセンター",

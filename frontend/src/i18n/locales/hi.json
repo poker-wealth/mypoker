@@ -401,7 +401,10 @@
     "jackpot": "जैकपॉट! आपने ₮{{amount}} जीते",
     "vipUp": "आपने {{tier}} प्राप्त किया",
     "addressChanged": "आपका निकासी पता बदल दिया गया",
-    "promo": "{{text}}"
+    "promo": "{{text}}",
+    "depositCredited": "₮{{amount}} की जमा राशि जोड़ी गई",
+    "withdrawalRequested": "₮{{amount}} की निकासी का अनुरोध किया गया",
+    "withdrawalSent": "₮{{amount}} की निकासी भेजी गई"
   },
   "agent": {
     "title": "एजेंट सेंटर",
