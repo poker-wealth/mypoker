@@ -206,6 +206,16 @@ function movesFor(tableId: string, snap: Snapshot, me: Snapshot['seats'][number]
     return null;
   }
 
+  if (tableId === 'dou-di-zhu') {
+    if (stage === 'BIDDING') return { kind: 'act', action: { type: 'bid-3' } };
+    // Simplest line that terminates: whoever holds the trick leads their lowest card and the
+    // other two always pass, so the leader empties their hand and the round ends.
+    const mine = me.cards.filter((c): c is string => typeof c === 'string');
+    if (mine.length === 0) return null;
+    if (snap.board.length === 0) return { kind: 'act', action: { type: 'play', cards: [mine[0]!] } };
+    return { kind: 'act', action: { type: 'pass' } };
+  }
+
   if (tableId === 'san-zhang' && me.bet === 0 && !me.isDealer) {
     return { kind: 'act', action: { type: 'bet', amount: 100 } };
   }
