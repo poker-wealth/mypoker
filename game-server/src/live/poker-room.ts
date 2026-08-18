@@ -1032,7 +1032,24 @@ export class PokerRoom implements LiveRoom {
       candidates: seatIds.map((playerId) => ({
         playerId,
         baseWeight: 1,
-        behavior: 'NORMAL' as const,
+        /**
+         * The seat's real behaviour, not a constant.
+         *
+         * The weights module was wired up but fed `NORMAL` for everyone, so a bot and a person had
+         * exactly the same chance at a jackpot — the scoring existed and decided nothing. This is
+         * the input side of it: `behaviorStatusFor` reads the reaction times and bet sizing the
+         * room records per turn and returns FLAGGED once a seat crosses the review threshold,
+         * which halves its jackpot weight.
+         *
+         * FLAGGED weights a draw and nothing else (§8.3): it never bans, never touches reputation
+         * and never blocks a withdrawal.
+         */
+        behavior: this.behaviorStatusFor(playerId),
+        /**
+         * Left alone deliberately. `associated` and COLLUDING come from the collusion and
+         * association pipeline, which is a different signal from per-seat timing — this change
+         * must not start asserting things that pipeline is responsible for.
+         */
         associated: false,
       })),
     });
