@@ -6,6 +6,8 @@ checkable and records what is already known about each.
 
 **Source:** `docs_extracted/FairPlay_12Week_Milestone_EN.txt`, Week 12
 ("Full QA + Security Audit + Launch Prep"), plus the sections cited per item.
+`docs_extracted/` is generated, not committed — if it is missing, run
+`python extract_docx.py` against the `.docx` files in the repo root first.
 
 > *"Every acceptance criterion from Weeks 1–11 must be green before W12 QA
 > begins. If any is red: fix it, not defer it."* — W12 objective
@@ -18,6 +20,8 @@ Each item is either:
 - **`[ ] MANUAL`** — needs a person, an environment, or a third party.
 - **`[x] VERIFIED`** — checked during development, with what was checked.
 - **`[!] OPEN`** — known not to pass today. These are the launch blockers.
+- **`[ ] DECISION`** — behaviour is implemented and safe but stricter or looser
+  than the spec's words; someone must choose it deliberately.
 
 A box is only ticked by someone who ran the check and saw the result. An
 inherited tick is worth nothing — the whole point of this document is that
@@ -27,7 +31,7 @@ somebody looked.
 
 | Gate | State |
 |---|---|
-| 1 · Ledger integrity | **automated** — invariants pass on real data; still needs a 100-hand run |
+| 1 · Ledger integrity | **automated** — checker built and verified against a settled hand + injected corruption; the 100-hand run on a live-like environment is still to do |
 | 2 · Security | app-level controls verified; **MongoDB RBAC and the pen test are outstanding** |
 | 3 · Latency | **not measured at all** — the largest untouched gate |
 | 4 · Chaos | not started |
@@ -52,23 +56,24 @@ and store submissions. Those need an environment and people, not another commit.
 
       ```bash
       cd financial-core
-      MONGO_URI=<uri> npx ts-node scripts/ledger-integrity.ts
+      MONGO_URI=<uri> MONGO_TLS=false npx ts-node scripts/ledger-integrity.ts
       ```
 
-      Exits 0 on zero discrepancy, 1 on any, 2 if it could not run — so a
-      launch runbook or CI job can gate on it. It asserts three things:
-      per-account (`Σ credits − Σ debits` equals the three balances summed),
-      double-entry (every idempotency key is a balanced pair, so a half-written
-      transfer cannot hide), and system-wide (all balances sum to zero, since
-      EXTERNAL is the only mint). Amounts go through integer micro-units, never
-      a float — a rounding error introduced by the *checker* would be
-      indistinguishable from a real discrepancy.
-      **This replaces the hand-sum this gate used to ask for.** Nobody sums a
-      ledger by hand, so that box would have been ticked on faith.
-      Verified to actually catch a break, not just to pass: adding ₮500 to an
-      account balance directly in MongoDB — the exact attack in Gate 2's pen
-      test — is reported by both the per-account and system-wide invariants,
-      with exit 1. A checker nobody has watched fail is not known to work.
+      (`MONGO_TLS=false` for a local mongod; drop it for Atlas.) Exits 0 on zero
+      discrepancy, 1 on any, 2 if it could not run — a runbook or CI job can
+      gate on it. Four invariants:
+      **per-account** (`Σ credits − Σ debits` equals the three balances summed),
+      **paired double-entry** (a transfer's idempotency key is a balanced pair),
+      **pot conservation** (table settlements write single legs against a
+      virtual `pot:<roundId>` — the pot must empty exactly: losses = wins +
+      rake + jackpot), and **system-wide zero** (EXTERNAL is the only mint).
+      Orphaned ledger rows naming a nonexistent account are reported too.
+      Amounts go through integer micro-units, never a float, and anything the
+      parser does not recognise (exponent notation, sub-micro precision) is
+      itself reported rather than guessed at.
+      An earlier version held settlement legs to the pair rule — it failed any
+      healthy system that had settled one poker hand. A gate that fails healthy
+      systems trains people to ignore it; that failure mode is now covered below.
 - [ ] **MANUAL** — 100 hands played, then the check above run against that
       environment. Confirm ledger entries exist for jackpot inject, rake,
       payout, and agent commission where applicable. **Any gap blocks launch
@@ -77,9 +82,9 @@ and store submissions. Those need an environment and people, not another commit.
       scenarios including rounding boundaries:
       `cd game-server && npx jest test/games/settlement-regression`
       Σ(losers) = Σ(winners) + rake + Σ(jackpot), asserted per case.
-- [x] **VERIFIED (unit)** — a replayed deposit writes no second ledger pair;
-      an overdrawn jackpot pool cannot pay:
-      `cd financial-core && npx jest test/settlement`
+- [x] **VERIFIED (unit)** — a replayed deposit writes no second ledger pair
+      (`test/deposit`); an overdrawn jackpot pool cannot pay (`test/settlement`):
+      `cd financial-core && npx jest test/deposit test/settlement`
 
 ## Gate 2 — Security
 
@@ -208,7 +213,7 @@ that is not currently true.
       `{"approverId":"ops-bob"}` in the body is ignored because the gateway
       takes the signer from the verified token. Reject releases the clearing
       hold exactly, with the total conserved.
-- [ ] **DECISION NEEDED** — the 48h withdrawal-address cooldown fires on a
+- [ ] **DECISION** — the 48h withdrawal-address cooldown fires on a
       **first** registration, not only a change. The spec says "address
       **modification**: 48h cooldown", so this is stricter than written: every
       new player's first withdrawal waits 48 hours. Defensible as security (an
@@ -228,7 +233,8 @@ that is not currently true.
       settled round and the aggregator commits batch roots on-chain (Gate 6).
       The published payout rates are anchored too — the rules that produced them
       are hashed and committed on-chain per version, and every round records the
-      version it ran under (`game-server/src/fairness/rule-version.ts`).
+      version it ran under (`game-server/src/fairness/rule-version.ts` — on the
+      rule-version-stamp branch; this claim holds once that PR merges).
       Remaining honesty caveat: a round's own leaf hash does not commit to the
       rule version — the version is stored beside the round, because folding it
       into `computeRoundHash` would stop every already-notarized round from
@@ -270,8 +276,10 @@ that is not currently true.
 ## Running the automated checks
 
 ```bash
-# Everything, all three packages
+# financial-core + game-server (root verify does NOT touch the frontend)
 npm run verify                                   # typecheck + lint + tests
+# the frontend, separately
+cd frontend && npx tsc -b && npx eslint src && npx vite build
 
 # The money paths specifically
 cd financial-core && npx jest test/settlement test/wallet test/league
@@ -280,15 +288,15 @@ cd game-server    && npx jest test/games/settlement-regression
 # Gate 1, against a real database (exit 1 = discrepancy)
 cd financial-core && MONGO_URI=<uri> npx ts-node scripts/ledger-integrity.ts
 
-# The fairness stamp: rules hash deterministically, and the round hash
-# stays byte-identical so the v6.0 verifier is unaffected
+# The fairness stamp (rule-version-stamp branch; on main these suites do not
+# exist yet): rules hash deterministically, round hash stays byte-identical
 cd game-server    && npx jest test/fairness/rule-version test/fairness/rule-stamp
 
 # The guards
 cd game-server    && npx jest test/gateway test/lobby/league-isolation
 ```
 
-**Baseline (verified 18 Aug 2026, on `main`):** financial-core **338/338**,
+**Baseline (verified 18 Aug 2026, on `main`):** financial-core **345/345**,
 game-server **853/853** across 103 suites. Both packages typecheck clean; the
 frontend typechecks and builds.
 
