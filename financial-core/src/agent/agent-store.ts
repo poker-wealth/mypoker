@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import { Schema, model } from 'mongoose';
 import { volumeBetween, lifetimeEffectiveFor, dayKey, monthKey } from '../vip/volume-tracker';
 
@@ -197,7 +197,15 @@ export async function createReferralLink(agentId: string, label = 'default'): Pr
   const agent = await AgentModel.findById(agentId).lean();
   if (!agent) throw new AgentError('not an agent');
 
-  const linkId = `${randomUUID()}${randomBytes(16).toString('hex')}`;
+  // 24 random bytes as hex = 48 characters, 192 bits of entropy.
+  //
+  // The length is a HARD CONSTRAINT, not a preference: this id is handed to
+  // Telegram as the `start` deep-link parameter (t.me/<bot>?start=<linkId>),
+  // which Telegram limits to 64 characters drawn from [A-Za-z0-9_-]. The
+  // previous `randomUUID() + randomBytes(16)` produced 68, so every referral
+  // link an agent shared was four characters too long for Telegram to open —
+  // the entire acquisition flow handed out links that silently did not work.
+  const linkId = randomBytes(24).toString('hex');
   await ReferralLinkModel.create({ _id: linkId, agentId, label });
   return linkId;
 }
