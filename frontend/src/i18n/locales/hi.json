@@ -156,7 +156,8 @@
     "checkPrivileges": "विशेषाधिकार देखें",
     "inviteFriends": "मित्रों को आमंत्रित करें",
     "earnRewards": "पुरस्कार कमाएँ",
-    "messageCenter": "संदेश केंद्र"
+    "messageCenter": "संदेश केंद्र",
+    "supportConnecting": "सहायता से जोड़ा जा रहा है…"
   },
   "wallet": {
     "totalBalance": "कुल बैलेंस",

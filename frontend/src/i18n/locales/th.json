@@ -156,7 +156,8 @@
     "checkPrivileges": "ดูสิทธิพิเศษ",
     "inviteFriends": "ชวนเพื่อน",
     "earnRewards": "รับรางวัล",
-    "messageCenter": "ศูนย์ข้อความ"
+    "messageCenter": "ศูนย์ข้อความ",
+    "supportConnecting": "กำลังเชื่อมต่อฝ่ายสนับสนุน…"
   },
   "wallet": {
     "totalBalance": "ยอดเงินรวม",

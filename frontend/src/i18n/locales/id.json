@@ -156,7 +156,8 @@
     "checkPrivileges": "Lihat Hak Istimewa",
     "inviteFriends": "Undang Teman",
     "earnRewards": "Dapatkan Hadiah",
-    "messageCenter": "Pusat Pesan"
+    "messageCenter": "Pusat Pesan",
+    "supportConnecting": "Menghubungkan ke dukungan…"
   },
   "wallet": {
     "totalBalance": "Total Saldo",

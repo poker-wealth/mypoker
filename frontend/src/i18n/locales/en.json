@@ -156,7 +156,8 @@
     "checkPrivileges": "Check Privileges",
     "inviteFriends": "Invite Friends",
     "earnRewards": "Earn Rewards",
-    "messageCenter": "Message Center"
+    "messageCenter": "Message Center",
+    "supportConnecting": "Connecting to support…"
   },
   "wallet": {
     "totalBalance": "Total Balance",

@@ -98,6 +98,15 @@ export function useVoiceRecorder(): UseVoiceRecorder {
   // fired by the auto-stop timer. Parking the resolver here means both routes
   // settle the same promise instead of racing two of them.
   const resolveRef = useRef<((c: VoiceClip | null) => void) | null>(null);
+  /**
+   * A clip that FINISHED before anyone asked for it. The 10-second ceiling
+   * stops the recorder while the finger is still down; the old code found no
+   * parked resolver in onstop and threw the blob away, so holding for the full
+   * ten seconds sent nothing at all — release at 9.9s worked, 10.0s vanished.
+   * Now the finished clip (a promise: encoding is async) waits here and the
+   * eventual finger-lift claims it.
+   */
+  const finishedRef = useRef<Promise<VoiceClip | null> | null>(null);
 
   const supported = typeof navigator !== 'undefined' && !!navigator.mediaDevices && pickMimeType() !== null;
 
@@ -122,6 +131,7 @@ export function useVoiceRecorder(): UseVoiceRecorder {
     if (!mime) { setError('recordingUnsupported'); return; }
 
     cancelledRef.current = false;
+    finishedRef.current = null;
     setError(null);
 
     void navigator.mediaDevices
@@ -144,20 +154,27 @@ export function useVoiceRecorder(): UseVoiceRecorder {
           resolveRef.current = null;
           teardown();
 
-          if (!resolve) return; // cancelled — nothing waiting on it
-          if (cancelledRef.current) { resolve(null); return; }
-          if (durationMs < MIN_MS) { setError('recordingTooShort'); resolve(null); return; }
-          if (blob.size > MAX_BYTES) {
-            // Belt and braces: the bitrate should prevent this, but a browser
-            // is free to ignore the hint, and the socket is not free to survive
-            // an oversized frame.
-            setError('recordingTooLong');
-            resolve(null);
-            return;
-          }
-          blobToBase64(blob)
-            .then((clip) => resolve({ clip, durationMs: Math.min(durationMs, MAX_MS), mime }))
-            .catch(() => { setError('recordingFailed'); resolve(null); });
+          if (cancelledRef.current) { resolve?.(null); return; }
+
+          const settle = (): Promise<VoiceClip | null> => {
+            if (durationMs < MIN_MS) { setError('recordingTooShort'); return Promise.resolve(null); }
+            if (blob.size > MAX_BYTES) {
+              // Belt and braces: the bitrate should prevent this, but a browser
+              // is free to ignore the hint, and the socket is not free to
+              // survive an oversized frame.
+              setError('recordingTooLong');
+              return Promise.resolve(null);
+            }
+            return blobToBase64(blob)
+              .then((clip) => ({ clip, durationMs: Math.min(durationMs, MAX_MS), mime }))
+              .catch(() => { setError('recordingFailed'); return null; });
+          };
+
+          const result = settle();
+          if (resolve) void result.then(resolve);
+          // Auto-stop at the ceiling: nobody is waiting yet. Park the finished
+          // clip for the finger-lift instead of discarding ten seconds of voice.
+          else finishedRef.current = result;
         };
 
         rec.start();
@@ -180,6 +197,13 @@ export function useVoiceRecorder(): UseVoiceRecorder {
   }, [teardown]);
 
   const stop = useCallback((): Promise<VoiceClip | null> => {
+    // A clip that hit the 10s ceiling finished while the finger was still
+    // down — this release claims it.
+    if (finishedRef.current) {
+      const done = finishedRef.current;
+      finishedRef.current = null;
+      return done;
+    }
     const rec = recorderRef.current;
     if (!rec || rec.state !== 'recording') {
       // Released before the recorder ever started (permission prompt, or a tap
@@ -196,6 +220,7 @@ export function useVoiceRecorder(): UseVoiceRecorder {
 
   const cancel = useCallback((): void => {
     cancelledRef.current = true;
+    finishedRef.current = null;
     const rec = recorderRef.current;
     if (rec && rec.state === 'recording') rec.stop();
     else teardown();
