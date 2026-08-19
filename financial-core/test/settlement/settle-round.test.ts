@@ -4,9 +4,10 @@ import { LedgerModel } from '../../src/wallet/ledger.model';
 import { SecurityLogModel } from '../../src/security/security-log.model';
 import { SettlementModel } from '../../src/settlement/settlement.model';
 import { settleRound } from '../../src/settlement/settle-round';
+import { transfer } from '../../src/wallet/transfer';
 import { TableType } from '../../src/settlement/settlement-domain';
 import { Money } from '../../src/domain/money';
-import { AccountType, LedgerDirection } from '../../src/domain/account-types';
+import { AccountType, LedgerType, LedgerDirection } from '../../src/domain/account-types';
 import { startTestDb, stopTestDb, clearCollections, ensureIndexes } from '../db-helper';
 
 async function makeAccount(t: AccountType, ownerId: string, available = '0'): Promise<string> {
@@ -166,5 +167,41 @@ describe('settleRound() — Phase 1 settlement', () => {
     expect(totals[LedgerDirection.DEBIT]).toBe(totals[LedgerDirection.CREDIT]);
     // 4 jackpot injects + 1 rake = 5 transfers = 10 ledger rows.
     expect(await LedgerModel.countDocuments({})).toBe(10);
+  });
+
+  it('a jackpot payout is NOT deduped against the round injection (idempotency-key regression)', async () => {
+    // The bug: settleRound injected under `${round}:jackpot:${tier}` and the payout endpoint used the
+    // SAME key, so paying a jackpot for a round that also injected that tier was silently skipped as a
+    // replay — the jackpot was announced but never paid. Injection now keys `:jp:`, the payout keys
+    // `:jackpot:`; the two money moves must coexist. Revert the fix and this test fails.
+    const winner = await makeAccount(AccountType.PLAYER, 'p-win', '2000');
+    await makeAccount(AccountType.TREASURY, 'PLATFORM');
+    const pools = await makeJackpotPools('table-collide');
+
+    // Round settles: 0.5% of 1000 = 5, mini's 20% share = 1.0, injected under `r-c:jp:mini`.
+    await settleRound({
+      roundId: 'r-c',
+      tableType: TableType.PLATFORM,
+      winnerAccountId: winner,
+      winnerProfit: Money.fromDecimalString('1000'),
+      rake: Money.ZERO,
+      jackpotAccounts: pools,
+    });
+    expect(await avail(pools.mini)).toBe(1); // injected
+
+    // The mini jackpot now FIRES for the SAME round+tier. Key format mirrors the
+    // /internal/jackpot-payouts endpoint (`${roundId}:jackpot:${tier}`). Pre-fix this collided with
+    // the injection key and was silently skipped; it must now apply.
+    await transfer({
+      fromAccountId: pools.mini,
+      toAccountId: winner,
+      amount: Money.fromDecimalString('1'),
+      type: LedgerType.JACKPOT_PAYOUT,
+      businessId: 'r-c',
+      idempotencyKey: 'r-c:jackpot:mini',
+    });
+
+    // Paid: the pool emptied to the winner. If the payout had been deduped, mini would still hold 1.
+    expect(await avail(pools.mini)).toBe(0);
   });
 });

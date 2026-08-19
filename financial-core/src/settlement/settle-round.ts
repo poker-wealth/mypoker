@@ -111,7 +111,12 @@ export async function settleRound(input: SettleRoundInput): Promise<SettlementRe
               toAccountId: inj.account,
               amount: inj.amount,
               type: LedgerType.JACKPOT_INJECT,
-              idempotencyKey: `${input.roundId}:jackpot:${inj.tier}`,
+              // `:jp:`, matching table-settlement — NOT `:jackpot:`, which is the jackpot PAYOUT's
+              // key (routes.ts `/internal/jackpot-payouts`). When they matched, an injection and a
+              // payout for the same round+tier shared one idempotency key, so whichever ran second
+              // was silently deduped as a replay — a jackpot won but never paid. Injection and payout
+              // are two distinct money moves and must never collide on a key.
+              idempotencyKey: `${input.roundId}:jp:${inj.tier}`,
               businessId: input.roundId,
             },
             session,
