@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Shield, Users, Plus, Crown, Lock } from 'lucide-react';
+import { Shield, Users, Plus, Crown, Lock, TableProperties } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -11,6 +11,7 @@ import { useMyLeagues, useDiscoverLeagues, useCreateLeague, useJoinLeague } from
 import { errorKey } from '@/api/errors';
 import { useSession } from '@/store/session';
 import { useContextStore } from '@/store/context';
+import { CreateTableSheet } from '@/components/league/CreateTableSheet';
 import { toast } from '@/lib/toast';
 import { haptic } from '@/lib/telegram';
 import type { League } from '@/api/leagues';
@@ -30,6 +31,10 @@ export function Alliance() {
   const { t } = useTranslation();
   const signedIn = useSession((s) => s.status === 'authenticated');
   const [createOpen, setCreateOpen] = useState(false);
+  // Which alliance is having a private table opened for it. Null = the sheet is
+  // closed; holding the league itself (not a boolean) keeps the sheet honest
+  // about WHICH alliance the table belongs to.
+  const [tableFor, setTableFor] = useState<League | null>(null);
 
   const mine = useMyLeagues();
   const discover = useDiscoverLeagues();
@@ -91,24 +96,38 @@ export function Alliance() {
                 league={l}
                 mine
                 action={
-                  activeLeagueId === l.leagueId ? (
-                    <Button variant="ghost" onClick={() => leavePlatformContext()}>
-                      {t('context.exit')}
+                  <div className="flex shrink-0 flex-col items-stretch gap-1.5">
+                    {activeLeagueId === l.leagueId ? (
+                      <Button size="sm" variant="ghost" onClick={() => leavePlatformContext()}>
+                        {t('context.exit')}
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          haptic('light');
+                          enterLeague(l.leagueId, l.name);
+                          // Straight to the room: entering an alliance and
+                          // staying on a list of alliances makes the switch feel
+                          // like it did not happen. The lobby is the index
+                          // route — '/lobby' matches nothing and navigated the
+                          // player to a blank screen.
+                          navigate('/');
+                        }}
+                      >
+                        {t('context.enter')}
+                      </Button>
+                    )}
+                    {/* Offered to every member, not just the owner: the browser
+                        cannot tell an ADMIN from a MEMBER (no role in any read
+                        it can call), and hiding this from admins would be a
+                        guard that lies. The server decides; see
+                        CreateTableSheet. */}
+                    <Button size="sm" variant="secondary" onClick={() => setTableFor(l)}>
+                      <TableProperties size={14} />
+                      {t('alliance.newTable')}
                     </Button>
-                  ) : (
-                    <Button
-                      onClick={() => {
-                        haptic('light');
-                        enterLeague(l.leagueId, l.name);
-                        // Straight to the room: entering an alliance and staying
-                        // on a list of alliances makes the switch feel like it
-                        // did not happen.
-                        navigate('/lobby');
-                      }}
-                    >
-                      {t('context.enter')}
-                    </Button>
-                  )
+                  </div>
                 }
               />
             ))}
@@ -180,6 +199,7 @@ export function Alliance() {
       )}
 
       <CreateSheet open={createOpen} onClose={() => setCreateOpen(false)} />
+      <CreateTableSheet league={tableFor} onClose={() => setTableFor(null)} />
     </div>
   );
 }
@@ -206,7 +226,7 @@ function LeagueCard({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <span className="truncate font-semibold">{league.name}</span>
-          {mine && <Crown size={13} className="shrink-0 text-jackpot" />}
+          {mine && <Crown size={13} className="shrink-0 text-accent" />}
           {league.inviteOnly && <Lock size={12} className="shrink-0 text-dim" />}
         </div>
         <div className="truncate text-[0.66rem] text-dim">
