@@ -117,6 +117,14 @@ export interface PokerRoomConfig extends LiveTableConfig {
    * client to show a "tap again to confirm" prompt and re-send. Leave off until that UI ships.
    */
   requireDoubleConfirm?: boolean;
+  /**
+   * A private league table (v5.9 §2). Absent/`'PLATFORM'` is a platform lobby table: rake → Treasury,
+   * insurance from the platform pool. `'LEAGUE'` with `leagueId` routes rake to that league's
+   * Inventory and draws insurance from that league's pool — never the platform's, never another
+   * league's. The rake destination is decided in the Financial Core from these two fields.
+   */
+  tableType?: 'PLATFORM' | 'LEAGUE';
+  leagueId?: string;
 }
 
 export interface PokerRoomDeps {
@@ -807,7 +815,11 @@ export class PokerRoom implements LiveRoom {
       {
         smallBlind: this.config.smallBlind,
         bigBlind: this.config.bigBlind,
-        tableType: 'PLATFORM',
+        // A league table settles its rake to the league's Inventory, not the platform Treasury. The
+        // FC decides the destination from (tableType, leagueId); the room must pass what it actually
+        // is, not a hardcoded PLATFORM — that was the gap that kept league tables off the floor.
+        tableType: this.config.tableType ?? 'PLATFORM',
+        ...(this.config.leagueId ? { leagueId: this.config.leagueId } : {}),
         accountOf: (playerId): string => playerId,
         // Per-table ids, per spec. The previous shared 'jp:mini' strings were
         // never created as accounts at all — transfer() throws on a missing
@@ -1108,10 +1120,11 @@ export class PokerRoom implements LiveRoom {
     if (this.reserveRefreshing || Date.now() - this.reserveFetchedAt < RESERVE_REFRESH_MS) return;
 
     this.reserveRefreshing = true;
-    // Platform system: live rooms are platform tables. A league room passes its
-    // leagueId here, which reaches the league's own pool and nobody else's.
+    // A league room draws on its OWN insurance pool, a platform table on the platform's. Passing the
+    // leagueId here keeps a league's all-in insurance inside that league — never the platform pool,
+    // never another league's.
     this.fc
-      .insuranceReserve('PLATFORM')
+      .insuranceReserve(this.config.leagueId ?? 'PLATFORM')
       .then((facts) => {
         const reserveBalance = chipsFromUsd(facts.insuranceBalance);
         this.reserve = {

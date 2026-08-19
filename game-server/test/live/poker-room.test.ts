@@ -2,6 +2,7 @@ import { ChipBank } from '../../src/live/chip-bank';
 import { DevPlayers } from '../../src/live/players';
 import { DEFAULT_ROOM, PokerRoom, type PokerRoomConfig } from '../../src/live/poker-room';
 import type { TableSnapshot } from '../../src/live/room-state';
+import type { TableSettlementRequest } from '../../src/core/financial-core-client';
 
 /**
  * Two people, two devices, one table. These tests drive the room exactly as the client does —
@@ -145,6 +146,45 @@ describe('PokerRoom — a table real people sit at', () => {
     for (const seat of view.seats) expect(seat.cards.every((c) => typeof c === 'string')).toBe(true);
     // The pot went somewhere real: players + house sinks still hold exactly what we started with.
     expect(h.players.totalChips() + h.bank.sinkTotal()).toBe(h.startingTotal);
+    h.room.dispose();
+  });
+
+  it('a league table settles its hand as LEAGUE, carrying the leagueId', async () => {
+    // The gap that kept league tables off the floor: PokerRoom hardcoded tableType PLATFORM, so a
+    // league hand's rake would have routed to the platform Treasury. The room must settle as what the
+    // table actually is; the Financial Core then sends the rake to League Inventory.
+    const h = harness({ tableType: 'LEAGUE', leagueId: 'league-7' });
+    let settled: TableSettlementRequest | null = null;
+    const realSettle = h.bank.settleTableHand.bind(h.bank);
+    h.bank.settleTableHand = (req: TableSettlementRequest): Promise<{ roundId: string; applied: boolean }> => {
+      settled = req;
+      return realSettle(req);
+    };
+
+    await seatBoth(h, 0, 1);
+    await playToShowdown(h, { 0: h.alice, 1: h.bob });
+    await until(() => settled !== null);
+
+    expect(settled!.tableType).toBe('LEAGUE');
+    expect(settled!.leagueId).toBe('league-7');
+    h.room.dispose();
+  });
+
+  it('a platform table still settles as PLATFORM, with no leagueId', async () => {
+    const h = harness(); // default config — no tableType set
+    let settled: TableSettlementRequest | null = null;
+    const realSettle = h.bank.settleTableHand.bind(h.bank);
+    h.bank.settleTableHand = (req: TableSettlementRequest): Promise<{ roundId: string; applied: boolean }> => {
+      settled = req;
+      return realSettle(req);
+    };
+
+    await seatBoth(h, 0, 1);
+    await playToShowdown(h, { 0: h.alice, 1: h.bob });
+    await until(() => settled !== null);
+
+    expect(settled!.tableType).toBe('PLATFORM');
+    expect(settled!.leagueId).toBeUndefined();
     h.room.dispose();
   });
 

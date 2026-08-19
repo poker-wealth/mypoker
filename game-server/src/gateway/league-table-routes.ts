@@ -39,10 +39,11 @@ import { LeagueRuleError, type LeagueSettingsState, type PlatformLeaguePolicy } 
  */
 
 /**
- * Flipped when PokerRoom can settle a league hand to League Inventory. Until
- * then this route refuses to open tables — see the AUDIT STOP in the handler.
+ * Now wired: PokerRoom threads (tableType: 'LEAGUE', leagueId) from the table config into the
+ * settlement request, so a league hand's rake routes to that league's Inventory and its insurance
+ * draws that league's pool — never the platform's. The AUDIT STOP below is therefore lifted.
  */
-const LEAGUE_SETTLEMENT_WIRED = false;
+const LEAGUE_SETTLEMENT_WIRED = true;
 
 /** Defaults if unset. Wide enough to be permissive; the point is that they are configurable. */
 const DEFAULT_POLICY: PlatformLeaguePolicy = {
@@ -217,16 +218,13 @@ export function buildLeagueTableRouter(
         throw err;
       }
 
-      // AUDIT STOP: the room class cannot yet settle a league hand correctly —
-      // PokerRoom hardcodes tableType PLATFORM at hand start, so rake from this
-      // table would route to the TREASURY, not League Inventory, violating
-      // v5.9's "rake 100% to League Inventory". Until the room grows a league
-      // mode (money-path work, paired with Victor), opening a table here would
-      // move real money to the wrong owner — so we refuse, loudly and honestly,
-      // instead of opening a table that lies about where its rake goes.
+      // Kill switch. League settlement is wired (PokerRoom now threads tableType/leagueId into the
+      // settlement request, so rake routes to League Inventory), so this is normally open. It stays
+      // here as a deliberate off-ramp: flip LEAGUE_SETTLEMENT_WIRED back to false and league tables
+      // stop opening — better a refusal than a table whose rake could go to the wrong owner.
       if (!LEAGUE_SETTLEMENT_WIRED) {
         res.status(503).json({
-          error: 'league tables are not yet connected to league settlement',
+          error: 'league tables are temporarily closed',
         });
         return;
       }
