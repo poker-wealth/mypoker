@@ -62,6 +62,8 @@ export enum LedgerType {
   JACKPOT_PAYOUT = 'JACKPOT_PAYOUT',
   LEAGUE_TOPUP = 'LEAGUE_TOPUP',
   LEAGUE_CASHOUT = 'LEAGUE_CASHOUT',
+  /** A league putting its own inventory into a member's league wallet. */
+  LEAGUE_GRANT = 'LEAGUE_GRANT',
   WITHDRAW_REFUND = 'WITHDRAW_REFUND',
   AGENT_COMMISSION = 'AGENT_COMMISSION',
   AGENT_VIP_BONUS = 'AGENT_VIP_BONUS',
