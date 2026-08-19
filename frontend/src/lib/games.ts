@@ -80,6 +80,15 @@ export const GAMES: GameDef[] = [
  * those screens are finished and verified end-to-end — each sits, bets, settles through the ledger
  * and pays the right rake. Putting a game in here is a launch decision, so taking one out is too.
  */
+/**
+ * Games withheld from the lobby.
+ *
+ * Empty again. Seven games came off sale earlier in this branch over the predictable jackpot seed
+ * and go back now that every room draws on the seed its round was actually generated from.
+ * `jackpot-seed.test.ts` fails if any room reintroduces the old pattern.
+ *
+ * Putting a game in here is a launch decision, so taking one out is too.
+ */
 export const HIDDEN_GAMES: ReadonlySet<string> = new Set<GameId>([]);
 
 /** The catalog minus anything not yet on sale. Use for anything player-facing. */

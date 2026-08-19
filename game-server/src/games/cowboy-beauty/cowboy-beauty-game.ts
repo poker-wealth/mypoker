@@ -70,6 +70,12 @@ export class CowboyBeautyGame extends BaseGame<CowboyPhase, CowboyAction, Cowboy
   private cards: { cowboy: string; beauty: string } | undefined;
   private net = new Map<string, number>();
   private readonly roundId: string;
+  /**
+   * The seed this round was actually generated from — server seed, every client seed and a
+   * future block hash, mixed. Kept rather than dropped so the jackpot can draw on it: the room
+   * used to fall back to a seed derived from the round id, which any player can reproduce.
+   */
+  private lastFinalSeed: string | undefined;
 
   constructor(
     roomId: string,
@@ -138,6 +144,7 @@ export class CowboyBeautyGame extends BaseGame<CowboyPhase, CowboyAction, Cowboy
       futureBlockHash,
       this.roundId,
     );
+    this.lastFinalSeed = finalSeed;
 
     const deck = shuffledDeck(finalSeed);
     const cowboyCard = deck[0]!;
@@ -197,5 +204,9 @@ export class CowboyBeautyGame extends BaseGame<CowboyPhase, CowboyAction, Cowboy
       winner: drawn ? this.winner : null,
       cards: drawn ? this.cards : null,
     };
+  }
+  /** The round's provably-fair seed, or undefined before the first round. */
+  roundSeed(): string | undefined {
+    return this.lastFinalSeed;
   }
 }

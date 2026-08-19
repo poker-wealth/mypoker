@@ -225,7 +225,10 @@ function movesFor(tableId: string, snap: Snapshot, me: Snapshot['seats'][number]
   }
 
   if (tableId === 'cowboy-beauty' && me.bet === 0 && !me.isDealer) {
-    return { kind: 'act', action: { type: 'cowboy', amount: 100 } };
+    // Opposite sides by seat: everyone backing the same one leaves no counterparty, and the
+    // round settles to nothing at all.
+    const side = me.index % 2 === 0 ? 'cowboy' : 'beauty';
+    return { kind: 'act', action: { type: side, amount: 100 } };
   }
 
   if (tableId === 'red-packet' && me.bet === 0 && !me.isDealer) {

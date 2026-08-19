@@ -53,6 +53,12 @@ export class SanZhangGame extends BaseGame<SanZhangPhase, SanZhangAction, SanZha
   private readonly hands = new Map<string, string[]>();
   private net = new Map<string, number>();
   private roundId = '';
+  /**
+   * The seed this round was actually generated from — server seed, every client seed and a
+   * future block hash, mixed. Kept rather than dropped so the jackpot can draw on it: the room
+   * used to fall back to `${roundId}:seed`, which any player can reproduce from a round id.
+   */
+  private lastFinalSeed: string | undefined;
   private handCounter = 0;
 
   constructor(
@@ -104,6 +110,7 @@ export class SanZhangGame extends BaseGame<SanZhangPhase, SanZhangAction, SanZha
     const target = (await this.chain.getLatestBlockNumber()) + 1;
     const futureBlockHash = await awaitFutureBlockHash(this.chain, target);
     const finalSeed = computeFinalSeed(serverSeed, allClientSeeds, futureBlockHash, this.roundId);
+    this.lastFinalSeed = finalSeed;
 
     // Deal 3 cards to each participant (banker first), in fixed order.
     const deck = shuffledDeck(finalSeed);
@@ -163,5 +170,9 @@ export class SanZhangGame extends BaseGame<SanZhangPhase, SanZhangAction, SanZha
       // At showdown all hands are revealed; before, only your own is visible.
       hands: revealed ? Object.fromEntries(this.hands) : undefined,
     };
+  }
+  /** The round's provably-fair seed, or undefined before the first round. */
+  roundSeed(): string | undefined {
+    return this.lastFinalSeed;
   }
 }

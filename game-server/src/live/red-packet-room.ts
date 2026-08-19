@@ -184,7 +184,20 @@ export class RedPacketRoom extends BaseLiveRoom<RedPacketRoomConfig, RoomSeat> {
       }
 
       const roundId = `${this.config.id}-rp-${this.handNumber}`;
-      await this.processJackpot(winnerProfit, roundId, `${roundId}:seed`);
+      // The jackpot draws on the seed the round was actually generated from, so a player can
+      // verify the draw the same way they verify the game. It used to draw on `${roundId}:seed`,
+      // which anyone holding a round id can reproduce — a predictable jackpot.
+      //
+      // No fallback on purpose: without a real seed the draw is SKIPPED, because running it on a
+      // guessable one is the bug rather than the backstop.
+      const jackpotSeed = this.game.reveal()?.serverSeed;
+      if (jackpotSeed) {
+        await this.processJackpot(winnerProfit, roundId, jackpotSeed);
+      } else {
+        console.error(
+          `[room ${this.config.id}] round ${roundId} has no verifiable seed — jackpot skipped rather than drawn on a predictable one`,
+        );
+      }
 
     } catch (err) {
       this.abandonRound(err);
