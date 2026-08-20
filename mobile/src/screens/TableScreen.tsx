@@ -7,6 +7,8 @@ import { useLiveTable } from '../table/useLiveTable';
 import { PokerTable } from '../components/poker/PokerTable';
 import { ActionBar } from '../components/poker/ActionBar';
 import { feltFor } from '../components/games/registry';
+import { BuyInSheet } from '../components/poker/BuyInSheet';
+import { JackpotBurst } from '../components/poker/JackpotBurst';
 import type { TableCommand, TableSnapshot } from '../lib/liveTable';
 
 /**
@@ -38,6 +40,9 @@ export function TableScreen({ route }: TableScreenProps) {
   }, []);
 
   const { snapshot, status, error, command } = useLiveTable(tableId, token);
+  const [buyInFor, setBuyInFor] = useState<number | null | false>(false);
+  /** Which jackpot this viewer has already watched, so a re-render cannot replay it. */
+  const [jackpotSeen, setJackpotSeen] = useState<string | null>(null);
   const Felt = feltFor(tableId);
 
   if (!tokenChecked) {
@@ -79,13 +84,41 @@ export function TableScreen({ route }: TableScreenProps) {
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         {Felt ? (
-          <Felt snapshot={snapshot} onCommand={command} />
+          <Felt snapshot={snapshot} onCommand={command} onSit={(seat) => setBuyInFor(seat)} />
         ) : (
           <Text style={styles.note}>
             {snapshot.name} has no felt on mobile yet. It is playable in the Mini App.
           </Text>
         )}
       </ScrollView>
+
+      <BuyInSheet
+        open={buyInFor !== false}
+        onClose={() => setBuyInFor(false)}
+        min={snapshot.minBuyIn}
+        max={snapshot.maxBuyIn}
+        bigBlind={snapshot.bigBlind}
+        available={snapshot.you?.available ?? 0}
+        seatIndex={typeof buyInFor === 'number' ? buyInFor : null}
+        onConfirm={(amount) => {
+          if (typeof buyInFor === 'number') {
+            command({ kind: 'sit', seat: buyInFor, buyIn: amount });
+          } else {
+            command({ kind: 'buyIn', amount });
+          }
+        }}
+      />
+
+      {/* A jackpot is table news: every viewer sees it, for as long as the server says. */}
+      {snapshot.jackpot && snapshot.jackpot.roundId !== jackpotSeen ? (
+        <JackpotBurst
+          tier={snapshot.jackpot.tier}
+          playerName={snapshot.jackpot.playerName}
+          amount={snapshot.jackpot.amount}
+          animationMs={snapshot.jackpot.animationMs}
+          onDone={() => setJackpotSeen(snapshot.jackpot?.roundId ?? null)}
+        />
+      ) : null}
 
       {yourTurn && snapshot.legal ? (
         <ActionBar
@@ -102,23 +135,15 @@ export function TableScreen({ route }: TableScreenProps) {
 /** The poker family shares one felt; this is it. */
 export function HoldemFelt({
   snapshot,
-  onCommand,
+  onSit,
 }: {
   snapshot: TableSnapshot;
   onCommand: (cmd: TableCommand) => void;
+  onSit?: (seatIndex: number) => void;
 }) {
   const seated = snapshot.seats.some((s) => s.isYou);
-  return (
-    <PokerTable
-      snapshot={snapshot}
-      {...(seated
-        ? {}
-        : {
-            onSit: (seatIndex: number) =>
-              onCommand({ kind: 'sit', seat: seatIndex, buyIn: snapshot.minBuyIn }),
-          })}
-    />
-  );
+  // Sitting goes through the buy-in sheet, so the amount is chosen rather than assumed.
+  return <PokerTable snapshot={snapshot} {...(seated || !onSit ? {} : { onSit })} />;
 }
 
 const styles = StyleSheet.create({

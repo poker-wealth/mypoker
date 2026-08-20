@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { PlayingCard } from './PlayingCard';
+import { ChipStack } from './ChipStack';
 import type { LiveSeat } from '../../lib/liveTable';
 
 /**
@@ -91,11 +92,8 @@ export function PlayerSeat({ seat, onSit, toAct = false, accent = '#f5c451' }: P
       {/* What they last did this street, as the server phrased it. */}
       {seat.lastAction ? <Text style={styles.lastAction}>{seat.lastAction}</Text> : null}
 
-      {seat.bet > 0 && (
-        <View style={styles.betChip}>
-          <Text style={styles.betText}>₮{seat.bet}</Text>
-        </View>
-      )}
+      {/* Chips in front of the seat, the way the felt shows a bet. */}
+      {seat.bet > 0 && <ChipStack amount={seat.bet} />}
     </View>
   );
 }

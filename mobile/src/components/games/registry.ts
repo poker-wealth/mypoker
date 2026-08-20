@@ -16,6 +16,11 @@ import { HoldemFelt } from '../../screens/TableScreen';
 export type FeltComponent = (props: {
   snapshot: TableSnapshot;
   onCommand: (cmd: TableCommand) => void;
+  /**
+   * Taking a seat. Optional because most felts seat you as part of a bet, while the poker family
+   * goes through the buy-in sheet — the screen owns that, not the felt.
+   */
+  onSit?: (seatIndex: number) => void;
 }) => React.ReactElement;
 
 /** Every table id that has a felt. Keep `PORTED_TABLES` in config.ts in step with this. */
