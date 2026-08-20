@@ -3,12 +3,23 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
+import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import { WalletScreen } from './src/screens/WalletScreen';
 import { TableScreen } from './src/screens/TableScreen';
+import { ProfileScreen } from './src/screens/ProfileScreen';
+import { AllianceScreen } from './src/screens/AllianceScreen';
+import { DataScreen } from './src/screens/DataScreen';
+import { VipScreen } from './src/screens/VipScreen';
+import { NotificationsScreen } from './src/screens/NotificationsScreen';
+import { SettingsScreen } from './src/screens/SettingsScreen';
 import type { RootStackParamList } from './src/navigation';
 import { API_URL } from './src/api';
 import { space, theme } from './src/theme';
+// Side-effect import: initialises i18next before any screen calls
+// useTranslation(). Nothing pulled this in until now — WalletScreen and
+// TableScreen predate it and hardcode their copy in English.
+import './src/i18n';
 
 /**
  * The app shell (SAMUEL_V2 task 8).
@@ -73,6 +84,7 @@ function NotPortedYet({ name }: { name: string }) {
 }
 
 function TabsScreen() {
+  const { t } = useTranslation();
   return (
     <Tabs.Navigator
       screenOptions={{
@@ -85,19 +97,24 @@ function TabsScreen() {
     >
       <Tabs.Screen name="Wallet" component={WalletScreen} />
       <Tabs.Screen name="Tables">{() => <NotPortedYet name="Tables" />}</Tabs.Screen>
-      <Tabs.Screen name="Account">{() => <NotPortedYet name="Account" />}</Tabs.Screen>
+      <Tabs.Screen name="Alliance" component={AllianceScreen} options={{ title: t('nav.alliance') }} />
+      <Tabs.Screen name="Data" component={DataScreen} options={{ title: t('nav.data') }} />
+      <Tabs.Screen name="Account" component={ProfileScreen} options={{ title: t('nav.account') }} />
     </Tabs.Navigator>
   );
 }
 
 export default function App() {
+  const { t } = useTranslation();
   return (
     <QueryClientProvider client={queryClient}>
       <NavigationContainer theme={navTheme}>
         <StatusBar style="light" />
         {/* A stack over the tabs, so a table opens WITH a tableId rather than
             being a tab that has to guess which table you meant. That param is
-            half the seam with the game side; see src/navigation.ts. */}
+            half the seam with the game side; see src/navigation.ts. Vip,
+            Notifications and Settings are pushed the same way, from the
+            Account tab — see src/screens/ProfileScreen.tsx. */}
         <Stack.Navigator
           screenOptions={{
             headerStyle: { backgroundColor: theme.bg },
@@ -108,6 +125,13 @@ export default function App() {
         >
           <Stack.Screen name="Tabs" component={TabsScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Table" component={TableScreen} />
+          <Stack.Screen name="Vip" component={VipScreen} options={{ title: t('account.vipMembership') }} />
+          <Stack.Screen
+            name="Notifications"
+            component={NotificationsScreen}
+            options={{ title: t('notifications.title') }}
+          />
+          <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: t('account.settings') }} />
         </Stack.Navigator>
 
         {/* Which gateway this build points at. Invisible in production, and the
