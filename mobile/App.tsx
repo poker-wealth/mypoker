@@ -9,6 +9,7 @@ import { WalletScreen } from './src/screens/WalletScreen';
 import { TableScreen } from './src/screens/TableScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { AllianceScreen } from './src/screens/AllianceScreen';
+import { DataScreen } from './src/screens/DataScreen';
 import { VipScreen } from './src/screens/VipScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
@@ -97,6 +98,7 @@ function TabsScreen() {
       <Tabs.Screen name="Wallet" component={WalletScreen} />
       <Tabs.Screen name="Tables">{() => <NotPortedYet name="Tables" />}</Tabs.Screen>
       <Tabs.Screen name="Alliance" component={AllianceScreen} options={{ title: t('nav.alliance') }} />
+      <Tabs.Screen name="Data" component={DataScreen} options={{ title: t('nav.data') }} />
       <Tabs.Screen name="Account" component={ProfileScreen} options={{ title: t('nav.account') }} />
     </Tabs.Navigator>
   );
