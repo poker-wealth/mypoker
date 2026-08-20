@@ -2,77 +2,107 @@
 // Without it, key generation throws at the first handshake.
 import 'react-native-get-random-values';
 
-import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { LobbyScreen } from './src/screens/LobbyScreen';
+import { Ionicons } from '@expo/vector-icons';
+
+import { colors, MAX_CONTENT_WIDTH } from './src/theme';
+import { NavProvider, useNav } from './src/navigation';
+import { Header } from './src/components/Header';
+import { BottomNav } from './src/components/BottomNav';
+import { GamesScreen } from './src/screens/GamesScreen';
 import { TableScreen } from './src/screens/TableScreen';
+import {
+  AllianceScreen,
+  DataScreen,
+  LobbyScreen,
+  ProfileScreen,
+} from './src/screens/PlaceholderScreens';
 
 /**
  * FairPlay, on the phone.
  *
- * ESTHER_V2 task 6: the same games, natively on iOS and Android, at parity with the web app and the
- * Telegram Mini App. This is the game/table half — the live-table transport and the felts. The
- * shell, wallet, auth and store submission are Samuel's.
+ * ESTHER_V2 task 6: the same product natively on iOS and Android, at parity with the web app and
+ * the Telegram Mini App. The arrangement here is the Mini App's — a route-titled header, the screen
+ * below it, and five tabs pinned to the bottom in the owner-specified order (Alliance, Games,
+ * Lobby, Data, Account), with Wallet hanging off My Account rather than taking a tab.
  *
- * Navigation is deliberately two screens and a piece of state for now, not a router. There is one
- * route that matters until the felts land, and wiring a navigator around it would be scaffolding
- * built before the thing it holds.
+ * A table opens OVER the tabs and takes the whole screen, exactly as `/table/:id` does on web.
+ *
+ * The seam with the app shell: Samuel owns the API client, the token/session store and navigation;
+ * this covers the socket and the felts. The shell here is a placeholder so the game side is
+ * testable — the screens only ever call `useNav()`, so replacing it is a small job.
  */
 
-interface OpenTable {
-  tableId: string;
-  name: string;
+const token: string | null = null;
+
+function Shell() {
+  const { tab, table, closeTable } = useNav();
+
+  if (table) {
+    return (
+      <View style={styles.fill}>
+        <View style={styles.tableHeader}>
+          <Pressable onPress={closeTable} hitSlop={12} style={styles.back}>
+            <Ionicons name="chevron-back" size={20} color={colors.dim} />
+            <Text style={styles.backText}>Games</Text>
+          </Pressable>
+          <Text style={styles.tableTitle} numberOfLines={1}>
+            {table.name}
+          </Text>
+        </View>
+        <TableScreen tableId={table.tableId} token={token} />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.fill}>
+      <Header tab={tab} />
+      <View style={styles.fill}>
+        {tab === 'lobby' && <LobbyScreen />}
+        {tab === 'games' && <GamesScreen />}
+        {tab === 'alliance' && <AllianceScreen />}
+        {tab === 'data' && <DataScreen />}
+        {tab === 'profile' && <ProfileScreen />}
+      </View>
+      <BottomNav />
+    </View>
+  );
 }
 
 export default function App() {
-  const [table, setTable] = useState<OpenTable | null>(null);
-
-  /**
-   * No session yet — auth is Samuel's half. The table screen says so plainly rather than opening a
-   * socket that will be refused, and a token dropped in here lights the whole path up.
-   */
-  const token: string | null = null;
-
   return (
     <SafeAreaProvider>
       <SafeAreaView style={styles.app} edges={['top', 'bottom']}>
         <StatusBar style="light" />
-
-        <View style={styles.header}>
-          {table ? (
-            <Pressable onPress={() => setTable(null)} hitSlop={12}>
-              <Text style={styles.back}>‹ tables</Text>
-            </Pressable>
-          ) : (
-            <Text style={styles.brand}>FAIRPLAY</Text>
-          )}
-          {table && <Text style={styles.title}>{table.name}</Text>}
+        {/* The Mini App caps its content at 520px and centres it; phones are narrower, tablets
+            are not, and an unbounded layout looks wrong on the latter. */}
+        <View style={styles.centred}>
+          <NavProvider>
+            <Shell />
+          </NavProvider>
         </View>
-
-        {table ? (
-          <TableScreen tableId={table.tableId} token={token} />
-        ) : (
-          <LobbyScreen onOpenTable={(tableId, name) => setTable({ tableId, name })} />
-        )}
       </SafeAreaView>
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  app: { flex: 1, backgroundColor: '#0b0b17' },
-  header: {
+  app: { flex: 1, backgroundColor: colors.bg },
+  centred: { flex: 1, width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center' },
+  fill: { flex: 1 },
+  tableHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#242445',
+    borderBottomColor: colors.border,
   },
-  brand: { color: '#f5c451', fontWeight: '900', letterSpacing: 2 },
-  back: { color: '#8b8bb0', fontSize: 15 },
-  title: { color: '#fff', fontWeight: '700' },
+  back: { flexDirection: 'row', alignItems: 'center' },
+  backText: { color: colors.dim, fontSize: 15 },
+  tableTitle: { color: colors.text, fontWeight: '700', flex: 1 },
 });

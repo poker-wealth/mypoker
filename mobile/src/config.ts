@@ -36,4 +36,9 @@ export const TABLES_WS_URL =
  * felt yet, so the lobby says so rather than opening a blank screen — the web app learned that one
  * the hard way when a lost registry sent every game to the poker table.
  */
-export const PORTED_TABLES: ReadonlySet<string> = new Set([]);
+export const PORTED_TABLES: ReadonlySet<string> = new Set([
+  'texas',
+  'texas-high',
+  'short-deck',
+  'omaha',
+]);
