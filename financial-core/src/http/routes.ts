@@ -54,6 +54,7 @@ import {
   executeLeagueFunding,
   pendingLeagueFunding,
 } from '../league/league-funding';
+import { grantToMember } from '../league/league-grant';
 import { getDepositAddress } from '../wallet/deposit-address';
 import { getWalletTransactions, getWithdrawals } from '../wallet/wallet-views';
 import { isValidTronAddress } from '../wallet/tron-address';
@@ -1365,6 +1366,43 @@ export function buildRouter(): Router {
       res.json({
         role: await membershipOf(String(req.params.leagueId), String(req.params.playerId)),
       });
+    }),
+  );
+
+  /**
+   * A league grants its own inventory to one of its members (LEAGUE_GRANT).
+   *
+   * Membership is checked HERE as well as in the gateway: the gateway decides
+   * whether the CALLER may grant, this decides whether the RECIPIENT may be
+   * granted to. Crediting a non-member would create a league wallet for someone
+   * outside the league — money inside a boundary they are not inside.
+   */
+  const grantBody = z.object({
+    playerId: z.string().min(1),
+    amount: money,
+    grantedBy: z.string().min(1),
+    /** Idempotency reference; a retried request must not pay twice. */
+    reference: z.string().min(1).optional(),
+  });
+  r.post(
+    '/internal/leagues/:leagueId/grants',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const leagueId = String(req.params.leagueId);
+      const b = grantBody.parse(req.body);
+
+      const role = await membershipOf(leagueId, b.playerId);
+      if (!role) throw new ApiError(400, 'that player is not a member of this league');
+
+      res.json(
+        await grantToMember({
+          leagueId,
+          playerId: b.playerId,
+          amount: Money.fromDecimalString(b.amount),
+          grantedBy: b.grantedBy,
+          ...(b.reference ? { reference: b.reference } : {}),
+        }),
+      );
     }),
   );
 

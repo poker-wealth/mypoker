@@ -133,6 +133,34 @@ export function buildLeagueTableRouter(
     }
   };
 
+  /** POST to financial-core, preserving its status and message on refusal —
+   *  a grant refused for a real reason ("not a member", "insufficient") must
+   *  reach the admin, not be flattened into a generic 502. */
+  const internalPost = async (
+    path: string,
+    body: unknown,
+  ): Promise<{ ok: true; body: unknown } | { ok: false; status: number; error: string }> => {
+    try {
+      const res = await fetch(`${config.financialCoreUrl}/api/v1${path}`, {
+        method: 'POST',
+        headers: { 'x-internal-secret': config.internalApiSecret, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const parsed: unknown = await res.json().catch(() => null);
+      if (!res.ok) {
+        const detail =
+          parsed && typeof parsed === 'object' && 'error' in parsed
+            ? String((parsed as { error: unknown }).error)
+            : 'league service unavailable';
+        return { ok: false, status: res.status || 502, error: detail };
+      }
+      return { ok: true, body: parsed };
+    } catch (err) {
+      console.error('[league-tables] financial-core unreachable:', err);
+      return { ok: false, status: 502, error: 'league service unavailable' };
+    }
+  };
+
   r.post('/:leagueId/tables', requireAuth(config), (req: Request, res: Response): void => {
     void (async (): Promise<void> => {
       const leagueId = String(req.params.leagueId ?? '');
@@ -291,6 +319,87 @@ export function buildLeagueTableRouter(
       // request AND (Node default) kills the process — every live table on it.
       console.error('[league-tables] create failed:', err);
       if (!res.headersSent) res.status(500).json({ error: 'could not open the table' });
+    });
+  });
+
+  /**
+   * A league admin grants chips from the league's inventory to a member.
+   *
+   * The league economy's missing middle: the spec gives the league an on-ramp
+   * (TREASURY → LEAGUE_INVENTORY) and an off-ramp, but nothing reached a
+   * player, so a member's league wallet stayed empty and league tables could
+   * never be sat at.
+   *
+   * Same authority as opening a room — OWNER or ADMIN of THIS league, taken
+   * from the verified token. A plain member gets 403, a stranger 404 (whether a
+   * league exists is not a stranger's to probe). financial-core independently
+   * checks the RECIPIENT is a member, so neither service trusts the other's
+   * word about who belongs where.
+   */
+  const grantBody = z.object({
+    playerId: z.string().min(1),
+    /** Decimal string; financial-core parses it as Money — never a float. */
+    amount: z.string().regex(/^\d+(\.\d{1,6})?$/, 'amount must be a positive decimal'),
+    /** Optional client reference so a retried request cannot pay twice. */
+    reference: z.string().min(1).max(100).optional(),
+  });
+
+  r.post('/:leagueId/grants', requireAuth(config), (req: Request, res: Response): void => {
+    void (async (): Promise<void> => {
+      const leagueId = String(req.params.leagueId ?? '');
+      const playerId = req.player?.playerId;
+      if (!playerId) {
+        res.status(401).json({ error: 'unauthorized' });
+        return;
+      }
+
+      let input: z.infer<typeof grantBody>;
+      try {
+        input = grantBody.parse(req.body ?? {});
+      } catch {
+        res.status(400).json({ error: 'invalid grant' });
+        return;
+      }
+
+      const membershipRaw = await internal<unknown>(
+        `/internal/leagues/${encodeURIComponent(leagueId)}/members/${encodeURIComponent(playerId)}`,
+      );
+      if (!membershipRaw) {
+        res.status(502).json({ error: 'league service unavailable' });
+        return;
+      }
+      const parsed = membershipShape.safeParse(membershipRaw);
+      if (!parsed.success) {
+        console.error('[league-tables] membership response malformed:', membershipRaw);
+        res.status(502).json({ error: 'league service unavailable' });
+        return;
+      }
+
+      const role = parsed.data.role;
+      if (role === null) {
+        res.status(404).json({ error: `no such league: ${leagueId}` });
+        return;
+      }
+      if (role !== 'OWNER' && role !== 'ADMIN') {
+        res.status(403).json({ error: 'only a league owner or admin can grant chips' });
+        return;
+      }
+
+      const result = await internalPost(`/internal/leagues/${encodeURIComponent(leagueId)}/grants`, {
+        playerId: input.playerId,
+        amount: input.amount,
+        // The granter is the authenticated caller, never anything in the body.
+        grantedBy: playerId,
+        ...(input.reference ? { reference: input.reference } : {}),
+      });
+      if (!result.ok) {
+        res.status(result.status).json({ error: result.error });
+        return;
+      }
+      res.status(201).json(result.body);
+    })().catch((err) => {
+      console.error('[league-tables] grant failed:', err);
+      if (!res.headersSent) res.status(500).json({ error: 'could not complete the grant' });
     });
   });
 
