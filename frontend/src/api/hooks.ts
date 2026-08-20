@@ -19,7 +19,14 @@ import {
   rejectWithdrawal,
 } from './admin';
 import { fetchVip } from './vip';
-import { fetchMyLeagues, fetchLeagues, createLeagueApi, joinLeagueApi } from './leagues';
+import {
+  fetchMyLeagues,
+  fetchLeagues,
+  createLeagueApi,
+  joinLeagueApi,
+  fetchLeague,
+  createLeagueTableApi,
+} from './leagues';
 import { fetchNotifications, markNotificationsRead, type NotificationPage } from './notifications';
 import { fetchRtp } from './fairnessFeed';
 import {
@@ -268,6 +275,41 @@ export function useCreateLeague() {
     mutationFn: createLeagueApi,
     // Both lists change: the new league is mine, and it becomes discoverable.
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['leagues'] }),
+  });
+}
+
+/**
+ * One league's own facts — including whether it has settings yet.
+ *
+ * Keyed by leagueId (never a bare ['league']), so entering a second alliance
+ * cannot render the first one's rake: a cached figure about the wrong league is
+ * worse than a spinner.
+ */
+export function useLeague(leagueId: string | null) {
+  return useQuery({
+    queryKey: ['leagues', 'detail', leagueId],
+    queryFn: () => fetchLeague(leagueId!),
+    enabled: Boolean(leagueId),
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * Open a league private room.
+ *
+ * Invalidates the lobby table lists as well as the league reads: the new room
+ * is listed immediately, but only inside that league's context, and the lobby
+ * hooks key on the context — so without this the admin who just opened a table
+ * would enter their alliance and not find it until the poll came round.
+ */
+export function useCreateLeagueTable() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createLeagueTableApi,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['lobby', 'tables'] });
+      void queryClient.invalidateQueries({ queryKey: ['lobby', 'games'] });
+    },
   });
 }
 
