@@ -87,4 +87,8 @@ export const api = {
   get: <T>(path: string): Promise<T> => request<T>(path),
   post: <T>(path: string, body?: unknown): Promise<T> =>
     request<T>(path, { method: 'POST', ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }),
+  // Added for Settings: the gateway only accepts PATCH on /me/settings
+  // (game-server/src/gateway/me-routes.ts), and nothing here needed it before.
+  patch: <T>(path: string, body?: unknown): Promise<T> =>
+    request<T>(path, { method: 'PATCH', ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }),
 };
