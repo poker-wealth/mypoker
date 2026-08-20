@@ -340,8 +340,15 @@ export function buildLeagueTableRouter(
     playerId: z.string().min(1),
     /** Decimal string; financial-core parses it as Money — never a float. */
     amount: z.string().regex(/^\d+(\.\d{1,6})?$/, 'amount must be a positive decimal'),
-    /** Optional client reference so a retried request cannot pay twice. */
-    reference: z.string().min(1).max(100).optional(),
+    /**
+     * Idempotency key — REQUIRED, and the client's to generate.
+     *
+     * Not optional and not minted here: a reference invented per HTTP request
+     * is no protection at all, since a double-submit is two requests. The
+     * caller generates one when the admin commits to a grant and reuses it on
+     * retry, so the second submit collapses onto the first transfer.
+     */
+    reference: z.string().min(1).max(100),
   });
 
   r.post('/:leagueId/grants', requireAuth(config), (req: Request, res: Response): void => {
@@ -357,7 +364,9 @@ export function buildLeagueTableRouter(
       try {
         input = grantBody.parse(req.body ?? {});
       } catch {
-        res.status(400).json({ error: 'invalid grant' });
+        res.status(400).json({
+          error: 'invalid grant — playerId, amount and a unique reference are all required',
+        });
         return;
       }
 
@@ -390,7 +399,7 @@ export function buildLeagueTableRouter(
         amount: input.amount,
         // The granter is the authenticated caller, never anything in the body.
         grantedBy: playerId,
-        ...(input.reference ? { reference: input.reference } : {}),
+        reference: input.reference,
       });
       if (!result.ok) {
         res.status(result.status).json({ error: result.error });
