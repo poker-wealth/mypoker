@@ -7,7 +7,8 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import { WalletScreen } from './src/screens/WalletScreen';
 import { TableScreen } from './src/screens/TableScreen';
-import { AccountScreen } from './src/screens/AccountScreen';
+import { ProfileScreen } from './src/screens/ProfileScreen';
+import { AllianceScreen } from './src/screens/AllianceScreen';
 import { VipScreen } from './src/screens/VipScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
@@ -95,7 +96,8 @@ function TabsScreen() {
     >
       <Tabs.Screen name="Wallet" component={WalletScreen} />
       <Tabs.Screen name="Tables">{() => <NotPortedYet name="Tables" />}</Tabs.Screen>
-      <Tabs.Screen name="Account" component={AccountScreen} options={{ title: t('nav.account') }} />
+      <Tabs.Screen name="Alliance" component={AllianceScreen} options={{ title: t('nav.alliance') }} />
+      <Tabs.Screen name="Account" component={ProfileScreen} options={{ title: t('nav.account') }} />
     </Tabs.Navigator>
   );
 }
@@ -110,7 +112,7 @@ export default function App() {
             being a tab that has to guess which table you meant. That param is
             half the seam with the game side; see src/navigation.ts. Vip,
             Notifications and Settings are pushed the same way, from the
-            Account tab — see src/screens/AccountScreen.tsx. */}
+            Account tab — see src/screens/ProfileScreen.tsx. */}
         <Stack.Navigator
           screenOptions={{
             headerStyle: { backgroundColor: theme.bg },

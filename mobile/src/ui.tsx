@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -117,6 +118,75 @@ export function Button({
     >
       <Text style={[styles.buttonText, { color: palette.fg }]}>{children}</Text>
     </Pressable>
+  );
+}
+
+/**
+ * A segmented control — the tab bar inside a screen.
+ *
+ * Options carry their own labels already translated; this never sees a key, so
+ * it cannot accidentally render one raw. Generic over the value so a caller
+ * gets back the union it passed in, not a bare string.
+ */
+export function Segmented<T extends string>({
+  options,
+  value,
+  onChange,
+}: {
+  options: readonly { value: T; label: string }[];
+  value: T;
+  onChange: (next: T) => void;
+}) {
+  return (
+    <View style={styles.segmented}>
+      {options.map((o) => {
+        const active = o.value === value;
+        return (
+          <Pressable
+            key={o.value}
+            onPress={() => onChange(o.value)}
+            style={[styles.segment, active && styles.segmentActive]}
+          >
+            <Text style={[styles.segmentText, active && styles.segmentTextActive]} numberOfLines={1}>
+              {o.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+/**
+ * A bottom sheet.
+ *
+ * `Modal` rather than an absolutely-positioned view, so it sits above
+ * everything including the tab bar and takes the hardware back button on
+ * Android — a sheet you cannot dismiss with Back is a trap on that platform.
+ *
+ * Dismissing by backdrop resolves as a CANCEL at the call site. For anything
+ * touching money the safe answer to a question nobody answered is no.
+ */
+export function Sheet({
+  open,
+  onClose,
+  title,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={styles.backdrop} onPress={onClose} />
+      <View style={styles.sheet}>
+        <View style={styles.grabber} />
+        {title !== undefined && <Text style={styles.sheetTitle}>{title}</Text>}
+        <View style={styles.sheetBody}>{children}</View>
+      </View>
+    </Modal>
   );
 }
 
@@ -255,4 +325,45 @@ const styles = StyleSheet.create({
   },
   errorText: { color: theme.text, fontSize: 13, lineHeight: 19 },
   pad: { alignSelf: 'flex-start', paddingVertical: space.md },
+  segmented: {
+    flexDirection: 'row',
+    backgroundColor: theme.surface,
+    borderColor: theme.border,
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    padding: 3,
+    gap: 3,
+  },
+  segment: { flex: 1, alignItems: 'center', borderRadius: radius.pill, paddingVertical: space.sm },
+  segmentActive: { backgroundColor: theme.surface2 },
+  segmentText: { color: theme.dim, fontSize: 12, fontWeight: '700' },
+  segmentTextActive: { color: theme.text },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
+  sheet: {
+    backgroundColor: theme.bg,
+    borderTopColor: theme.border,
+    borderTopWidth: 1,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: space.xl,
+    maxHeight: '85%',
+  },
+  grabber: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: radius.pill,
+    backgroundColor: theme.border,
+    marginVertical: space.sm,
+  },
+  sheetTitle: {
+    color: theme.text,
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'center',
+    paddingBottom: space.sm,
+    borderBottomColor: theme.border,
+    borderBottomWidth: 1,
+  },
+  sheetBody: { padding: space.lg, gap: space.md },
 });
