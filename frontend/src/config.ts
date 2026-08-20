@@ -71,3 +71,23 @@ export const LIVE_TABLE_IDS = new Set([
   'texas-cowboy',
 ]);
 
+/**
+ * Does this route param name a table the app can actually open?
+ *
+ * `/table/:id` takes two different kinds of thing, and conflating them was a
+ * real bug: a GAME SLUG from the static list above (open that game's default
+ * table), or a SPECIFIC TABLE ID minted at runtime. League private rooms are
+ * the second kind — the server mints `lg-<leagueId>-<8 hex>` — so they could
+ * never appear in a fixed allowlist, and every league table route fell through
+ * to "this game isn't ready yet". Create worked; join did not.
+ *
+ * The `lg-` shape mirrors `league-rooms.ts`'s minting. That is a coupling, and
+ * a deliberate one: the alternative is opening a socket for any id at all and
+ * discovering it does not exist, which turns a friendly "not ready yet" into a
+ * connection error for genuinely unwired games.
+ */
+const LEAGUE_TABLE_ID = /^lg-.+-[0-9a-f]{8}$/;
+
+export const isOpenableTableId = (id: string | undefined): id is string =>
+  Boolean(id) && (LIVE_TABLE_IDS.has(id!) || LEAGUE_TABLE_ID.test(id!));
+

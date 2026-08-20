@@ -1,108 +1,142 @@
-// Must be first: @noble needs a CSPRNG, and React Native has none until this shim installs one.
-// Without it, key generation throws at the first handshake.
-import 'react-native-get-random-values';
-
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { NavigationContainer, type Theme } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
-
-import { colors, MAX_CONTENT_WIDTH } from './src/theme';
-import { NavProvider, useNav } from './src/navigation';
-import { Header } from './src/components/Header';
-import { BottomNav } from './src/components/BottomNav';
-import { GamesScreen } from './src/screens/GamesScreen';
+import { StyleSheet, Text, View } from 'react-native';
+import { WalletScreen } from './src/screens/WalletScreen';
 import { TableScreen } from './src/screens/TableScreen';
-import {
-  AllianceScreen,
-  DataScreen,
-  LobbyScreen,
-  ProfileScreen,
-} from './src/screens/PlaceholderScreens';
+import type { RootStackParamList } from './src/navigation';
+import { API_URL } from './src/api';
+import { space, theme } from './src/theme';
 
 /**
- * FairPlay, on the phone.
+ * The app shell (SAMUEL_V2 task 8).
  *
- * ESTHER_V2 task 6: the same product natively on iOS and Android, at parity with the web app and
- * the Telegram Mini App. The arrangement here is the Mini App's — a route-titled header, the screen
- * below it, and five tabs pinned to the bottom in the owner-specified order (Alliance, Games,
- * Lobby, Data, Account), with Wallet hanging off My Account rather than taking a tab.
+ * Owns navigation, session and the API client. The game side — felts and the
+ * live-table socket — plugs in here; the seam between us is the session token
+ * and a tableId, nothing more.
  *
- * A table opens OVER the tabs and takes the whole screen, exactly as `/table/:id` does on web.
- *
- * The seam with the app shell: Samuel owns the API client, the token/session store and navigation;
- * this covers the socket and the felts. The shell here is a placeholder so the game side is
- * testable — the screens only ever call `useNav()`, so replacing it is a small job.
+ * Deliberately thin at this stage. It exists so there is somewhere for both
+ * halves to land and so the Bare Workflow gate can be proven on hardware, not
+ * because a two-tab app is the goal.
  */
 
-const token: string | null = null;
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // A phone changes networks constantly; one retry absorbs a handover,
+      // more just delays telling the user something is wrong.
+      retry: 1,
+      staleTime: 10_000,
+    },
+  },
+});
 
-function Shell() {
-  const { tab, table, closeTable } = useNav();
+const Tabs = createBottomTabNavigator();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
-  if (table) {
-    return (
-      <View style={styles.fill}>
-        <View style={styles.tableHeader}>
-          <Pressable onPress={closeTable} hitSlop={12} style={styles.back}>
-            <Ionicons name="chevron-back" size={20} color={colors.dim} />
-            <Text style={styles.backText}>Games</Text>
-          </Pressable>
-          <Text style={styles.tableTitle} numberOfLines={1}>
-            {table.name}
-          </Text>
-        </View>
-        <TableScreen tableId={table.tableId} token={token} />
-      </View>
-    );
-  }
+const navTheme: Theme = {
+  dark: true,
+  colors: {
+    primary: theme.brand,
+    background: theme.bg,
+    card: theme.surface,
+    text: theme.text,
+    border: theme.border,
+    notification: theme.danger,
+  },
+  fonts: {
+    regular: { fontFamily: 'System', fontWeight: '400' },
+    medium: { fontFamily: 'System', fontWeight: '500' },
+    bold: { fontFamily: 'System', fontWeight: '700' },
+    heavy: { fontFamily: 'System', fontWeight: '900' },
+  },
+};
 
+/**
+ * Placeholder for a screen that has not been ported yet.
+ *
+ * It says so plainly rather than showing an empty tab or invented content — the
+ * same honesty rule the Mini App follows. A blank screen reads as broken; this
+ * reads as unfinished, which is what it is.
+ */
+function NotPortedYet({ name }: { name: string }) {
   return (
-    <View style={styles.fill}>
-      <Header tab={tab} />
-      <View style={styles.fill}>
-        {tab === 'lobby' && <LobbyScreen />}
-        {tab === 'games' && <GamesScreen />}
-        {tab === 'alliance' && <AllianceScreen />}
-        {tab === 'data' && <DataScreen />}
-        {tab === 'profile' && <ProfileScreen />}
-      </View>
-      <BottomNav />
+    <View style={styles.placeholder}>
+      <Text style={styles.placeholderTitle}>{name}</Text>
+      <Text style={styles.placeholderBody}>
+        Not ported to the app yet. It is live in the Telegram Mini App.
+      </Text>
     </View>
+  );
+}
+
+function TabsScreen() {
+  return (
+    <Tabs.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: theme.bg },
+        headerTitleStyle: { color: theme.text },
+        tabBarStyle: { backgroundColor: theme.surface, borderTopColor: theme.border },
+        tabBarActiveTintColor: theme.brand,
+        tabBarInactiveTintColor: theme.dim,
+      }}
+    >
+      <Tabs.Screen name="Wallet" component={WalletScreen} />
+      <Tabs.Screen name="Tables">{() => <NotPortedYet name="Tables" />}</Tabs.Screen>
+      <Tabs.Screen name="Account">{() => <NotPortedYet name="Account" />}</Tabs.Screen>
+    </Tabs.Navigator>
   );
 }
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <SafeAreaView style={styles.app} edges={['top', 'bottom']}>
+    <QueryClientProvider client={queryClient}>
+      <NavigationContainer theme={navTheme}>
         <StatusBar style="light" />
-        {/* The Mini App caps its content at 520px and centres it; phones are narrower, tablets
-            are not, and an unbounded layout looks wrong on the latter. */}
-        <View style={styles.centred}>
-          <NavProvider>
-            <Shell />
-          </NavProvider>
-        </View>
-      </SafeAreaView>
-    </SafeAreaProvider>
+        {/* A stack over the tabs, so a table opens WITH a tableId rather than
+            being a tab that has to guess which table you meant. That param is
+            half the seam with the game side; see src/navigation.ts. */}
+        <Stack.Navigator
+          screenOptions={{
+            headerStyle: { backgroundColor: theme.bg },
+            headerTitleStyle: { color: theme.text },
+            headerTintColor: theme.text,
+            contentStyle: { backgroundColor: theme.bg },
+          }}
+        >
+          <Stack.Screen name="Tabs" component={TabsScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Table" component={TableScreen} />
+        </Stack.Navigator>
+
+        {/* Which gateway this build points at. Invisible in production, and the
+            first question worth answering when a device "cannot load anything" —
+            on an Android emulator the host is 10.0.2.2, never localhost. */}
+        {__DEV__ && (
+          <Text style={styles.devBanner}>{API_URL || 'EXPO_PUBLIC_API_URL is not set'}</Text>
+        )}
+      </NavigationContainer>
+    </QueryClientProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  app: { flex: 1, backgroundColor: colors.bg },
-  centred: { flex: 1, width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center' },
-  fill: { flex: 1 },
-  tableHeader: {
-    flexDirection: 'row',
+  placeholder: {
+    flex: 1,
+    backgroundColor: theme.bg,
     alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    justifyContent: 'center',
+    padding: space.xl,
+    gap: space.sm,
   },
-  back: { flexDirection: 'row', alignItems: 'center' },
-  backText: { color: colors.dim, fontSize: 15 },
-  tableTitle: { color: colors.text, fontWeight: '700', flex: 1 },
+  placeholderTitle: { color: theme.text, fontSize: 18, fontWeight: '800' },
+  placeholderBody: { color: theme.dim, fontSize: 13, textAlign: 'center', lineHeight: 19 },
+  devBanner: {
+    color: theme.dim,
+    fontSize: 10,
+    textAlign: 'center',
+    paddingBottom: space.xs,
+    backgroundColor: theme.bg,
+  },
 });

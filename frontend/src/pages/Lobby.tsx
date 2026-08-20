@@ -9,6 +9,7 @@ import { ContextBanner } from '@/components/ContextBanner';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { cn } from '@/lib/cn';
 import { haptic } from '@/lib/telegram';
+import { toast } from '@/lib/toast';
 
 /**
  * A lobby row, built only from what the server actually sent.
@@ -293,17 +294,24 @@ export function Lobby() {
           <Zap size={18} className="fill-current text-white" />
           QUICK JOIN
         </button>
-        {/* Disabled, not removed. There is no create-table endpoint — the
-            gateway exposes reads only — and this button used to open
-            /table/texas, so it appeared to work while silently dropping the
-            player onto an existing public table. A control that lies is worse
-            than one that is visibly not ready yet. */}
+        {/* Live again, but as a signpost rather than a creator.
+
+            A private table is a LEAGUE room (v5.9 §2: "league tables visible
+            only to league members, completely invisible to lobby players") and
+            only that league's owner or an admin may open one. So a creator here
+            would be a control almost nobody looking at it can use. This routes
+            to the alliance tab, where the control belongs, and says why — which
+            is also the answer for a player who is not in an alliance yet. */}
         <button
-          disabled
-          title={t('lobby.createSoon')}
-          className="flex flex-1 cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-dashed border-border bg-surface/50 py-3 px-3 text-xs font-bold text-dim"
+          onClick={() => {
+            haptic('light');
+            toast.info(t('lobby.createPrivateHint'));
+            navigate('/alliance');
+          }}
+          title={t('lobby.createPrivateHint')}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface-2 py-3 px-3 text-xs font-bold text-text transition-all active:scale-[0.98]"
         >
-          <Plus size={16} className="text-dim" />
+          <Plus size={16} className="text-brand" />
           {t('lobby.createPrivate')}
         </button>
       </div>

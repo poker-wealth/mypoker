@@ -1,0 +1,90 @@
+import { clearToken, getToken } from './session';
+
+/**
+ * The one API client. The shell owns it; the game side uses it.
+ *
+ * Deliberately small and dependency-free — it mirrors the Mini App's client
+ * (`frontend/src/api/client.ts`) in behaviour so the two cannot answer the same
+ * question differently, but it does not import it: that file is bundled for a
+ * browser and reaches for browser globals.
+ */
+
+/**
+ * Where the gateway lives.
+ *
+ * `EXPO_PUBLIC_` is inlined at build time by Expo. On an Android emulator the
+ * host machine is `10.0.2.2` — `localhost` there means the emulator itself,
+ * which is the single most common "why does nothing load" on this platform.
+ */
+export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '');
+
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+/** A request that never resolves is worse than one that fails — phones change networks. */
+const TIMEOUT_MS = 15_000;
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  if (!API_URL) {
+    throw new ApiError(0, 'No API URL configured — set EXPO_PUBLIC_API_URL for this build.');
+  }
+
+  const token = await getToken();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        ...(init.body ? { 'content-type': 'application/json' } : {}),
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...init.headers,
+      },
+    });
+  } catch (err) {
+    // Offline, DNS, a dropped connection, or our own timeout. Status 0 means
+    // "never reached the server", which callers render differently from a
+    // refusal — the server saying no is not the same as not asking.
+    throw new ApiError(0, (err as Error)?.name === 'AbortError' ? 'The request timed out.' : 'Could not reach the server.');
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (res.status === 401) {
+    // The token is gone or expired. Drop it so the app stops presenting a
+    // signed-in shell over a session the server has already forgotten.
+    await clearToken();
+    throw new ApiError(401, 'Your session has expired. Sign in again.');
+  }
+
+  const body: unknown = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    // Prefer the server's own message: it is the one that knows WHY, and the
+    // money paths return refusals a user can act on ("48h cooldown", "not a
+    // member") that a generic string would throw away.
+    const message =
+      body && typeof body === 'object' && 'error' in body
+        ? String((body as { error: unknown }).error)
+        : `Request failed (${res.status})`;
+    throw new ApiError(res.status, message);
+  }
+
+  return body as T;
+}
+
+export const api = {
+  get: <T>(path: string): Promise<T> => request<T>(path),
+  post: <T>(path: string, body?: unknown): Promise<T> =>
+    request<T>(path, { method: 'POST', ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }),
+};

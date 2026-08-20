@@ -1,0 +1,67 @@
+import * as SecureStore from 'expo-secure-store';
+
+/**
+ * The session token — the seam between the shell and everything else.
+ *
+ * The shell owns identity: it obtains the token, stores it, and hands it out.
+ * The game side (felts, live-table socket) asks for it and never stores its
+ * own copy. Two stores would drift, and the one that drifted would fail at a
+ * table mid-hand.
+ *
+ * WHY SECURE STORE AND NOT AsyncStorage
+ *
+ * This token authorises money: buy-ins, withdrawals, admin actions. AsyncStorage
+ * is plain files in the app sandbox — readable on a rooted or jailbroken device
+ * and swept up by device backups. SecureStore is the Keychain on iOS and
+ * EncryptedSharedPreferences on Android.
+ *
+ * That does NOT make a compromised device safe, which is exactly why the spec
+ * requires root/jailbreak detection before real money. Storage is one layer;
+ * refusing to run on a compromised device is the other.
+ */
+
+const TOKEN_KEY = 'mypoker.session.token';
+
+/**
+ * A cached copy, because the socket asks for the token on every reconnect and
+ * SecureStore is a native round-trip. `undefined` means "not read yet"; `null`
+ * means "read, and there is none" — a distinction that matters, or a cold start
+ * looks identical to a signed-out user and we would clear a session that exists.
+ */
+let cached: string | null | undefined;
+
+export async function getToken(): Promise<string | null> {
+  if (cached !== undefined) return cached;
+  try {
+    cached = (await SecureStore.getItemAsync(TOKEN_KEY)) ?? null;
+  } catch {
+    // A keychain read can fail on a locked device. Treat it as "no token" for
+    // this attempt but do NOT cache the failure as an answer — the next call
+    // should try again rather than inherit a wrong null for the whole session.
+    return null;
+  }
+  return cached;
+}
+
+export async function setToken(token: string): Promise<void> {
+  cached = token;
+  await SecureStore.setItemAsync(TOKEN_KEY, token, {
+    // Only after the device has been unlocked once since boot: background work
+    // must not be able to read it while the phone is locked in a pocket.
+    keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+  });
+}
+
+export async function clearToken(): Promise<void> {
+  cached = null;
+  await SecureStore.deleteItemAsync(TOKEN_KEY).catch(() => {
+    // Already gone, or the keychain is unavailable. The in-memory clear above
+    // is what stops this process using it; a failed delete is not worth
+    // throwing at a user who is signing out.
+  });
+}
+
+/** True when a token exists. Says nothing about whether the SERVER still accepts it. */
+export async function hasSession(): Promise<boolean> {
+  return (await getToken()) !== null;
+}

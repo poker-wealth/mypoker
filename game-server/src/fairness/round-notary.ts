@@ -23,6 +23,8 @@ export interface NotarizeInput {
   /** The full shuffled deck derived from finalSeed — exactly what the verifier re-checks (step 4). */
   cards: string[];
   timestamp: number;
+  /** The committed rule version in force for this hand (queue #12). */
+  ruleVersion?: string;
 }
 
 export interface RoundNotary {
@@ -68,6 +70,7 @@ export class MerkleRoundNotary implements RoundNotary {
       cards: input.cards,
       timestamp: input.timestamp,
       roundHash,
+      ...(input.ruleVersion ? { ruleVersion: input.ruleVersion } : {}),
     });
     await this.aggregator.addRound(input.roundId, roundHash);
   }

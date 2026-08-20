@@ -115,8 +115,11 @@ export function PokerTable({ snapshot, onSit, accent = '#f5c451' }: PokerTablePr
 const styles = StyleSheet.create({
   stage: { alignSelf: 'center', marginVertical: 8 },
   rail: {
-    ...StyleSheet.absoluteFillObject,
-    margin: 8,
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    right: 8,
+    bottom: 8,
     borderRadius: 999,
     backgroundColor: '#14100d',
     padding: 10,

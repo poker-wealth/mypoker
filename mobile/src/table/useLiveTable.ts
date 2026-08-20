@@ -1,15 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
-import { TableSocket, type SocketStatus } from '../api/tableSocket';
-import { TABLES_WS_URL } from '../config';
+import { TableSocket, type SocketStatus } from './tableSocket';
+import { API_URL } from '../api';
 import type { TableCommand, TableSnapshot } from '../lib/liveTable';
 
 /**
  * A live table, as one hook.
  *
- * Mirrors `frontend/src/hooks/useLiveTable.ts`: open the socket, hold the latest snapshot, expose a
- * way to send commands. Everything on screen is the server's answer — this never computes a stack,
- * a pot or a legal move of its own.
+ * Mirrors `frontend/src/hooks/useLiveTable.ts`: open the socket, hold the latest snapshot, send
+ * commands. Everything on screen is the server's answer — this never computes a stack, a pot or a
+ * legal move of its own.
+ *
+ * The socket URL is the gateway's, with the scheme swapped and `/ws` appended, exactly as the web
+ * client derives it. One API URL, not a second one to keep in step.
  */
+
+export const socketUrl = (): string => `${API_URL.replace(/^http/, 'ws')}/ws`;
+
 export interface LiveTable {
   snapshot: TableSnapshot | null;
   status: SocketStatus;
@@ -29,7 +35,7 @@ export function useLiveTable(tableId: string, token: string | null): LiveTable {
       return;
     }
 
-    const socket = new TableSocket(TABLES_WS_URL, token, tableId, {
+    const socket = new TableSocket(socketUrl(), token, tableId, {
       onSnapshot: (next) => {
         setSnapshot(next);
         setError(null);
@@ -46,10 +52,5 @@ export function useLiveTable(tableId: string, token: string | null): LiveTable {
     };
   }, [tableId, token]);
 
-  return {
-    snapshot,
-    status,
-    error,
-    command: (cmd) => socketRef.current?.send(cmd),
-  };
+  return { snapshot, status, error, command: (cmd) => socketRef.current?.send(cmd) };
 }

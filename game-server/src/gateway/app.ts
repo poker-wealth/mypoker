@@ -10,6 +10,8 @@ import { buildAdminRouter } from './admin-routes';
 import { buildMeRouter } from './me-routes';
 import { createRedEnvelopeRouter } from './red-envelope-routes';
 import { buildInternalRouter } from './internal-routes';
+import { currentRuleManifest, ruleVersionFor } from '../fairness/rule-version';
+import { ruleCommitment } from '../fairness/rule-commitment';
 import { mountLiveTables } from '../live/mount';
 import { buildLeagueTableRouter } from './league-table-routes';
 import { defaultTables } from '../live/server';
@@ -44,11 +46,91 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
   // token — this is financial-core asking, not a browser.
   app.use('/internal', buildInternalRouter(config));
   // Public payout rates — open by design; the numbers exist to be checked.
+  //
+  // The rates come from financial-core (it owns the volume rows); the RULE
+  // VERSION those rates were earned under comes from here, because the rules
+  // are game-server's. Joining them is the whole feature: a rate without the
+  // committed rules behind it is a number the platform asserts about itself
+  // (queue #12), which is what this endpoint exists NOT to be.
   app.get('/fairness/rtp', (_req, res) => {
-    void fetch(`${config.financialCoreUrl}/api/v1/fairness/rtp`)
-      .then(async (r) => res.status(r.status).json(await r.json()))
-      .catch(() => res.status(502).json({ error: 'financial service unavailable' }));
+    void (async (): Promise<void> => {
+      let rates: unknown;
+      try {
+        const r = await fetch(`${config.financialCoreUrl}/api/v1/fairness/rtp`);
+        if (!r.ok) {
+          res.status(r.status).json({ error: 'financial service unavailable' });
+          return;
+        }
+        rates = await r.json();
+      } catch {
+        res.status(502).json({ error: 'financial service unavailable' });
+        return;
+      }
+
+      // The stamp is best-effort ON TOP of the rates: if the commitment cannot
+      // be read, publish the rates with `rules: null` rather than 502 the whole
+      // feed. An absent stamp is honest; a missing feed helps nobody.
+      const manifest = currentRuleManifest();
+      let commitment: Awaited<ReturnType<typeof ruleCommitment>> = null;
+      try {
+        commitment = await ruleCommitment(manifest.version);
+      } catch (err) {
+        console.error('[rtp] rule commitment unreadable:', err);
+      }
+
+      res.json({
+        ...(rates as Record<string, unknown>),
+        rules: {
+          version: manifest.version,
+          manifestRevision: manifest.manifestRevision,
+          // Each game carries ITS OWN version — the hash a default table of
+          // that game stamps on its rounds. This is the join the audit found
+          // missing: the manifest version alone could never equal any round's
+          // stamp, so the published stamp was uncheckable. Now: round says Y →
+          // find the game entry with version Y (or fetch /fairness/rules/Y for
+          // a custom table) → re-hash the entry → Y. Anchored via the same
+          // commitment store.
+          games: manifest.games.map((g) => ({ ...g, version: ruleVersionFor(g) })),
+          // Null txId = the rules are published but not yet anchored on-chain.
+          // The UI must say which, and never imply the stronger claim.
+          chainTx: commitment?.txId ?? null,
+          committedAt: commitment?.committedAt ?? null,
+        },
+      });
+    })();
   });
+  // The preimage behind one rule version — what a round's stamp actually
+  // hashes. Public for the same reason the rates are: the number exists to be
+  // checked. 404 for an unknown version is honest (nothing was committed under
+  // that hash), and the response carries the chain tx so the ordering claim —
+  // rules anchored BEFORE the hands that cite them — is independently checkable.
+  app.get('/fairness/rules/:version', (req: Request, res: Response) => {
+    void (async (): Promise<void> => {
+      const version = String(req.params.version ?? '');
+      if (!/^[0-9a-f]{64}$/.test(version)) {
+        res.status(400).json({ error: 'a rule version is a 64-char hex digest' });
+        return;
+      }
+      try {
+        const commitment = await ruleCommitment(version);
+        if (!commitment) {
+          res.status(404).json({ error: 'unknown rule version' });
+          return;
+        }
+        res.json({
+          version: commitment._id,
+          manifestRevision: commitment.manifestRevision,
+          manifest: commitment.manifest,
+          chainTx: commitment.txId,
+          committedAt: commitment.committedAt,
+        });
+      } catch (err) {
+        console.error('[rules] commitment lookup failed:', err);
+        res.status(503).json({ error: 'rule store unavailable' });
+      }
+    })();
+  });
+
   // Optional so auth-only deployments (and the auth tests) don't have to stand
   // up a lobby they never read.
   // Config passed so the lobby can resolve a league context; without it the

@@ -12,7 +12,7 @@ import { BuyInSheet } from '@/components/poker/BuyInSheet';
 import { TableDesignSheet } from '@/components/poker/TableDesignSheet';
 import { Button } from '@/components/ui/Button';
 import { GAMES } from '@/lib/games';
-import { LIVE_TABLE_IDS } from '@/config';
+import { isOpenableTableId } from '@/config';
 import { useDemoHand } from '@/hooks/useDemoHand';
 import { useLiveTable } from '@/hooks/useLiveTable';
 import { ChatBox } from '@/components/poker/ChatBox';
@@ -37,7 +37,7 @@ import { feltFor } from '@/components/games/registry';
 export function Table() {
   const [params] = useSearchParams();
   const { id } = useParams();
-  const tableId = id && LIVE_TABLE_IDS.has(id) ? id : null;
+  const tableId = isOpenableTableId(id) ? id : null;
 
   if (!tableId) return <NoTableYet gameId={id} />;
   return params.get('demo') === '1' ? <DemoTable /> : <LiveTable tableId={tableId} />;
