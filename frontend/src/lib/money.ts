@@ -25,11 +25,18 @@ export const SYMBOL = '₮';
  * Two decimals by default because that is what a currency looks like; a balance
  * that renders ₮12.5 reads like a typo next to ₮12.50.
  */
-export function money(micros: number, options: { decimals?: number; sign?: boolean } = {}): string {
-  const { decimals = 2, sign = false } = options;
+export function money(
+  micros: number,
+  options: { decimals?: number; sign?: boolean; symbol?: boolean } = {},
+): string {
+  // `symbol: false` for strings whose TRANSLATION already carries the currency
+  // mark. Every locale places it differently ("₮{{amount}} to V2" in English,
+  // "{{tier}} まで ₮{{amount}}" in Japanese), so the template owns the symbol and the
+  // formatter must not add a second one.
+  const { decimals = 2, sign = false, symbol = true } = options;
   const value = micros / 1_000_000;
   const prefix = sign && value > 0 ? '+' : '';
-  return `${prefix}${SYMBOL}${value.toLocaleString(undefined, {
+  return `${prefix}${symbol ? SYMBOL : ''}${value.toLocaleString(undefined, {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   })}`;
