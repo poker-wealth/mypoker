@@ -1,9 +1,12 @@
 import { NavigationContainer, type Theme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import { StyleSheet, Text, View } from 'react-native';
 import { WalletScreen } from './src/screens/WalletScreen';
+import { TableScreen } from './src/screens/TableScreen';
+import type { RootStackParamList } from './src/navigation';
 import { API_URL } from './src/api';
 import { space, theme } from './src/theme';
 
@@ -31,6 +34,7 @@ const queryClient = new QueryClient({
 });
 
 const Tabs = createBottomTabNavigator();
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const navTheme: Theme = {
   dark: true,
@@ -68,28 +72,43 @@ function NotPortedYet({ name }: { name: string }) {
   );
 }
 
+function TabsScreen() {
+  return (
+    <Tabs.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: theme.bg },
+        headerTitleStyle: { color: theme.text },
+        tabBarStyle: { backgroundColor: theme.surface, borderTopColor: theme.border },
+        tabBarActiveTintColor: theme.brand,
+        tabBarInactiveTintColor: theme.dim,
+      }}
+    >
+      <Tabs.Screen name="Wallet" component={WalletScreen} />
+      <Tabs.Screen name="Tables">{() => <NotPortedYet name="Tables" />}</Tabs.Screen>
+      <Tabs.Screen name="Account">{() => <NotPortedYet name="Account" />}</Tabs.Screen>
+    </Tabs.Navigator>
+  );
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <NavigationContainer theme={navTheme}>
         <StatusBar style="light" />
-        <Tabs.Navigator
+        {/* A stack over the tabs, so a table opens WITH a tableId rather than
+            being a tab that has to guess which table you meant. That param is
+            half the seam with the game side; see src/navigation.ts. */}
+        <Stack.Navigator
           screenOptions={{
             headerStyle: { backgroundColor: theme.bg },
             headerTitleStyle: { color: theme.text },
-            tabBarStyle: { backgroundColor: theme.surface, borderTopColor: theme.border },
-            tabBarActiveTintColor: theme.brand,
-            tabBarInactiveTintColor: theme.dim,
+            headerTintColor: theme.text,
+            contentStyle: { backgroundColor: theme.bg },
           }}
         >
-          <Tabs.Screen name="Wallet" component={WalletScreen} />
-          <Tabs.Screen name="Tables">
-            {() => <NotPortedYet name="Tables" />}
-          </Tabs.Screen>
-          <Tabs.Screen name="Account">
-            {() => <NotPortedYet name="Account" />}
-          </Tabs.Screen>
-        </Tabs.Navigator>
+          <Stack.Screen name="Tabs" component={TabsScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="Table" component={TableScreen} />
+        </Stack.Navigator>
 
         {/* Which gateway this build points at. Invisible in production, and the
             first question worth answering when a device "cannot load anything" —
