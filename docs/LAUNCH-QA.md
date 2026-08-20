@@ -6,6 +6,8 @@ checkable and records what is already known about each.
 
 **Source:** `docs_extracted/FairPlay_12Week_Milestone_EN.txt`, Week 12
 ("Full QA + Security Audit + Launch Prep"), plus the sections cited per item.
+`docs_extracted/` is generated, not committed — if it is missing, run
+`python extract_docx.py` against the `.docx` files in the repo root first.
 
 > *"Every acceptance criterion from Weeks 1–11 must be green before W12 QA
 > begins. If any is red: fix it, not defer it."* — W12 objective
@@ -18,10 +20,30 @@ Each item is either:
 - **`[ ] MANUAL`** — needs a person, an environment, or a third party.
 - **`[x] VERIFIED`** — checked during development, with what was checked.
 - **`[!] OPEN`** — known not to pass today. These are the launch blockers.
+- **`[ ] DECISION`** — behaviour is implemented and safe but stricter or looser
+  than the spec's words; someone must choose it deliberately.
 
 A box is only ticked by someone who ran the check and saw the result. An
 inherited tick is worth nothing — the whole point of this document is that
 somebody looked.
+
+## Where it stands (18 Aug 2026)
+
+| Gate | State |
+|---|---|
+| 1 · Ledger integrity | **automated** — checker built and verified against a settled hand + injected corruption; the 100-hand run on a live-like environment is still to do |
+| 2 · Security | app-level controls verified; **MongoDB RBAC and the pen test are outstanding** |
+| 3 · Latency | **not measured at all** — the largest untouched gate |
+| 4 · Chaos | not started |
+| 5 · Platforms | not started; the native app is in progress |
+| 6 · Chain | rounds now notarize and commit; **contracts still on devnet** |
+| 7 · Wallets | owner-side, not started |
+| 8 · Go/No-Go | blocked on the above |
+
+The honest summary: **what the application can enforce, it enforces and is
+tested.** What remains is mostly not application code — load measurement, chaos
+drills, cluster RBAC, a third-party pen test, mainnet migration, wallet funding
+and store submissions. Those need an environment and people, not another commit.
 
 ---
 
@@ -30,18 +52,39 @@ somebody looked.
 > *"100-hand check → sum of all Ledger entries per account = current account
 > balance. Zero discrepancy."*
 
-- [ ] **MANUAL** — 100-hand spot check against a live-like environment. Every
-      hand: ledger entries exist for jackpot inject, rake, payout, and agent
-      commission where applicable.
-- [ ] **MANUAL** — For every account: `Σ(ledger entries) === current balance`.
-      Zero discrepancy allowed. **Any gap blocks launch until root-caused.**
+- [ ] **AUTOMATED** — run the integrity check against the environment:
+
+      ```bash
+      cd financial-core
+      MONGO_URI=<uri> MONGO_TLS=false npx ts-node scripts/ledger-integrity.ts
+      ```
+
+      (`MONGO_TLS=false` for a local mongod; drop it for Atlas.) Exits 0 on zero
+      discrepancy, 1 on any, 2 if it could not run — a runbook or CI job can
+      gate on it. Four invariants:
+      **per-account** (`Σ credits − Σ debits` equals the three balances summed),
+      **paired double-entry** (a transfer's idempotency key is a balanced pair),
+      **pot conservation** (table settlements write single legs against a
+      virtual `pot:<roundId>` — the pot must empty exactly: losses = wins +
+      rake + jackpot), and **system-wide zero** (EXTERNAL is the only mint).
+      Orphaned ledger rows naming a nonexistent account are reported too.
+      Amounts go through integer micro-units, never a float, and anything the
+      parser does not recognise (exponent notation, sub-micro precision) is
+      itself reported rather than guessed at.
+      An earlier version held settlement legs to the pair rule — it failed any
+      healthy system that had settled one poker hand. A gate that fails healthy
+      systems trains people to ignore it; that failure mode is now covered below.
+- [ ] **MANUAL** — 100 hands played, then the check above run against that
+      environment. Confirm ledger entries exist for jackpot inject, rake,
+      payout, and agent commission where applicable. **Any gap blocks launch
+      until root-caused.**
 - [x] **VERIFIED (unit)** — settlement conserves money across 13 pinned
       scenarios including rounding boundaries:
       `cd game-server && npx jest test/games/settlement-regression`
       Σ(losers) = Σ(winners) + rake + Σ(jackpot), asserted per case.
-- [x] **VERIFIED (unit)** — a replayed deposit writes no second ledger pair;
-      an overdrawn jackpot pool cannot pay:
-      `cd financial-core && npx jest test/settlement`
+- [x] **VERIFIED (unit)** — a replayed deposit writes no second ledger pair
+      (`test/deposit`); an overdrawn jackpot pool cannot pay (`test/settlement`):
+      `cd financial-core && npx jest test/deposit test/settlement`
 
 ## Gate 2 — Security
 
@@ -64,9 +107,10 @@ somebody looked.
       disconnect + 30-minute fingerprint ban, NoSQL injection on every public
       endpoint.
 - [x] **VERIFIED** — the admin API answers 404 (not 403) to non-ops, so it does
-      not confirm its own existence to a stolen player token. Covered on the
-      **`feat/admin-ui--samuel`** branch, which is not merged — the tests do not
-      exist on `main`, so re-run this gate after that PR lands.
+      not confirm its own existence to a stolen player token. **Now on `main`**
+      (PR #17): `cd game-server && npx jest test/gateway/admin-routes`.
+      Re-confirmed against a live stack: no token → 401, player token → 404,
+      forged signature → 401, ops token → 200.
 
 ## Gate 3 — Latency
 
@@ -108,14 +152,14 @@ Isolated environment, synthetic data — **never production data** (W12, Day 58)
 > *"Solana contracts: migrated from devnet to mainnet. commitRound live on
 > mainnet."*
 
-- [!] **OPEN** — the Merkle aggregator is **called by no production code**, so
-      real rounds are verifiable locally (step 6a) and anchored nowhere (6b).
-      `MerkleAggregator` exists and is unit-tested; nothing feeds it. Also
-      missing: the spec's 30-second flush ("every 100 rounds **or 30s**"), so a
-      quiet table would never commit a batch. **Unowned** — appears in no P3
-      queue item, and `docs/handoff/05-where-we-stopped.md` marks
-      "Provably-fair v6.0 (commit-reveal + Merkle)" ✅, which covers the
-      components rather than a working path.
+- [x] **VERIFIED** — real rounds now reach the chain. `MerkleRoundNotary`
+      persists every settled round and queues its hash into `MerkleAggregator`,
+      the gateway mounts live tables with `notarize: true`, and the spec's
+      30-second flush is configured (`flushIntervalMs: 30_000`) so a quiet table
+      still commits a partial batch. This was the V1 audit's "aggregator is
+      called by no production code" finding; it is closed.
+      Still worth a live check before launch: play a hand, then confirm its
+      round doc carries a `merkleRoot` and a non-null `chainTx`.
 - [!] **OPEN** — contracts are on devnet, not mainnet. `SolanaChainClient`
       exists and is tested; L2 (Polygon) and L3 (RFC 3161) are unconfigured
       declining layers, so a Solana outage degrades to a local timestamp.
@@ -158,6 +202,23 @@ that is not currently true.
       refresh, the 60s trust window, and the degrade-to-no-offer behaviour have
       **no test at all**. Worth one before insurance handles real money: the
       failure it would catch is silent, and it quotes against stale numbers.
+- [x] **VERIFIED** — a player can actually withdraw. §3.6 requires a
+      pre-registered address; financial-core enforced it while nothing could
+      **set** one, so every withdrawal returned `403 no withdrawal address is
+      set`. The gateway now proxies it and the wallet has the UI.
+- [x] **VERIFIED** — the **>₮10,000 two-person rule** genuinely holds, attacked
+      rather than read: ₮10,000.00 releases on one approval and ₮10,000.01 does
+      not (strictly `>`, per spec); the same approver signing three times stays
+      at 1 of 2; only a second distinct token releases it; and re-posting with
+      `{"approverId":"ops-bob"}` in the body is ignored because the gateway
+      takes the signer from the verified token. Reject releases the clearing
+      hold exactly, with the total conserved.
+- [ ] **DECISION** — the 48h withdrawal-address cooldown fires on a
+      **first** registration, not only a change. The spec says "address
+      **modification**: 48h cooldown", so this is stricter than written: every
+      new player's first withdrawal waits 48 hours. Defensible as security (an
+      account takeover cannot set an address and drain immediately), but it is a
+      product decision that should be made deliberately, not inherited.
 - [!] **Rotate the credentials that passed through chat**: the Atlas password,
       the Telegram bot token, and the `wang@mypoker777.com` mailbox password.
 - [ ] **SPF, DKIM and DMARC** for `mypoker777.com`. A new domain sending
@@ -167,8 +228,17 @@ that is not currently true.
 
 ## Claims the product makes
 
-- [!] **"Fair. On-Chain. Always."** holds for a hand pasted into the verifier,
-      not for a hand actually played — see Gate 6.
+- [x] **VERIFIED** — **"Fair. On-Chain. Always."** now holds for a hand actually
+      played, not only one pasted into the verifier: live tables notarize every
+      settled round and the aggregator commits batch roots on-chain (Gate 6).
+      The published payout rates are anchored too — the rules that produced them
+      are hashed and committed on-chain per version, and every round records the
+      version it ran under (`game-server/src/fairness/rule-version.ts` — on the
+      rule-version-stamp branch; this claim holds once that PR merges).
+      Remaining honesty caveat: a round's own leaf hash does not commit to the
+      rule version — the version is stored beside the round, because folding it
+      into `computeRoundHash` would stop every already-notarized round from
+      verifying. Closing that is a v6.0 verifier-contract change.
 - [ ] **V3's "Pro Tracker HUD (VPIP, PFR)"** is marked *coming soon* rather than
       dropped, because those figures are not derivable from the ledger. Either
       build the data or remove the promise before a V3 player pays for it.
@@ -206,18 +276,40 @@ that is not currently true.
 ## Running the automated checks
 
 ```bash
-# Everything, all three packages
+# financial-core + game-server (root verify does NOT touch the frontend)
 npm run verify                                   # typecheck + lint + tests
+# the frontend, separately
+cd frontend && npx tsc -b && npx eslint src && npx vite build
 
 # The money paths specifically
 cd financial-core && npx jest test/settlement test/wallet test/league
 cd game-server    && npx jest test/games/settlement-regression
 
+# Gate 1, against a real database (exit 1 = discrepancy)
+cd financial-core && MONGO_URI=<uri> npx ts-node scripts/ledger-integrity.ts
+
+# The fairness stamp (rule-version-stamp branch; on main these suites do not
+# exist yet): rules hash deterministically, round hash stays byte-identical
+cd game-server    && npx jest test/fairness/rule-version test/fairness/rule-stamp
+
 # The guards
 cd game-server    && npx jest test/gateway test/lobby/league-isolation
 ```
 
-**Known:** 4 tests fail in `financial-core/test/http/app.test.ts` on `main`
-(stale `'TXaddr'` fixtures and a settlement 409). Two are fixed by the profile
-branch. Fix them before using this checklist, or a real regression will hide
-among them.
+**Baseline (verified 18 Aug 2026, on `main`):** financial-core **345/345**,
+game-server **853/853** across 103 suites. Both packages typecheck clean; the
+frontend typechecks and builds.
+
+The four `app.test.ts` failures this section used to warn about are **fixed** —
+they were placeholder `'TXaddr'` addresses the real TRON validator rejected
+before the flow under test ran.
+
+Two things a runner should still expect, so neither is mistaken for a regression:
+
+- **16 eslint `any` errors** in `frontend/src/components/games/` — pre-existing,
+  not introduced by any checklist work.
+- Run financial-core with **`-w 1`** if suites fail in bulk. The in-memory Mongo
+  instances contend on a loaded machine, and a contended run fails whole suites
+  at setup, which looks alarming and means nothing. A crashed run also leaves
+  `mongo-mem-*` directories in the temp dir; a later start can fail with
+  `fassert()` until they are cleared.

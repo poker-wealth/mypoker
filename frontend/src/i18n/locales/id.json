@@ -340,12 +340,16 @@
     "provableBlurb": "Aturan milik kami, dan setiap ronde dapat diverifikasi",
     "vendorAttested": "Disahkan vendor",
     "vendorBlurb": "Pemasok luar memiliki aturannya; setiap hasil ditandatangani, tetapi tabel pembayaran mereka tidak dapat dibuktikan tidak berubah",
-    "ratesPending": "Tingkat pembayaran yang dipublikasikan belum ditampilkan. Sebuah tingkat baru bermakna setelah aturan di baliknya dikomit on-chain dan diberi versi — sebelum itu ia hanyalah angka yang kami klaim tentang diri sendiri, hal yang justru ingin dihindari halaman ini.",
     "actualRate": "Pengembalian aktual {{rate}}% dari {{count}} ronde",
     "theoreticalRate": "dinyatakan {{rate}}%",
     "ownSeedUnchecked": "Data ronde ini tidak memuat seed Anda, jadi langkah ini hanya memeriksa konsistensi daftar seed — bukan apakah seed Anda ada di dalamnya pada kursi Anda.",
     "notAnchored": "Root batch ini belum ditautkan ke chain. 6a (bukti) diverifikasi lokal; 6b (catatan permanen) dapat diperiksa setelah notarisasi berjalan.",
-    "viewOnChain": "Periksa root di Solana Explorer (6b)"
+    "viewOnChain": "Periksa root di Solana Explorer (6b)",
+    "rulesAnchored": "On-chain",
+    "rulesPublished": "Dipublikasikan",
+    "rulesAnchoredBlurb": "Rasio ini dihasilkan di bawah versi aturan yang dikomit on-chain pada {{when}}. Komitmen itu mendahului setiap tangan yang merujuknya, sehingga aturan tidak bisa diubah setelahnya.",
+    "rulesPublishedBlurb": "Versi aturan sudah tetap dan setiap tangan mencatatnya, tetapi komitmen on-chain belum selesai. Sementara itu, Anda dapat memverifikasi tangan langkah demi langkah.",
+    "rulesAbsent": "Versi aturan di balik rasio ini sedang tidak tersedia, jadi tidak ada klaim yang dibuat."
   },
   "reputation": {
     "title": "Reputasi",

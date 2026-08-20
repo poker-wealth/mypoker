@@ -340,12 +340,16 @@
     "provableBlurb": "Chúng tôi sở hữu luật chơi và mọi ván đều xác minh được",
     "vendorAttested": "Nhà cung cấp xác nhận",
     "vendorBlurb": "Nhà cung cấp bên ngoài sở hữu luật chơi; mỗi kết quả đều được ký, nhưng không thể chứng minh bảng trả thưởng không bị đổi",
-    "ratesPending": "Tỷ lệ chi trả công bố chưa được hiển thị. Một tỷ lệ chỉ có ý nghĩa khi luật chơi đằng sau nó được cam kết on-chain và đánh phiên bản — trước đó nó chỉ là con số chúng tôi tự khẳng định, đúng điều mà trang này tồn tại để tránh.",
     "actualRate": "Tỷ lệ trả thực tế {{rate}}% ({{count}} ván)",
     "theoreticalRate": "công bố {{rate}}%",
     "ownSeedUnchecked": "Dữ liệu ván này không chứa seed của bạn, nên bước này chỉ kiểm tra tính nhất quán của danh sách seed, chưa xác minh seed của bạn có trong đó tại đúng vị trí ngồi hay không.",
     "notAnchored": "Root của lô này chưa được ghi lên chuỗi. 6a (bằng chứng) đã xác minh cục bộ; 6b (bản ghi vĩnh viễn) sẽ kiểm tra được sau khi công chứng.",
-    "viewOnChain": "Kiểm tra root trên Solana Explorer (6b)"
+    "viewOnChain": "Kiểm tra root trên Solana Explorer (6b)",
+    "rulesAnchored": "Trên chuỗi",
+    "rulesPublished": "Đã công bố",
+    "rulesAnchoredBlurb": "Các tỷ lệ này được ghi nhận theo phiên bản luật đã cam kết trên chuỗi vào {{when}}. Cam kết có trước mọi ván bài tham chiếu đến nó, nên luật không thể bị thay đổi sau đó.",
+    "rulesPublishedBlurb": "Phiên bản luật đã cố định và mỗi ván bài đều ghi lại nó, nhưng cam kết trên chuỗi chưa hoàn tất. Trong lúc đó, bạn có thể xác minh từng ván bài theo từng bước.",
+    "rulesAbsent": "Hiện không thể lấy phiên bản luật đứng sau các tỷ lệ này, nên không đưa ra bất kỳ khẳng định nào."
   },
   "reputation": {
     "title": "Uy tín",
