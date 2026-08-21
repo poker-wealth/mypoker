@@ -4,12 +4,10 @@ import type { TableScreenProps } from '../navigation';
 import { getToken } from '../session';
 import { space, theme } from '../theme';
 import { useLiveTable } from '../table/useLiveTable';
-import { PokerTable } from '../components/poker/PokerTable';
 import { ActionBar } from '../components/poker/ActionBar';
 import { feltFor } from '../components/games/registry';
 import { BuyInSheet } from '../components/poker/BuyInSheet';
 import { JackpotBurst } from '../components/poker/JackpotBurst';
-import type { TableCommand, TableSnapshot } from '../lib/liveTable';
 
 /**
  * TableScreen — the seam, now joined.
@@ -130,20 +128,6 @@ export function TableScreen({ route }: TableScreenProps) {
       ) : null}
     </View>
   );
-}
-
-/** The poker family shares one felt; this is it. */
-export function HoldemFelt({
-  snapshot,
-  onSit,
-}: {
-  snapshot: TableSnapshot;
-  onCommand: (cmd: TableCommand) => void;
-  onSit?: (seatIndex: number) => void;
-}) {
-  const seated = snapshot.seats.some((s) => s.isYou);
-  // Sitting goes through the buy-in sheet, so the amount is chosen rather than assumed.
-  return <PokerTable snapshot={snapshot} {...(seated || !onSit ? {} : { onSit })} />;
 }
 
 const styles = StyleSheet.create({

@@ -1,5 +1,5 @@
 import type { TableCommand, TableSnapshot } from '../../lib/liveTable';
-import { HoldemFelt } from '../../screens/TableScreen';
+import { HoldemFelt } from './HoldemFelt';
 import { NiuNiuFelt } from './NiuNiuFelt';
 import { BaccaratFelt } from './BaccaratFelt';
 import { SideBetFelt } from './SideBetFelt';
