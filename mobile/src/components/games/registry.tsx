@@ -3,6 +3,11 @@ import { HoldemFelt } from './HoldemFelt';
 import { NiuNiuFelt } from './NiuNiuFelt';
 import { BaccaratFelt } from './BaccaratFelt';
 import { SideBetFelt } from './SideBetFelt';
+import { RedPacketFelt } from './RedPacketFelt';
+import { DouDiZhuFelt } from './DouDiZhuFelt';
+import { LotteryFelt } from './LotteryFelt';
+import { SlotsFelt } from './SlotsFelt';
+import { TexasCowboyFelt } from './TexasCowboyFelt';
 import { theme } from '../../theme';
 
 /**
@@ -67,7 +72,10 @@ function SanZhangFelt({ snapshot, onCommand }: Parameters<FeltComponent>[0]) {
   );
 }
 
-/** Every table id that has a felt. Keep `PORTED_TABLES` in config.ts in step with this. */
+/**
+ * Every table id that has a felt. This map is the single list — `scripts/check-felts.mjs` reads it
+ * and fails the build if an id disappears.
+ */
 export const GAME_FELTS: Record<string, FeltComponent> = {
   texas: HoldemFelt,
   'texas-high': HoldemFelt,
@@ -77,9 +85,19 @@ export const GAME_FELTS: Record<string, FeltComponent> = {
   baccarat: BaccaratFelt,
   'cowboy-beauty': CowboyBeautyFelt,
   'san-zhang': SanZhangFelt,
+  'red-packet': RedPacketFelt,
+  'dou-di-zhu': DouDiZhuFelt,
+  lottery: LotteryFelt,
+  slots: SlotsFelt,
+  'texas-cowboy': TexasCowboyFelt,
 };
 
-/** The felt for a table id, or undefined when it has none yet. */
+/**
+ * The felt for a table id, or undefined when it has none yet.
+ *
+ * A practice table (`<game>-ai`) is the same game, so it gets the same felt — the web registry does
+ * the same, and without it every practice table would report having no felt at all.
+ */
 export function feltFor(tableId: string): FeltComponent | undefined {
-  return GAME_FELTS[tableId];
+  return GAME_FELTS[tableId] ?? GAME_FELTS[tableId.replace(/-ai$/, '')];
 }

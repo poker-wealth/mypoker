@@ -13,6 +13,7 @@ import { DataScreen } from './src/screens/DataScreen';
 import { VipScreen } from './src/screens/VipScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import { FeltGalleryScreen } from './src/screens/FeltGalleryScreen';
 import type { RootStackParamList } from './src/navigation';
 import { API_URL } from './src/api';
 import { space, theme } from './src/theme';
@@ -96,7 +97,13 @@ function TabsScreen() {
       }}
     >
       <Tabs.Screen name="Wallet" component={WalletScreen} />
-      <Tabs.Screen name="Tables">{() => <NotPortedYet name="Tables" />}</Tabs.Screen>
+      {/* The lobby is the shell's and is not built yet, so nothing navigates to the Table route and
+          no felt can be reached. In a dev build this tab shows the felt gallery instead, purely so
+          the game side can be looked at; a release build keeps the honest placeholder. Delete this
+          branch when the real lobby lands — see src/screens/FeltGalleryScreen.tsx. */}
+      <Tabs.Screen name="Tables">
+        {() => (__DEV__ ? <FeltGalleryScreen /> : <NotPortedYet name="Tables" />)}
+      </Tabs.Screen>
       <Tabs.Screen name="Alliance" component={AllianceScreen} options={{ title: t('nav.alliance') }} />
       <Tabs.Screen name="Data" component={DataScreen} options={{ title: t('nav.data') }} />
       <Tabs.Screen name="Account" component={ProfileScreen} options={{ title: t('nav.account') }} />
