@@ -117,10 +117,48 @@ and store submissions. Those need an environment and people, not another commit.
 > *"P99 (100 concurrent players, 50 tables): card deal <200ms, action <50ms,
 > insurance <30ms, post-Jackpot gap <200ms. ALL four pass."*
 
-- [ ] **MANUAL** — all four measured under production-shaped load and
-      documented. **Not yet measured at all.** A P99 failure blocks launch;
-      it cannot be waived.
+An earlier revision of this file said "not measured at all". That was wrong,
+and it understated what exists. The engine budgets **are** measured and pinned;
+what is missing is the *load* and the *transport*. Precisely:
+
+- [x] **AUTOMATED** — deal and action P99, in-memory, no I/O:
+      `cd game-server && npm test -- test/perf/game-latency.test.ts`.
+      Passing. Its real value is regression protection — if a change puts a DB
+      read or a chain call on the deal or action path, this fails loudly
+      instead of the table quietly getting slow.
+- [ ] **insurance P99 <30ms — NOT verified.** That test asserts the **median**,
+      deliberately: on a shared dev machine the p99 is dominated by unrelated
+      process scheduling (40–80ms run-to-run for the same code). The reasoning
+      is sound and documented in the test, but it means the spec's p99 budget
+      is still owed a run on dedicated hardware.
+- [ ] **post-Jackpot gap <200ms — not measured, and structurally at risk.**
+      No test covers it, and the code path suggests it is the metric most
+      likely to fail. In `poker-room.ts` the room's `settleTableHand` awaits
+      `evaluateJackpots()`, which on a hit awaits `fc.jackpotPayout()` — a
+      financial-core round-trip and ledger write — *before* the win is
+      announced and therefore inside the gap the 200ms budget measures.
+
+      That ordering is deliberate and correct: announcing first would show an
+      animation for a win the ledger might refuse (see the comment at
+      `poker-room.ts:1037`). But the spec's own design (12-week plan, "Jackpot
+      animation parallel optimization") assumes the opposite shape — the
+      animation starts, and the next hand is prepared *during* its 3–10s
+      window, so the gap is near zero. Nothing implements that overlap.
+
+      So the budget currently applies to a synchronous ledger round-trip.
+      **Measure before redesigning** — if the round-trip is comfortably inside
+      200ms this is a non-issue; if it is not, the fix is a money-correctness
+      trade (show an unconfirmed win, or hold the table) and is Victor's call,
+      not a client-side tweak.
 - [ ] **MANUAL** — 100 concurrent WebSocket connections, 50 active tables.
+      Nothing measures the system *through the transport under concurrency*,
+      which is what the gate actually asks for. The in-memory numbers say the
+      algorithms are fast; they say nothing about 100 sockets contending.
+
+**A P99 failure blocks launch and cannot be waived**, so the two unmeasured
+items above are real launch risk, not paperwork. The load harness needs an
+environment that is not a developer laptop: numbers taken here would be
+dominated by local resource contention and would not transfer.
 
 ## Gate 4 — Chaos
 
