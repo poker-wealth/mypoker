@@ -13,6 +13,7 @@ import { DataScreen } from './src/screens/DataScreen';
 import { VipScreen } from './src/screens/VipScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import { LobbyScreen } from './src/screens/LobbyScreen';
 import { FeltGalleryScreen } from './src/screens/FeltGalleryScreen';
 import type { RootStackParamList } from './src/navigation';
 import { API_URL } from './src/api';
@@ -97,13 +98,7 @@ function TabsScreen() {
       }}
     >
       <Tabs.Screen name="Wallet" component={WalletScreen} />
-      {/* The lobby is the shell's and is not built yet, so nothing navigates to the Table route and
-          no felt can be reached. In a dev build this tab shows the felt gallery instead, purely so
-          the game side can be looked at; a release build keeps the honest placeholder. Delete this
-          branch when the real lobby lands — see src/screens/FeltGalleryScreen.tsx. */}
-      <Tabs.Screen name="Tables">
-        {() => (__DEV__ ? <FeltGalleryScreen /> : <NotPortedYet name="Tables" />)}
-      </Tabs.Screen>
+      <Tabs.Screen name="Tables" component={LobbyScreen} />
       <Tabs.Screen name="Alliance" component={AllianceScreen} options={{ title: t('nav.alliance') }} />
       <Tabs.Screen name="Data" component={DataScreen} options={{ title: t('nav.data') }} />
       <Tabs.Screen name="Account" component={ProfileScreen} options={{ title: t('nav.account') }} />
@@ -139,6 +134,17 @@ export default function App() {
             options={{ title: t('notifications.title') }}
           />
           <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: t('account.settings') }} />
+          {/* A developer harness, NOT a screen anyone navigates to by accident: it renders every
+              felt against invented data. It briefly lived in the Tables tab, which meant the app
+              opened onto a debug scaffold instead of the product — never again. Dev builds only,
+              reached from Settings. */}
+          {__DEV__ && (
+            <Stack.Screen
+              name="FeltGallery"
+              component={FeltGalleryScreen}
+              options={{ title: 'Felt gallery (dev)' }}
+            />
+          )}
         </Stack.Navigator>
 
         {/* Which gateway this build points at. Invisible in production, and the

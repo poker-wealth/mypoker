@@ -2,6 +2,9 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { GAME_FELTS, feltFor } from '../components/games/registry';
 import { TableDesignSheet } from '../components/poker/TableDesignSheet';
+import { ChatBox, type ChatMessage } from '../components/poker/ChatBox';
+import { ChallengeModal } from '../components/poker/ChallengeModal';
+import { Sheet } from '../ui';
 import { radius, space, theme } from '../theme';
 import type { LiveSeat, TableSnapshot } from '../lib/liveTable';
 
@@ -172,9 +175,28 @@ const FIXTURES: Record<string, TableSnapshot> = {
 
 const TABLE_IDS = Object.keys(GAME_FELTS);
 
+/** One of each row ChatBox can draw, including the two it cannot play. */
+const FIXTURE_CHAT: ChatMessage[] = [
+  { id: 'c1', senderId: 'fixture-0', senderName: 'FIXTURE 0', timestamp: 0, text: 'nice hand' },
+  { id: 'c2', senderId: 'fixture-1', senderName: 'YOU (FIXTURE)', timestamp: 0, text: 'thanks' },
+  { id: 'c3', senderId: 'system', senderName: 'system', timestamp: 0, isSystem: true, text: 'FIXTURE 2 joined' },
+  {
+    id: 'c4',
+    senderId: 'fixture-2',
+    senderName: 'FIXTURE BOT',
+    timestamp: 0,
+    voice: { clip: '', durationMs: 4_000, mime: 'audio/webm' },
+  },
+  // Its audio was trimmed out of history — the row must still say somebody spoke.
+  { id: 'c5', senderId: 'fixture-0', senderName: 'FIXTURE 0', timestamp: 0 },
+];
+
 export function FeltGalleryScreen() {
   const [selected, setSelected] = useState<string>(TABLE_IDS[0] ?? 'texas');
   const [designOpen, setDesignOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [challengeOpen, setChallengeOpen] = useState(false);
+  const [chat, setChat] = useState<ChatMessage[]>(FIXTURE_CHAT);
   const Felt = feltFor(selected);
   // Poker's four ids share one felt and one fixture; anything without its own falls back to base.
   const snapshot = FIXTURES[selected] ?? baseSnapshot(selected);
@@ -204,10 +226,50 @@ export function FeltGalleryScreen() {
         ))}
       </View>
 
-      <Pressable onPress={() => setDesignOpen(true)} style={styles.designButton}>
-        <Text style={styles.designText}>Table design…</Text>
-      </Pressable>
+      <View style={styles.tools}>
+        <Pressable onPress={() => setDesignOpen(true)} style={styles.designButton}>
+          <Text style={styles.designText}>Table design…</Text>
+        </Pressable>
+        <Pressable onPress={() => setChatOpen(true)} style={styles.designButton}>
+          <Text style={styles.designText}>Chat…</Text>
+        </Pressable>
+        <Pressable onPress={() => setChallengeOpen(true)} style={styles.designButton}>
+          <Text style={styles.designText}>Bot check…</Text>
+        </Pressable>
+      </View>
+
       <TableDesignSheet open={designOpen} onClose={() => setDesignOpen(false)} />
+
+      <Sheet open={chatOpen} onClose={() => setChatOpen(false)} title="Table chat">
+        <View style={styles.chatHost}>
+          <ChatBox
+            messages={chat}
+            myPlayerId="fixture-1"
+            onSend={(text) =>
+              // Echoed locally, NOT sent: the gallery has no socket and must not pretend to.
+              setChat((prev) => [
+                ...prev,
+                {
+                  id: `local-${prev.length}`,
+                  senderId: 'fixture-1',
+                  senderName: 'YOU (FIXTURE)',
+                  timestamp: 0,
+                  text,
+                },
+              ])
+            }
+          />
+        </View>
+      </Sheet>
+
+      <ChallengeModal
+        open={challengeOpen}
+        challengerId="fixture-0"
+        onAnswer={(passed, responseMs) => {
+          console.log('[felt-gallery] challenge answered', { passed, responseMs });
+          setChallengeOpen(false);
+        }}
+      />
 
       {Felt ? (
         <Felt
@@ -249,6 +311,8 @@ const styles = StyleSheet.create({
   tabOn: { borderColor: theme.brand, backgroundColor: theme.surface2 },
   tabText: { color: theme.dim, fontSize: 11, fontWeight: '700' },
   tabTextOn: { color: theme.text },
+  tools: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  chatHost: { height: 380 },
   designButton: {
     alignSelf: 'flex-start',
     borderRadius: radius.pill,

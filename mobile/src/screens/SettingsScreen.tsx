@@ -1,7 +1,10 @@
 import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
+import type { RootStackParamList } from '../navigation';
 import { api } from '../api';
 import { space, theme } from '../theme';
 import { Card, ListRow, Screen, Toggle } from '../ui';
@@ -68,6 +71,8 @@ export function SettingsScreen() {
     update.mutate(patch);
   };
 
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
   return (
     <Screen query={settings} errorLabel={{ retry: t('common.retry'), fallback: t('states.error') }}>
       {(data) => (
@@ -97,7 +102,16 @@ export function SettingsScreen() {
               right={<Toggle value={data.notifyPromos} onChange={(v) => set({ notifyPromos: v })} />}
             />
           </Section>
+
+          {/* Developer tools. `__DEV__` is false in any release build, so this section does not
+              exist in a shipped app — it is not hidden, it is absent. */}
+          {__DEV__ && (
+            <Section title="Developer">
+              <ListRow label="Felt gallery" onPress={() => navigation.navigate('FeltGallery')} />
+            </Section>
+          )}
         </>
+
       )}
     </Screen>
   );

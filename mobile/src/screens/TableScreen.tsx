@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { TableScreenProps } from '../navigation';
 import { getToken } from '../session';
+import { Sheet } from '../ui';
 import { radius, space, theme } from '../theme';
 import { useLiveTable } from '../table/useLiveTable';
 import { ActionBar } from '../components/poker/ActionBar';
@@ -10,6 +11,10 @@ import { HoldemFelt } from '../components/games/HoldemFelt';
 import { BuyInSheet } from '../components/poker/BuyInSheet';
 import { JackpotBurst } from '../components/poker/JackpotBurst';
 import { TableDesignSheet } from '../components/poker/TableDesignSheet';
+import { ChatBox } from '../components/poker/ChatBox';
+import { ChallengeModal } from '../components/poker/ChallengeModal';
+import { useTableChat } from '../table/useTableChat';
+import { useChallengePrompt } from '../table/useChallengePrompt';
 
 /**
  * TableScreen — the seam, now joined.
@@ -39,7 +44,10 @@ export function TableScreen({ route }: TableScreenProps) {
     };
   }, []);
 
-  const { snapshot, status, error, command } = useLiveTable(tableId, token);
+  const { snapshot, status, error, command, socket } = useLiveTable(tableId, token);
+  const { messages, sendChat } = useTableChat(socket);
+  const { challengerId, clear: clearChallenge } = useChallengePrompt(socket);
+  const [chatOpen, setChatOpen] = useState(false);
   const [buyInFor, setBuyInFor] = useState<number | null | false>(false);
   /** Which jackpot this viewer has already watched, so a re-render cannot replay it. */
   const [jackpotSeen, setJackpotSeen] = useState<string | null>(null);
@@ -98,14 +106,45 @@ export function TableScreen({ route }: TableScreenProps) {
           </Text>
         )}
 
-        {designable ? (
-          <Pressable onPress={() => setDesignOpen(true)} style={styles.designButton}>
-            <Text style={styles.designText}>Table design</Text>
+        <View style={styles.tableTools}>
+          <Pressable onPress={() => setChatOpen(true)} style={styles.toolButton}>
+            <Text style={styles.toolText}>
+              Chat{messages.length > 0 ? ` (${messages.length})` : ''}
+            </Text>
           </Pressable>
-        ) : null}
+          {designable ? (
+            <Pressable onPress={() => setDesignOpen(true)} style={styles.toolButton}>
+              <Text style={styles.toolText}>Table design</Text>
+            </Pressable>
+          ) : null}
+        </View>
       </ScrollView>
 
       <TableDesignSheet open={designOpen} onClose={() => setDesignOpen(false)} />
+
+      <Sheet open={chatOpen} onClose={() => setChatOpen(false)} title="Table chat">
+        <View style={styles.chatHost}>
+          <ChatBox
+            messages={messages}
+            onSend={sendChat}
+            {...(snapshot.you ? { myPlayerId: snapshot.you.playerId } : {})}
+            // Chat is a seated privilege; a spectator watching a table does not get to talk at it.
+            disabled={!snapshot.you || snapshot.yourSeat === null}
+            placeholder={snapshot.yourSeat === null ? 'Take a seat to chat' : 'Say something...'}
+          />
+        </View>
+      </Sheet>
+
+      {/* The bot check. Arrives addressed to this viewer only, and cannot be dismissed — see
+          ChallengeModal. Answering clears it; the server scores how long it took. */}
+      <ChallengeModal
+        open={challengerId !== null}
+        challengerId={challengerId ?? ''}
+        onAnswer={(passed, responseMs) => {
+          command({ kind: 'answer_challenge', passed, responseMs });
+          clearChallenge();
+        }}
+      />
 
       <BuyInSheet
         open={buyInFor !== false}
@@ -158,8 +197,8 @@ const styles = StyleSheet.create({
     padding: space.xl,
     backgroundColor: theme.bg,
   },
-  designButton: {
-    alignSelf: 'center',
+  tableTools: { flexDirection: 'row', justifyContent: 'center', gap: space.sm },
+  toolButton: {
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: theme.border,
@@ -167,7 +206,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg,
     paddingVertical: 7,
   },
-  designText: { color: theme.dim, fontSize: 12, fontWeight: '600' },
+  toolText: { color: theme.dim, fontSize: 12, fontWeight: '600' },
+  // The sheet sizes to its content, and ChatBox is `flex: 1` — without a height it collapses to
+  // nothing and the composer sits under the title with no log above it.
+  chatHost: { height: 380 },
   dim: { color: theme.dim, fontSize: 12 },
   note: { color: theme.dim, fontSize: 13, textAlign: 'center', lineHeight: 19 },
   error: { color: theme.danger, fontSize: 12 },
