@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { api } from '../api';
 import type { RootStackParamList } from '../navigation';
+import { moneyFromDecimal } from '../money';
 import { radius, space, theme } from '../theme';
 import { Badge, Card, ListRow, Screen, Skeleton } from '../ui';
 
@@ -50,13 +51,6 @@ interface VipPreviewData {
   tier: VipTier;
   progressPct: number;
   next: { tier: VipTier } | null;
-}
-
-/** Money for display, from a decimal string. Mirrors frontend/src/lib/money.ts moneyFromDecimal(). */
-function moneyFromDecimal(value: string): string {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return value; // never show NaN where a balance goes
-  return `₮${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function ProfileScreen() {
@@ -133,6 +127,10 @@ export function ProfileScreen() {
                   <Badge tone="warn">{unread.data > 99 ? '99+' : unread.data}</Badge>
                 ) : undefined
               }
+            />
+            <ListRow
+              label={t('agent.title')}
+              onPress={() => navigation.navigate('AgentCenter')}
             />
             <ListRow label={t('account.settings')} onPress={() => navigation.navigate('Settings')} />
           </Card>
