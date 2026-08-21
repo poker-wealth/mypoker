@@ -264,6 +264,7 @@
     "chatDisabled": "Trò chuyện đã tắt",
     "microphoneDenied": "Quyền truy cập micro bị từ chối",
     "recordingUnsupported": "Trình duyệt này không ghi âm được",
+    "recordingUnavailable": "Thiết bị này không hỗ trợ ghi âm",
     "recordingTooShort": "Giữ lâu hơn một chút để gửi",
     "recordingTooLong": "Bản ghi quá lớn để gửi",
     "recordingFailed": "Không gửi được bản ghi đó"

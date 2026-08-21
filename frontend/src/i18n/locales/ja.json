@@ -264,6 +264,7 @@
     "chatDisabled": "チャットは無効です",
     "microphoneDenied": "マイクへのアクセスが拒否されました",
     "recordingUnsupported": "このブラウザーは録音に対応していません",
+    "recordingUnavailable": "この端末では録音できません",
     "recordingTooShort": "もう少し長押ししてください",
     "recordingTooLong": "録音が大きすぎて送信できません",
     "recordingFailed": "この録音を送信できませんでした"

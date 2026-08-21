@@ -264,6 +264,7 @@
     "chatDisabled": "Obrolan dinonaktifkan",
     "microphoneDenied": "Akses mikrofon ditolak",
     "recordingUnsupported": "Peramban ini tidak bisa merekam audio",
+    "recordingUnavailable": "Perekaman tidak tersedia di perangkat ini",
     "recordingTooShort": "Tahan sedikit lebih lama untuk mengirim",
     "recordingTooLong": "Rekaman terlalu besar untuk dikirim",
     "recordingFailed": "Tidak dapat mengirim rekaman itu"

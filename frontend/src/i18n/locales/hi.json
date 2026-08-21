@@ -264,6 +264,7 @@
     "chatDisabled": "चैट बंद है",
     "microphoneDenied": "माइक्रोफ़ोन की अनुमति नहीं मिली",
     "recordingUnsupported": "यह ब्राउज़र ऑडियो रिकॉर्ड नहीं कर सकता",
+    "recordingUnavailable": "इस डिवाइस पर रिकॉर्डिंग उपलब्ध नहीं है",
     "recordingTooShort": "भेजने के लिए थोड़ा और दबाए रखें",
     "recordingTooLong": "रिकॉर्डिंग भेजने के लिए बहुत बड़ी है",
     "recordingFailed": "वह रिकॉर्डिंग नहीं भेजी जा सकी"

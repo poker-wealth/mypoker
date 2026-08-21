@@ -43,7 +43,8 @@
     "plugins": [
       "expo-secure-store",
       "expo-localization",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-audio"
     ],
     "extra": {
       "eas": {

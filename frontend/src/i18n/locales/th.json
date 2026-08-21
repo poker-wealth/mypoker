@@ -264,6 +264,7 @@
     "chatDisabled": "ปิดการแชท",
     "microphoneDenied": "การเข้าถึงไมโครโฟนถูกปฏิเสธ",
     "recordingUnsupported": "เบราว์เซอร์นี้บันทึกเสียงไม่ได้",
+    "recordingUnavailable": "อุปกรณ์นี้ไม่รองรับการบันทึกเสียง",
     "recordingTooShort": "กดค้างนานขึ้นอีกนิดเพื่อส่ง",
     "recordingTooLong": "ไฟล์เสียงใหญ่เกินไป",
     "recordingFailed": "ส่งเสียงนี้ไม่สำเร็จ"

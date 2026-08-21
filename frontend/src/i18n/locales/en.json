@@ -264,6 +264,7 @@
     "chatDisabled": "Chat is disabled",
     "microphoneDenied": "Microphone access was denied",
     "recordingUnsupported": "This browser can't record audio",
+    "recordingUnavailable": "Recording isn't available on this device",
     "recordingTooShort": "Hold a little longer to send a voice note",
     "recordingTooLong": "That recording was too large to send",
     "recordingFailed": "Couldn't send that recording"

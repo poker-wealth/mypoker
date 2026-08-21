@@ -264,6 +264,7 @@
     "chatDisabled": "聊天已关闭",
     "microphoneDenied": "麦克风访问被拒绝",
     "recordingUnsupported": "此浏览器无法录音",
+    "recordingUnavailable": "此设备不支持录音",
     "recordingTooShort": "请按住久一点再发送语音",
     "recordingTooLong": "录音过大，无法发送",
     "recordingFailed": "无法发送该录音"

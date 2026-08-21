@@ -8,6 +8,7 @@
     "@react-navigation/native-stack": "^7.18.9",
     "@tanstack/react-query": "^5.101.4",
     "expo": "~57.0.14",
+    "expo-audio": "~57.0.4",
     "expo-clipboard": "~57.0.1",
     "expo-file-system": "~57.0.5",
     "expo-localization": "~57.0.1",
@@ -31,7 +32,8 @@
     "android": "node scripts/check-android-env.mjs && expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "check:android-env": "node scripts/check-android-env.mjs"
+    "check:android-env": "node scripts/check-android-env.mjs",
+    "check:voice-budget": "node scripts/check-voice-budget.mjs"
   },
   "private": true
 }
