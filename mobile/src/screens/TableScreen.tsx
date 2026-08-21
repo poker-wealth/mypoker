@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { TableScreenProps } from '../navigation';
 import { getToken } from '../session';
-import { space, theme } from '../theme';
+import { radius, space, theme } from '../theme';
 import { useLiveTable } from '../table/useLiveTable';
 import { ActionBar } from '../components/poker/ActionBar';
 import { feltFor } from '../components/games/registry';
+import { HoldemFelt } from '../components/games/HoldemFelt';
 import { BuyInSheet } from '../components/poker/BuyInSheet';
 import { JackpotBurst } from '../components/poker/JackpotBurst';
+import { TableDesignSheet } from '../components/poker/TableDesignSheet';
 
 /**
  * TableScreen — the seam, now joined.
@@ -41,7 +43,14 @@ export function TableScreen({ route }: TableScreenProps) {
   const [buyInFor, setBuyInFor] = useState<number | null | false>(false);
   /** Which jackpot this viewer has already watched, so a re-render cannot replay it. */
   const [jackpotSeen, setJackpotSeen] = useState<string | null>(null);
+  const [designOpen, setDesignOpen] = useState(false);
   const Felt = feltFor(tableId);
+  /**
+   * Only the poker family draws the configurable table, so only it offers the picker. Derived from
+   * the registry rather than a second list of table ids — one of those would eventually disagree
+   * with the other, and the disagreement would show up as a control that changes nothing.
+   */
+  const designable = Felt === HoldemFelt;
 
   if (!tokenChecked) {
     return (
@@ -88,7 +97,15 @@ export function TableScreen({ route }: TableScreenProps) {
             {snapshot.name} has no felt on mobile yet. It is playable in the Mini App.
           </Text>
         )}
+
+        {designable ? (
+          <Pressable onPress={() => setDesignOpen(true)} style={styles.designButton}>
+            <Text style={styles.designText}>Table design</Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
+
+      <TableDesignSheet open={designOpen} onClose={() => setDesignOpen(false)} />
 
       <BuyInSheet
         open={buyInFor !== false}
@@ -141,6 +158,16 @@ const styles = StyleSheet.create({
     padding: space.xl,
     backgroundColor: theme.bg,
   },
+  designButton: {
+    alignSelf: 'center',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
+    paddingHorizontal: space.lg,
+    paddingVertical: 7,
+  },
+  designText: { color: theme.dim, fontSize: 12, fontWeight: '600' },
   dim: { color: theme.dim, fontSize: 12 },
   note: { color: theme.dim, fontSize: 13, textAlign: 'center', lineHeight: 19 },
   error: { color: theme.danger, fontSize: 12 },

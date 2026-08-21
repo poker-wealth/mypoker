@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { GAME_FELTS, feltFor } from '../components/games/registry';
+import { TableDesignSheet } from '../components/poker/TableDesignSheet';
 import { radius, space, theme } from '../theme';
 import type { LiveSeat, TableSnapshot } from '../lib/liveTable';
 
@@ -173,6 +174,7 @@ const TABLE_IDS = Object.keys(GAME_FELTS);
 
 export function FeltGalleryScreen() {
   const [selected, setSelected] = useState<string>(TABLE_IDS[0] ?? 'texas');
+  const [designOpen, setDesignOpen] = useState(false);
   const Felt = feltFor(selected);
   // Poker's four ids share one felt and one fixture; anything without its own falls back to base.
   const snapshot = FIXTURES[selected] ?? baseSnapshot(selected);
@@ -201,6 +203,11 @@ export function FeltGalleryScreen() {
           </Pressable>
         ))}
       </View>
+
+      <Pressable onPress={() => setDesignOpen(true)} style={styles.designButton}>
+        <Text style={styles.designText}>Table design…</Text>
+      </Pressable>
+      <TableDesignSheet open={designOpen} onClose={() => setDesignOpen(false)} />
 
       {Felt ? (
         <Felt
@@ -242,5 +249,15 @@ const styles = StyleSheet.create({
   tabOn: { borderColor: theme.brand, backgroundColor: theme.surface2 },
   tabText: { color: theme.dim, fontSize: 11, fontWeight: '700' },
   tabTextOn: { color: theme.text },
+  designButton: {
+    alignSelf: 'flex-start',
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
+    paddingHorizontal: space.md,
+    paddingVertical: 6,
+  },
+  designText: { color: theme.dim, fontSize: 11, fontWeight: '600' },
   missing: { color: theme.danger, fontSize: 13, textAlign: 'center' },
 });

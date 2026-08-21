@@ -2,6 +2,8 @@ import { Image, StyleSheet, Text, View, useWindowDimensions } from 'react-native
 import { PlayingCard } from './PlayingCard';
 import { PlayerSeat } from './PlayerSeat';
 import { designById, ringFor, type TableDesign } from '../../table/tableDesigns';
+import { useTableDesign } from '../../table/tableDesignStore';
+import { PotToWinner } from './PotToWinner';
 import { theme } from '../../theme';
 import type { TableSnapshot } from '../../lib/liveTable';
 
@@ -27,7 +29,9 @@ export interface PokerTableProps {
 
 export function PokerTable({ snapshot, onSit, design: override }: PokerTableProps) {
   const { width } = useWindowDimensions();
-  const design = override ?? designById('emerald');
+  // The player's saved choice, unless a preview is forcing one.
+  const { id: chosen } = useTableDesign();
+  const design = override ?? designById(chosen);
 
   // As wide as the screen allows, as tall as the artwork's aspect demands.
   const tableWidth = Math.min(width - 24, 440);
@@ -93,6 +97,20 @@ export function PokerTable({ snapshot, onSit, design: override }: PokerTableProp
           </View>
         );
       })}
+
+      {/* The pot arriving at whoever won it. Purely decorative — the ledger settled long before
+          this mounts — and it animates to the ROTATED seat positions, so the award lands on the
+          chair the player is actually looking at. */}
+      <PotToWinner
+        handId={snapshot.handId}
+        amount={snapshot.pot}
+        winners={ordered
+          .map((seat, place) => (seat.isWinner ? ring[place % ring.length]! : null))
+          .filter((p): p is NonNullable<typeof p> => p !== null)}
+        tableWidth={tableWidth}
+        tableHeight={tableHeight}
+        potTop={design.boardTop}
+      />
     </View>
   );
 }
