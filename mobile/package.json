@@ -25,9 +25,10 @@
   },
   "scripts": {
     "start": "expo start",
-    "android": "expo run:android",
+    "android": "node scripts/check-android-env.mjs && expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "check:android-env": "node scripts/check-android-env.mjs"
   },
   "private": true
 }
