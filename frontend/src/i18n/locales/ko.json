@@ -552,5 +552,9 @@
     "inLeague": "{{name}} 내부",
     "isolationNote": "리그 테이블과 지갑만 표시됩니다. 플랫폼 테이블은 숨겨집니다.",
     "backToPlatform": "플랫폼 로비로 돌아가기"
+  },
+  "security": {
+    "deviceModifiedTitle": "이 기기는 변조된 것으로 보입니다",
+    "deviceModifiedBody": "루팅 또는 탈옥 도구가 감지되었습니다. 계속 플레이할 수 있지만 변조된 기기는 조작에 취약하므로 입출금 시 주의하세요."
   }
 }

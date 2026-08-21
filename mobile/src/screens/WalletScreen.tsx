@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { api, ApiError } from '../api';
 import { radius, space, theme } from '../theme';
+import { SecurityBanner } from '../SecurityBanner';
 
 /**
  * Wallet — the first screen that talks to the real gateway.
@@ -32,6 +33,10 @@ export function WalletScreen() {
 
   return (
     <View style={styles.screen}>
+      {/* Above the balance, not below it: this is the screen money leaves
+          from, so the warning has to be read before the number, not after. */}
+      <SecurityBanner />
+
       <Text style={styles.label}>Available</Text>
 
       {q.isPending && <ActivityIndicator color={theme.brand} style={styles.pad} />}

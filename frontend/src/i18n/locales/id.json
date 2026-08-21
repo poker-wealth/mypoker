@@ -552,5 +552,9 @@
     "inLeague": "Di dalam {{name}}",
     "isolationNote": "Hanya meja dan dompet liga. Meja platform disembunyikan.",
     "backToPlatform": "Kembali ke lobi platform"
+  },
+  "security": {
+    "deviceModifiedTitle": "Perangkat ini tampak dimodifikasi",
+    "deviceModifiedBody": "Terdeteksi alat root atau jailbreak. Anda tetap bisa bermain, tetapi perangkat yang dimodifikasi lebih rentan dimanipulasi — berhati-hatilah saat menyetor dan menarik dana."
   }
 }

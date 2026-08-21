@@ -552,5 +552,9 @@
     "inLeague": "当前：{{name}}",
     "isolationNote": "仅显示联盟牌桌与钱包，平台牌桌已隐藏。",
     "backToPlatform": "返回平台大厅"
+  },
+  "security": {
+    "deviceModifiedTitle": "此设备似乎已被修改",
+    "deviceModifiedBody": "检测到 Root 或越狱工具。您仍可继续游戏，但已修改的设备更容易被篡改，请谨慎进行充值与提现。"
   }
 }

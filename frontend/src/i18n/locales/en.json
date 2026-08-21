@@ -552,5 +552,9 @@
     "inLeague": "Inside {{name}}",
     "isolationNote": "League tables and wallet only. Platform tables are hidden.",
     "backToPlatform": "Back to the platform lobby"
+  },
+  "security": {
+    "deviceModifiedTitle": "This device looks modified",
+    "deviceModifiedBody": "Root or jailbreak tools were detected. You can keep playing, but a modified device is easier to tamper with — take care with deposits and withdrawals."
   }
 }

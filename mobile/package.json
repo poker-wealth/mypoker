@@ -16,6 +16,7 @@
     "expo-sharing": "~57.0.14",
     "expo-status-bar": "~57.0.1",
     "i18next": "^26.4.0",
+    "jail-monkey": "^3.0.0",
     "react": "19.2.3",
     "react-i18next": "^17.0.12",
     "react-native": "0.86.2",
@@ -33,7 +34,8 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "check:android-env": "node scripts/check-android-env.mjs",
-    "check:voice-budget": "node scripts/check-voice-budget.mjs"
+    "check:voice-budget": "node scripts/check-voice-budget.mjs",
+    "check:integrity": "node scripts/check-integrity-tiering.mjs"
   },
   "private": true
 }

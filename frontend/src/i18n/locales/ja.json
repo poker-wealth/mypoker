@@ -552,5 +552,9 @@
     "inLeague": "{{name}} 内",
     "isolationNote": "リーグのテーブルとウォレットのみ。プラットフォームのテーブルは非表示です。",
     "backToPlatform": "プラットフォームロビーへ戻る"
+  },
+  "security": {
+    "deviceModifiedTitle": "この端末は改造されている可能性があります",
+    "deviceModifiedBody": "Root化または脱獄ツールが検出されました。プレイは続けられますが、改造された端末は改ざんされやすいため、入出金にはご注意ください。"
   }
 }
