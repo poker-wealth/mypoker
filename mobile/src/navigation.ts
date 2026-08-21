@@ -17,6 +17,7 @@ export type RootStackParamList = {
   Vip: undefined;
   Notifications: undefined;
   Settings: undefined;
+  AgentCenter: undefined;
 };
 
 /** Props for a screen in the root stack. `TableScreenProps` is the one the game side uses. */

@@ -14,6 +14,7 @@ import { LobbyScreen } from './src/screens/LobbyScreen';
 import { VipScreen } from './src/screens/VipScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import { AgentCenterScreen } from './src/screens/AgentCenterScreen';
 import type { RootStackParamList } from './src/navigation';
 import { API_URL } from './src/api';
 import { space, theme } from './src/theme';
@@ -148,6 +149,11 @@ export default function App() {
             options={{ title: t('notifications.title') }}
           />
           <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: t('account.settings') }} />
+          <Stack.Screen
+            name="AgentCenter"
+            component={AgentCenterScreen}
+            options={{ title: t('agent.title') }}
+          />
         </Stack.Navigator>
 
         {/* Which gateway this build points at. Invisible in production, and the
