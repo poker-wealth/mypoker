@@ -3,8 +3,11 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { getToken, subscribeToSession } from './src/session';
+import { LoginScreen } from './src/screens/LoginScreen';
 import { WalletScreen } from './src/screens/WalletScreen';
 import { TableScreen } from './src/screens/TableScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
@@ -106,8 +109,55 @@ function TabsScreen() {
   );
 }
 
+/**
+ * Signed in, or not.
+ *
+ * The app used to render the whole shell regardless, so a signed-out player saw tabs full of "your
+ * session has expired" with nowhere to go — there was no login screen at all. Now the token decides
+ * which tree exists.
+ *
+ * `undefined` means "not read yet" and shows a spinner. Treating it as signed-out would flash the
+ * login screen at every returning player on every cold start.
+ */
+function useSessionToken(): string | null | undefined {
+  const [token, setToken] = useState<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getToken().then((t) => {
+      if (!cancelled) setToken(t);
+    });
+    const unsubscribe = subscribeToSession((t) => setToken(t));
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []);
+
+  return token;
+}
+
 export default function App() {
   const { t } = useTranslation();
+  const token = useSessionToken();
+
+  if (token === undefined) {
+    return (
+      <View style={styles.booting}>
+        <ActivityIndicator color={theme.brand} />
+      </View>
+    );
+  }
+
+  if (token === null) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <StatusBar style="light" />
+        <LoginScreen />
+      </QueryClientProvider>
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <NavigationContainer theme={navTheme}>
@@ -167,6 +217,7 @@ const styles = StyleSheet.create({
     padding: space.xl,
     gap: space.sm,
   },
+  booting: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.bg },
   placeholderTitle: { color: theme.text, fontSize: 18, fontWeight: '800' },
   placeholderBody: { color: theme.dim, fontSize: 13, textAlign: 'center', lineHeight: 19 },
   devBanner: {

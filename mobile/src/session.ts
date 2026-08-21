@@ -43,6 +43,26 @@ export async function getToken(): Promise<string | null> {
   return cached;
 }
 
+/**
+ * Anyone who needs to re-render when the session changes.
+ *
+ * The token was write-and-forget: sign-in stored it and nothing on screen noticed, which is fine
+ * for a socket that reads it on connect and useless for deciding whether to show the app or the
+ * login screen. Callers subscribe; `setToken` and `clearToken` notify.
+ */
+const listeners = new Set<(token: string | null) => void>();
+
+export function subscribeToSession(cb: (token: string | null) => void): () => void {
+  listeners.add(cb);
+  return () => {
+    listeners.delete(cb);
+  };
+}
+
+function notify(token: string | null): void {
+  for (const cb of listeners) cb(token);
+}
+
 export async function setToken(token: string): Promise<void> {
   cached = token;
   await SecureStore.setItemAsync(TOKEN_KEY, token, {
@@ -50,6 +70,8 @@ export async function setToken(token: string): Promise<void> {
     // must not be able to read it while the phone is locked in a pocket.
     keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
   });
+  // After the write, so a subscriber that immediately reads the token gets the stored one.
+  notify(token);
 }
 
 export async function clearToken(): Promise<void> {
@@ -59,6 +81,7 @@ export async function clearToken(): Promise<void> {
     // is what stops this process using it; a failed delete is not worth
     // throwing at a user who is signing out.
   });
+  notify(null);
 }
 
 /** True when a token exists. Says nothing about whether the SERVER still accepts it. */
