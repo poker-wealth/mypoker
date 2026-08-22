@@ -30,6 +30,23 @@ const TOKEN_KEY = 'mypoker.session.token';
  */
 let cached: string | null | undefined;
 
+/**
+ * Notified whenever the token is dropped, including by api.ts on a 401.
+ *
+ * Without this the shell keeps rendering a signed-in app over a session the
+ * server has already forgotten: the token is gone from storage but the auth
+ * context still says 'signedIn', so every screen errors and nothing routes the
+ * player back to sign-in. A Set rather than a single callback so the provider
+ * can subscribe and unsubscribe cleanly across remounts.
+ */
+const sessionLostListeners = new Set<() => void>();
+
+/** Subscribe to session loss. Returns the unsubscribe function. */
+export function onSessionLost(fn: () => void): () => void {
+  sessionLostListeners.add(fn);
+  return () => sessionLostListeners.delete(fn);
+}
+
 export async function getToken(): Promise<string | null> {
   if (cached !== undefined) return cached;
   try {
@@ -43,26 +60,6 @@ export async function getToken(): Promise<string | null> {
   return cached;
 }
 
-/**
- * Anyone who needs to re-render when the session changes.
- *
- * The token was write-and-forget: sign-in stored it and nothing on screen noticed, which is fine
- * for a socket that reads it on connect and useless for deciding whether to show the app or the
- * login screen. Callers subscribe; `setToken` and `clearToken` notify.
- */
-const listeners = new Set<(token: string | null) => void>();
-
-export function subscribeToSession(cb: (token: string | null) => void): () => void {
-  listeners.add(cb);
-  return () => {
-    listeners.delete(cb);
-  };
-}
-
-function notify(token: string | null): void {
-  for (const cb of listeners) cb(token);
-}
-
 export async function setToken(token: string): Promise<void> {
   cached = token;
   await SecureStore.setItemAsync(TOKEN_KEY, token, {
@@ -70,8 +67,6 @@ export async function setToken(token: string): Promise<void> {
     // must not be able to read it while the phone is locked in a pocket.
     keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
   });
-  // After the write, so a subscriber that immediately reads the token gets the stored one.
-  notify(token);
 }
 
 export async function clearToken(): Promise<void> {
@@ -81,7 +76,16 @@ export async function clearToken(): Promise<void> {
     // is what stops this process using it; a failed delete is not worth
     // throwing at a user who is signing out.
   });
-  notify(null);
+  // Notify last: the token must actually be gone — from the cache and from
+  // storage — before anyone reacts to its going, or a listener that reads the
+  // token back (directly or via getToken) could still see the old value.
+  for (const fn of sessionLostListeners) {
+    try {
+      fn();
+    } catch {
+      // One listener throwing must not stop the others from being notified.
+    }
+  }
 }
 
 /** True when a token exists. Says nothing about whether the SERVER still accepts it. */

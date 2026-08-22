@@ -3,11 +3,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import { getToken, subscribeToSession } from './src/session';
-import { LoginScreen } from './src/screens/LoginScreen';
 import { WalletScreen } from './src/screens/WalletScreen';
 import { TableScreen } from './src/screens/TableScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
@@ -17,11 +14,11 @@ import { LobbyScreen } from './src/screens/LobbyScreen';
 import { VipScreen } from './src/screens/VipScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
-import { LobbyScreen } from './src/screens/LobbyScreen';
 import { AgentCenterScreen } from './src/screens/AgentCenterScreen';
-import { FeltGalleryScreen } from './src/screens/FeltGalleryScreen';
+import { LoginScreen } from './src/screens/LoginScreen';
+import { AuthProvider, useAuth } from './src/auth';
 import type { RootStackParamList } from './src/navigation';
-import { API_URL } from './src/api';
+import { useApiBase } from './src/apiConfig';
 import { space, theme } from './src/theme';
 import { AccountIcon, AllianceIcon, DataIcon, TablesIcon, WalletIcon } from './src/icons';
 // Side-effect import: initialises i18next before any screen calls
@@ -88,7 +85,10 @@ function TabsScreen() {
       <Tabs.Screen
         name="Wallet"
         component={WalletScreen}
-        options={{ tabBarIcon: ({ color, size }) => <WalletIcon color={color} size={size} /> }}
+        options={{
+          title: t('nav.wallet'),
+          tabBarIcon: ({ color, size }) => <WalletIcon color={color} size={size} />,
+        }}
       />
       <Tabs.Screen
         name="Tables"
@@ -127,111 +127,86 @@ function TabsScreen() {
 }
 
 /**
- * Signed in, or not.
- *
- * The app used to render the whole shell regardless, so a signed-out player saw tabs full of "your
- * session has expired" with nowhere to go — there was no login screen at all. Now the token decides
- * which tree exists.
- *
- * `undefined` means "not read yet" and shows a spinner. Treating it as signed-out would flash the
- * login screen at every returning player on every cold start.
+ * The navigation tree, split out from `App` so it can call `useAuth()` —
+ * which needs `AuthProvider` above it, which in turn needs `QueryClientProvider`
+ * above IT (`signOut` clears the query cache). `AuthProvider` sits inside
+ * `QueryClientProvider` but outside `NavigationContainer`: a signed-out user
+ * renders `LoginScreen` directly, with nowhere to navigate to yet.
  */
-function useSessionToken(): string | null | undefined {
-  const [token, setToken] = useState<string | null | undefined>(undefined);
-
-  useEffect(() => {
-    let cancelled = false;
-    void getToken().then((t) => {
-      if (!cancelled) setToken(t);
-    });
-    const unsubscribe = subscribeToSession((t) => setToken(t));
-    return () => {
-      cancelled = true;
-      unsubscribe();
-    };
-  }, []);
-
-  return token;
-}
-
-export default function App() {
+function Root() {
   const { t } = useTranslation();
-  const token = useSessionToken();
+  const { status } = useAuth();
+  const apiBase = useApiBase();
 
-  if (token === undefined) {
+  if (status === 'loading') {
+    // A cold start must not look like signed-out — that would flash the
+    // login screen at someone who already has a session — so this state
+    // renders neither the navigator nor LoginScreen, just a spinner.
     return (
-      <View style={styles.booting}>
+      <View style={styles.loading}>
         <ActivityIndicator color={theme.brand} />
       </View>
     );
   }
 
-  if (token === null) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <StatusBar style="light" />
-        <LoginScreen />
-      </QueryClientProvider>
-    );
+  if (status === 'signedOut') {
+    return <LoginScreen />;
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <NavigationContainer theme={navTheme}>
-        <StatusBar style="light" />
-        {/* A stack over the tabs, so a table opens WITH a tableId rather than
-            being a tab that has to guess which table you meant. That param is
-            half the seam with the game side; see src/navigation.ts. Vip,
-            Notifications and Settings are pushed the same way, from the
-            Account tab — see src/screens/ProfileScreen.tsx. */}
-        <Stack.Navigator
-          screenOptions={{
-            headerStyle: { backgroundColor: theme.bg },
-            headerTitleStyle: { color: theme.text },
-            headerTintColor: theme.text,
-            contentStyle: { backgroundColor: theme.bg },
-          }}
-        >
-          <Stack.Screen name="Tabs" component={TabsScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="Table" component={TableScreen} />
-          <Stack.Screen name="Vip" component={VipScreen} options={{ title: t('account.vipMembership') }} />
-          <Stack.Screen
-            name="Notifications"
-            component={NotificationsScreen}
-            options={{ title: t('notifications.title') }}
-          />
-          <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: t('account.settings') }} />
-          <Stack.Screen
-            name="AgentCenter"
-            component={AgentCenterScreen}
-            options={{ title: t('agent.title') }}
-          />
-          {/* A developer harness, NOT a screen anyone navigates to by accident: it renders every
-              felt against invented data. It briefly lived in the Tables tab, which meant the app
-              opened onto a debug scaffold instead of the product — never again. Dev builds only,
-              reached from Settings. */}
-          {__DEV__ && (
-            <Stack.Screen
-              name="FeltGallery"
-              component={FeltGalleryScreen}
-              options={{ title: 'Felt gallery (dev)' }}
-            />
-          )}
-        </Stack.Navigator>
+    <NavigationContainer theme={navTheme}>
+      <StatusBar style="light" />
+      {/* A stack over the tabs, so a table opens WITH a tableId rather than
+          being a tab that has to guess which table you meant. That param is
+          half the seam with the game side; see src/navigation.ts. Vip,
+          Notifications and Settings are pushed the same way, from the
+          Account tab — see src/screens/ProfileScreen.tsx. */}
+      <Stack.Navigator
+        screenOptions={{
+          headerStyle: { backgroundColor: theme.bg },
+          headerTitleStyle: { color: theme.text },
+          headerTintColor: theme.text,
+          contentStyle: { backgroundColor: theme.bg },
+        }}
+      >
+        <Stack.Screen name="Tabs" component={TabsScreen} options={{ headerShown: false }} />
+        <Stack.Screen name="Table" component={TableScreen} />
+        <Stack.Screen name="Vip" component={VipScreen} options={{ title: t('account.vipMembership') }} />
+        <Stack.Screen
+          name="Notifications"
+          component={NotificationsScreen}
+          options={{ title: t('notifications.title') }}
+        />
+        <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: t('account.settings') }} />
+        <Stack.Screen
+          name="AgentCenter"
+          component={AgentCenterScreen}
+          options={{ title: t('agent.title') }}
+        />
+      </Stack.Navigator>
 
-        {/* Which gateway this build points at. Invisible in production, and the
-            first question worth answering when a device "cannot load anything" —
-            on an Android emulator the host is 10.0.2.2, never localhost. */}
-        {__DEV__ && (
-          <Text style={styles.devBanner}>{API_URL || 'EXPO_PUBLIC_API_URL is not set'}</Text>
-        )}
-      </NavigationContainer>
+      {/* Which gateway this build points at. Invisible in production, and the
+          first question worth answering when a device "cannot load anything" —
+          on an Android emulator the host is 10.0.2.2, never localhost. */}
+      {__DEV__ && apiBase !== null && (
+        <Text style={styles.devBanner}>{apiBase || 'No API URL set — open Settings'}</Text>
+      )}
+    </NavigationContainer>
+  );
+}
+
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <Root />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  booting: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.bg },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.bg },
   devBanner: {
     color: theme.dim,
     fontSize: 10,

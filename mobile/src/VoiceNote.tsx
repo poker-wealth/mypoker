@@ -172,7 +172,30 @@ export function VoiceBar({ onSend }: { onSend: (clip: VoiceClip) => void }) {
   const { t } = useTranslation();
   const { recording, progress, error, clearError, start, stop, cancel } = useVoiceRecorder();
 
-  const release = (): void => {
+  /**
+   * Slide-off must CANCEL, and onPressOut alone cannot tell the difference:
+   * RN fires it both when the finger releases inside the button and when it
+   * slides beyond the retention rect. What distinguishes the two is onPress,
+   * which fires only for an inside release, synchronously after onPressOut in
+   * the same event batch. So onPressOut arms a cancel on a 0ms timer, and
+   * onPress — if it comes — disarms it and sends. On a slide-off no onPress
+   * arrives, the timer survives the batch, and the recording is discarded.
+   * The task-8 audit caught the old wiring sending on slide-off.
+   */
+  const pendingCancel = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const armCancel = (): void => {
+    pendingCancel.current = setTimeout(() => {
+      pendingCancel.current = null;
+      cancel();
+    }, 0);
+  };
+
+  const send = (): void => {
+    if (pendingCancel.current) {
+      clearTimeout(pendingCancel.current);
+      pendingCancel.current = null;
+    }
     void stop().then((clip) => {
       if (clip) onSend(clip);
     });
@@ -188,8 +211,10 @@ export function VoiceBar({ onSend }: { onSend: (clip: VoiceClip) => void }) {
 
       <Pressable
         onPressIn={start}
-        onPressOut={release}
-        // A press that leaves the button is a cancel, not a send.
+        onPressOut={armCancel}
+        onPress={send}
+        // Responder theft (a scroll, an incoming call) — not the slide-off
+        // path, which onPressOut + the missing onPress handles above.
         onTouchCancel={cancel}
         accessibilityRole="button"
         accessibilityLabel={t('table.voiceHold')}

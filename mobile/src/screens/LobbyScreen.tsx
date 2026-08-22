@@ -6,6 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { api } from '../api';
 import type { RootStackParamList } from '../navigation';
+import { money } from '../money';
 import { space, theme } from '../theme';
 import { Badge, Card, ListRow, Screen, Segmented } from '../ui';
 
@@ -131,10 +132,16 @@ function TableRow({ table, onOpen }: { table: LobbyTable; onOpen: () => void }) 
   const { t } = useTranslation();
   const name = table.name || t(`gameNames.${table.gameId}`, { defaultValue: table.gameId });
 
-  // Seats first — it is what decides whether to tap — then the stake.
+  // Seats first — it is what decides whether to tap — then the blinds as the
+  // small/big pair, the way the web lobby prints them. `stakes` is micro-USD;
+  // the raw field here rendered "Blinds 2000000" where "1/2" was meant — the
+  // exact unit bug money() exists to prevent, caught in the task-8 audit.
+  const blinds =
+    `${money(table.stakes / 2, { symbol: false, decimals: 0 })}` +
+    `/${money(table.stakes, { symbol: false, decimals: 0 })}`;
   const hint =
     `${t('lobby.colPlayers')} ${table.players}/${table.maxPlayers}` +
-    ` · ${t('lobby.colBlinds')} ${table.stakes}`;
+    ` · ${t('lobby.colBlinds')} ${blinds}`;
 
   return (
     <ListRow
@@ -145,7 +152,9 @@ function TableRow({ table, onOpen }: { table: LobbyTable; onOpen: () => void }) 
           {/* Only a real jackpot is printed. A zero is not news, and a figure
               in this position reads as a prize on offer. */}
           {table.jackpot > 0 && (
-            <Text style={styles.jackpot}>{table.jackpot.toLocaleString()}</Text>
+            // Micro-USD, like every figure the lobby serves. The raw field
+            // rendered a ₮52 pool as 52,000,000 — in gold, as a prize.
+            <Text style={styles.jackpot}>{money(table.jackpot, { decimals: 0 })}</Text>
           )}
           <Badge tone={STATUS_TONE[table.status]}>
             {t(`lobby.status.${table.status.toLowerCase()}`, { defaultValue: table.status })}
