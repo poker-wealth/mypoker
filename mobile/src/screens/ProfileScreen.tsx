@@ -3,8 +3,9 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { api } from '../api';
+import { useAuth } from '../auth';
 import type { RootStackParamList } from '../navigation';
 import { moneyFromDecimal } from '../money';
 import { radius, space, theme } from '../theme';
@@ -18,12 +19,6 @@ import { Badge, Card, ListRow, Screen, Skeleton } from '../ui';
  * Left out, deliberately, because what they depend on does not exist in the
  * shell yet:
  *
- *   Identity (avatar, display name, sign-in card, sign-out) — there is no
- *   reactive session/player store here, only a token (see session.ts). Every
- *   other ported screen (Vip, Settings, Wallet) handles that the same way:
- *   no gate, just ask the server and let a 401 speak for itself. This screen
- *   follows suit rather than inventing a player identity to show.
- *
  *   Personal Info, Fairness, Invite Friends, Support, Language — each is its
  *   own unported screen or unavailable config (no SUPPORT_URL, no language
  *   picker; i18n.ts reads the device language once and says switching
@@ -33,6 +28,11 @@ import { Badge, Card, ListRow, Screen, Skeleton } from '../ui';
  *   Deposit / Withdraw buttons — WalletScreen has no deposit or withdraw flow
  *   yet, only a balance read. A button wired to nothing is worse than no
  *   button.
+ *
+ * The identity header IS here now — avatar, name, VIP chip, player id, and the
+ * settings gear. It was left out originally because there was "no reactive
+ * session/player store, only a token": true when this was written, and untrue
+ * since AuthProvider landed carrying the player. Every field is a server value.
  *
  * What is left is exactly what can be shown honestly: the real balance, the
  * real VIP progress (same endpoint and cache key as VipScreen, so the two
@@ -55,6 +55,7 @@ interface VipPreviewData {
 
 export function ProfileScreen() {
   const { t } = useTranslation();
+  const { player } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [hidden, setHidden] = useState(false);
 
@@ -87,6 +88,49 @@ export function ProfileScreen() {
     <Screen query={balance} errorLabel={{ retry: t('common.retry'), fallback: t('states.error') }}>
       {(data) => (
         <>
+          {/*
+            Identity, and the settings gear.
+
+            This header was left out of the original port with the note that there was "no reactive
+            session/player store here, only a token". That was true then and is not now: Samuel's
+            AuthProvider carries `player`, so the name, id, avatar and tier are all real values from
+            the server rather than anything invented here. A signed-out viewer never reaches this
+            screen — App.tsx renders LoginScreen instead — so there is no guest branch to write.
+          */}
+          <Pressable style={styles.identity} onPress={() => navigation.navigate('Settings')}>
+            {player?.photoUrl ? (
+              <Image source={{ uri: player.photoUrl }} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <Text style={styles.avatarInitial}>
+                  {(player?.displayName ?? 'M').charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.identityText}>
+              <Text style={styles.displayName} numberOfLines={1}>
+                {player?.displayName ?? t('account.guest')}
+              </Text>
+              <View style={styles.identityMeta}>
+                {vip.isSuccess ? (
+                  <View style={styles.vipChip}>
+                    <Text style={styles.vipChipText}>♛ {vip.data.tier}</Text>
+                  </View>
+                ) : null}
+                <Text style={styles.playerId} numberOfLines={1}>
+                  {player ? t('account.id', { id: player.playerId }) : ''}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={styles.chevron}>›</Text>
+          </Pressable>
+
+          {/* Tier progress sits directly under the identity, above the balance — the Mini App's
+              order, and the one that reads correctly: it belongs to the person, not the money. */}
+          <VipPreview vip={vip} onPress={() => navigation.navigate('Vip')} />
+
           <Card>
             <View style={styles.balanceHeader}>
               <Text style={styles.balanceLabel}>{t('wallet.totalBalance')}</Text>
@@ -110,8 +154,6 @@ export function ProfileScreen() {
               </Text>
             )}
           </Card>
-
-          <VipPreview vip={vip} onPress={() => navigation.navigate('Vip')} />
 
           <Card style={styles.menuCard}>
             {/* Wallet is reached from here, not from a tab — the Mini App's own arrangement.
@@ -192,6 +234,17 @@ function VipPreview({
 }
 
 const styles = StyleSheet.create({
+  identity: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: 4 },
+  avatar: { width: 64, height: 64, borderRadius: 32 },
+  avatarFallback: { width: 64, height: 64, borderRadius: 32, backgroundColor: theme.brand, alignItems: 'center', justifyContent: 'center' },
+  avatarInitial: { color: '#fff', fontSize: 22, fontWeight: '900' },
+  identityText: { flex: 1, minWidth: 0, gap: 5 },
+  displayName: { color: theme.text, fontSize: 16, fontWeight: '700' },
+  identityMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  vipChip: { backgroundColor: theme.brand, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 },
+  vipChipText: { color: '#fff', fontSize: 10, fontWeight: '900' },
+  playerId: { flex: 1, color: theme.dim, fontSize: 11 },
+  chevron: { color: theme.dim, fontSize: 20 },
   balanceHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   balanceLabel: { color: theme.dim, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
   balanceToggle: { color: theme.dim, fontSize: 11, fontWeight: '700' },

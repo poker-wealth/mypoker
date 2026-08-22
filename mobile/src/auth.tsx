@@ -1,7 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from './api';
-import { clearToken, getToken, onSessionLost, setToken } from './session';
+import {
+  clearCachedPlayer,
+  clearToken,
+  getCachedPlayer,
+  getToken,
+  onSessionLost,
+  setCachedPlayer,
+  setToken,
+} from './session';
 
 /**
  * Session state, owned by React context — there is no state library in this
@@ -54,10 +62,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // clears it when that happens. A startup `/auth/me` check that confirms
     // the token is still good before rendering anything is the upgrade path,
     // not a requirement of this pass.
-    void getToken().then((token) => {
+    void (async () => {
+      const token = await getToken();
       if (cancelled) return;
-      setStatus(token !== null ? 'signedIn' : 'signedOut');
-    });
+      if (token === null) {
+        setStatus('signedOut');
+        return;
+      }
+      // Restore WHO we last signed in as, not just that we did. Without this the shell is
+      // 'signedIn' with a null player, and the account screen greeted a signed-in person as
+      // "Guest Player" with no id. /auth/me is not the answer on its own — it returns
+      // `displayName: playerId`, a placeholder rather than their actual name.
+      const cached = await getCachedPlayer<Player>();
+      if (cancelled) return;
+      if (cached) setPlayer(cached);
+      setStatus('signedIn');
+    })();
     return () => {
       cancelled = true;
     };
@@ -71,6 +91,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // shell drops out of the signed-in view instead of continuing to render
     // it over a session the server has already forgotten.
     return onSessionLost(() => {
+      // The cached profile goes with the session. Leaving it behind would greet the NEXT person
+      // to open the app on this device by the previous player's name.
+      void clearCachedPlayer();
       setPlayer(null);
       setStatus('signedOut');
       queryClient.clear();
@@ -86,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await api.post<AuthResponse>('/auth/login', { email, password });
       await setToken(res.token);
       setPlayer(res.player);
+      void setCachedPlayer(res.player);
       setStatus('signedIn');
     } catch (err) {
       // ApiError.message is the server's own words (see api.ts) — kept as-is
@@ -116,6 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await api.post<AuthResponse>('/auth/google', { token: accessToken });
       await setToken(res.token);
       setPlayer(res.player);
+      void setCachedPlayer(res.player);
       setStatus('signedIn');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -138,6 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       await setToken(res.token);
       setPlayer(res.player);
+      void setCachedPlayer(res.player);
       setStatus('signedIn');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -149,6 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await clearToken();
+    await clearCachedPlayer();
     setPlayer(null);
     setStatus('signedOut');
     // Wipe every cached query, not just invalidate: react-query would

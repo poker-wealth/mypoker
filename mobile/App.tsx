@@ -12,6 +12,7 @@ import { AllianceScreen } from './src/screens/AllianceScreen';
 import { DataScreen } from './src/screens/DataScreen';
 import { LobbyScreen } from './src/screens/LobbyScreen';
 import { GamesScreen } from './src/screens/GamesScreen';
+import { FeltGalleryScreen } from './src/screens/FeltGalleryScreen';
 import { VipScreen } from './src/screens/VipScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
@@ -122,10 +123,21 @@ function TabsScreen() {
       <Tabs.Screen
         name="Account"
         component={ProfileScreen}
-        options={{
+        options={({ navigation }) => ({
           title: t('nav.account'),
           tabBarIcon: ({ color, size }) => <AccountIcon color={color} size={size} />,
-        }}
+          // The gear belongs in the header bar, as in the Mini App. Put inside the screen it
+          // needed its own title row, which printed "My Account" twice.
+          headerRight: () => (
+            <Text
+              onPress={() => navigation.navigate('Settings')}
+              accessibilityLabel={t('account.settings')}
+              style={styles.headerGear}
+            >
+              ⚙
+            </Text>
+          ),
+        })}
       />
     </Tabs.Navigator>
   );
@@ -191,6 +203,20 @@ function Root() {
         {/* Wallet came off the tab bar to match the Mini App, which reaches it from the account
             side (frontend/src/pages/Profile.tsx). Pushed, not dropped — see ProfileScreen. */}
         <Stack.Screen name="Wallet" component={WalletScreen} options={{ title: t('nav.wallet') }} />
+        {/* The dev felt harness, reached from Settings → Developer.
+
+            This registration was lost when I resolved the auth merge by taking the whole of
+            Samuel's App.tsx: the Settings row and the route type survived, the screen did not, and
+            tapping it threw "was not handled by any navigator". A row pointing at nothing is the
+            dead tap this app keeps deleting — restored rather than the row removed, because the
+            gallery is how every felt gets looked at. */}
+        {__DEV__ && (
+          <Stack.Screen
+            name="FeltGallery"
+            component={FeltGalleryScreen}
+            options={{ title: 'Felt gallery (dev)' }}
+          />
+        )}
       </Stack.Navigator>
 
       {/* Which gateway this build points at. Invisible in production, and the
@@ -214,6 +240,7 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  headerGear: { color: theme.dim, fontSize: 19, paddingHorizontal: 14 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.bg },
   devBanner: {
     color: theme.dim,
