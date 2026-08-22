@@ -83,7 +83,10 @@ function TabsScreen() {
       <Tabs.Screen
         name="Wallet"
         component={WalletScreen}
-        options={{ tabBarIcon: ({ color, size }) => <WalletIcon color={color} size={size} /> }}
+        options={{
+          title: t('nav.wallet'),
+          tabBarIcon: ({ color, size }) => <WalletIcon color={color} size={size} />,
+        }}
       />
       <Tabs.Screen
         name="Tables"
