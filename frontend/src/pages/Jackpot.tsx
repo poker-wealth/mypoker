@@ -209,7 +209,7 @@ function TierCard({ tier }: { tier: TierState }) {
           </div>
           <div className="mt-1.5 flex items-center gap-1 text-[0.62rem] text-dim">
             <Lock size={11} />
-            {t('jackpot.needsMore', { amount: money(tier.minThreshold - tier.amount) })}
+            {t('jackpot.needsMore', { amount: money(tier.minThreshold - tier.amount, { symbol: false }) })}
           </div>
         </>
       )}
