@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "MYPOKER",
-    "slug": "mypoker",
+    "slug": "my-poker",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -33,7 +33,11 @@
       },
       "permissions": [
         "RECORD_AUDIO",
-        "INTERNET"
+        "INTERNET",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
       "blockedPermissions": [
         "ACCESS_FINE_LOCATION",
@@ -46,9 +50,10 @@
       "expo-sharing",
       "expo-audio"
     ],
+    "owner": "xantle-application",
     "extra": {
       "eas": {
-        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+        "projectId": "e2999632-d12b-4ea0-bd08-21c995e9c8ad"
       }
     }
   }
