@@ -572,8 +572,7 @@
     "emailInvalid": "Masukkan alamat email yang valid",
     "passwordTooShort": "Kata sandi minimal 8 karakter",
     "signedOut": "Anda telah keluar",
-    "or": "ATAU",
     "continueWithGoogle": "Lanjutkan dengan Google",
-    "googleUnconfigured": "Login Google belum dikonfigurasi untuk build ini. Gunakan email di atas."
+    "or": "atau"
   }
 }

@@ -572,8 +572,7 @@
     "emailInvalid": "请输入有效的邮箱地址",
     "passwordTooShort": "密码至少需要 8 个字符",
     "signedOut": "您已退出登录",
-    "or": "或",
     "continueWithGoogle": "使用 Google 继续",
-    "googleUnconfigured": "此版本未配置 Google 登录，请使用上方的邮箱登录。"
+    "or": "或"
   }
 }

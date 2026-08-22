@@ -572,8 +572,7 @@
     "emailInvalid": "Enter a valid email address",
     "passwordTooShort": "Password must be at least 8 characters",
     "signedOut": "You are signed out",
-    "or": "OR",
     "continueWithGoogle": "Continue with Google",
-    "googleUnconfigured": "Google sign-in is not configured for this build. Use email above."
+    "or": "or"
   }
 }

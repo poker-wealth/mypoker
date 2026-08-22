@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { ApiUrlField } from '../ApiUrlField';
 import { useAuth } from '../auth';
-import { useGoogleAuth } from '../auth/useGoogleAuth';
+import { GOOGLE_ENABLED } from '../googleAuth';
 import { radius, space, theme } from '../theme';
 import { Button, Card, ErrorState } from '../ui';
 
@@ -19,7 +19,6 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function LoginScreen() {
   const { t } = useTranslation();
   const { signIn, signUp, signInWithGoogle, error, clearError, busy } = useAuth();
-  const google = useGoogleAuth();
 
   const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
   const [email, setEmail] = useState('');
@@ -40,23 +39,17 @@ export function LoginScreen() {
     clearError();
   };
 
-  const onGoogle = (): void => {
-    clearError();
-    void google.signIn().then((accessToken) => {
-      // Null means cancelled or unconfigured — useGoogleAuth already holds the reason, and a
-      // player who backed out of the browser does not need an error thrown at them.
-      if (!accessToken) return;
-      void signInWithGoogle(accessToken).catch(() => {
-        // Surfaced via `error` from useAuth, same as the email paths.
-      });
-    });
-  };
-
   const submit = (): void => {
     if (!canSubmit) return;
     const action =
       mode === 'signIn' ? signIn(email, password) : signUp(email, password, displayName.trim() || undefined);
     void action.catch(() => {
+      // Surfaced via `error` from useAuth already; nothing else to do here.
+    });
+  };
+
+  const submitGoogle = (): void => {
+    void signInWithGoogle().catch(() => {
       // Surfaced via `error` from useAuth already; nothing else to do here.
     });
   };
@@ -69,6 +62,23 @@ export function LoginScreen() {
       </View>
 
       <Card style={styles.card}>
+        {/* Hidden rather than disabled when GOOGLE_ENABLED is false: a
+            disabled control with no explanation is worse than no control at
+            all, and a build with no Google client ID configured yet is a
+            developer situation, not something an end user needs to see. */}
+        {GOOGLE_ENABLED && (
+          <>
+            <Button variant="ghost" disabled={busy} onPress={submitGoogle}>
+              {t('auth.continueWithGoogle')}
+            </Button>
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>{t('auth.or')}</Text>
+              <View style={styles.dividerLine} />
+            </View>
+          </>
+        )}
+
         <View style={styles.field}>
           <Text style={styles.label}>{t('auth.email')}</Text>
           <TextInput
@@ -142,25 +152,6 @@ export function LoginScreen() {
           {mode === 'signIn' ? t('auth.noAccount') : t('auth.haveAccount')}
         </Button>
 
-        {/* Google, below the email form because email is the path that works
-            without configuration. The Mini App leads with Google; here it is
-            second until a client id exists, so the working route is the
-            obvious one rather than the one that cannot run. */}
-        <View style={styles.dividerRow}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>{t('auth.or')}</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        <Button variant="ghost" disabled={!google.ready || google.busy} onPress={onGoogle}>
-          {google.busy ? t('common.loading') : t('auth.continueWithGoogle')}
-        </Button>
-
-        {/* Say WHY rather than showing a control that opens a browser to an
-            error page. Google needs an ANDROID OAuth client id (package
-            com.mypoker.app + signing SHA-1); the web client id is rejected for
-            a native caller, so this stays disabled until one is set. */}
-        {!google.ready && <Text style={styles.googleNote}>{t('auth.googleUnconfigured')}</Text>}
       </Card>
 
       {/* Must live here, not just in Settings: Settings is only reachable
@@ -179,10 +170,6 @@ const styles = StyleSheet.create({
   title: { color: theme.text, fontSize: 24, fontWeight: '900' },
   subtitle: { color: theme.dim, fontSize: 13, lineHeight: 19 },
   card: { gap: space.md },
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
-  dividerLine: { flex: 1, height: 1, backgroundColor: theme.border },
-  dividerText: { color: theme.dim, fontSize: 11, fontWeight: '700' },
-  googleNote: { color: theme.dim, fontSize: 11, textAlign: 'center', lineHeight: 16 },
   field: { gap: space.xs },
   label: { color: theme.dim, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
   input: {
@@ -196,4 +183,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   invalid: { color: theme.danger, fontSize: 11 },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  dividerLine: { flex: 1, height: 1, backgroundColor: theme.border },
+  dividerText: { color: theme.dim, fontSize: 11, textTransform: 'uppercase', fontWeight: '800' },
 });

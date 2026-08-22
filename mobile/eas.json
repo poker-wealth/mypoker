@@ -26,7 +26,6 @@
       "android": { "buildType": "apk" },
       "ios": { "resourceClass": "m-medium" },
       "env": {
-        "EXPO_PUBLIC_API_URL": "",
         "EXPO_PUBLIC_ALLOW_API_OVERRIDE": "true"
       }
     },

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from './api';
+import { signInWithGoogleNative } from './googleAuth';
 import {
   clearCachedPlayer,
   clearToken,
@@ -38,7 +39,7 @@ interface AuthContextValue {
   player: Player | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName?: string) => Promise<void>;
-  signInWithGoogle: (accessToken: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   error: string | null;
   clearError: () => void;
@@ -122,22 +123,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  /**
-   * Exchange a Google access token for ours.
-   *
-   * Same shape as signIn deliberately — one place that turns a credential into a session, so no
-   * path can forget to store the token or leave `status` behind.
-   *
-   * The token comes from useGoogleAuth (expo-auth-session, implicit flow). The gateway's
-   * /auth/google accepts either a verified idToken JWT or an implicit-flow `token` it resolves
-   * through Google's userinfo endpoint; the Mini App sends the latter and so do we, so both clients
-   * exercise one server path rather than two.
-   */
-  const signInWithGoogle = useCallback(async (accessToken: string) => {
+  const signUp = useCallback(async (email: string, password: string, displayName?: string) => {
     setBusy(true);
     setError(null);
     try {
-      const res = await api.post<AuthResponse>('/auth/google', { token: accessToken });
+      const res = await api.post<AuthResponse>('/auth/signup', {
+        email,
+        password,
+        // Omit entirely when empty rather than sending "" — the gateway
+        // treats an absent field differently from a blank one.
+        ...(displayName ? { displayName } : {}),
+      });
       await setToken(res.token);
       setPlayer(res.player);
       void setCachedPlayer(res.player);
@@ -150,17 +146,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string, displayName?: string) => {
+  const signInWithGoogle = useCallback(async () => {
     setBusy(true);
     setError(null);
     try {
-      const res = await api.post<AuthResponse>('/auth/signup', {
-        email,
-        password,
-        // Omit entirely when empty rather than sending "" — the gateway
-        // treats an absent field differently from a blank one.
-        ...(displayName ? { displayName } : {}),
-      });
+      const idToken = await signInWithGoogleNative();
+      if (idToken === null) {
+        // User cancelled the native sheet — not an error, nothing to show.
+        return;
+      }
+      const res = await api.post<AuthResponse>('/auth/google', { idToken });
       await setToken(res.token);
       setPlayer(res.player);
       void setCachedPlayer(res.player);

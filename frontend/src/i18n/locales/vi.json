@@ -572,8 +572,7 @@
     "emailInvalid": "Vui lòng nhập địa chỉ email hợp lệ",
     "passwordTooShort": "Mật khẩu phải có ít nhất 8 ký tự",
     "signedOut": "Bạn đã đăng xuất",
-    "or": "HOẶC",
     "continueWithGoogle": "Tiếp tục với Google",
-    "googleUnconfigured": "Bản dựng này chưa cấu hình đăng nhập Google. Vui lòng dùng email ở trên."
+    "or": "hoặc"
   }
 }

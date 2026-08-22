@@ -572,8 +572,7 @@
     "emailInvalid": "मान्य ईमेल पता दर्ज करें",
     "passwordTooShort": "पासवर्ड कम से कम 8 अक्षरों का होना चाहिए",
     "signedOut": "आप साइन आउट हो गए हैं",
-    "or": "या",
     "continueWithGoogle": "Google से जारी रखें",
-    "googleUnconfigured": "इस बिल्ड में Google साइन-इन कॉन्फ़िगर नहीं है। ऊपर दिए ईमेल का उपयोग करें।"
+    "or": "या"
   }
 }

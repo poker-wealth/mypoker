@@ -572,8 +572,7 @@
     "emailInvalid": "有効なメールアドレスを入力してください",
     "passwordTooShort": "パスワードは8文字以上で入力してください",
     "signedOut": "ログアウトしました",
-    "or": "または",
-    "continueWithGoogle": "Google で続行",
-    "googleUnconfigured": "このビルドでは Google ログインが設定されていません。上記のメールをご利用ください。"
+    "continueWithGoogle": "Google で続ける",
+    "or": "または"
   }
 }
