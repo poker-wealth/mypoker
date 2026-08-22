@@ -20,6 +20,16 @@
         "EXPO_PUBLIC_API_URL": "http://10.0.2.2:4100"
       }
     },
+    "device": {
+      "distribution": "internal",
+      "channel": "device",
+      "android": { "buildType": "apk" },
+      "ios": { "resourceClass": "m-medium" },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "",
+        "EXPO_PUBLIC_ALLOW_API_OVERRIDE": "true"
+      }
+    },
     "preview": {
       "distribution": "internal",
       "channel": "preview",

@@ -1,5 +1,6 @@
 {
   "nav": {
+    "wallet": "Dompet",
     "alliance": "Aliansi",
     "games": "Game",
     "lobby": "Lobi",
@@ -264,6 +265,7 @@
     "chatDisabled": "Obrolan dinonaktifkan",
     "microphoneDenied": "Akses mikrofon ditolak",
     "recordingUnsupported": "Peramban ini tidak bisa merekam audio",
+    "recordingUnavailable": "Perekaman tidak tersedia di perangkat ini",
     "recordingTooShort": "Tahan sedikit lebih lama untuk mengirim",
     "recordingTooLong": "Rekaman terlalu besar untuk dikirim",
     "recordingFailed": "Tidak dapat mengirim rekaman itu"
@@ -551,5 +553,27 @@
     "inLeague": "Di dalam {{name}}",
     "isolationNote": "Hanya meja dan dompet liga. Meja platform disembunyikan.",
     "backToPlatform": "Kembali ke lobi platform"
+  },
+  "security": {
+    "deviceModifiedTitle": "Perangkat ini tampak dimodifikasi",
+    "deviceModifiedBody": "Terdeteksi alat root atau jailbreak. Anda tetap bisa bermain, tetapi perangkat yang dimodifikasi lebih rentan dimanipulasi — berhati-hatilah saat menyetor dan menarik dana."
+  },
+  "auth": {
+    "title": "Masuk",
+    "subtitle": "Masuk untuk bermain, atau buat akun baru.",
+    "email": "Email",
+    "password": "Kata sandi",
+    "displayName": "Nama tampilan",
+    "displayNameOptional": "Nama tampilan (opsional)",
+    "signIn": "Masuk",
+    "createAccount": "Buat akun",
+    "noAccount": "Baru di sini? Buat akun",
+    "haveAccount": "Sudah punya akun? Masuk",
+    "emailInvalid": "Masukkan alamat email yang valid",
+    "passwordTooShort": "Kata sandi minimal 8 karakter",
+    "signedOut": "Anda telah keluar",
+    "or": "ATAU",
+    "continueWithGoogle": "Lanjutkan dengan Google",
+    "googleUnconfigured": "Login Google belum dikonfigurasi untuk build ini. Gunakan email di atas."
   }
 }

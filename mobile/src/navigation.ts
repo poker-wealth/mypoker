@@ -14,6 +14,12 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 export type RootStackParamList = {
   Tabs: undefined;
   Table: { tableId: string };
+  Vip: undefined;
+  Notifications: undefined;
+  Settings: undefined;
+  AgentCenter: undefined;
+  /** A dev-only felt harness, registered only when __DEV__. See App.tsx. */
+  FeltGallery: undefined;
 };
 
 /** Props for a screen in the root stack. `TableScreenProps` is the one the game side uses. */

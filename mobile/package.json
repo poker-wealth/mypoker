@@ -3,17 +3,33 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
+    "@noble/curves": "^2.3.0",
+    "@noble/hashes": "^2.3.0",
     "@react-navigation/bottom-tabs": "^7.18.17",
     "@react-navigation/native": "^7.3.17",
     "@react-navigation/native-stack": "^7.18.9",
+    "@scure/base": "^2.0.0",
     "@tanstack/react-query": "^5.101.4",
     "expo": "~57.0.14",
+    "expo-audio": "~57.0.4",
+    "expo-auth-session": "~57.0.8",
+    "expo-clipboard": "~57.0.1",
+    "expo-crypto": "~57.0.1",
+    "expo-file-system": "~57.0.5",
+    "expo-localization": "~57.0.1",
     "expo-secure-store": "~57.0.1",
+    "expo-sharing": "~57.0.14",
     "expo-status-bar": "~57.0.1",
+    "expo-web-browser": "~57.0.2",
+    "i18next": "^26.4.0",
+    "jail-monkey": "^3.0.0",
     "react": "19.2.3",
+    "react-i18next": "^17.0.12",
     "react-native": "0.86.2",
+    "react-native-get-random-values": "~1.11.0",
     "react-native-safe-area-context": "~5.7.0",
-    "react-native-screens": "~4.26.0"
+    "react-native-screens": "~4.26.0",
+    "react-native-svg": "15.15.4"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
@@ -21,9 +37,14 @@
   },
   "scripts": {
     "start": "expo start",
-    "android": "expo run:android",
+    "android": "node scripts/check-android-env.mjs && expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "check:felts": "node scripts/check-felts.mjs",
+    "check:android-env": "node scripts/check-android-env.mjs",
+    "check:voice-budget": "node scripts/check-voice-budget.mjs",
+    "check:integrity": "node scripts/check-integrity-tiering.mjs",
+    "verify": "tsc --noEmit && node scripts/check-felts.mjs && node scripts/check-voice-budget.mjs && node scripts/check-integrity-tiering.mjs"
   },
   "private": true
 }

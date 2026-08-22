@@ -1,5 +1,6 @@
 {
   "nav": {
+    "wallet": "ウォレット",
     "alliance": "同盟",
     "games": "ゲーム",
     "lobby": "ロビー",
@@ -264,6 +265,7 @@
     "chatDisabled": "チャットは無効です",
     "microphoneDenied": "マイクへのアクセスが拒否されました",
     "recordingUnsupported": "このブラウザーは録音に対応していません",
+    "recordingUnavailable": "この端末では録音できません",
     "recordingTooShort": "もう少し長押ししてください",
     "recordingTooLong": "録音が大きすぎて送信できません",
     "recordingFailed": "この録音を送信できませんでした"
@@ -551,5 +553,27 @@
     "inLeague": "{{name}} 内",
     "isolationNote": "リーグのテーブルとウォレットのみ。プラットフォームのテーブルは非表示です。",
     "backToPlatform": "プラットフォームロビーへ戻る"
+  },
+  "security": {
+    "deviceModifiedTitle": "この端末は改造されている可能性があります",
+    "deviceModifiedBody": "Root化または脱獄ツールが検出されました。プレイは続けられますが、改造された端末は改ざんされやすいため、入出金にはご注意ください。"
+  },
+  "auth": {
+    "title": "ログイン",
+    "subtitle": "ログインしてプレイするか、アカウントを作成してください。",
+    "email": "メールアドレス",
+    "password": "パスワード",
+    "displayName": "表示名",
+    "displayNameOptional": "表示名（任意）",
+    "signIn": "ログイン",
+    "createAccount": "アカウント作成",
+    "noAccount": "初めてですか？アカウントを作成",
+    "haveAccount": "アカウントをお持ちですか？ログイン",
+    "emailInvalid": "有効なメールアドレスを入力してください",
+    "passwordTooShort": "パスワードは8文字以上で入力してください",
+    "signedOut": "ログアウトしました",
+    "or": "または",
+    "continueWithGoogle": "Google で続行",
+    "googleUnconfigured": "このビルドでは Google ログインが設定されていません。上記のメールをご利用ください。"
   }
 }

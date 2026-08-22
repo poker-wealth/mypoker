@@ -1,5 +1,6 @@
 {
   "nav": {
+    "wallet": "钱包",
     "alliance": "联盟",
     "games": "游戏",
     "lobby": "大厅",
@@ -264,6 +265,7 @@
     "chatDisabled": "聊天已关闭",
     "microphoneDenied": "麦克风访问被拒绝",
     "recordingUnsupported": "此浏览器无法录音",
+    "recordingUnavailable": "此设备不支持录音",
     "recordingTooShort": "请按住久一点再发送语音",
     "recordingTooLong": "录音过大，无法发送",
     "recordingFailed": "无法发送该录音"
@@ -551,5 +553,27 @@
     "inLeague": "当前：{{name}}",
     "isolationNote": "仅显示联盟牌桌与钱包，平台牌桌已隐藏。",
     "backToPlatform": "返回平台大厅"
+  },
+  "security": {
+    "deviceModifiedTitle": "此设备似乎已被修改",
+    "deviceModifiedBody": "检测到 Root 或越狱工具。您仍可继续游戏，但已修改的设备更容易被篡改，请谨慎进行充值与提现。"
+  },
+  "auth": {
+    "title": "登录",
+    "subtitle": "登录即可开始游戏，或创建账户。",
+    "email": "邮箱",
+    "password": "密码",
+    "displayName": "昵称",
+    "displayNameOptional": "昵称（可选）",
+    "signIn": "登录",
+    "createAccount": "创建账户",
+    "noAccount": "还没有账户？立即创建",
+    "haveAccount": "已有账户？前往登录",
+    "emailInvalid": "请输入有效的邮箱地址",
+    "passwordTooShort": "密码至少需要 8 个字符",
+    "signedOut": "您已退出登录",
+    "or": "或",
+    "continueWithGoogle": "使用 Google 继续",
+    "googleUnconfigured": "此版本未配置 Google 登录，请使用上方的邮箱登录。"
   }
 }
