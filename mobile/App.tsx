@@ -3,6 +3,16 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
+// Per-weight entry points, NOT the package barrel. The barrel `require`s every
+// variant Nunito ships — 16 faces including italics — and Metro cannot tree
+// shake a require, so importing from it bundled ~10 fonts nobody asks for.
+import { useFonts } from 'expo-font';
+import { Nunito_400Regular } from '@expo-google-fonts/nunito/400Regular';
+import { Nunito_500Medium } from '@expo-google-fonts/nunito/500Medium';
+import { Nunito_600SemiBold } from '@expo-google-fonts/nunito/600SemiBold';
+import { Nunito_700Bold } from '@expo-google-fonts/nunito/700Bold';
+import { Nunito_800ExtraBold } from '@expo-google-fonts/nunito/800ExtraBold';
+import { Nunito_900Black } from '@expo-google-fonts/nunito/900Black';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { WalletScreen } from './src/screens/WalletScreen';
@@ -11,6 +21,9 @@ import { ProfileScreen } from './src/screens/ProfileScreen';
 import { AllianceScreen } from './src/screens/AllianceScreen';
 import { DataScreen } from './src/screens/DataScreen';
 import { LobbyScreen } from './src/screens/LobbyScreen';
+import { GamesScreen } from './src/screens/GamesScreen';
+import { JackpotScreen } from './src/screens/JackpotScreen';
+import { FairnessScreen } from './src/screens/FairnessScreen';
 import { VipScreen } from './src/screens/VipScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
@@ -20,7 +33,8 @@ import { AuthProvider, useAuth } from './src/auth';
 import type { RootStackParamList } from './src/navigation';
 import { useApiBase } from './src/apiConfig';
 import { space, theme } from './src/theme';
-import { AccountIcon, AllianceIcon, DataIcon, TablesIcon, WalletIcon } from './src/icons';
+import { AccountIcon, AllianceIcon, DataIcon, GamesIcon, TablesIcon } from './src/icons';
+import { headerRightFor } from './src/HeaderActions';
 // Side-effect import: initialises i18next before any screen calls
 // useTranslation(). Nothing pulled this in until now — WalletScreen and
 // TableScreen predate it and hardcode their copy in English.
@@ -82,34 +96,43 @@ function TabsScreen() {
         tabBarInactiveTintColor: theme.dim,
       }}
     >
+      {/* The web's order, exactly: Alliance · Games · Lobby · Data · Account
+          (frontend/src/components/BottomNav.tsx). Wallet is NOT a tab there —
+          it is reached from Account — and it was only ever a tab here because
+          WalletScreen was the shell's first bring-up screen and nobody moved
+          it afterwards. */}
       <Tabs.Screen
-        name="Wallet"
-        component={WalletScreen}
+        name="Alliance"
+        component={AllianceScreen}
         options={{
-          title: t('nav.wallet'),
-          tabBarIcon: ({ color, size }) => <WalletIcon color={color} size={size} />,
+          headerRight: headerRightFor('Alliance'),
+          title: t('nav.alliance'),
+          tabBarIcon: ({ color, size }) => <AllianceIcon color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="Games"
+        component={GamesScreen}
+        options={{
+          headerRight: headerRightFor('Games'),
+          title: t('nav.games'),
+          tabBarIcon: ({ color, size }) => <GamesIcon color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="Tables"
         component={LobbyScreen}
         options={{
+          headerRight: headerRightFor('Tables'),
           title: t('nav.lobby'),
           tabBarIcon: ({ color, size }) => <TablesIcon color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="Alliance"
-        component={AllianceScreen}
-        options={{
-          title: t('nav.alliance'),
-          tabBarIcon: ({ color, size }) => <AllianceIcon color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="Data"
         component={DataScreen}
         options={{
+          headerRight: headerRightFor('Data'),
           title: t('nav.data'),
           tabBarIcon: ({ color, size }) => <DataIcon color={color} size={size} />,
         }}
@@ -118,6 +141,7 @@ function TabsScreen() {
         name="Account"
         component={ProfileScreen}
         options={{
+          headerRight: headerRightFor('Account'),
           title: t('nav.account'),
           tabBarIcon: ({ color, size }) => <AccountIcon color={color} size={size} />,
         }}
@@ -136,6 +160,34 @@ function TabsScreen() {
 function Root() {
   const { t } = useTranslation();
   const { status } = useAuth();
+
+  /**
+   * The Mini App is set in Nunito, so this is too — the two apps being
+   * typographically different was a real parity gap, not a detail.
+   *
+   * Render nothing until the faces are in memory. RN silently substitutes the
+   * system font for a family it cannot find, so a first paint before loading
+   * completes shows Roboto and then reflows to Nunito — visible, and worse
+   * than a beat of nothing.
+   */
+  const [fontsLoaded, fontError] = useFonts({
+    Nunito_400Regular,
+    Nunito_500Medium,
+    Nunito_600SemiBold,
+    Nunito_700Bold,
+    Nunito_800ExtraBold,
+    Nunito_900Black,
+  });
+
+  // A font that fails to load must not hold the app hostage: carry on with the
+  // system face rather than showing a spinner forever over a cosmetic problem.
+  if (!fontsLoaded && !fontError) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator color={theme.brand} />
+      </View>
+    );
+  }
   const apiBase = useApiBase();
 
   if (status === 'loading') {
@@ -182,6 +234,19 @@ function Root() {
           name="AgentCenter"
           component={AgentCenterScreen}
           options={{ title: t('agent.title') }}
+        />
+        {/* Not tabs on the web either — reached from Account, the lobby's
+            jackpot card, and the fairness links in Settings and Profile. */}
+        <Stack.Screen name="Wallet" component={WalletScreen} options={{ title: t('nav.wallet') }} />
+        <Stack.Screen
+          name="Jackpot"
+          component={JackpotScreen}
+          options={{ title: t('lobby.grandJackpot') }}
+        />
+        <Stack.Screen
+          name="Fairness"
+          component={FairnessScreen}
+          options={{ title: t('fairness.title') }}
         />
       </Stack.Navigator>
 

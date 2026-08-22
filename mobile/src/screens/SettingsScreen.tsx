@@ -5,7 +5,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { api } from '../api';
 import { ApiUrlField } from '../ApiUrlField';
 import { useAuth } from '../auth';
-import { space, theme } from '../theme';
+import { space, theme, weight } from '../theme';
 import { Button, Card, ListRow, Screen, Toggle } from '../ui';
 
 /**
@@ -136,7 +136,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.bg },
   section: { gap: space.sm },
-  sectionTitle: { paddingHorizontal: space.xs, color: theme.dim, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+  sectionTitle: { paddingHorizontal: space.xs, color: theme.dim, fontSize: 11, textTransform: 'uppercase', fontFamily: weight('800') },
   sectionCard: { padding: 0, paddingHorizontal: space.md, gap: 0 },
   footer: { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.md },
 });

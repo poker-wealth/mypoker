@@ -7,7 +7,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { api } from '../api';
 import type { RootStackParamList } from '../navigation';
 import { moneyFromDecimal } from '../money';
-import { radius, space, theme } from '../theme';
+import { radius, space, theme, weight } from '../theme';
 import { Badge, Card, ListRow, Screen, Skeleton } from '../ui';
 
 /**
@@ -114,6 +114,13 @@ export function ProfileScreen() {
           <VipPreview vip={vip} onPress={() => navigation.navigate('Vip')} />
 
           <Card style={styles.menuCard}>
+            {/* Wallet lives here, not in the tab bar — the web reaches it from
+                this menu (frontend/src/pages/Profile.tsx) and the tab was an
+                artefact of it being the shell's first bring-up screen. */}
+            <ListRow
+              label={t('account.wallet')}
+              onPress={() => navigation.navigate('Wallet')}
+            />
             <ListRow
               label={t('account.vipMembership')}
               hint={t('account.checkPrivileges')}
@@ -131,6 +138,10 @@ export function ProfileScreen() {
             <ListRow
               label={t('agent.title')}
               onPress={() => navigation.navigate('AgentCenter')}
+            />
+            <ListRow
+              label={t('account.fairness')}
+              onPress={() => navigation.navigate('Fairness')}
             />
             <ListRow label={t('account.settings')} onPress={() => navigation.navigate('Settings')} />
           </Card>
@@ -185,13 +196,13 @@ function VipPreview({
 
 const styles = StyleSheet.create({
   balanceHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  balanceLabel: { color: theme.dim, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
-  balanceToggle: { color: theme.dim, fontSize: 11, fontWeight: '700' },
-  balanceAmount: { marginTop: space.xs, color: theme.text, fontSize: 30, fontWeight: '900' },
-  balanceSplit: { marginTop: 2, color: theme.dim, fontSize: 11 },
+  balanceLabel: { color: theme.dim, fontSize: 11, textTransform: 'uppercase', fontFamily: weight('700') },
+  balanceToggle: { color: theme.dim, fontSize: 11, fontFamily: weight('700') },
+  balanceAmount: { marginTop: space.xs, color: theme.text, fontSize: 30, fontFamily: weight('900') },
+  balanceSplit: { marginTop: 2, color: theme.dim, fontSize: 11, fontFamily: weight('400') },
   vipCard: { padding: space.md },
   vipRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  vipTitle: { flexShrink: 0, color: theme.text, fontSize: 12, fontWeight: '700' },
+  vipTitle: { flexShrink: 0, color: theme.text, fontSize: 12, fontFamily: weight('700') },
   vipBarTrack: {
     flex: 1,
     height: 6,
@@ -200,7 +211,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   vipBarFill: { height: '100%', borderRadius: radius.pill, backgroundColor: theme.brand },
-  vipPct: { flexShrink: 0, color: theme.dim, fontSize: 11 },
+  vipPct: { flexShrink: 0, color: theme.dim, fontSize: 11, fontFamily: weight('400') },
   menuCard: { padding: 0, paddingHorizontal: space.md, gap: 0 },
-  buildLine: { paddingTop: space.xs, color: theme.dim, fontSize: 10, textAlign: 'center' },
+  buildLine: { paddingTop: space.xs, color: theme.dim, fontSize: 10, textAlign: 'center', fontFamily: weight('400') },
 });

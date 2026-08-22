@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Path, Stop, Line } from 'react-native-svg';
-import { space, theme } from './theme';
+import { space, theme, weight } from './theme';
 
 /**
  * The cumulative profit line, ported from the Mini App's `TrendChart`.
@@ -114,7 +114,5 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: space.xs,
     top: 0,
-    fontSize: 11,
-    fontWeight: '800',
-  },
+    fontSize: 11, fontFamily: weight('800') },
 });

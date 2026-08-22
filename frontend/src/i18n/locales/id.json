@@ -351,7 +351,10 @@
     "rulesPublished": "Dipublikasikan",
     "rulesAnchoredBlurb": "Rasio ini dihasilkan di bawah versi aturan yang dikomit on-chain pada {{when}}. Komitmen itu mendahului setiap tangan yang merujuknya, sehingga aturan tidak bisa diubah setelahnya.",
     "rulesPublishedBlurb": "Versi aturan sudah tetap dan setiap tangan mencatatnya, tetapi komitmen on-chain belum selesai. Sementara itu, Anda dapat memverifikasi tangan langkah demi langkah.",
-    "rulesAbsent": "Versi aturan di balik rasio ini sedang tidak tersedia, jadi tidak ada klaim yang dibuat."
+    "rulesAbsent": "Versi aturan di balik rasio ini sedang tidak tersedia, jadi tidak ada klaim yang dibuat.",
+    "notVerifiedOnDevice": "Tidak dihitung ulang di perangkat ini",
+    "seedFound": "Seed Anda ada di kursi Anda",
+    "seedNotFound": "Seed Anda tidak ada di kursi Anda"
   },
   "reputation": {
     "title": "Reputasi",

@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import { File, Paths } from 'expo-file-system';
 import { useTranslation } from 'react-i18next';
-import { radius, space, theme } from './theme';
+import { radius, space, theme, weight } from './theme';
 import { useVoiceRecorder, type VoiceClip } from './useVoiceRecorder';
 
 /**
@@ -246,10 +246,10 @@ const styles = StyleSheet.create({
   noteMine: { backgroundColor: 'rgba(187,92,246,0.2)', borderColor: 'rgba(187,92,246,0.3)' },
   noteTheirs: { backgroundColor: theme.surface2, borderColor: theme.border },
   dim: { opacity: 0.5 },
-  glyph: { fontSize: 11 },
+  glyph: { fontSize: 11, fontFamily: weight('400') },
   bars: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   bar: { width: 2, borderRadius: 1 },
-  seconds: { color: theme.dim, fontSize: 10 },
+  seconds: { color: theme.dim, fontSize: 10, fontFamily: weight('400') },
   barWrap: { gap: space.xs },
   holdButton: {
     overflow: 'hidden',
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     paddingVertical: space.md,
   },
   holdButtonActive: { backgroundColor: 'rgba(187,92,246,0.16)', borderColor: theme.brand },
-  holdText: { color: theme.dim, fontSize: 13, fontWeight: '700' },
+  holdText: { color: theme.dim, fontSize: 13, fontFamily: weight('700') },
   holdTextActive: { color: theme.brand },
   progress: {
     position: 'absolute',
@@ -278,5 +278,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.md,
     paddingVertical: 6,
   },
-  errorText: { color: theme.danger, fontSize: 11 },
+  errorText: { color: theme.danger, fontSize: 11, fontFamily: weight('400') },
 });

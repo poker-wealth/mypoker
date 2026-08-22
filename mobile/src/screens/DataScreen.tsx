@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import { api } from '../api';
 import { moneyFromDecimal } from '../money';
-import { radius, space, theme } from '../theme';
+import { radius, space, theme, weight } from '../theme';
 import { Button, Card, EmptyState, ErrorState, ListRow, Screen, Segmented, Skeleton } from '../ui';
 import { TrendChart } from '../TrendChart';
 
@@ -267,12 +267,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.bg },
   periodBar: { paddingHorizontal: space.lg, paddingTop: space.lg },
   section: { gap: space.sm },
-  sectionTitle: { paddingHorizontal: space.xs, color: theme.dim, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
-  cardTitle: { color: theme.dim, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+  sectionTitle: { paddingHorizontal: space.xs, color: theme.dim, fontSize: 11, textTransform: 'uppercase', fontFamily: weight('800') },
+  cardTitle: { color: theme.dim, fontSize: 11, textTransform: 'uppercase', fontFamily: weight('800') },
   tileGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   tile: { width: '31%', gap: 2 },
-  tileValue: { fontSize: 16, fontWeight: '900' },
-  tileLabel: { color: theme.dim, fontSize: 10 },
+  tileValue: { fontSize: 16, fontFamily: weight('900') },
+  tileLabel: { color: theme.dim, fontSize: 10, fontFamily: weight('400') },
   listCard: { padding: 0, paddingHorizontal: space.md, gap: 0 },
-  roundNet: { fontSize: 13, fontWeight: '700' },
+  roundNet: { fontSize: 13, fontFamily: weight('700') },
 });

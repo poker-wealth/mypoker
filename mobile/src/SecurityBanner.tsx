@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { radius, space, theme } from './theme';
+import { radius, space, theme, weight } from './theme';
 import { useDeviceIntegrity } from './integrity';
 
 /**
@@ -45,6 +45,6 @@ const styles = StyleSheet.create({
     padding: space.md,
     gap: space.xs,
   },
-  title: { color: theme.danger, fontSize: 13, fontWeight: '800' },
-  body: { color: theme.dim, fontSize: 11, lineHeight: 17 },
+  title: { color: theme.danger, fontSize: 13, fontFamily: weight('800') },
+  body: { color: theme.dim, fontSize: 11, lineHeight: 17, fontFamily: weight('400') },
 });

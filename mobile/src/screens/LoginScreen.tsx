@@ -4,7 +4,7 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { ApiUrlField } from '../ApiUrlField';
 import { useAuth } from '../auth';
 import { GOOGLE_ENABLED } from '../googleAuth';
-import { radius, space, theme } from '../theme';
+import { radius, space, theme, weight } from '../theme';
 import { Button, Card, ErrorState } from '../ui';
 
 /**
@@ -166,11 +166,11 @@ export function LoginScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.bg, justifyContent: 'center', padding: space.lg, gap: space.lg },
   header: { gap: space.xs },
-  title: { color: theme.text, fontSize: 24, fontWeight: '900' },
-  subtitle: { color: theme.dim, fontSize: 13, lineHeight: 19 },
+  title: { color: theme.text, fontSize: 24, fontFamily: weight('900') },
+  subtitle: { color: theme.dim, fontSize: 13, lineHeight: 19, fontFamily: weight('400') },
   card: { gap: space.md },
   field: { gap: space.xs },
-  label: { color: theme.dim, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+  label: { color: theme.dim, fontSize: 11, textTransform: 'uppercase', fontFamily: weight('800') },
   input: {
     backgroundColor: theme.surface2,
     borderColor: theme.border,
@@ -179,10 +179,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
     color: theme.text,
-    fontSize: 15,
-  },
-  invalid: { color: theme.danger, fontSize: 11 },
+    fontSize: 15, fontFamily: weight('400') },
+  invalid: { color: theme.danger, fontSize: 11, fontFamily: weight('400') },
   dividerRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   dividerLine: { flex: 1, height: 1, backgroundColor: theme.border },
-  dividerText: { color: theme.dim, fontSize: 11, textTransform: 'uppercase', fontWeight: '800' },
+  dividerText: { color: theme.dim, fontSize: 11, textTransform: 'uppercase', fontFamily: weight('800') },
 });

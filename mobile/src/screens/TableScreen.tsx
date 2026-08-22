@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { TableScreenProps } from '../navigation';
 import { useApiBase } from '../apiConfig';
 import { getToken } from '../session';
-import { radius, space, theme } from '../theme';
+import { radius, space, theme, weight } from '../theme';
 
 /**
  * TableScreen — THE SEAM. A stub, deliberately.
@@ -98,7 +98,7 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.bg },
   content: { padding: space.lg, gap: space.md },
-  heading: { color: theme.text, fontSize: 20, fontWeight: '800' },
+  heading: { color: theme.text, fontSize: 20, fontFamily: weight('800') },
   card: {
     backgroundColor: theme.surface,
     borderColor: theme.border,
@@ -111,10 +111,8 @@ const styles = StyleSheet.create({
   rowLabel: {
     color: theme.dim,
     fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  rowValue: { color: theme.text, fontSize: 13 },
+    textTransform: 'uppercase', fontFamily: weight('700') },
+  rowValue: { color: theme.text, fontSize: 13, fontFamily: weight('400') },
   mono: { fontFamily: 'monospace' },
-  note: { color: theme.dim, fontSize: 12, lineHeight: 18 },
+  note: { color: theme.dim, fontSize: 12, lineHeight: 18, fontFamily: weight('400') },
 });

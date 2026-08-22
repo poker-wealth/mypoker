@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.ts",
   "dependencies": {
+    "@expo-google-fonts/nunito": "^0.4.2",
     "@react-native-google-signin/google-signin": "^16.1.4",
     "@react-navigation/bottom-tabs": "^7.18.17",
     "@react-navigation/native": "^7.3.17",
@@ -11,7 +12,10 @@
     "expo": "~57.0.14",
     "expo-audio": "~57.0.4",
     "expo-clipboard": "~57.0.1",
+    "expo-crypto": "~57.0.1",
     "expo-file-system": "~57.0.5",
+    "expo-font": "~57.0.1",
+    "expo-linear-gradient": "~57.0.1",
     "expo-localization": "~57.0.1",
     "expo-secure-store": "~57.0.1",
     "expo-sharing": "~57.0.14",
@@ -36,7 +40,8 @@
     "web": "expo start --web",
     "check:android-env": "node scripts/check-android-env.mjs",
     "check:voice-budget": "node scripts/check-voice-budget.mjs",
-    "check:integrity": "node scripts/check-integrity-tiering.mjs"
+    "check:integrity": "node scripts/check-integrity-tiering.mjs",
+    "check:fairness": "node scripts/check-fairness.mjs"
   },
   "private": true
 }

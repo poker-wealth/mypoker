@@ -351,7 +351,10 @@
     "rulesPublished": "已公布",
     "rulesAnchoredBlurb": "这些赔率是在 {{when}} 已上链提交的规则版本下产生的。该承诺早于所有引用它的牌局，因此规则无法事后更改。",
     "rulesPublishedBlurb": "规则版本已固定，每手牌都会记录它，但链上提交尚未完成。在此期间可逐手验证牌局。",
-    "rulesAbsent": "目前无法获取这些赔率背后的规则版本，因此不作任何声明。"
+    "rulesAbsent": "目前无法获取这些赔率背后的规则版本，因此不作任何声明。",
+    "notVerifiedOnDevice": "本设备未重新计算",
+    "seedFound": "您的种子在您的座位上",
+    "seedNotFound": "您的种子不在您的座位上"
   },
   "reputation": {
     "title": "信誉",

@@ -351,7 +351,10 @@
     "rulesPublished": "Published",
     "rulesAnchoredBlurb": "These rates were earned under a rule version committed on-chain on {{when}}. The commitment predates every hand that cites it, so the rules could not be changed after the fact.",
     "rulesPublishedBlurb": "The rule version is fixed and every hand records it, but the on-chain commitment has not landed yet. Verify a hand step-by-step in the meantime.",
-    "rulesAbsent": "The rule version behind these rates is unavailable right now, so no claim is made about it."
+    "rulesAbsent": "The rule version behind these rates is unavailable right now, so no claim is made about it.",
+    "notVerifiedOnDevice": "Not recomputed on this device",
+    "seedFound": "Your seed is at your seat",
+    "seedNotFound": "Your seed is not at your seat"
   },
   "reputation": {
     "title": "Reputation",
