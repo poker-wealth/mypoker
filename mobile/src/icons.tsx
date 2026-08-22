@@ -87,3 +87,31 @@ export function AccountIcon(p: IconProps) {
     </Frame>
   );
 }
+
+/**
+ * Games — a gamepad, matching the Mini App's `Gamepad2`.
+ *
+ * Added when the tab bar was corrected to the Mini App's own five: Alliance, Games, Lobby, Data,
+ * My Account. Wallet came off the bar — the Mini App does not carry it there.
+ */
+export function GamesIcon(p: IconProps) {
+  return (
+    <Frame {...p}>
+      <Path d="M6 12h4M8 10v4" />
+      <Circle cx={15.5} cy={11} r={0.9} fill={p.color} stroke="none" />
+      <Circle cx={18} cy={13.5} r={0.9} fill={p.color} stroke="none" />
+      <Path d="M17.3 6H6.7A4.7 4.7 0 0 0 2 10.7v2.6A4.7 4.7 0 0 0 6.7 18c1.5 0 2.2-.6 3-1.4l.6-.6h3.4l.6.6c.8.8 1.5 1.4 3 1.4a4.7 4.7 0 0 0 4.7-4.7v-2.6A4.7 4.7 0 0 0 17.3 6Z" />
+    </Frame>
+  );
+}
+
+/** Lobby — a house, matching the Mini App's `Home`. */
+export function LobbyIcon(p: IconProps) {
+  return (
+    <Frame {...p}>
+      <Path d="M3 10.5 12 3l9 7.5" />
+      <Path d="M5.5 9.8V20h13V9.8" />
+      <Path d="M9.8 20v-5.5h4.4V20" />
+    </Frame>
+  );
+}

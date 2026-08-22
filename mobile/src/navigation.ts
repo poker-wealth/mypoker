@@ -18,6 +18,7 @@ export type RootStackParamList = {
   Notifications: undefined;
   Settings: undefined;
   AgentCenter: undefined;
+  Wallet: undefined;
   /** A dev-only felt harness, registered only when __DEV__. See App.tsx. */
   FeltGallery: undefined;
 };

@@ -114,6 +114,10 @@ export function ProfileScreen() {
           <VipPreview vip={vip} onPress={() => navigation.navigate('Vip')} />
 
           <Card style={styles.menuCard}>
+            {/* Wallet is reached from here, not from a tab — the Mini App's own arrangement
+                (frontend/src/pages/Profile.tsx navigates to /wallet from this menu). It was a tab
+                on mobile only because the tab bar had not been matched to the Mini App yet. */}
+            <ListRow label={t('nav.wallet')} onPress={() => navigation.navigate('Wallet')} />
             <ListRow
               label={t('account.vipMembership')}
               hint={t('account.checkPrivileges')}

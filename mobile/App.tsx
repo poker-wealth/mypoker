@@ -11,6 +11,7 @@ import { ProfileScreen } from './src/screens/ProfileScreen';
 import { AllianceScreen } from './src/screens/AllianceScreen';
 import { DataScreen } from './src/screens/DataScreen';
 import { LobbyScreen } from './src/screens/LobbyScreen';
+import { GamesScreen } from './src/screens/GamesScreen';
 import { VipScreen } from './src/screens/VipScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
@@ -20,7 +21,7 @@ import { AuthProvider, useAuth } from './src/auth';
 import type { RootStackParamList } from './src/navigation';
 import { useApiBase } from './src/apiConfig';
 import { space, theme } from './src/theme';
-import { AccountIcon, AllianceIcon, DataIcon, TablesIcon, WalletIcon } from './src/icons';
+import { AccountIcon, AllianceIcon, DataIcon, GamesIcon, LobbyIcon } from './src/icons';
 // Side-effect import: initialises i18next before any screen calls
 // useTranslation(). Nothing pulled this in until now — WalletScreen and
 // TableScreen predate it and hardcode their copy in English.
@@ -82,12 +83,24 @@ function TabsScreen() {
         tabBarInactiveTintColor: theme.dim,
       }}
     >
+      {/* The Mini App's own five, in its own order: Alliance, Games, Lobby, Data, My Account
+          (frontend/src/components/BottomNav.tsx). Wallet is NOT a tab there — it is reached from
+          the account side — and Games, which had no mobile equivalent at all, is the screen the
+          felts are actually opened from. */}
       <Tabs.Screen
-        name="Wallet"
-        component={WalletScreen}
+        name="Alliance"
+        component={AllianceScreen}
         options={{
-          title: t('nav.wallet'),
-          tabBarIcon: ({ color, size }) => <WalletIcon color={color} size={size} />,
+          title: t('nav.alliance'),
+          tabBarIcon: ({ color, size }) => <AllianceIcon color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="Games"
+        component={GamesScreen}
+        options={{
+          title: t('nav.games'),
+          tabBarIcon: ({ color, size }) => <GamesIcon color={color} size={size} />,
         }}
       />
       <Tabs.Screen
@@ -95,15 +108,7 @@ function TabsScreen() {
         component={LobbyScreen}
         options={{
           title: t('nav.lobby'),
-          tabBarIcon: ({ color, size }) => <TablesIcon color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="Alliance"
-        component={AllianceScreen}
-        options={{
-          title: t('nav.alliance'),
-          tabBarIcon: ({ color, size }) => <AllianceIcon color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <LobbyIcon color={color} size={size} />,
         }}
       />
       <Tabs.Screen
@@ -183,6 +188,9 @@ function Root() {
           component={AgentCenterScreen}
           options={{ title: t('agent.title') }}
         />
+        {/* Wallet came off the tab bar to match the Mini App, which reaches it from the account
+            side (frontend/src/pages/Profile.tsx). Pushed, not dropped — see ProfileScreen. */}
+        <Stack.Screen name="Wallet" component={WalletScreen} options={{ title: t('nav.wallet') }} />
       </Stack.Navigator>
 
       {/* Which gateway this build points at. Invisible in production, and the
