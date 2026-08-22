@@ -21,6 +21,8 @@ export type RootStackParamList = {
   Wallet: undefined;
   Jackpot: undefined;
   Fairness: undefined;
+  /** A dev-only felt harness, registered only when __DEV__. See App.tsx. */
+  FeltGallery: undefined;
 };
 
 /**

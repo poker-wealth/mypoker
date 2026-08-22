@@ -92,3 +92,43 @@ export async function clearToken(): Promise<void> {
 export async function hasSession(): Promise<boolean> {
   return (await getToken()) !== null;
 }
+
+/**
+ * The signed-in player, cached beside the token.
+ *
+ * WHY THIS EXISTS
+ *
+ * `AuthProvider` learns who you are from the sign-in RESPONSE and holds it in memory. On a cold
+ * start it only reads the token back, so `player` is null while `status` is 'signedIn' — and the
+ * account screen greeted a signed-in player as "Guest Player" with no id.
+ *
+ * `/auth/me` is not the fix on its own: it returns `displayName: playerId`, a placeholder rather
+ * than the name the user actually has. Caching the real profile from sign-in preserves it.
+ *
+ * This is a CACHE, never an authority. It says who we last signed in as, not that the session is
+ * still valid — only the server decides that, and a 401 clears both.
+ */
+const PLAYER_KEY = 'mypoker.session.player';
+
+export async function setCachedPlayer(player: unknown): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(PLAYER_KEY, JSON.stringify(player), {
+      keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+    });
+  } catch {
+    // A profile we cannot cache is a cosmetic loss on the next cold start, not a failed sign-in.
+  }
+}
+
+export async function getCachedPlayer<T>(): Promise<T | null> {
+  try {
+    const raw = await SecureStore.getItemAsync(PLAYER_KEY);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function clearCachedPlayer(): Promise<void> {
+  await SecureStore.deleteItemAsync(PLAYER_KEY).catch(() => {});
+}

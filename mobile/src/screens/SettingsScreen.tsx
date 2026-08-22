@@ -1,10 +1,13 @@
 import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import { api } from '../api';
 import { ApiUrlField } from '../ApiUrlField';
 import { useAuth } from '../auth';
+import type { RootStackParamList } from '../navigation';
 import { space, theme, weight } from '../theme';
 import { Button, Card, ListRow, Screen, Toggle } from '../ui';
 
@@ -41,6 +44,7 @@ export function SettingsScreen() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const { signOut } = useAuth();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const settings = useQuery({
     queryKey: SETTINGS_KEY,
@@ -100,6 +104,16 @@ export function SettingsScreen() {
                 right={<Toggle value={data.notifyPromos} onChange={(v) => set({ notifyPromos: v })} />}
               />
             </Section>
+
+            {/* Developer tools. `__DEV__` is false in any release build, so this section does not
+                exist in a shipped app — it is not hidden, it is absent. Untranslated on purpose:
+                it never reaches a player. Must stay in step with the FeltGallery route in App.tsx
+                — the pair got separated in an earlier merge and this row became a dead tap. */}
+            {__DEV__ && (
+              <Section title="Developer">
+                <ListRow label="Felt gallery" onPress={() => navigation.navigate('FeltGallery')} />
+              </Section>
+            )}
           </>
         )}
       </Screen>

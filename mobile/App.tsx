@@ -22,6 +22,7 @@ import { AllianceScreen } from './src/screens/AllianceScreen';
 import { DataScreen } from './src/screens/DataScreen';
 import { LobbyScreen } from './src/screens/LobbyScreen';
 import { GamesScreen } from './src/screens/GamesScreen';
+import { FeltGalleryScreen } from './src/screens/FeltGalleryScreen';
 import { JackpotScreen } from './src/screens/JackpotScreen';
 import { FairnessScreen } from './src/screens/FairnessScreen';
 import { VipScreen } from './src/screens/VipScreen';
@@ -160,6 +161,15 @@ function TabsScreen() {
 function Root() {
   const { t } = useTranslation();
   const { status } = useAuth();
+  /**
+   * Every hook in this component must sit above the first conditional return.
+   *
+   * This one was below the fonts guard after a merge, which crashed the app on launch with
+   * "Rendered more hooks than during the previous render": the first pass returned the spinner
+   * before reaching it (17 hooks), the second ran it (18). React counts hooks positionally, so a
+   * hook after an early return is a different hook list on the render where that return is skipped.
+   */
+  const apiBase = useApiBase();
 
   /**
    * The Mini App is set in Nunito, so this is too — the two apps being
@@ -188,7 +198,6 @@ function Root() {
       </View>
     );
   }
-  const apiBase = useApiBase();
 
   if (status === 'loading') {
     // A cold start must not look like signed-out — that would flash the
@@ -248,6 +257,16 @@ function Root() {
           component={FairnessScreen}
           options={{ title: t('fairness.title') }}
         />
+        {/* The dev felt harness, reached from Settings → Developer. Registered only under
+            __DEV__, so it does not exist in a release build. Settings already carries the row
+            that navigates here; the two must stay together or the row is a dead tap. */}
+        {__DEV__ && (
+          <Stack.Screen
+            name="FeltGallery"
+            component={FeltGalleryScreen}
+            options={{ title: 'Felt gallery (dev)' }}
+          />
+        )}
       </Stack.Navigator>
 
       {/* Which gateway this build points at. Invisible in production, and the

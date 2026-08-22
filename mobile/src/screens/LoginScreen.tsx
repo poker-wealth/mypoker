@@ -151,6 +151,7 @@ export function LoginScreen() {
         <Button variant="ghost" onPress={toggleMode}>
           {mode === 'signIn' ? t('auth.noAccount') : t('auth.haveAccount')}
         </Button>
+
       </Card>
 
       {/* Must live here, not just in Settings: Settings is only reachable

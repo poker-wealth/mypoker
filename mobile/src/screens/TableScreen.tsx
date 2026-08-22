@@ -1,118 +1,216 @@
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { TableScreenProps } from '../navigation';
-import { useApiBase } from '../apiConfig';
 import { getToken } from '../session';
-import { radius, space, theme, weight } from '../theme';
+import { Sheet } from '../ui';
+import { radius, space, theme } from '../theme';
+import { useLiveTable } from '../table/useLiveTable';
+import { ActionBar } from '../components/poker/ActionBar';
+import { feltFor } from '../components/games/registry';
+import { HoldemFelt } from '../components/games/HoldemFelt';
+import { BuyInSheet } from '../components/poker/BuyInSheet';
+import { JackpotBurst } from '../components/poker/JackpotBurst';
+import { TableDesignSheet } from '../components/poker/TableDesignSheet';
+import { ChatBox } from '../components/poker/ChatBox';
+import { ChallengeModal } from '../components/poker/ChallengeModal';
+import { useTableChat } from '../table/useTableChat';
+import { useChallengePrompt } from '../table/useChallengePrompt';
 
 /**
- * TableScreen — THE SEAM. A stub, deliberately.
+ * TableScreen — the seam, now joined.
  *
- * The shell's job ends here: it has decided which table and it can prove who
- * you are. Everything below this line — connecting, the handshake, the felt,
- * betting — belongs to the game side (ESTHER_V2 task 6), which is why this file
- * opens no socket and renders no cards.
+ * The shell decided which table and can prove who you are; everything from here down is the game
+ * side. The stub is replaced and the wiring it asked me to leave alone is untouched: the same props
+ * from `RootStackParamList`, the same `getToken()`, the same theme tokens.
  *
- * It exists so that work does not start by wiring navigation, which is the
- * shell's half. Replace the placeholder below; leave the wiring alone.
- *
- * ─────────────────────────────────────────────────────────────────────────
- * WHAT THE WEB CLIENT DOES, AS THE REFERENCE
- *
- *   new TableSocket(url, token, tableId, {
- *     onSnapshot, onStatus, onError, onUnauthorized?
- *   })                                  frontend/src/api/tableSocket.ts:70-75
- *
- * It auto-sends `{ type: 'join', roomId }` once the handshake completes, then
- * seating is a separate command: `{ kind: 'sit', seat, buyIn }`.
- *
- * Wire types (TableSnapshot, TableCommand, LiveSeat) are in
- * `frontend/src/lib/liveTable.ts`, mirroring `game-server/src/live/room-state.ts`.
- * The socket URL is the gateway with the scheme swapped: http -> ws, plus `/ws`.
- *
- * WHAT REACT NATIVE DOES NOT GIVE YOU
- *
- *   crypto.subtle   — the whole X25519/HKDF/HMAC path needs a native provider.
- *                     See mobile/CLAUDE.md for the exact parameters and the
- *                     SPKI-vs-raw-32-bytes trap.
- *   btoa / atob     — used for base64 on the wire; shim or swap.
- *   localStorage    — the client seed lives there on web
- *                     (frontend/src/lib/clientSeed.ts:11). SecureStore or
- *                     AsyncStorage here; it is not a secret, just per-device.
- *   window.setTimeout handle types — RN returns a different handle type.
- *
- * RN DOES provide `WebSocket` and `fetch`, so the transport shape carries over.
- * ─────────────────────────────────────────────────────────────────────────
+ * A game whose felt is ported gets its felt; anything else says so rather than falling through to
+ * a default. The Mini App spent a day rendering every game as poker because a lost registry did
+ * exactly that, and nothing failed while it happened.
  */
 export function TableScreen({ route }: TableScreenProps) {
   const { tableId } = route.params;
-  const [hasToken, setHasToken] = useState<boolean | null>(null);
-  const apiBase = useApiBase();
+  const [token, setToken] = useState<string | null>(null);
+  const [tokenChecked, setTokenChecked] = useState(false);
 
   useEffect(() => {
-    let alive = true;
-    // The shell owns the token; the game side asks for it and never stores its
-    // own copy. Two copies drift, and the one that drifts fails mid-hand.
+    let cancelled = false;
     void getToken().then((t) => {
-      if (alive) setHasToken(t !== null);
+      if (cancelled) return;
+      setToken(t);
+      setTokenChecked(true);
     });
     return () => {
-      alive = false;
+      cancelled = true;
     };
   }, []);
 
-  return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Text style={styles.heading}>Table</Text>
+  const { snapshot, status, error, command, socket } = useLiveTable(tableId, token);
+  const { messages, sendChat } = useTableChat(socket);
+  const { challengerId, clear: clearChallenge } = useChallengePrompt(socket);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [buyInFor, setBuyInFor] = useState<number | null | false>(false);
+  /** Which jackpot this viewer has already watched, so a re-render cannot replay it. */
+  const [jackpotSeen, setJackpotSeen] = useState<string | null>(null);
+  const [designOpen, setDesignOpen] = useState(false);
+  const Felt = feltFor(tableId);
+  /**
+   * Only the poker family draws the configurable table, so only it offers the picker. Derived from
+   * the registry rather than a second list of table ids — one of those would eventually disagree
+   * with the other, and the disagreement would show up as a control that changes nothing.
+   */
+  const designable = Felt === HoldemFelt;
 
-      <View style={styles.card}>
-        <Row label="tableId" value={tableId} mono />
-        <Row label="gateway" value={apiBase === null ? '…' : apiBase || 'No API URL set'} mono />
-        <Row
-          label="session"
-          value={
-            hasToken === null ? 'checking…' : hasToken ? 'token available' : 'signed out'
-          }
-        />
+  if (!tokenChecked) {
+    return (
+      <View style={styles.centre}>
+        <ActivityIndicator color={theme.brand} />
       </View>
+    );
+  }
 
-      <Text style={styles.note}>
-        The shell stops here. The socket, the handshake and the felt are the game side&apos;s —
-        see the handoff notes at the top of this file.
-      </Text>
-    </ScrollView>
-  );
-}
+  if (!token) {
+    return (
+      <View style={styles.centre}>
+        <Text style={styles.note}>
+          Sign in to sit at a table. The table refuses an unauthenticated socket, so there is
+          nothing to show until you do.
+        </Text>
+      </View>
+    );
+  }
 
-function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  if (!snapshot) {
+    return (
+      <View style={styles.centre}>
+        <ActivityIndicator color={theme.brand} />
+        <Text style={styles.dim}>{status === 'ready' ? 'waiting for the table…' : status}</Text>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+      </View>
+    );
+  }
+
+  const you = snapshot.seats.find((s) => s.isYou);
+  // The server alone decides whose turn it is: `legal` is present only when it is yours.
+  const yourTurn = Boolean(you) && snapshot.toActSeat === you?.index && snapshot.legal !== null;
+
   return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={[styles.rowValue, mono && styles.mono]} numberOfLines={2}>
-        {value}
-      </Text>
+    <View style={styles.screen}>
+      <ScrollView contentContainerStyle={styles.content}>
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        {Felt ? (
+          <Felt snapshot={snapshot} onCommand={command} onSit={(seat) => setBuyInFor(seat)} />
+        ) : (
+          <Text style={styles.note}>
+            {snapshot.name} has no felt on mobile yet. It is playable in the Mini App.
+          </Text>
+        )}
+
+        <View style={styles.tableTools}>
+          <Pressable onPress={() => setChatOpen(true)} style={styles.toolButton}>
+            <Text style={styles.toolText}>
+              Chat{messages.length > 0 ? ` (${messages.length})` : ''}
+            </Text>
+          </Pressable>
+          {designable ? (
+            <Pressable onPress={() => setDesignOpen(true)} style={styles.toolButton}>
+              <Text style={styles.toolText}>Table design</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </ScrollView>
+
+      <TableDesignSheet open={designOpen} onClose={() => setDesignOpen(false)} />
+
+      <Sheet open={chatOpen} onClose={() => setChatOpen(false)} title="Table chat">
+        <View style={styles.chatHost}>
+          <ChatBox
+            messages={messages}
+            onSend={sendChat}
+            {...(snapshot.you ? { myPlayerId: snapshot.you.playerId } : {})}
+            // Chat is a seated privilege; a spectator watching a table does not get to talk at it.
+            disabled={!snapshot.you || snapshot.yourSeat === null}
+            placeholder={snapshot.yourSeat === null ? 'Take a seat to chat' : 'Say something...'}
+          />
+        </View>
+      </Sheet>
+
+      {/* The bot check. Arrives addressed to this viewer only, and cannot be dismissed — see
+          ChallengeModal. Answering clears it; the server scores how long it took. */}
+      <ChallengeModal
+        open={challengerId !== null}
+        challengerId={challengerId ?? ''}
+        onAnswer={(passed, responseMs) => {
+          command({ kind: 'answer_challenge', passed, responseMs });
+          clearChallenge();
+        }}
+      />
+
+      <BuyInSheet
+        open={buyInFor !== false}
+        onClose={() => setBuyInFor(false)}
+        min={snapshot.minBuyIn}
+        max={snapshot.maxBuyIn}
+        bigBlind={snapshot.bigBlind}
+        available={snapshot.you?.available ?? 0}
+        seatIndex={typeof buyInFor === 'number' ? buyInFor : null}
+        onConfirm={(amount) => {
+          if (typeof buyInFor === 'number') {
+            command({ kind: 'sit', seat: buyInFor, buyIn: amount });
+          } else {
+            command({ kind: 'buyIn', amount });
+          }
+        }}
+      />
+
+      {/* A jackpot is table news: every viewer sees it, for as long as the server says. */}
+      {snapshot.jackpot && snapshot.jackpot.roundId !== jackpotSeen ? (
+        <JackpotBurst
+          tier={snapshot.jackpot.tier}
+          playerName={snapshot.jackpot.playerName}
+          amount={snapshot.jackpot.amount}
+          animationMs={snapshot.jackpot.animationMs}
+          onDone={() => setJackpotSeen(snapshot.jackpot?.roundId ?? null)}
+        />
+      ) : null}
+
+      {yourTurn && snapshot.legal ? (
+        <ActionBar
+          legal={snapshot.legal}
+          bet={you?.bet ?? 0}
+          pot={snapshot.pot}
+          onCommand={command}
+        />
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.bg },
-  content: { padding: space.lg, gap: space.md },
-  heading: { color: theme.text, fontSize: 20, fontFamily: weight('800') },
-  card: {
-    backgroundColor: theme.surface,
-    borderColor: theme.border,
-    borderWidth: 1,
-    borderRadius: radius.card,
-    padding: space.md,
-    gap: space.sm,
+  content: { padding: space.md, gap: space.md },
+  centre: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.md,
+    padding: space.xl,
+    backgroundColor: theme.bg,
   },
-  row: { gap: 2 },
-  rowLabel: {
-    color: theme.dim,
-    fontSize: 11,
-    textTransform: 'uppercase', fontFamily: weight('700') },
-  rowValue: { color: theme.text, fontSize: 13, fontFamily: weight('400') },
-  mono: { fontFamily: 'monospace' },
-  note: { color: theme.dim, fontSize: 12, lineHeight: 18, fontFamily: weight('400') },
+  tableTools: { flexDirection: 'row', justifyContent: 'center', gap: space.sm },
+  toolButton: {
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
+    paddingHorizontal: space.lg,
+    paddingVertical: 7,
+  },
+  toolText: { color: theme.dim, fontSize: 12, fontWeight: '600' },
+  // The sheet sizes to its content, and ChatBox is `flex: 1` — without a height it collapses to
+  // nothing and the composer sits under the title with no log above it.
+  chatHost: { height: 380 },
+  dim: { color: theme.dim, fontSize: 12 },
+  note: { color: theme.dim, fontSize: 13, textAlign: 'center', lineHeight: 19 },
+  error: { color: theme.danger, fontSize: 12 },
 });

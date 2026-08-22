@@ -1,5 +1,6 @@
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import { FilterError } from '../lobby';
+import { syncLobbyWithLiveTables } from '../lobby/live-sync';
 import type { GatewayConfig } from './config';
 import { buildAuthRouter } from './auth';
 import { buildLobbyRouter } from './lobby-routes';
@@ -145,14 +146,32 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
   // gateway (and the auth/lobby tests) skip it. The WebSocket itself is attached to the http server
   // in gateway/server.ts, which reads `app.locals.tableHub`.
   if (config.internalApiSecret) {
+    const liveTables = defaultTables();
     const mounted = mountLiveTables(app, {
       jwtSecret: config.jwtSecret,
       financialCore: { baseUrl: config.financialCoreUrl, internalSecret: config.internalApiSecret },
-      tables: defaultTables(),
+      tables: liveTables,
       // The gateway connects to Mongo (the user store), so it can persist round proofs — notarize here.
       notarize: true,
     });
     app.locals.tableHub = mounted.hub;
+
+    /**
+     * Point the lobby at the rooms that actually exist.
+     *
+     * Without this the lobby and the hub are two unrelated lists: the lobby advertised `tx-1`
+     * while the hub only ever knew `texas`, so every row a player could tap answered
+     * "unknown table". See src/lobby/live-sync.ts for the full account.
+     *
+     * Re-synced on an interval so seat counts do not freeze at whatever they were when the process
+     * started. `unref()` so this timer never holds the process (or a test run) open.
+     */
+    if (lobby) {
+      const resync = (): void =>
+        syncLobbyWithLiveTables(lobby, mounted.hub.tables(), liveTables);
+      resync();
+      setInterval(resync, 5_000).unref();
+    }
 
     // League private rooms (v5.9 §2). Mounted here rather than beside the other
     // league routes because it needs the hub and the lobby, which only exist

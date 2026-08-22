@@ -2,7 +2,15 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './api';
 import { signInWithGoogleNative } from './googleAuth';
-import { clearToken, getToken, onSessionLost, setToken } from './session';
+import {
+  clearCachedPlayer,
+  clearToken,
+  getCachedPlayer,
+  getToken,
+  onSessionLost,
+  setCachedPlayer,
+  setToken,
+} from './session';
 
 /**
  * Session state, owned by React context — there is no state library in this
@@ -49,23 +57,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    // A stored token alone is not proof of a valid session, so on cold start
-    // we ask the server who it belongs to instead of trusting its mere
-    // presence. Three outcomes, each handled differently:
-    //   - No token: nothing to restore, straight to signed-out.
-    //   - The server confirms it (200): restore the real profile so the UI
-    //     never shows a placeholder name for a genuinely signed-in person.
-    //   - The server rejects it (401): do nothing here. api.ts already
-    //     cleared the token and fired onSessionLost, and the effect below is
-    //     subscribed to that — it will set signed-out and clear the query
-    //     cache. Setting state here too would race it.
-    //   - Anything else (offline, timeout, 5xx — i.e. we simply couldn't
-    //     reach the server): stay signed in with `player` left null. We know
-    //     a token exists; we just couldn't confirm the name that goes with
-    //     it. Treating an unreachable server as a sign-out would destroy a
-    //     valid session over a network blip, which is worse than a missing
-    //     display name. Individual screens fetch their own data and surface
-    //     their own errors.
+    // This fixes "shows Guest Player on cold start" from both directions we
+    // independently chased it (the cache from Esther, the server check from
+    // me), and keeping both here is deliberate — not leftover merge noise.
+    // We paint from the cache first because it's instant and it's the only
+    // source that works with no network at all, but a cache can go stale (a
+    // changed display name or VIP tier never shows up) and it says nothing
+    // about whether the token is even still valid — only the server can
+    // answer that — so we still ask it right after, and correct the
+    // in-memory player if the answer differs from the cache.
     void (async () => {
       const token = await getToken();
       if (cancelled) return;
@@ -73,17 +73,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStatus('signedOut');
         return;
       }
+      const cached = await getCachedPlayer<Player>();
+      if (cancelled) return;
+      if (cached) setPlayer(cached);
+      setStatus('signedIn');
       try {
         const profile = await api.get<Player>('/auth/me');
         if (cancelled) return;
         setPlayer(profile);
-        setStatus('signedIn');
+        void setCachedPlayer(profile);
       } catch (err) {
         if (cancelled) return;
         if (err instanceof ApiError && err.status === 401) {
+          // api.ts has already cleared the token and fired onSessionLost;
+          // the effect below is subscribed to that and will sign out and
+          // clear the query cache. Touching state here too would race it.
           return;
         }
-        setStatus('signedIn');
+        // Any other failure (offline, timeout, 5xx) means we simply
+        // couldn't reach the server, not that the session is bad. We stay
+        // signed in with whatever the cache gave us — a lift with no signal
+        // or a flaky tunnel is not a reason to sign someone out or wipe a
+        // perfectly good cached profile over a slightly stale name.
       }
     })();
     return () => {
@@ -99,6 +110,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // shell drops out of the signed-in view instead of continuing to render
     // it over a session the server has already forgotten.
     return onSessionLost(() => {
+      // The cached profile goes with the session. Leaving it behind would greet the NEXT person
+      // to open the app on this device by the previous player's name.
+      void clearCachedPlayer();
       setPlayer(null);
       setStatus('signedOut');
       queryClient.clear();
@@ -114,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await api.post<AuthResponse>('/auth/login', { email, password });
       await setToken(res.token);
       setPlayer(res.player);
+      void setCachedPlayer(res.player);
       setStatus('signedIn');
     } catch (err) {
       // ApiError.message is the server's own words (see api.ts) — kept as-is
@@ -139,6 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       await setToken(res.token);
       setPlayer(res.player);
+      void setCachedPlayer(res.player);
       setStatus('signedIn');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -160,6 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await api.post<AuthResponse>('/auth/google', { idToken });
       await setToken(res.token);
       setPlayer(res.player);
+      void setCachedPlayer(res.player);
       setStatus('signedIn');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -171,6 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await clearToken();
+    await clearCachedPlayer();
     setPlayer(null);
     setStatus('signedOut');
     // Wipe every cached query, not just invalidate: react-query would

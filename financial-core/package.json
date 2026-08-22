@@ -22,7 +22,8 @@
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "node dist/index.js",
-    "watch:deposits": "ts-node scripts/deposit-watcher.ts"
+    "watch:deposits": "ts-node scripts/deposit-watcher.ts",
+    "dev:mongo": "ts-node scripts/dev-mongo.ts"
   },
   "dependencies": {
     "@aws-sdk/client-kms": "^3.1111.0",
