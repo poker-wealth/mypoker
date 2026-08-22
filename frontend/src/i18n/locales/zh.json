@@ -557,5 +557,20 @@
   "security": {
     "deviceModifiedTitle": "此设备似乎已被修改",
     "deviceModifiedBody": "检测到 Root 或越狱工具。您仍可继续游戏，但已修改的设备更容易被篡改，请谨慎进行充值与提现。"
+  },
+  "auth": {
+    "title": "登录",
+    "subtitle": "登录即可开始游戏，或创建账户。",
+    "email": "邮箱",
+    "password": "密码",
+    "displayName": "昵称",
+    "displayNameOptional": "昵称（可选）",
+    "signIn": "登录",
+    "createAccount": "创建账户",
+    "noAccount": "还没有账户？立即创建",
+    "haveAccount": "已有账户？前往登录",
+    "emailInvalid": "请输入有效的邮箱地址",
+    "passwordTooShort": "密码至少需要 8 个字符",
+    "signedOut": "您已退出登录"
   }
 }

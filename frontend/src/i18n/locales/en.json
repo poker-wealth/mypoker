@@ -557,5 +557,20 @@
   "security": {
     "deviceModifiedTitle": "This device looks modified",
     "deviceModifiedBody": "Root or jailbreak tools were detected. You can keep playing, but a modified device is easier to tamper with — take care with deposits and withdrawals."
+  },
+  "auth": {
+    "title": "Sign in",
+    "subtitle": "Sign in to play, or create an account.",
+    "email": "Email",
+    "password": "Password",
+    "displayName": "Display name",
+    "displayNameOptional": "Display name (optional)",
+    "signIn": "Sign in",
+    "createAccount": "Create account",
+    "noAccount": "New here? Create an account",
+    "haveAccount": "Already have an account? Sign in",
+    "emailInvalid": "Enter a valid email address",
+    "passwordTooShort": "Password must be at least 8 characters",
+    "signedOut": "You are signed out"
   }
 }

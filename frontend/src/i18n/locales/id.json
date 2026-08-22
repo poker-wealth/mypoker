@@ -557,5 +557,20 @@
   "security": {
     "deviceModifiedTitle": "Perangkat ini tampak dimodifikasi",
     "deviceModifiedBody": "Terdeteksi alat root atau jailbreak. Anda tetap bisa bermain, tetapi perangkat yang dimodifikasi lebih rentan dimanipulasi — berhati-hatilah saat menyetor dan menarik dana."
+  },
+  "auth": {
+    "title": "Masuk",
+    "subtitle": "Masuk untuk bermain, atau buat akun baru.",
+    "email": "Email",
+    "password": "Kata sandi",
+    "displayName": "Nama tampilan",
+    "displayNameOptional": "Nama tampilan (opsional)",
+    "signIn": "Masuk",
+    "createAccount": "Buat akun",
+    "noAccount": "Baru di sini? Buat akun",
+    "haveAccount": "Sudah punya akun? Masuk",
+    "emailInvalid": "Masukkan alamat email yang valid",
+    "passwordTooShort": "Kata sandi minimal 8 karakter",
+    "signedOut": "Anda telah keluar"
   }
 }
