@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import { api } from '../api';
+import { money } from '../money';
 import { radius, space, theme } from '../theme';
 import { Badge, Card, ListRow, Screen } from '../ui';
 
@@ -51,26 +52,6 @@ const TIER_COLOR: Record<VipTier, string> = {
   V5: theme.accent,
 };
 
-/** Money for display, from micro-USD. Mirrors frontend/src/lib/money.ts money(). */
-function money(micros: number): string {
-  return `₮${(micros / 1_000_000).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
-/**
- * The bare number, no currency mark — for interpolating into a template that
- * already carries its own ₮ (vip.remaining, vip.roundsStaked). Using money()
- * there would double the symbol.
- */
-function amountOnly(micros: number): string {
-  return (micros / 1_000_000).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
 export function VipScreen() {
   const { t } = useTranslation();
   const vip = useQuery({
@@ -102,7 +83,7 @@ export function VipScreen() {
                   <Text style={styles.dimSmall}>{data.progressPct}%</Text>
                   <Text style={styles.dimSmall}>
                     {t('vip.remaining', {
-                      amount: amountOnly(data.next.remaining),
+                      amount: money(data.next.remaining, { symbol: false }),
                       tier: data.next.tier,
                     })}
                   </Text>
@@ -126,7 +107,7 @@ export function VipScreen() {
                   <ListRow
                     key={g.gameId}
                     label={t(`gameNames.${g.gameId}`, { defaultValue: g.gameId })}
-                    hint={t('vip.roundsStaked', { rounds: g.rounds, staked: amountOnly(g.staked) })}
+                    hint={t('vip.roundsStaked', { rounds: g.rounds, staked: money(g.staked, { symbol: false }) })}
                     right={
                       <View style={styles.rightCol}>
                         <Text style={styles.rightAmount}>{money(g.effective)}</Text>

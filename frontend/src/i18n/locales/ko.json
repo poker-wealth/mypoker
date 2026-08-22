@@ -264,6 +264,7 @@
     "chatDisabled": "채팅이 비활성화되었습니다",
     "microphoneDenied": "마이크 접근이 거부되었습니다",
     "recordingUnsupported": "이 브라우저는 녹음을 지원하지 않습니다",
+    "recordingUnavailable": "이 기기에서는 녹음할 수 없습니다",
     "recordingTooShort": "조금 더 길게 눌러 주세요",
     "recordingTooLong": "녹음이 너무 커서 보낼 수 없습니다",
     "recordingFailed": "녹음을 보내지 못했습니다"
@@ -551,5 +552,9 @@
     "inLeague": "{{name}} 내부",
     "isolationNote": "리그 테이블과 지갑만 표시됩니다. 플랫폼 테이블은 숨겨집니다.",
     "backToPlatform": "플랫폼 로비로 돌아가기"
+  },
+  "security": {
+    "deviceModifiedTitle": "이 기기는 변조된 것으로 보입니다",
+    "deviceModifiedBody": "루팅 또는 탈옥 도구가 감지되었습니다. 계속 플레이할 수 있지만 변조된 기기는 조작에 취약하므로 입출금 시 주의하세요."
   }
 }

@@ -35,8 +35,11 @@ export function money(
   // formatter must not add a second one.
   const { decimals = 2, sign = false, symbol = true } = options;
   const value = micros / 1_000_000;
-  const prefix = sign && value > 0 ? '+' : '';
-  return `${prefix}${symbol ? SYMBOL : ''}${value.toLocaleString(undefined, {
+  // The minus goes OUTSIDE the currency mark: -₮1.50, not ₮-1.50. That is what
+  // every locale-aware formatter does, and a losing round on the Data tab is
+  // where it shows.
+  const prefix = value < 0 ? '-' : sign && value > 0 ? '+' : '';
+  return `${prefix}${symbol ? SYMBOL : ''}${Math.abs(value).toLocaleString(undefined, {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   })}`;

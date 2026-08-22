@@ -3,6 +3,7 @@ import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-q
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import { api } from '../api';
+import { moneyFromDecimal } from '../money';
 import { radius, space, theme } from '../theme';
 import { Button, Card, Screen } from '../ui';
 
@@ -53,21 +54,10 @@ function fetchNotifications(params: { limit?: number; cursor?: string } = {}): P
   return api.get<NotificationPage>(`/me/notifications${suffix ? `?${suffix}` : ''}`);
 }
 
-/**
- * The NUMBER part of a ledger decimal string ('500.000000'), no currency
- * mark — the templates place their own. Mirrors frontend/src/lib/money.ts
- * amountOnly().
- */
-function amountOnly(value: string): string {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return value;
-  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
 function displayParams(params: Record<string, string | number> | undefined): Record<string, string | number> {
   if (!params) return {};
   const out: Record<string, string | number> = { ...params };
-  if (typeof out.amount === 'string') out.amount = amountOnly(out.amount);
+  if (typeof out.amount === 'string') out.amount = moneyFromDecimal(out.amount, { symbol: false });
   return out;
 }
 

@@ -264,6 +264,7 @@
     "chatDisabled": "Trò chuyện đã tắt",
     "microphoneDenied": "Quyền truy cập micro bị từ chối",
     "recordingUnsupported": "Trình duyệt này không ghi âm được",
+    "recordingUnavailable": "Thiết bị này không hỗ trợ ghi âm",
     "recordingTooShort": "Giữ lâu hơn một chút để gửi",
     "recordingTooLong": "Bản ghi quá lớn để gửi",
     "recordingFailed": "Không gửi được bản ghi đó"
@@ -551,5 +552,9 @@
     "inLeague": "Đang ở {{name}}",
     "isolationNote": "Chỉ bàn và ví của liên minh. Bàn nền tảng đã bị ẩn.",
     "backToPlatform": "Quay lại sảnh nền tảng"
+  },
+  "security": {
+    "deviceModifiedTitle": "Thiết bị này có vẻ đã bị chỉnh sửa",
+    "deviceModifiedBody": "Đã phát hiện công cụ root hoặc jailbreak. Bạn vẫn có thể chơi, nhưng thiết bị đã chỉnh sửa dễ bị can thiệp hơn — hãy thận trọng khi nạp và rút tiền."
   }
 }

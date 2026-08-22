@@ -13,14 +13,17 @@ import { TableScreen } from './src/screens/TableScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { AllianceScreen } from './src/screens/AllianceScreen';
 import { DataScreen } from './src/screens/DataScreen';
+import { LobbyScreen } from './src/screens/LobbyScreen';
 import { VipScreen } from './src/screens/VipScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { LobbyScreen } from './src/screens/LobbyScreen';
+import { AgentCenterScreen } from './src/screens/AgentCenterScreen';
 import { FeltGalleryScreen } from './src/screens/FeltGalleryScreen';
 import type { RootStackParamList } from './src/navigation';
 import { API_URL } from './src/api';
 import { space, theme } from './src/theme';
+import { AccountIcon, AllianceIcon, DataIcon, TablesIcon, WalletIcon } from './src/icons';
 // Side-effect import: initialises i18next before any screen calls
 // useTranslation(). Nothing pulled this in until now — WalletScreen and
 // TableScreen predate it and hardcode their copy in English.
@@ -70,24 +73,6 @@ const navTheme: Theme = {
   },
 };
 
-/**
- * Placeholder for a screen that has not been ported yet.
- *
- * It says so plainly rather than showing an empty tab or invented content — the
- * same honesty rule the Mini App follows. A blank screen reads as broken; this
- * reads as unfinished, which is what it is.
- */
-function NotPortedYet({ name }: { name: string }) {
-  return (
-    <View style={styles.placeholder}>
-      <Text style={styles.placeholderTitle}>{name}</Text>
-      <Text style={styles.placeholderBody}>
-        Not ported to the app yet. It is live in the Telegram Mini App.
-      </Text>
-    </View>
-  );
-}
-
 function TabsScreen() {
   const { t } = useTranslation();
   return (
@@ -100,11 +85,43 @@ function TabsScreen() {
         tabBarInactiveTintColor: theme.dim,
       }}
     >
-      <Tabs.Screen name="Wallet" component={WalletScreen} />
-      <Tabs.Screen name="Tables" component={LobbyScreen} />
-      <Tabs.Screen name="Alliance" component={AllianceScreen} options={{ title: t('nav.alliance') }} />
-      <Tabs.Screen name="Data" component={DataScreen} options={{ title: t('nav.data') }} />
-      <Tabs.Screen name="Account" component={ProfileScreen} options={{ title: t('nav.account') }} />
+      <Tabs.Screen
+        name="Wallet"
+        component={WalletScreen}
+        options={{ tabBarIcon: ({ color, size }) => <WalletIcon color={color} size={size} /> }}
+      />
+      <Tabs.Screen
+        name="Tables"
+        component={LobbyScreen}
+        options={{
+          title: t('nav.lobby'),
+          tabBarIcon: ({ color, size }) => <TablesIcon color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="Alliance"
+        component={AllianceScreen}
+        options={{
+          title: t('nav.alliance'),
+          tabBarIcon: ({ color, size }) => <AllianceIcon color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="Data"
+        component={DataScreen}
+        options={{
+          title: t('nav.data'),
+          tabBarIcon: ({ color, size }) => <DataIcon color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="Account"
+        component={ProfileScreen}
+        options={{
+          title: t('nav.account'),
+          tabBarIcon: ({ color, size }) => <AccountIcon color={color} size={size} />,
+        }}
+      />
     </Tabs.Navigator>
   );
 }
@@ -184,6 +201,11 @@ export default function App() {
             options={{ title: t('notifications.title') }}
           />
           <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: t('account.settings') }} />
+          <Stack.Screen
+            name="AgentCenter"
+            component={AgentCenterScreen}
+            options={{ title: t('agent.title') }}
+          />
           {/* A developer harness, NOT a screen anyone navigates to by accident: it renders every
               felt against invented data. It briefly lived in the Tables tab, which meant the app
               opened onto a debug scaffold instead of the product — never again. Dev builds only,
@@ -209,17 +231,7 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  placeholder: {
-    flex: 1,
-    backgroundColor: theme.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: space.xl,
-    gap: space.sm,
-  },
   booting: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.bg },
-  placeholderTitle: { color: theme.text, fontSize: 18, fontWeight: '800' },
-  placeholderBody: { color: theme.dim, fontSize: 13, textAlign: 'center', lineHeight: 19 },
   devBanner: {
     color: theme.dim,
     fontSize: 10,

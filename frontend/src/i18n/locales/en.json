@@ -264,6 +264,7 @@
     "chatDisabled": "Chat is disabled",
     "microphoneDenied": "Microphone access was denied",
     "recordingUnsupported": "This browser can't record audio",
+    "recordingUnavailable": "Recording isn't available on this device",
     "recordingTooShort": "Hold a little longer to send a voice note",
     "recordingTooLong": "That recording was too large to send",
     "recordingFailed": "Couldn't send that recording"
@@ -551,5 +552,9 @@
     "inLeague": "Inside {{name}}",
     "isolationNote": "League tables and wallet only. Platform tables are hidden.",
     "backToPlatform": "Back to the platform lobby"
+  },
+  "security": {
+    "deviceModifiedTitle": "This device looks modified",
+    "deviceModifiedBody": "Root or jailbreak tools were detected. You can keep playing, but a modified device is easier to tamper with — take care with deposits and withdrawals."
   }
 }

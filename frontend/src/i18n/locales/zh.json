@@ -264,6 +264,7 @@
     "chatDisabled": "聊天已关闭",
     "microphoneDenied": "麦克风访问被拒绝",
     "recordingUnsupported": "此浏览器无法录音",
+    "recordingUnavailable": "此设备不支持录音",
     "recordingTooShort": "请按住久一点再发送语音",
     "recordingTooLong": "录音过大，无法发送",
     "recordingFailed": "无法发送该录音"
@@ -551,5 +552,9 @@
     "inLeague": "当前：{{name}}",
     "isolationNote": "仅显示联盟牌桌与钱包，平台牌桌已隐藏。",
     "backToPlatform": "返回平台大厅"
+  },
+  "security": {
+    "deviceModifiedTitle": "此设备似乎已被修改",
+    "deviceModifiedBody": "检测到 Root 或越狱工具。您仍可继续游戏，但已修改的设备更容易被篡改，请谨慎进行充值与提现。"
   }
 }

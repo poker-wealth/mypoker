@@ -3,6 +3,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import { api } from '../api';
+import { moneyFromDecimal } from '../money';
 import { radius, space, theme } from '../theme';
 import { Button, Card, EmptyState, ErrorState, ListRow, Screen, Segmented, Skeleton } from '../ui';
 import { TrendChart } from '../TrendChart';
@@ -65,14 +66,6 @@ const PERIODS: { value: StatsPeriod; key: string }[] = [
   { value: '30d', key: 'data.period30d' },
   { value: 'all', key: 'data.periodAll' },
 ];
-
-/** Money from a decimal string ('12.500000'), as financial-core sends it. Mirrors frontend/src/lib/money.ts moneyFromDecimal(). */
-function moneyFromDecimal(value: string, options?: { sign?: boolean }): string {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return value; // never show NaN where a figure goes
-  const prefix = options?.sign && n > 0 ? '+' : '';
-  return `${prefix}₮${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
 
 function fetchHistory(params: { limit?: number; cursor?: string; period?: StatsPeriod }): Promise<HistoryPage> {
   const query = new URLSearchParams();

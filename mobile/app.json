@@ -43,6 +43,8 @@
     "plugins": [
       "expo-secure-store",
       "expo-localization",
+      "expo-sharing",
+      "expo-audio",
       "expo-web-browser"
     ],
     "extra": {
