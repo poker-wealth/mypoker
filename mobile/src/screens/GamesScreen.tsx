@@ -228,12 +228,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   comingTitle: { color: theme.dim, fontSize: 14, fontWeight: '700' },
-  comingGrid: { gap: space.sm },
+  // Two columns, as in the Mini App — not a stack of full-width rows.
+  comingGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
   comingRow: {
+    // Half the row, less the gap between the two columns.
+    width: '47.5%',
+    flexGrow: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: 60,
+    height: 80,
     paddingHorizontal: space.lg,
     borderRadius: radius.card,
     borderWidth: 1,
