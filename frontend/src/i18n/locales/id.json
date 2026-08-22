@@ -571,6 +571,8 @@
     "haveAccount": "Sudah punya akun? Masuk",
     "emailInvalid": "Masukkan alamat email yang valid",
     "passwordTooShort": "Kata sandi minimal 8 karakter",
-    "signedOut": "Anda telah keluar"
+    "signedOut": "Anda telah keluar",
+    "continueWithGoogle": "Lanjutkan dengan Google",
+    "or": "atau"
   }
 }

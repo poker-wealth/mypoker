@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from './api';
+import { signInWithGoogleNative } from './googleAuth';
 import { clearToken, getToken, onSessionLost, setToken } from './session';
 
 /**
@@ -30,6 +31,7 @@ interface AuthContextValue {
   player: Player | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName?: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   error: string | null;
   clearError: () => void;
@@ -119,6 +121,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const signInWithGoogle = useCallback(async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const idToken = await signInWithGoogleNative();
+      if (idToken === null) {
+        // User cancelled the native sheet — not an error, nothing to show.
+        return;
+      }
+      const res = await api.post<AuthResponse>('/auth/google', { idToken });
+      await setToken(res.token);
+      setPlayer(res.player);
+      setStatus('signedIn');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      throw err;
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     await clearToken();
     setPlayer(null);
@@ -131,8 +154,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ status, player, signIn, signUp, signOut, error, clearError, busy }),
-    [status, player, signIn, signUp, signOut, error, clearError, busy],
+    () => ({ status, player, signIn, signUp, signInWithGoogle, signOut, error, clearError, busy }),
+    [status, player, signIn, signUp, signInWithGoogle, signOut, error, clearError, busy],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

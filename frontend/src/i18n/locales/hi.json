@@ -571,6 +571,8 @@
     "haveAccount": "पहले से खाता है? साइन इन करें",
     "emailInvalid": "मान्य ईमेल पता दर्ज करें",
     "passwordTooShort": "पासवर्ड कम से कम 8 अक्षरों का होना चाहिए",
-    "signedOut": "आप साइन आउट हो गए हैं"
+    "signedOut": "आप साइन आउट हो गए हैं",
+    "continueWithGoogle": "Google से जारी रखें",
+    "or": "या"
   }
 }

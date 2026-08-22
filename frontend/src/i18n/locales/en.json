@@ -571,6 +571,8 @@
     "haveAccount": "Already have an account? Sign in",
     "emailInvalid": "Enter a valid email address",
     "passwordTooShort": "Password must be at least 8 characters",
-    "signedOut": "You are signed out"
+    "signedOut": "You are signed out",
+    "continueWithGoogle": "Continue with Google",
+    "or": "or"
   }
 }

@@ -571,6 +571,8 @@
     "haveAccount": "이미 계정이 있으신가요? 로그인",
     "emailInvalid": "유효한 이메일 주소를 입력하세요",
     "passwordTooShort": "비밀번호는 8자 이상이어야 합니다",
-    "signedOut": "로그아웃되었습니다"
+    "signedOut": "로그아웃되었습니다",
+    "continueWithGoogle": "Google로 계속하기",
+    "or": "또는"
   }
 }

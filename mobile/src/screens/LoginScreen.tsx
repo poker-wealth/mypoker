@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { ApiUrlField } from '../ApiUrlField';
 import { useAuth } from '../auth';
+import { GOOGLE_ENABLED } from '../googleAuth';
 import { radius, space, theme } from '../theme';
 import { Button, Card, ErrorState } from '../ui';
 
@@ -17,7 +18,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function LoginScreen() {
   const { t } = useTranslation();
-  const { signIn, signUp, error, clearError, busy } = useAuth();
+  const { signIn, signUp, signInWithGoogle, error, clearError, busy } = useAuth();
 
   const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
   const [email, setEmail] = useState('');
@@ -47,6 +48,12 @@ export function LoginScreen() {
     });
   };
 
+  const submitGoogle = (): void => {
+    void signInWithGoogle().catch(() => {
+      // Surfaced via `error` from useAuth already; nothing else to do here.
+    });
+  };
+
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
@@ -55,6 +62,23 @@ export function LoginScreen() {
       </View>
 
       <Card style={styles.card}>
+        {/* Hidden rather than disabled when GOOGLE_ENABLED is false: a
+            disabled control with no explanation is worse than no control at
+            all, and a build with no Google client ID configured yet is a
+            developer situation, not something an end user needs to see. */}
+        {GOOGLE_ENABLED && (
+          <>
+            <Button variant="ghost" disabled={busy} onPress={submitGoogle}>
+              {t('auth.continueWithGoogle')}
+            </Button>
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>{t('auth.or')}</Text>
+              <View style={styles.dividerLine} />
+            </View>
+          </>
+        )}
+
         <View style={styles.field}>
           <Text style={styles.label}>{t('auth.email')}</Text>
           <TextInput
@@ -158,4 +182,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   invalid: { color: theme.danger, fontSize: 11 },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  dividerLine: { flex: 1, height: 1, backgroundColor: theme.border },
+  dividerText: { color: theme.dim, fontSize: 11, textTransform: 'uppercase', fontWeight: '800' },
 });

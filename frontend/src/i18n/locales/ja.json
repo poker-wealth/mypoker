@@ -571,6 +571,8 @@
     "haveAccount": "アカウントをお持ちですか？ログイン",
     "emailInvalid": "有効なメールアドレスを入力してください",
     "passwordTooShort": "パスワードは8文字以上で入力してください",
-    "signedOut": "ログアウトしました"
+    "signedOut": "ログアウトしました",
+    "continueWithGoogle": "Google で続ける",
+    "or": "または"
   }
 }
