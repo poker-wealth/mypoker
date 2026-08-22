@@ -129,6 +129,12 @@ export interface LeagueSettingsFacts {
   spectatorsAllowed: boolean;
 }
 
+export interface LeagueMember {
+  playerId: string;
+  role: LeagueRole;
+  joinedAt: string;
+}
+
 export interface League {
   leagueId: string;
   name: string;
@@ -300,6 +306,26 @@ export async function leaveLeague(leagueId: string, playerId: string): Promise<v
 export async function membershipOf(leagueId: string, playerId: string): Promise<LeagueRole | null> {
   const doc = await MembershipModel.findById(membershipId(leagueId, playerId)).lean();
   return doc ? doc.role : null;
+}
+
+/**
+ * One league's roster.
+ *
+ * Facts only — who is in, what role, since when. No balances: what a member
+ * holds is theirs, and an owner funding the league has no business seeing it.
+ * The wallet isolation rule is structural elsewhere in this codebase and stays
+ * structural here, by not selecting the field rather than by filtering it out.
+ *
+ * Sorted oldest first so the roster reads as a history rather than reshuffling
+ * between calls, which matters when someone is picking a row to send money to.
+ */
+export async function membersOf(leagueId: string): Promise<LeagueMember[]> {
+  const docs = await MembershipModel.find({ leagueId }).sort({ createdAt: 1 }).lean();
+  return docs.map((d) => ({
+    playerId: d.playerId,
+    role: d.role,
+    joinedAt: d.createdAt.toISOString(),
+  }));
 }
 
 /** Every league this player belongs to. */

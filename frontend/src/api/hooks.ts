@@ -26,6 +26,8 @@ import {
   joinLeagueApi,
   fetchLeague,
   createLeagueTableApi,
+  fetchLeagueMembers,
+  grantToMemberApi,
 } from './leagues';
 import { fetchNotifications, markNotificationsRead, type NotificationPage } from './notifications';
 import { fetchRtp } from './fairnessFeed';
@@ -309,6 +311,49 @@ export function useCreateLeagueTable() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['lobby', 'tables'] });
       void queryClient.invalidateQueries({ queryKey: ['lobby', 'games'] });
+    },
+  });
+}
+
+/**
+ * A league's roster.
+ *
+ * This is also the only read that tells the browser its OWN role — until it
+ * existed, no callable endpoint exposed membership, which is why the league
+ * card offers "new table" to every member and lets the server refuse. With a
+ * role in hand, funding can be offered only to those who can actually do it.
+ */
+export function useLeagueMembers(leagueId: string | null) {
+  return useQuery({
+    queryKey: ['leagues', 'members', leagueId],
+    queryFn: () => fetchLeagueMembers(leagueId!),
+    enabled: Boolean(leagueId),
+    staleTime: 30_000,
+  });
+}
+
+/**
+ * Grant chips to a member. Money-touching: senior-reviewed.
+ *
+ * Invalidates the granter's own balance as well as the roster — the inventory
+ * it came out of is a balance they can see, and leaving it stale shows money
+ * that has already moved.
+ */
+export function useGrantToMember() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      leagueId,
+      ...body
+    }: {
+      leagueId: string;
+      playerId: string;
+      amount: string;
+      reference: string;
+    }) => grantToMemberApi(leagueId, body),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['balance'] });
+      void queryClient.invalidateQueries({ queryKey: ['leagues'] });
     },
   });
 }

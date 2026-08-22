@@ -93,3 +93,59 @@ export const createLeagueTableApi = ({
   ...body
 }: CreateLeagueTableInput): Promise<LeagueTable> =>
   api.post<LeagueTable>(`/leagues/${encodeURIComponent(leagueId)}/tables`, body);
+
+export type LeagueRole = 'OWNER' | 'ADMIN' | 'MEMBER';
+
+/**
+ * A league's roster. Facts only — no balances.
+ *
+ * The server has no balance field to return here, deliberately: what a member
+ * holds is theirs, and an owner funding the league has no business seeing it.
+ * Members only; a non-member gets the same 404 as an unknown league, so this
+ * cannot be used to probe for private leagues.
+ */
+export interface LeagueMember {
+  playerId: string;
+  role: LeagueRole;
+  joinedAt: string;
+}
+
+export const fetchLeagueMembers = (leagueId: string): Promise<{ members: LeagueMember[] }> =>
+  api.get<{ members: LeagueMember[] }>(`/leagues/${encodeURIComponent(leagueId)}/members`);
+
+/**
+ * Move chips from the league's inventory into a member's league wallet.
+ *
+ * `reference` is REQUIRED by this client even though the endpoint accepts it as
+ * optional. A double-submit is two requests, so the key that makes them one
+ * payment can only come from the caller — a server-minted one would differ
+ * between them and pay twice. Victor's review of the grant endpoint made the
+ * same point, and #38 makes it required server-side too.
+ *
+ * `amount` is a decimal STRING. It never becomes a float on the way to the
+ * ledger, which is iron rule #2.
+ */
+export const grantToMemberApi = (
+  leagueId: string,
+  body: { playerId: string; amount: string; reference: string },
+): Promise<{ grantId: string }> =>
+  api.post<{ grantId: string }>(`/leagues/${encodeURIComponent(leagueId)}/grants`, body);
+
+/** Only these roles may move chips out of the league's inventory. */
+const ROLES_THAT_MAY_GRANT: readonly LeagueRole[] = ['OWNER', 'ADMIN'];
+
+/**
+ * Whether this player may fund members — read from the roster, never guessed.
+ *
+ * Comparing against `league.ownerId` would be the cheap version and would be
+ * wrong: an ADMIN may grant too, and would be shown nothing.
+ *
+ * This is a display decision only. The server checks the same thing and is the
+ * one that counts; a client-side role check exists so people are not offered
+ * buttons that will refuse them, not to enforce anything.
+ */
+export function canGrant(members: LeagueMember[] | undefined, playerId: string | null): boolean {
+  if (!members || !playerId) return false;
+  const me = members.find((m) => m.playerId === playerId);
+  return me !== undefined && ROLES_THAT_MAY_GRANT.includes(me.role);
+}

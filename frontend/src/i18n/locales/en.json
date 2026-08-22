@@ -551,5 +551,26 @@
     "inLeague": "Inside {{name}}",
     "isolationNote": "League tables and wallet only. Platform tables are hidden.",
     "backToPlatform": "Back to the platform lobby"
+  },
+  "grants": {
+    "title": "Fund members",
+    "fund": "Fund members",
+    "blurb": "Move chips from the alliance inventory into a member's alliance wallet. These chips can be played but never withdrawn.",
+    "recipient": "Member",
+    "amount": "Amount",
+    "amountInvalid": "Enter an amount, up to 6 decimal places",
+    "send": "Send chips",
+    "sent": "Chips sent",
+    "confirmTitle": "Send these chips?",
+    "confirmBody": "Send {{amount}} to {{player}} from the alliance inventory.",
+    "noMembers": "No one to fund yet",
+    "noMembersBlurb": "Invite players to the alliance first.",
+    "notAllowed": "Only an owner or admin can fund members",
+    "notAllowedBlurb": "Ask an alliance owner to grant chips.",
+    "role": {
+      "OWNER": "Owner",
+      "ADMIN": "Admin",
+      "MEMBER": "Member"
+    }
   }
 }
