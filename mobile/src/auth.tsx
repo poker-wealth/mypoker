@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { api } from './api';
+import { api, ApiError } from './api';
 import { signInWithGoogleNative } from './googleAuth';
 import { clearToken, getToken, onSessionLost, setToken } from './session';
 
@@ -49,16 +49,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    // Deliberately NOT verified against the server: a stored token is treated
-    // as signed-in on the strength of its presence alone. An expired token
-    // surfaces as a 401 from whichever screen asks first — api.ts already
-    // clears it when that happens. A startup `/auth/me` check that confirms
-    // the token is still good before rendering anything is the upgrade path,
-    // not a requirement of this pass.
-    void getToken().then((token) => {
+    // A stored token alone is not proof of a valid session, so on cold start
+    // we ask the server who it belongs to instead of trusting its mere
+    // presence. Three outcomes, each handled differently:
+    //   - No token: nothing to restore, straight to signed-out.
+    //   - The server confirms it (200): restore the real profile so the UI
+    //     never shows a placeholder name for a genuinely signed-in person.
+    //   - The server rejects it (401): do nothing here. api.ts already
+    //     cleared the token and fired onSessionLost, and the effect below is
+    //     subscribed to that — it will set signed-out and clear the query
+    //     cache. Setting state here too would race it.
+    //   - Anything else (offline, timeout, 5xx — i.e. we simply couldn't
+    //     reach the server): stay signed in with `player` left null. We know
+    //     a token exists; we just couldn't confirm the name that goes with
+    //     it. Treating an unreachable server as a sign-out would destroy a
+    //     valid session over a network blip, which is worse than a missing
+    //     display name. Individual screens fetch their own data and surface
+    //     their own errors.
+    void (async () => {
+      const token = await getToken();
       if (cancelled) return;
-      setStatus(token !== null ? 'signedIn' : 'signedOut');
-    });
+      if (token === null) {
+        setStatus('signedOut');
+        return;
+      }
+      try {
+        const profile = await api.get<Player>('/auth/me');
+        if (cancelled) return;
+        setPlayer(profile);
+        setStatus('signedIn');
+      } catch (err) {
+        if (cancelled) return;
+        if (err instanceof ApiError && err.status === 401) {
+          return;
+        }
+        setStatus('signedIn');
+      }
+    })();
     return () => {
       cancelled = true;
     };
