@@ -161,6 +161,15 @@ function TabsScreen() {
 function Root() {
   const { t } = useTranslation();
   const { status } = useAuth();
+  /**
+   * Every hook in this component must sit above the first conditional return.
+   *
+   * This one was below the fonts guard after a merge, which crashed the app on launch with
+   * "Rendered more hooks than during the previous render": the first pass returned the spinner
+   * before reaching it (17 hooks), the second ran it (18). React counts hooks positionally, so a
+   * hook after an early return is a different hook list on the render where that return is skipped.
+   */
+  const apiBase = useApiBase();
 
   /**
    * The Mini App is set in Nunito, so this is too — the two apps being
@@ -189,7 +198,6 @@ function Root() {
       </View>
     );
   }
-  const apiBase = useApiBase();
 
   if (status === 'loading') {
     // A cold start must not look like signed-out — that would flash the
