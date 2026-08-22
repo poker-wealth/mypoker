@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 import { api } from '../api';
-import { radius, space, theme } from '../theme';
+import { radius, space, theme, weight } from '../theme';
 import { Badge, Button, Card, EmptyState, ErrorState, ListRow, Screen, Sheet, Toggle } from '../ui';
 
 /**
@@ -255,14 +255,14 @@ function CreateSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
 
 const styles = StyleSheet.create({
   section: { gap: space.sm },
-  sectionTitle: { paddingHorizontal: space.xs, color: theme.dim, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+  sectionTitle: { paddingHorizontal: space.xs, color: theme.dim, fontSize: 11, textTransform: 'uppercase', fontFamily: weight('800') },
   list: { gap: space.sm },
   leagueCard: { padding: 0, paddingHorizontal: space.md, gap: 0 },
   leagueRight: { alignItems: 'flex-end', gap: space.xs },
   pad: { alignSelf: 'flex-start', paddingVertical: space.sm },
-  errorText: { color: theme.danger, fontSize: 12 },
+  errorText: { color: theme.danger, fontSize: 12, fontFamily: weight('400') },
   field: { gap: space.xs },
-  fieldLabel: { color: theme.dim, fontSize: 11, fontWeight: '700' },
+  fieldLabel: { color: theme.dim, fontSize: 11, fontFamily: weight('700') },
   input: {
     borderColor: theme.border,
     borderWidth: 1,
@@ -271,8 +271,7 @@ const styles = StyleSheet.create({
     paddingVertical: space.sm,
     color: theme.text,
     fontSize: 14,
-    backgroundColor: theme.surface,
-  },
+    backgroundColor: theme.surface, fontFamily: weight('400') },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -285,6 +284,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.surface,
   },
   toggleMain: { flex: 1, gap: 2, paddingRight: space.sm },
-  toggleLabel: { color: theme.text, fontSize: 13, fontWeight: '600' },
-  toggleHint: { color: theme.dim, fontSize: 11 },
+  toggleLabel: { color: theme.text, fontSize: 13, fontFamily: weight('600') },
+  toggleHint: { color: theme.dim, fontSize: 11, fontFamily: weight('400') },
 });

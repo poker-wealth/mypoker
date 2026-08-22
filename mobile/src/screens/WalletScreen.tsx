@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { api } from '../api';
 import { moneyFromDecimal } from '../money';
-import { space, theme } from '../theme';
+import { space, theme, weight } from '../theme';
 import { ErrorState } from '../ui';
 import { SecurityBanner } from '../SecurityBanner';
 
@@ -78,8 +78,8 @@ export function WalletScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.bg, padding: space.lg, gap: space.sm },
-  label: { color: theme.dim, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' },
-  amount: { color: theme.text, fontSize: 34, fontWeight: '900' },
-  sub: { color: theme.dim, fontSize: 13 },
+  label: { color: theme.dim, fontSize: 12, textTransform: 'uppercase', fontFamily: weight('700') },
+  amount: { color: theme.text, fontSize: 34, fontFamily: weight('900') },
+  sub: { color: theme.dim, fontSize: 13, fontFamily: weight('400') },
   pad: { alignSelf: 'flex-start', paddingVertical: space.md },
 });

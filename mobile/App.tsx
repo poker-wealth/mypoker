@@ -3,6 +3,16 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
+// Per-weight entry points, NOT the package barrel. The barrel `require`s every
+// variant Nunito ships — 16 faces including italics — and Metro cannot tree
+// shake a require, so importing from it bundled ~10 fonts nobody asks for.
+import { useFonts } from 'expo-font';
+import { Nunito_400Regular } from '@expo-google-fonts/nunito/400Regular';
+import { Nunito_500Medium } from '@expo-google-fonts/nunito/500Medium';
+import { Nunito_600SemiBold } from '@expo-google-fonts/nunito/600SemiBold';
+import { Nunito_700Bold } from '@expo-google-fonts/nunito/700Bold';
+import { Nunito_800ExtraBold } from '@expo-google-fonts/nunito/800ExtraBold';
+import { Nunito_900Black } from '@expo-google-fonts/nunito/900Black';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { WalletScreen } from './src/screens/WalletScreen';
@@ -13,6 +23,8 @@ import { DataScreen } from './src/screens/DataScreen';
 import { LobbyScreen } from './src/screens/LobbyScreen';
 import { GamesScreen } from './src/screens/GamesScreen';
 import { FeltGalleryScreen } from './src/screens/FeltGalleryScreen';
+import { JackpotScreen } from './src/screens/JackpotScreen';
+import { FairnessScreen } from './src/screens/FairnessScreen';
 import { VipScreen } from './src/screens/VipScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
@@ -22,7 +34,8 @@ import { AuthProvider, useAuth } from './src/auth';
 import type { RootStackParamList } from './src/navigation';
 import { useApiBase } from './src/apiConfig';
 import { space, theme } from './src/theme';
-import { AccountIcon, AllianceIcon, DataIcon, GamesIcon, LobbyIcon } from './src/icons';
+import { AccountIcon, AllianceIcon, DataIcon, GamesIcon, TablesIcon } from './src/icons';
+import { headerRightFor } from './src/HeaderActions';
 // Side-effect import: initialises i18next before any screen calls
 // useTranslation(). Nothing pulled this in until now — WalletScreen and
 // TableScreen predate it and hardcode their copy in English.
@@ -84,14 +97,16 @@ function TabsScreen() {
         tabBarInactiveTintColor: theme.dim,
       }}
     >
-      {/* The Mini App's own five, in its own order: Alliance, Games, Lobby, Data, My Account
-          (frontend/src/components/BottomNav.tsx). Wallet is NOT a tab there — it is reached from
-          the account side — and Games, which had no mobile equivalent at all, is the screen the
-          felts are actually opened from. */}
+      {/* The web's order, exactly: Alliance · Games · Lobby · Data · Account
+          (frontend/src/components/BottomNav.tsx). Wallet is NOT a tab there —
+          it is reached from Account — and it was only ever a tab here because
+          WalletScreen was the shell's first bring-up screen and nobody moved
+          it afterwards. */}
       <Tabs.Screen
         name="Alliance"
         component={AllianceScreen}
         options={{
+          headerRight: headerRightFor('Alliance'),
           title: t('nav.alliance'),
           tabBarIcon: ({ color, size }) => <AllianceIcon color={color} size={size} />,
         }}
@@ -100,6 +115,7 @@ function TabsScreen() {
         name="Games"
         component={GamesScreen}
         options={{
+          headerRight: headerRightFor('Games'),
           title: t('nav.games'),
           tabBarIcon: ({ color, size }) => <GamesIcon color={color} size={size} />,
         }}
@@ -108,14 +124,16 @@ function TabsScreen() {
         name="Tables"
         component={LobbyScreen}
         options={{
+          headerRight: headerRightFor('Tables'),
           title: t('nav.lobby'),
-          tabBarIcon: ({ color, size }) => <LobbyIcon color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <TablesIcon color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="Data"
         component={DataScreen}
         options={{
+          headerRight: headerRightFor('Data'),
           title: t('nav.data'),
           tabBarIcon: ({ color, size }) => <DataIcon color={color} size={size} />,
         }}
@@ -123,21 +141,11 @@ function TabsScreen() {
       <Tabs.Screen
         name="Account"
         component={ProfileScreen}
-        options={({ navigation }) => ({
+        options={{
+          headerRight: headerRightFor('Account'),
           title: t('nav.account'),
           tabBarIcon: ({ color, size }) => <AccountIcon color={color} size={size} />,
-          // The gear belongs in the header bar, as in the Mini App. Put inside the screen it
-          // needed its own title row, which printed "My Account" twice.
-          headerRight: () => (
-            <Text
-              onPress={() => navigation.navigate('Settings')}
-              accessibilityLabel={t('account.settings')}
-              style={styles.headerGear}
-            >
-              ⚙
-            </Text>
-          ),
-        })}
+        }}
       />
     </Tabs.Navigator>
   );
@@ -153,6 +161,34 @@ function TabsScreen() {
 function Root() {
   const { t } = useTranslation();
   const { status } = useAuth();
+
+  /**
+   * The Mini App is set in Nunito, so this is too — the two apps being
+   * typographically different was a real parity gap, not a detail.
+   *
+   * Render nothing until the faces are in memory. RN silently substitutes the
+   * system font for a family it cannot find, so a first paint before loading
+   * completes shows Roboto and then reflows to Nunito — visible, and worse
+   * than a beat of nothing.
+   */
+  const [fontsLoaded, fontError] = useFonts({
+    Nunito_400Regular,
+    Nunito_500Medium,
+    Nunito_600SemiBold,
+    Nunito_700Bold,
+    Nunito_800ExtraBold,
+    Nunito_900Black,
+  });
+
+  // A font that fails to load must not hold the app hostage: carry on with the
+  // system face rather than showing a spinner forever over a cosmetic problem.
+  if (!fontsLoaded && !fontError) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator color={theme.brand} />
+      </View>
+    );
+  }
   const apiBase = useApiBase();
 
   if (status === 'loading') {
@@ -200,16 +236,22 @@ function Root() {
           component={AgentCenterScreen}
           options={{ title: t('agent.title') }}
         />
-        {/* Wallet came off the tab bar to match the Mini App, which reaches it from the account
-            side (frontend/src/pages/Profile.tsx). Pushed, not dropped — see ProfileScreen. */}
+        {/* Not tabs on the web either — reached from Account, the lobby's
+            jackpot card, and the fairness links in Settings and Profile. */}
         <Stack.Screen name="Wallet" component={WalletScreen} options={{ title: t('nav.wallet') }} />
-        {/* The dev felt harness, reached from Settings → Developer.
-
-            This registration was lost when I resolved the auth merge by taking the whole of
-            Samuel's App.tsx: the Settings row and the route type survived, the screen did not, and
-            tapping it threw "was not handled by any navigator". A row pointing at nothing is the
-            dead tap this app keeps deleting — restored rather than the row removed, because the
-            gallery is how every felt gets looked at. */}
+        <Stack.Screen
+          name="Jackpot"
+          component={JackpotScreen}
+          options={{ title: t('lobby.grandJackpot') }}
+        />
+        <Stack.Screen
+          name="Fairness"
+          component={FairnessScreen}
+          options={{ title: t('fairness.title') }}
+        />
+        {/* The dev felt harness, reached from Settings → Developer. Registered only under
+            __DEV__, so it does not exist in a release build. Settings already carries the row
+            that navigates here; the two must stay together or the row is a dead tap. */}
         {__DEV__ && (
           <Stack.Screen
             name="FeltGallery"
@@ -240,7 +282,6 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  headerGear: { color: theme.dim, fontSize: 19, paddingHorizontal: 14 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.bg },
   devBanner: {
     color: theme.dim,

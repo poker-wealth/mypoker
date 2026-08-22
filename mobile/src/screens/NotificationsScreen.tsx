@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import { api } from '../api';
 import { moneyFromDecimal } from '../money';
-import { radius, space, theme } from '../theme';
+import { radius, space, theme, weight } from '../theme';
 import { Button, Card, Screen } from '../ui';
 
 /**
@@ -152,8 +152,8 @@ const styles = StyleSheet.create({
   },
   dot: { marginTop: 5, width: 8, height: 8, borderRadius: radius.pill },
   rowMain: { flex: 1, gap: 2 },
-  rowTitle: { color: theme.text, fontSize: 13, fontWeight: '700' },
-  rowTitleRead: { color: theme.dim, fontWeight: '400' },
-  rowDate: { color: theme.dim, fontSize: 10 },
+  rowTitle: { color: theme.text, fontSize: 13, fontFamily: weight('700') },
+  rowTitleRead: { color: theme.dim, fontFamily: weight('400') },
+  rowDate: { color: theme.dim, fontSize: 10, fontFamily: weight('400') },
   unreadDot: { marginTop: 6, width: 7, height: 7, borderRadius: radius.pill, backgroundColor: theme.brand },
 });

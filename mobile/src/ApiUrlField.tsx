@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { BUILD_API_URL, OVERRIDE_ALLOWED, clearApiOverride, getApiOverride, setApiOverride } from './apiConfig';
-import { radius, space, theme } from './theme';
+import { radius, space, theme, weight } from './theme';
 import { Button } from './ui';
 
 /**
@@ -70,7 +70,7 @@ export function ApiUrlField() {
 
 const styles = StyleSheet.create({
   container: { gap: space.xs },
-  heading: { color: theme.dim, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+  heading: { color: theme.dim, fontSize: 11, textTransform: 'uppercase', fontFamily: weight('800') },
   input: {
     backgroundColor: theme.surface2,
     borderColor: theme.border,
@@ -79,8 +79,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.md,
     paddingVertical: space.sm,
     color: theme.text,
-    fontSize: 15,
-  },
+    fontSize: 15, fontFamily: weight('400') },
   row: { flexDirection: 'row', gap: space.sm },
-  status: { color: theme.dim, fontSize: 11 },
+  status: { color: theme.dim, fontSize: 11, fontFamily: weight('400') },
 });

@@ -8,7 +8,7 @@ import { api } from '../api';
 import { ApiUrlField } from '../ApiUrlField';
 import { useAuth } from '../auth';
 import type { RootStackParamList } from '../navigation';
-import { space, theme } from '../theme';
+import { space, theme, weight } from '../theme';
 import { Button, Card, ListRow, Screen, Toggle } from '../ui';
 
 /**
@@ -105,10 +105,10 @@ export function SettingsScreen() {
               />
             </Section>
 
-            {/* Developer tools. `__DEV__` is false in any release build, so this section does
-                not exist in a shipped app — it is not hidden, it is absent. Untranslated on
-                purpose: it never reaches a player, and adding eight locales for it would put
-                developer strings in the translators' queue. */}
+            {/* Developer tools. `__DEV__` is false in any release build, so this section does not
+                exist in a shipped app — it is not hidden, it is absent. Untranslated on purpose:
+                it never reaches a player. Must stay in step with the FeltGallery route in App.tsx
+                — the pair got separated in an earlier merge and this row became a dead tap. */}
             {__DEV__ && (
               <Section title="Developer">
                 <ListRow label="Felt gallery" onPress={() => navigation.navigate('FeltGallery')} />
@@ -150,7 +150,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.bg },
   section: { gap: space.sm },
-  sectionTitle: { paddingHorizontal: space.xs, color: theme.dim, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+  sectionTitle: { paddingHorizontal: space.xs, color: theme.dim, fontSize: 11, textTransform: 'uppercase', fontFamily: weight('800') },
   sectionCard: { padding: 0, paddingHorizontal: space.md, gap: 0 },
   footer: { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.md },
 });

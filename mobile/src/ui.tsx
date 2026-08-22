@@ -10,7 +10,7 @@ import {
   View,
   type ViewStyle,
 } from 'react-native';
-import { radius, space, theme } from './theme';
+import { radius, space, theme, weight } from './theme';
 
 /**
  * The native primitives, mirroring `frontend/src/components/ui/`.
@@ -297,24 +297,24 @@ const styles = StyleSheet.create({
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingVertical: space.sm },
   rowMain: { flex: 1, gap: 2 },
-  rowLabel: { color: theme.text, fontSize: 14 },
-  rowHint: { color: theme.dim, fontSize: 11 },
-  rowValue: { color: theme.dim, fontSize: 13, maxWidth: '50%' },
+  rowLabel: { color: theme.text, fontSize: 14, fontFamily: weight('400') },
+  rowHint: { color: theme.dim, fontSize: 11, fontFamily: weight('400') },
+  rowValue: { color: theme.dim, fontSize: 13, maxWidth: '50%', fontFamily: weight('400') },
   pressed: { opacity: 0.6 },
   badge: { alignSelf: 'flex-start', borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 3 },
-  badgeText: { fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
+  badgeText: { fontSize: 10, textTransform: 'uppercase', fontFamily: weight('800') },
   button: {
     alignItems: 'center',
     borderRadius: radius.pill,
     paddingHorizontal: space.lg,
     paddingVertical: space.md,
   },
-  buttonText: { fontSize: 14, fontWeight: '700' },
+  buttonText: { fontSize: 14, fontFamily: weight('700') },
   dim: { opacity: 0.55 },
   skeleton: { backgroundColor: theme.surface2, borderRadius: 6, height: 14 },
   state: { alignItems: 'center', gap: space.xs, paddingVertical: space.xl },
-  stateTitle: { color: theme.text, fontSize: 15, fontWeight: '700' },
-  stateBody: { color: theme.dim, fontSize: 12, textAlign: 'center' },
+  stateTitle: { color: theme.text, fontSize: 15, fontFamily: weight('700') },
+  stateBody: { color: theme.dim, fontSize: 12, textAlign: 'center', fontFamily: weight('400') },
   errorBox: {
     backgroundColor: theme.surface,
     borderColor: theme.border,
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
     padding: space.md,
     gap: space.sm,
   },
-  errorText: { color: theme.text, fontSize: 13, lineHeight: 19 },
+  errorText: { color: theme.text, fontSize: 13, lineHeight: 19, fontFamily: weight('400') },
   pad: { alignSelf: 'flex-start', paddingVertical: space.md },
   segmented: {
     flexDirection: 'row',
@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
   },
   segment: { flex: 1, alignItems: 'center', borderRadius: radius.pill, paddingVertical: space.sm },
   segmentActive: { backgroundColor: theme.surface2 },
-  segmentText: { color: theme.dim, fontSize: 12, fontWeight: '700' },
+  segmentText: { color: theme.dim, fontSize: 12, fontFamily: weight('700') },
   segmentTextActive: { color: theme.text },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
   sheet: {
@@ -359,11 +359,11 @@ const styles = StyleSheet.create({
   sheetTitle: {
     color: theme.text,
     fontSize: 15,
-    fontWeight: '700',
     textAlign: 'center',
     paddingBottom: space.sm,
     borderBottomColor: theme.border,
     borderBottomWidth: 1,
+    fontFamily: weight('700'),
   },
   sheetBody: { padding: space.lg, gap: space.md },
 });

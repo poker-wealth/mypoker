@@ -19,8 +19,25 @@ export type RootStackParamList = {
   Settings: undefined;
   AgentCenter: undefined;
   Wallet: undefined;
+  Jackpot: undefined;
+  Fairness: undefined;
   /** A dev-only felt harness, registered only when __DEV__. See App.tsx. */
   FeltGallery: undefined;
+};
+
+/**
+ * The tab navigator's own screens, in the web's order.
+ *
+ * Declared so a screen INSIDE the tabs can reach a sibling — the web's
+ * "create private table" button navigates to Alliance from the lobby, and
+ * without this that call is untyped.
+ */
+export type TabParamList = {
+  Alliance: undefined;
+  Games: undefined;
+  Tables: undefined;
+  Data: undefined;
+  Account: undefined;
 };
 
 /** Props for a screen in the root stack. `TableScreenProps` is the one the game side uses. */

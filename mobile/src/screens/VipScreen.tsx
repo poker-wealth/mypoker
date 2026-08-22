@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import { api } from '../api';
 import { money } from '../money';
-import { radius, space, theme } from '../theme';
+import { radius, space, theme, weight } from '../theme';
 import { Badge, Card, ListRow, Screen } from '../ui';
 
 /**
@@ -146,10 +146,10 @@ export function VipScreen() {
 
 const styles = StyleSheet.create({
   tierRow: { flexDirection: 'row', alignItems: 'baseline', gap: space.sm },
-  tier: { fontSize: 20, fontWeight: '900' },
-  tierTitle: { color: theme.dim, fontSize: 13, fontWeight: '700' },
-  label: { marginTop: space.sm, color: theme.dim, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
-  amount: { color: theme.text, fontSize: 24, fontWeight: '900' },
+  tier: { fontSize: 20, fontFamily: weight('900') },
+  tierTitle: { color: theme.dim, fontSize: 13, fontFamily: weight('700') },
+  label: { marginTop: space.sm, color: theme.dim, fontSize: 11, textTransform: 'uppercase', fontFamily: weight('700') },
+  amount: { color: theme.text, fontSize: 24, fontFamily: weight('900') },
   barTrack: {
     marginTop: space.md,
     height: 8,
@@ -159,16 +159,16 @@ const styles = StyleSheet.create({
   },
   barFill: { height: '100%', borderRadius: radius.pill, backgroundColor: theme.brand },
   barRow: { marginTop: space.xs, flexDirection: 'row', justifyContent: 'space-between' },
-  dimSmall: { color: theme.dim, fontSize: 11 },
-  estimate: { marginTop: space.xs, color: theme.dim, fontSize: 10 },
-  topTier: { marginTop: space.sm, color: theme.accent, fontSize: 12, fontWeight: '700' },
+  dimSmall: { color: theme.dim, fontSize: 11, fontFamily: weight('400') },
+  estimate: { marginTop: space.xs, color: theme.dim, fontSize: 10, fontFamily: weight('400') },
+  topTier: { marginTop: space.sm, color: theme.accent, fontSize: 12, fontFamily: weight('700') },
   section: { gap: space.sm },
-  sectionTitle: { paddingHorizontal: space.xs, color: theme.dim, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
+  sectionTitle: { paddingHorizontal: space.xs, color: theme.dim, fontSize: 11, textTransform: 'uppercase', fontFamily: weight('800') },
   listCard: { padding: 0, gap: 0 },
   rightCol: { alignItems: 'flex-end' },
-  rightAmount: { color: theme.text, fontSize: 13, fontWeight: '700' },
-  rightCaption: { color: theme.dim, fontSize: 9 },
-  note: { paddingHorizontal: space.xs, color: theme.dim, fontSize: 10, lineHeight: 15 },
+  rightAmount: { color: theme.text, fontSize: 13, fontFamily: weight('700') },
+  rightCaption: { color: theme.dim, fontSize: 9, fontFamily: weight('400') },
+  note: { paddingHorizontal: space.xs, color: theme.dim, fontSize: 10, lineHeight: 15, fontFamily: weight('400') },
   tierCard: { padding: 0 },
   tierCardLocked: { padding: 0, opacity: 0.6 },
 });
