@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { ApiUrlField } from '../ApiUrlField';
 import { useAuth } from '../auth';
 import { radius, space, theme } from '../theme';
 import { Button, Card, ErrorState } from '../ui';
@@ -67,6 +68,8 @@ export function LoginScreen() {
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
+            textContentType="emailAddress"
+            autoComplete="email"
             placeholderTextColor={theme.dim}
           />
           {emailTouched && !emailValid && <Text style={styles.invalid}>{t('auth.emailInvalid')}</Text>}
@@ -83,6 +86,12 @@ export function LoginScreen() {
             }}
             onBlur={() => setPasswordTouched(true)}
             secureTextEntry
+            // `newPassword` is what prompts a password manager to offer a
+            // generated password on sign-up; using it on sign-in would
+            // instead prompt to overwrite whatever is already stored, so the
+            // hint must track which form this is.
+            textContentType={mode === 'signIn' ? 'password' : 'newPassword'}
+            autoComplete={mode === 'signIn' ? 'current-password' : 'new-password'}
             placeholderTextColor={theme.dim}
           />
           {passwordTouched && !passwordValid && (
@@ -98,6 +107,8 @@ export function LoginScreen() {
               value={displayName}
               onChangeText={setDisplayName}
               autoCapitalize="words"
+              textContentType="name"
+              autoComplete="name"
               placeholderTextColor={theme.dim}
             />
           </View>
@@ -117,6 +128,13 @@ export function LoginScreen() {
           {mode === 'signIn' ? t('auth.noAccount') : t('auth.haveAccount')}
         </Button>
       </Card>
+
+      {/* Must live here, not just in Settings: Settings is only reachable
+          after sign-in, and sign-in needs a working API URL. Without this
+          control on the sign-in screen, a device build pointed at a stale
+          tunnel URL is unrecoverable without a full rebuild. Renders nothing
+          outside a `device` build — see ApiUrlField.tsx. */}
+      <ApiUrlField />
     </View>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { TableScreenProps } from '../navigation';
-import { API_URL } from '../api';
+import { useApiBase } from '../apiConfig';
 import { getToken } from '../session';
 import { radius, space, theme } from '../theme';
 
@@ -47,6 +47,7 @@ import { radius, space, theme } from '../theme';
 export function TableScreen({ route }: TableScreenProps) {
   const { tableId } = route.params;
   const [hasToken, setHasToken] = useState<boolean | null>(null);
+  const apiBase = useApiBase();
 
   useEffect(() => {
     let alive = true;
@@ -66,7 +67,7 @@ export function TableScreen({ route }: TableScreenProps) {
 
       <View style={styles.card}>
         <Row label="tableId" value={tableId} mono />
-        <Row label="gateway" value={API_URL || 'EXPO_PUBLIC_API_URL not set'} mono />
+        <Row label="gateway" value={apiBase === null ? '…' : apiBase || 'No API URL set'} mono />
         <Row
           label="session"
           value={

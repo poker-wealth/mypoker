@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 import { api } from '../api';
+import { ApiUrlField } from '../ApiUrlField';
 import { useAuth } from '../auth';
 import { space, theme } from '../theme';
 import { Button, Card, ListRow, Screen, Toggle } from '../ui';
@@ -108,6 +109,11 @@ export function SettingsScreen() {
           query fails. Gating this button on that query succeeding would trap
           the player behind the error state with no way back to login. */}
       <View style={styles.footer}>
+        {/* Renders nothing outside a `device` build (see ApiUrlField.tsx).
+            Placed here, above sign-out, and outside <Screen> so it still
+            renders when /me/settings fails. */}
+        <ApiUrlField />
+
         {/* No confirmation dialog: signing out is reversible and destroys
             nothing — the token is simply dropped. */}
         <Button variant="danger" onPress={() => void signOut()}>
@@ -132,5 +138,5 @@ const styles = StyleSheet.create({
   section: { gap: space.sm },
   sectionTitle: { paddingHorizontal: space.xs, color: theme.dim, fontSize: 11, fontWeight: '800', textTransform: 'uppercase' },
   sectionCard: { padding: 0, paddingHorizontal: space.md, gap: 0 },
-  footer: { paddingHorizontal: space.lg, paddingBottom: space.lg },
+  footer: { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.md },
 });

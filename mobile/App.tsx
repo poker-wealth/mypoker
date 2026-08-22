@@ -18,7 +18,7 @@ import { AgentCenterScreen } from './src/screens/AgentCenterScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { AuthProvider, useAuth } from './src/auth';
 import type { RootStackParamList } from './src/navigation';
-import { API_URL } from './src/api';
+import { useApiBase } from './src/apiConfig';
 import { space, theme } from './src/theme';
 import { AccountIcon, AllianceIcon, DataIcon, TablesIcon, WalletIcon } from './src/icons';
 // Side-effect import: initialises i18next before any screen calls
@@ -136,6 +136,7 @@ function TabsScreen() {
 function Root() {
   const { t } = useTranslation();
   const { status } = useAuth();
+  const apiBase = useApiBase();
 
   if (status === 'loading') {
     // A cold start must not look like signed-out — that would flash the
@@ -187,8 +188,8 @@ function Root() {
       {/* Which gateway this build points at. Invisible in production, and the
           first question worth answering when a device "cannot load anything" —
           on an Android emulator the host is 10.0.2.2, never localhost. */}
-      {__DEV__ && (
-        <Text style={styles.devBanner}>{API_URL || 'EXPO_PUBLIC_API_URL is not set'}</Text>
+      {__DEV__ && apiBase !== null && (
+        <Text style={styles.devBanner}>{apiBase || 'No API URL set — open Settings'}</Text>
       )}
     </NavigationContainer>
   );
