@@ -129,7 +129,12 @@ export function gameVisual(id: string): GameDef | undefined {
 const ART: Record<string, number> = {
   '/brand/bull.png': require('../assets/brand/bull.png'),
   '/brand/cards.png': require('../assets/brand/cards.png'),
-  '/brand/dou_di_zhu.png': require('../assets/brand/dou_di_zhu.png'),
+  // dou_di_zhu is actually a JPEG despite the web catalogue naming it .png (copied
+  // from frontend/public/brand/ where browsers sniff content and don't care about
+  // the extension). The key mirrors the web catalogue's `image` path; the require
+  // points at what the file actually is. Naming it .png broke an Android build:
+  // AAPT compiles resources for real and rejected the mislabelled file.
+  '/brand/dou_di_zhu.png': require('../assets/brand/dou_di_zhu.jpg'),
   '/brand/envelope.png': require('../assets/brand/envelope.png'),
   '/brand/minesweepers.png': require('../assets/brand/minesweepers.png'),
   '/brand/slots.png': require('../assets/brand/slots.png'),
