@@ -7,12 +7,14 @@ import { StatusBar } from 'expo-status-bar';
 // variant Nunito ships — 16 faces including italics — and Metro cannot tree
 // shake a require, so importing from it bundled ~10 fonts nobody asks for.
 import { useFonts } from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
 import { Nunito_400Regular } from '@expo-google-fonts/nunito/400Regular';
 import { Nunito_500Medium } from '@expo-google-fonts/nunito/500Medium';
 import { Nunito_600SemiBold } from '@expo-google-fonts/nunito/600SemiBold';
 import { Nunito_700Bold } from '@expo-google-fonts/nunito/700Bold';
 import { Nunito_800ExtraBold } from '@expo-google-fonts/nunito/800ExtraBold';
 import { Nunito_900Black } from '@expo-google-fonts/nunito/900Black';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { WalletScreen } from './src/screens/WalletScreen';
@@ -52,6 +54,15 @@ import './src/i18n';
  * halves to land and so the Bare Workflow gate can be proven on hardware, not
  * because a two-tab app is the goal.
  */
+
+/**
+ * Keep the native splash up past the first frame.
+ *
+ * Module scope on purpose: this has to run before React renders anything, and a call inside a
+ * component is already too late — the splash auto-hides as soon as the first frame draws, which
+ * is why it appeared not to exist. Root releases it once the fonts resolve.
+ */
+void SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -189,15 +200,23 @@ function Root() {
     Nunito_900Black,
   });
 
-  // A font that fails to load must not hold the app hostage: carry on with the
-  // system face rather than showing a spinner forever over a cosmetic problem.
-  if (!fontsLoaded && !fontError) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator color={theme.brand} />
-      </View>
-    );
-  }
+  /**
+   * Hold the native splash until the fonts are in, then hand straight to the app.
+   *
+   * Without this the sequence was: splash for one frame, a blank window, then a spinner, then the
+   * app — which is why the splash looked absent. `preventAutoHideAsync` is called at module scope
+   * below; this is the release.
+   *
+   * Fires on `fontError` too. A font that fails to load must not hold the app hostage — better the
+   * system face than a splash that never lifts.
+   */
+  useEffect(() => {
+    if (fontsLoaded || fontError) void SplashScreen.hideAsync();
+  }, [fontsLoaded, fontError]);
+
+  // Render nothing (not a spinner) while the splash is still up — a spinner drawn underneath it is
+  // what produced the flash of grey between splash and app.
+  if (!fontsLoaded && !fontError) return null;
 
   if (status === 'loading') {
     // A cold start must not look like signed-out — that would flash the

@@ -8,11 +8,6 @@
     "scheme": "mypoker",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0d0d1a"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.mypoker.app",
@@ -49,7 +44,16 @@
       "expo-localization",
       "expo-sharing",
       "expo-audio",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0d0d1a",
+          "imageWidth": 200
+        }
+      ]
     ],
     "owner": "xantle-application",
     "extra": {
