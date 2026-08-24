@@ -5,6 +5,9 @@ import { loadConfig } from '../../src/gateway/config';
 import { verifyToken, signToken } from '../../src/gateway/tokens';
 import { userStore } from '../../src/auth/user-store';
 
+// userStore is mocked: the Google routes call userStore.oauth() and /me calls
+// userStore.byPlayerId(), both of which would otherwise hit a real Mongoose
+// connection this suite never sets up.
 jest.mock('../../src/auth/user-store', () => ({
   userStore: {
     signup: jest.fn(),
@@ -222,6 +225,113 @@ describe('configuration guards', () => {
     expect(() =>
       loadConfig({ NODE_ENV: 'production', JWT_SECRET } as NodeJS.ProcessEnv),
     ).toThrow(/TELEGRAM_BOT_TOKEN is required/);
+  });
+});
+
+describe('POST /auth/google', () => {
+  const ORIGINAL_CLIENT_ID = process.env['GOOGLE_CLIENT_ID'];
+  const ORIGINAL_FETCH = global.fetch;
+
+  afterEach(() => {
+    if (ORIGINAL_CLIENT_ID === undefined) delete process.env['GOOGLE_CLIENT_ID'];
+    else process.env['GOOGLE_CLIENT_ID'] = ORIGINAL_CLIENT_ID;
+    global.fetch = ORIGINAL_FETCH;
+  });
+
+  it('503s when unconfigured, and never calls out to Google (fail closed)', async () => {
+    delete process.env['GOOGLE_CLIENT_ID'];
+    const fetchSpy = jest.fn();
+    global.fetch = fetchSpy as unknown as typeof fetch;
+
+    const res = await request(appWith()).post('/auth/google').send({ token: 'whatever' });
+
+    expect(res.status).toBe(503);
+    expect(res.body.error).toBe('Google sign-in is not configured');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects an access token issued to a client outside the allow-list', async () => {
+    process.env['GOOGLE_CLIENT_ID'] = 'good-client.apps.googleusercontent.com';
+    // userinfo is deliberately mocked to succeed here too: it reports whose
+    // token this is but not which client requested it, so if the aud check
+    // were skipped this attacker-controlled token would otherwise sail
+    // through to a 200 with a real session issued for the victim's account.
+    const fetchSpy = jest.fn(async (url: string) => {
+      if (url.includes('tokeninfo')) {
+        return {
+          ok: true,
+          json: async () => ({ aud: 'some-other-app.apps.googleusercontent.com' }),
+        };
+      }
+      if (url.includes('userinfo')) {
+        return {
+          ok: true,
+          json: async () => ({ sub: 'victim-1', email: 'victim@example.com', name: 'Victim' }),
+        };
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    global.fetch = fetchSpy as unknown as typeof fetch;
+    (userStore.oauth as jest.Mock).mockResolvedValue({
+      playerId: 'victim-1',
+      email: 'victim@example.com',
+      displayName: 'Victim',
+      photoUrl: null,
+    });
+
+    const res = await request(appWith()).post('/auth/google').send({ token: 'some-access-token' });
+
+    expect(res.status).toBe(401);
+    expect(res.body.token).toBeUndefined();
+  });
+
+  it('accepts an access token issued to an allow-listed client', async () => {
+    process.env['GOOGLE_CLIENT_ID'] = 'good-client.apps.googleusercontent.com';
+    const fetchSpy = jest.fn(async (url: string) => {
+      if (url.includes('tokeninfo')) {
+        return {
+          ok: true,
+          json: async () => ({ aud: 'good-client.apps.googleusercontent.com' }),
+        };
+      }
+      if (url.includes('userinfo')) {
+        return {
+          ok: true,
+          json: async () => ({ sub: 'g-100', email: 'ada@example.com', name: 'Ada' }),
+        };
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    global.fetch = fetchSpy as unknown as typeof fetch;
+    (userStore.oauth as jest.Mock).mockResolvedValue({
+      playerId: 'g-100',
+      email: 'ada@example.com',
+      displayName: 'Ada',
+      photoUrl: null,
+    });
+
+    const res = await request(appWith()).post('/auth/google').send({ token: 'some-access-token' });
+
+    expect(res.status).toBe(200);
+    expect(typeof res.body.token).toBe('string');
+    expect(res.body.player.displayName).toBe('Ada');
+  });
+
+  it('rejects a JWT-shaped token that fails audience verification, without retrying it as an access token', async () => {
+    process.env['GOOGLE_CLIENT_ID'] = 'good-client.apps.googleusercontent.com';
+    const fetchSpy = jest.fn(async (url: string) => {
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    global.fetch = fetchSpy as unknown as typeof fetch;
+
+    // Three dot-separated segments so the handler treats it as a JWT; it is
+    // not a real Google-signed token, so verifyIdToken will reject it.
+    const fakeJwt = 'header.payload.signature';
+    const res = await request(appWith()).post('/auth/google').send({ credential: fakeJwt });
+
+    expect(res.status).toBe(401);
+    expect(res.body.token).toBeUndefined();
+    expect(fetchSpy).not.toHaveBeenCalledWith(expect.stringContaining('tokeninfo'));
   });
 });
 

@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { AccountType, LedgerType } from '../domain/account-types';
 import { Money } from '../domain/money';
 import { AccountModel } from '../wallet/account.model';
@@ -36,8 +35,26 @@ import { leagueInventoryId } from './league-funding';
  * league admin granting themselves chips therefore cannot convert them to real
  * money without passing the controls that already exist.
  *
- * Every grant names its granter and is idempotent on a caller-supplied
- * reference, so a retried request cannot pay twice.
+ * IDEMPOTENCY IS THE CALLER'S TO SUPPLY, AND IT IS REQUIRED
+ *
+ * `reference` used to be optional, falling back to a fresh UUID per call — so
+ * two identical POSTs charged the league twice and credited the member twice.
+ * The comment here claimed "the route supplies one"; no route did. Caught in
+ * review after merge.
+ *
+ * It is now required, and deliberately not derivable server-side:
+ *
+ *   Minting one per HTTP request does not help — two requests, two references,
+ *   same double-pay one layer up.
+ *
+ *   Deriving it from the content (league + player + amount + a time bucket)
+ *   would collapse a genuine second grant of the same size on the same day into
+ *   silence, which is a worse bug than the one it fixes: money the league
+ *   believes it sent, never sent.
+ *
+ * So the caller decides what "the same grant" means — generated once when an
+ * admin commits to the action and reused on retry, the way an idempotency key
+ * is meant to work.
  */
 
 export class LeagueGrantError extends Error {
@@ -55,11 +72,11 @@ export interface GrantInput {
   /** The league admin making the grant — from a verified token, never a body. */
   grantedBy: string;
   /**
-   * Caller-supplied idempotency reference. Absent means "generate one", which
-   * makes the call non-idempotent — acceptable for a human clicking once, and
-   * the route supplies one so a retried HTTP request cannot double-pay.
+   * Idempotency key. REQUIRED: it is the only thing standing between a
+   * double-submit and a double payment. Stable across retries of the SAME
+   * intended grant, different for a genuinely new one.
    */
-  reference?: string;
+  reference: string;
 }
 
 export interface GrantResult {
@@ -100,7 +117,8 @@ export async function grantToMember(input: GrantInput): Promise<GrantResult> {
     throw new LeagueGrantError('grants may only credit PLAYER accounts');
   }
 
-  const grantId = input.reference ?? randomUUID();
+  if (!input.reference) throw new LeagueGrantError('a grant reference is required');
+  const grantId = input.reference;
   const result = await transfer({
     fromAccountId: inventoryId,
     toAccountId: wallet._id,

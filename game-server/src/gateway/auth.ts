@@ -170,6 +170,24 @@ export function buildAuthRouter(config: GatewayConfig): Router {
 
   r.post('/google', async (req: Request, res: Response) => {
     try {
+      // Every OAuth client we accept a token from — web, Android, iOS. Comma
+      // separated in GOOGLE_CLIENT_ID.
+      const allowedClientIds = (process.env['GOOGLE_CLIENT_ID'] ?? '')
+        .split(',')
+        .map((id) => id.trim())
+        .filter((id) => id.length > 0);
+
+      // An empty allow-list used to mean "accept any Google token from any
+      // application" — verifyIdToken was simply skipped, and the userinfo
+      // fallback trusts whoever the token names without ever checking which
+      // client it was issued to. That is the account-takeover bug this fixes.
+      // Refusing outright is the only safe reading of "not configured": fail
+      // closed, and do it before the token is even looked at.
+      if (allowedClientIds.length === 0) {
+        res.status(503).json({ error: 'Google sign-in is not configured' });
+        return;
+      }
+
       const { idToken, token, credential } = (req.body ?? {}) as Record<string, string>;
       const accessToken = credential || token || idToken;
       if (!accessToken) {
@@ -180,22 +198,46 @@ export function buildAuthRouter(config: GatewayConfig): Router {
       let payload: { sub: string; email: string; name?: string; picture?: string } | null = null;
 
       // A JWT idToken verifies offline; the implicit-flow access_token instead
-      // resolves through Google's userinfo endpoint.
-      const googleClientId = process.env['GOOGLE_CLIENT_ID'] ?? '';
-      if (googleClientId) {
+      // resolves through Google's tokeninfo + userinfo endpoints. Tell them
+      // apart by shape (three dot-separated segments), since a JWT that fails
+      // audience verification must be rejected outright, never silently
+      // retried as an access token.
+      const looksLikeJwt = accessToken.split('.').length === 3;
+
+      if (looksLikeJwt) {
         try {
           const ticket = await googleClient.verifyIdToken({
             idToken: accessToken,
-            audience: googleClientId,
+            audience: allowedClientIds,
           });
           const p = ticket.getPayload();
           if (p?.email) payload = { sub: p.sub, email: p.email, ...(p.name ? { name: p.name } : {}), ...(p.picture ? { picture: p.picture } : {}) };
         } catch {
-          // Not a JWT — fall through to the userinfo lookup.
+          // Well-formed JWT, but it failed verification (bad signature, wrong
+          // audience, expired, ...) — reject it outright rather than falling
+          // through to the access-token path.
+          res.status(401).json({ error: 'Invalid Google token' });
+          return;
         }
-      }
+      } else {
+        // Access tokens carry no audience of their own. userinfo reports WHOSE
+        // token it is but not which client it was issued to, so on its own it
+        // cannot answer "did our app request this?" — that's what tokeninfo's
+        // `aud` field is for. Only once that has been checked against the
+        // allow-list is it safe to call userinfo for the display profile.
+        const tokenInfoRes = await fetch(
+          `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`,
+        );
+        if (!tokenInfoRes.ok) {
+          res.status(401).json({ error: 'Invalid Google token' });
+          return;
+        }
+        const tokenInfo = (await tokenInfoRes.json()) as Record<string, string>;
+        if (!tokenInfo['aud'] || !allowedClientIds.includes(tokenInfo['aud'])) {
+          res.status(401).json({ error: 'Invalid Google token' });
+          return;
+        }
 
-      if (!payload) {
         const userinfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
           headers: { Authorization: `Bearer ${accessToken}` },
         });

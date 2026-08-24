@@ -557,6 +557,27 @@
     "isolationNote": "Chỉ bàn và ví của liên minh. Bàn nền tảng đã bị ẩn.",
     "backToPlatform": "Quay lại sảnh nền tảng"
   },
+  "grants": {
+    "title": "Cấp chip cho thành viên",
+    "fund": "Cấp chip cho thành viên",
+    "blurb": "Chuyển chip từ kho liên minh vào ví liên minh của thành viên. Chip này dùng để chơi nhưng không thể rút.",
+    "recipient": "Thành viên",
+    "amount": "Số tiền",
+    "amountInvalid": "Nhập số tiền, tối đa 6 chữ số thập phân",
+    "send": "Gửi chip",
+    "sent": "Đã gửi chip",
+    "confirmTitle": "Gửi số chip này?",
+    "confirmBody": "Gửi {{amount}} cho {{player}} từ kho liên minh.",
+    "noMembers": "Chưa có thành viên để cấp",
+    "noMembersBlurb": "Hãy mời người chơi vào liên minh trước.",
+    "notAllowed": "Chỉ chủ sở hữu hoặc quản trị viên mới cấp được",
+    "notAllowedBlurb": "Hãy nhờ chủ liên minh cấp chip.",
+    "role": {
+      "OWNER": "Chủ sở hữu",
+      "ADMIN": "Quản trị viên",
+      "MEMBER": "Thành viên"
+    }
+  },
   "security": {
     "deviceModifiedTitle": "Thiết bị này có vẻ đã bị chỉnh sửa",
     "deviceModifiedBody": "Đã phát hiện công cụ root hoặc jailbreak. Bạn vẫn có thể chơi, nhưng thiết bị đã chỉnh sửa dễ bị can thiệp hơn — hãy thận trọng khi nạp và rút tiền."

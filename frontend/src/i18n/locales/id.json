@@ -557,6 +557,27 @@
     "isolationNote": "Hanya meja dan dompet liga. Meja platform disembunyikan.",
     "backToPlatform": "Kembali ke lobi platform"
   },
+  "grants": {
+    "title": "Danai anggota",
+    "fund": "Danai anggota",
+    "blurb": "Pindahkan chip dari inventaris aliansi ke dompet aliansi anggota. Chip ini bisa dimainkan tetapi tidak bisa ditarik.",
+    "recipient": "Anggota",
+    "amount": "Jumlah",
+    "amountInvalid": "Masukkan jumlah, maksimal 6 desimal",
+    "send": "Kirim chip",
+    "sent": "Chip terkirim",
+    "confirmTitle": "Kirim chip ini?",
+    "confirmBody": "Kirim {{amount}} ke {{player}} dari inventaris aliansi.",
+    "noMembers": "Belum ada anggota untuk didanai",
+    "noMembersBlurb": "Undang pemain ke aliansi terlebih dahulu.",
+    "notAllowed": "Hanya pemilik atau admin yang dapat mendanai",
+    "notAllowedBlurb": "Minta pemilik aliansi untuk memberi chip.",
+    "role": {
+      "OWNER": "Pemilik",
+      "ADMIN": "Admin",
+      "MEMBER": "Anggota"
+    }
+  },
   "security": {
     "deviceModifiedTitle": "Perangkat ini tampak dimodifikasi",
     "deviceModifiedBody": "Terdeteksi alat root atau jailbreak. Anda tetap bisa bermain, tetapi perangkat yang dimodifikasi lebih rentan dimanipulasi — berhati-hatilah saat menyetor dan menarik dana."

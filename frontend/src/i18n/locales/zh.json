@@ -557,6 +557,27 @@
     "isolationNote": "仅显示联盟牌桌与钱包，平台牌桌已隐藏。",
     "backToPlatform": "返回平台大厅"
   },
+  "grants": {
+    "title": "为成员充值",
+    "fund": "为成员充值",
+    "blurb": "将筹码从联盟库存转入成员的联盟钱包。这些筹码可用于游戏，但无法提现。",
+    "recipient": "成员",
+    "amount": "金额",
+    "amountInvalid": "请输入金额，最多 6 位小数",
+    "send": "发送筹码",
+    "sent": "筹码已发送",
+    "confirmTitle": "确认发送筹码？",
+    "confirmBody": "从联盟库存向 {{player}} 发送 {{amount}}。",
+    "noMembers": "暂无可充值的成员",
+    "noMembersBlurb": "请先邀请玩家加入联盟。",
+    "notAllowed": "仅盟主或管理员可为成员充值",
+    "notAllowedBlurb": "请联系盟主发放筹码。",
+    "role": {
+      "OWNER": "盟主",
+      "ADMIN": "管理员",
+      "MEMBER": "成员"
+    }
+  },
   "security": {
     "deviceModifiedTitle": "此设备似乎已被修改",
     "deviceModifiedBody": "检测到 Root 或越狱工具。您仍可继续游戏，但已修改的设备更容易被篡改，请谨慎进行充值与提现。"

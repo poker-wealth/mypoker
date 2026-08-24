@@ -12,6 +12,7 @@ import { errorKey } from '@/api/errors';
 import { useSession } from '@/store/session';
 import { useContextStore } from '@/store/context';
 import { CreateTableSheet } from '@/components/league/CreateTableSheet';
+import { GrantSheet, FundMembersButton } from '@/components/league/GrantSheet';
 import { toast } from '@/lib/toast';
 import { haptic } from '@/lib/telegram';
 import type { League } from '@/api/leagues';
@@ -35,6 +36,7 @@ export function Alliance() {
   // closed; holding the league itself (not a boolean) keeps the sheet honest
   // about WHICH alliance the table belongs to.
   const [tableFor, setTableFor] = useState<League | null>(null);
+  const [grantFor, setGrantFor] = useState<League | null>(null);
 
   const mine = useMyLeagues();
   const discover = useDiscoverLeagues();
@@ -127,6 +129,12 @@ export function Alliance() {
                       <TableProperties size={14} />
                       {t('alliance.newTable')}
                     </Button>
+                    {/* Unlike the button above, this one knows whether it
+                        should exist: the roster returns the caller's role, so
+                        a plain member never sees a control they cannot use. */}
+                    <FundMembersButton league={l} onOpen={() => setGrantFor(l)}>
+                      {t('grants.fund')}
+                    </FundMembersButton>
                   </div>
                 }
               />
@@ -200,6 +208,7 @@ export function Alliance() {
 
       <CreateSheet open={createOpen} onClose={() => setCreateOpen(false)} />
       <CreateTableSheet league={tableFor} onClose={() => setTableFor(null)} />
+      <GrantSheet league={grantFor} onClose={() => setGrantFor(null)} />
     </div>
   );
 }
