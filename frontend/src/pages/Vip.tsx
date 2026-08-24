@@ -103,8 +103,14 @@ export function Vip() {
                 <div className="mt-1.5 flex justify-between text-[0.66rem] text-dim">
                   <span>{vip.data.progressPct}%</span>
                   <span className="tabular-nums">
+                    {/* symbol: false — the template already carries the currency
+                        mark in all 8 locales, so the default rendered it twice
+                        ("₮₮1,234 to V2"). Found while porting this screen to native.
+                        NOT amountOnly(): `remaining` is micros, and that helper
+                        takes a decimal string, so it would print the raw
+                        9,710,157,500. */}
                     {t('vip.remaining', {
-                      amount: money(vip.data.next.remaining),
+                      amount: money(vip.data.next.remaining, { symbol: false }),
                       tier: vip.data.next.tier,
                     })}
                   </span>

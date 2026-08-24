@@ -1,5 +1,6 @@
 {
   "nav": {
+    "wallet": "ウォレット",
     "alliance": "同盟",
     "games": "ゲーム",
     "lobby": "ロビー",
@@ -264,6 +265,7 @@
     "chatDisabled": "チャットは無効です",
     "microphoneDenied": "マイクへのアクセスが拒否されました",
     "recordingUnsupported": "このブラウザーは録音に対応していません",
+    "recordingUnavailable": "この端末では録音できません",
     "recordingTooShort": "もう少し長押ししてください",
     "recordingTooLong": "録音が大きすぎて送信できません",
     "recordingFailed": "この録音を送信できませんでした"
@@ -349,7 +351,10 @@
     "rulesPublished": "公開済み",
     "rulesAnchoredBlurb": "これらの還元率は、{{when}} にオンチェーンでコミットされたルールバージョンの下で記録されたものです。コミットはそれを参照するすべてのハンドより前に行われているため、後からルールを変更することはできません。",
     "rulesPublishedBlurb": "ルールバージョンは確定しており各ハンドに記録されますが、オンチェーンへのコミットはまだ完了していません。それまでの間はハンドを手順ごとに検証できます。",
-    "rulesAbsent": "これらの還元率の背後にあるルールバージョンを現在取得できないため、主張は行いません。"
+    "rulesAbsent": "これらの還元率の背後にあるルールバージョンを現在取得できないため、主張は行いません。",
+    "notVerifiedOnDevice": "この端末では再計算していません",
+    "seedFound": "あなたのシードは自席にあります",
+    "seedNotFound": "あなたのシードが自席にありません"
   },
   "reputation": {
     "title": "信頼度",
@@ -572,5 +577,26 @@
       "ADMIN": "管理者",
       "MEMBER": "メンバー"
     }
+  },
+  "security": {
+    "deviceModifiedTitle": "この端末は改造されている可能性があります",
+    "deviceModifiedBody": "Root化または脱獄ツールが検出されました。プレイは続けられますが、改造された端末は改ざんされやすいため、入出金にはご注意ください。"
+  },
+  "auth": {
+    "title": "ログイン",
+    "subtitle": "ログインしてプレイするか、アカウントを作成してください。",
+    "email": "メールアドレス",
+    "password": "パスワード",
+    "displayName": "表示名",
+    "displayNameOptional": "表示名（任意）",
+    "signIn": "ログイン",
+    "createAccount": "アカウント作成",
+    "noAccount": "初めてですか？アカウントを作成",
+    "haveAccount": "アカウントをお持ちですか？ログイン",
+    "emailInvalid": "有効なメールアドレスを入力してください",
+    "passwordTooShort": "パスワードは8文字以上で入力してください",
+    "signedOut": "ログアウトしました",
+    "continueWithGoogle": "Google で続ける",
+    "or": "または"
   }
 }

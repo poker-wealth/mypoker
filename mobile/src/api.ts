@@ -1,3 +1,4 @@
+import { getApiBase } from './apiConfig';
 import { clearToken, getToken } from './session';
 
 /**
@@ -9,14 +10,11 @@ import { clearToken, getToken } from './session';
  * browser and reaches for browser globals.
  */
 
-/**
- * Where the gateway lives.
- *
- * `EXPO_PUBLIC_` is inlined at build time by Expo. On an Android emulator the
- * host machine is `10.0.2.2` — `localhost` there means the emulator itself,
- * which is the single most common "why does nothing load" on this platform.
- */
-export const API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/$/, '');
+// Re-exported so App.tsx and TableScreen.tsx (which display the configured
+// gateway) keep one definition of the build-time URL rather than importing
+// from apiConfig.ts directly. This is the build-time value only — it does NOT
+// reflect a runtime override; see apiConfig.ts's `getApiBase`.
+export { BUILD_API_URL as API_URL } from './apiConfig';
 
 export class ApiError extends Error {
   constructor(
@@ -32,7 +30,8 @@ export class ApiError extends Error {
 const TIMEOUT_MS = 15_000;
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  if (!API_URL) {
+  const base = await getApiBase();
+  if (!base) {
     throw new ApiError(0, 'No API URL configured — set EXPO_PUBLIC_API_URL for this build.');
   }
 
@@ -42,7 +41,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   let res: Response;
   try {
-    res = await fetch(`${API_URL}${path}`, {
+    res = await fetch(`${base}${path}`, {
       ...init,
       signal: controller.signal,
       headers: {
@@ -87,4 +86,8 @@ export const api = {
   get: <T>(path: string): Promise<T> => request<T>(path),
   post: <T>(path: string, body?: unknown): Promise<T> =>
     request<T>(path, { method: 'POST', ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }),
+  // Added for Settings: the gateway only accepts PATCH on /me/settings
+  // (game-server/src/gateway/me-routes.ts), and nothing here needed it before.
+  patch: <T>(path: string, body?: unknown): Promise<T> =>
+    request<T>(path, { method: 'PATCH', ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }),
 };

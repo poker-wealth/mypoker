@@ -17,25 +17,49 @@
         "resourceClass": "m-medium"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "http://10.0.2.2:4100"
+        "EXPO_PUBLIC_API_URL": "http://10.0.2.2:4100",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "183763358080-gdksnp9288rgq7falqlvvms0bvhm2fvm.apps.googleusercontent.com"
+      }
+    },
+    "device": {
+      "distribution": "internal",
+      "channel": "device",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "resourceClass": "m-medium"
+      },
+      "env": {
+        "EXPO_PUBLIC_ALLOW_API_OVERRIDE": "true"
       }
     },
     "preview": {
       "distribution": "internal",
       "channel": "preview",
-      "android": { "buildType": "apk" },
-      "ios": { "resourceClass": "m-medium" },
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "resourceClass": "m-medium"
+      },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://mypoker777.com"
+        "EXPO_PUBLIC_API_URL": "https://mypoker777.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "183763358080-gdksnp9288rgq7falqlvvms0bvhm2fvm.apps.googleusercontent.com"
       }
     },
     "production": {
       "channel": "production",
       "autoIncrement": true,
-      "android": { "buildType": "app-bundle" },
-      "ios": { "resourceClass": "m-medium" },
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "ios": {
+        "resourceClass": "m-medium"
+      },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://mypoker777.com"
+        "EXPO_PUBLIC_API_URL": "https://mypoker777.com",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "183763358080-gdksnp9288rgq7falqlvvms0bvhm2fvm.apps.googleusercontent.com"
       }
     }
   },

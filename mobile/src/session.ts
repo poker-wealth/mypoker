@@ -30,6 +30,23 @@ const TOKEN_KEY = 'mypoker.session.token';
  */
 let cached: string | null | undefined;
 
+/**
+ * Notified whenever the token is dropped, including by api.ts on a 401.
+ *
+ * Without this the shell keeps rendering a signed-in app over a session the
+ * server has already forgotten: the token is gone from storage but the auth
+ * context still says 'signedIn', so every screen errors and nothing routes the
+ * player back to sign-in. A Set rather than a single callback so the provider
+ * can subscribe and unsubscribe cleanly across remounts.
+ */
+const sessionLostListeners = new Set<() => void>();
+
+/** Subscribe to session loss. Returns the unsubscribe function. */
+export function onSessionLost(fn: () => void): () => void {
+  sessionLostListeners.add(fn);
+  return () => sessionLostListeners.delete(fn);
+}
+
 export async function getToken(): Promise<string | null> {
   if (cached !== undefined) return cached;
   try {
@@ -59,9 +76,59 @@ export async function clearToken(): Promise<void> {
     // is what stops this process using it; a failed delete is not worth
     // throwing at a user who is signing out.
   });
+  // Notify last: the token must actually be gone — from the cache and from
+  // storage — before anyone reacts to its going, or a listener that reads the
+  // token back (directly or via getToken) could still see the old value.
+  for (const fn of sessionLostListeners) {
+    try {
+      fn();
+    } catch {
+      // One listener throwing must not stop the others from being notified.
+    }
+  }
 }
 
 /** True when a token exists. Says nothing about whether the SERVER still accepts it. */
 export async function hasSession(): Promise<boolean> {
   return (await getToken()) !== null;
+}
+
+/**
+ * The signed-in player, cached beside the token.
+ *
+ * WHY THIS EXISTS
+ *
+ * `AuthProvider` learns who you are from the sign-in RESPONSE and holds it in memory. On a cold
+ * start it only reads the token back, so `player` is null while `status` is 'signedIn' — and the
+ * account screen greeted a signed-in player as "Guest Player" with no id.
+ *
+ * `/auth/me` is not the fix on its own: it returns `displayName: playerId`, a placeholder rather
+ * than the name the user actually has. Caching the real profile from sign-in preserves it.
+ *
+ * This is a CACHE, never an authority. It says who we last signed in as, not that the session is
+ * still valid — only the server decides that, and a 401 clears both.
+ */
+const PLAYER_KEY = 'mypoker.session.player';
+
+export async function setCachedPlayer(player: unknown): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(PLAYER_KEY, JSON.stringify(player), {
+      keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY,
+    });
+  } catch {
+    // A profile we cannot cache is a cosmetic loss on the next cold start, not a failed sign-in.
+  }
+}
+
+export async function getCachedPlayer<T>(): Promise<T | null> {
+  try {
+    const raw = await SecureStore.getItemAsync(PLAYER_KEY);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function clearCachedPlayer(): Promise<void> {
+  await SecureStore.deleteItemAsync(PLAYER_KEY).catch(() => {});
 }

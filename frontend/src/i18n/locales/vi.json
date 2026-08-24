@@ -1,5 +1,6 @@
 {
   "nav": {
+    "wallet": "Ví",
     "alliance": "Liên minh",
     "games": "Trò chơi",
     "lobby": "Sảnh",
@@ -264,6 +265,7 @@
     "chatDisabled": "Trò chuyện đã tắt",
     "microphoneDenied": "Quyền truy cập micro bị từ chối",
     "recordingUnsupported": "Trình duyệt này không ghi âm được",
+    "recordingUnavailable": "Thiết bị này không hỗ trợ ghi âm",
     "recordingTooShort": "Giữ lâu hơn một chút để gửi",
     "recordingTooLong": "Bản ghi quá lớn để gửi",
     "recordingFailed": "Không gửi được bản ghi đó"
@@ -349,7 +351,10 @@
     "rulesPublished": "Đã công bố",
     "rulesAnchoredBlurb": "Các tỷ lệ này được ghi nhận theo phiên bản luật đã cam kết trên chuỗi vào {{when}}. Cam kết có trước mọi ván bài tham chiếu đến nó, nên luật không thể bị thay đổi sau đó.",
     "rulesPublishedBlurb": "Phiên bản luật đã cố định và mỗi ván bài đều ghi lại nó, nhưng cam kết trên chuỗi chưa hoàn tất. Trong lúc đó, bạn có thể xác minh từng ván bài theo từng bước.",
-    "rulesAbsent": "Hiện không thể lấy phiên bản luật đứng sau các tỷ lệ này, nên không đưa ra bất kỳ khẳng định nào."
+    "rulesAbsent": "Hiện không thể lấy phiên bản luật đứng sau các tỷ lệ này, nên không đưa ra bất kỳ khẳng định nào.",
+    "notVerifiedOnDevice": "Chưa tính lại trên thiết bị này",
+    "seedFound": "Seed của bạn ở đúng ghế của bạn",
+    "seedNotFound": "Seed của bạn không ở ghế của bạn"
   },
   "reputation": {
     "title": "Uy tín",
@@ -572,5 +577,26 @@
       "ADMIN": "Quản trị viên",
       "MEMBER": "Thành viên"
     }
+  },
+  "security": {
+    "deviceModifiedTitle": "Thiết bị này có vẻ đã bị chỉnh sửa",
+    "deviceModifiedBody": "Đã phát hiện công cụ root hoặc jailbreak. Bạn vẫn có thể chơi, nhưng thiết bị đã chỉnh sửa dễ bị can thiệp hơn — hãy thận trọng khi nạp và rút tiền."
+  },
+  "auth": {
+    "title": "Đăng nhập",
+    "subtitle": "Đăng nhập để chơi, hoặc tạo tài khoản mới.",
+    "email": "Email",
+    "password": "Mật khẩu",
+    "displayName": "Tên hiển thị",
+    "displayNameOptional": "Tên hiển thị (tùy chọn)",
+    "signIn": "Đăng nhập",
+    "createAccount": "Tạo tài khoản",
+    "noAccount": "Chưa có tài khoản? Tạo ngay",
+    "haveAccount": "Đã có tài khoản? Đăng nhập",
+    "emailInvalid": "Vui lòng nhập địa chỉ email hợp lệ",
+    "passwordTooShort": "Mật khẩu phải có ít nhất 8 ký tự",
+    "signedOut": "Bạn đã đăng xuất",
+    "continueWithGoogle": "Tiếp tục với Google",
+    "or": "hoặc"
   }
 }

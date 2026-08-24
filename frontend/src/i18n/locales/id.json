@@ -1,5 +1,6 @@
 {
   "nav": {
+    "wallet": "Dompet",
     "alliance": "Aliansi",
     "games": "Game",
     "lobby": "Lobi",
@@ -264,6 +265,7 @@
     "chatDisabled": "Obrolan dinonaktifkan",
     "microphoneDenied": "Akses mikrofon ditolak",
     "recordingUnsupported": "Peramban ini tidak bisa merekam audio",
+    "recordingUnavailable": "Perekaman tidak tersedia di perangkat ini",
     "recordingTooShort": "Tahan sedikit lebih lama untuk mengirim",
     "recordingTooLong": "Rekaman terlalu besar untuk dikirim",
     "recordingFailed": "Tidak dapat mengirim rekaman itu"
@@ -349,7 +351,10 @@
     "rulesPublished": "Dipublikasikan",
     "rulesAnchoredBlurb": "Rasio ini dihasilkan di bawah versi aturan yang dikomit on-chain pada {{when}}. Komitmen itu mendahului setiap tangan yang merujuknya, sehingga aturan tidak bisa diubah setelahnya.",
     "rulesPublishedBlurb": "Versi aturan sudah tetap dan setiap tangan mencatatnya, tetapi komitmen on-chain belum selesai. Sementara itu, Anda dapat memverifikasi tangan langkah demi langkah.",
-    "rulesAbsent": "Versi aturan di balik rasio ini sedang tidak tersedia, jadi tidak ada klaim yang dibuat."
+    "rulesAbsent": "Versi aturan di balik rasio ini sedang tidak tersedia, jadi tidak ada klaim yang dibuat.",
+    "notVerifiedOnDevice": "Tidak dihitung ulang di perangkat ini",
+    "seedFound": "Seed Anda ada di kursi Anda",
+    "seedNotFound": "Seed Anda tidak ada di kursi Anda"
   },
   "reputation": {
     "title": "Reputasi",
@@ -572,5 +577,26 @@
       "ADMIN": "Admin",
       "MEMBER": "Anggota"
     }
+  },
+  "security": {
+    "deviceModifiedTitle": "Perangkat ini tampak dimodifikasi",
+    "deviceModifiedBody": "Terdeteksi alat root atau jailbreak. Anda tetap bisa bermain, tetapi perangkat yang dimodifikasi lebih rentan dimanipulasi — berhati-hatilah saat menyetor dan menarik dana."
+  },
+  "auth": {
+    "title": "Masuk",
+    "subtitle": "Masuk untuk bermain, atau buat akun baru.",
+    "email": "Email",
+    "password": "Kata sandi",
+    "displayName": "Nama tampilan",
+    "displayNameOptional": "Nama tampilan (opsional)",
+    "signIn": "Masuk",
+    "createAccount": "Buat akun",
+    "noAccount": "Baru di sini? Buat akun",
+    "haveAccount": "Sudah punya akun? Masuk",
+    "emailInvalid": "Masukkan alamat email yang valid",
+    "passwordTooShort": "Kata sandi minimal 8 karakter",
+    "signedOut": "Anda telah keluar",
+    "continueWithGoogle": "Lanjutkan dengan Google",
+    "or": "atau"
   }
 }

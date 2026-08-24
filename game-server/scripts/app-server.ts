@@ -1,6 +1,6 @@
 import express, { type Request, type Response } from 'express';
 import { join } from 'node:path';
-import { LobbyService } from '../src/lobby/lobby-service';
+import { seedLobby } from '../src/lobby/dev-seed';
 import { GAME_IDS, gameSpec, type GameId } from '../src/lobby/game-catalog';
 import { createTable, startHand, act, viewFor, type TableVariantId } from './table-runtime';
 import type { Action } from '../src/games/texas/betting';
@@ -28,30 +28,6 @@ import {
  */
 
 const PORT = Number(process.env.PORT ?? 4100);
-
-/** Seed a believable lobby so the screen has something live to show. All money in micro-USD. */
-function seedLobby(): LobbyService {
-  const l = new LobbyService();
-  const $ = (dollars: number): number => dollars * 1_000_000;
-  const tables: { id: string; gameId: GameId; stakes: number; players: number; jackpot: number }[] = [
-    { id: 'tx-1', gameId: 'texas', stakes: $(2), players: 6, jackpot: $(52.14) },
-    { id: 'tx-2', gameId: 'texas', stakes: $(20), players: 4, jackpot: $(128.43) },
-    { id: 'tx-3', gameId: 'texas', stakes: $(1), players: 2, jackpot: $(8.9) },
-    { id: 'sd-1', gameId: 'short-deck', stakes: $(5), players: 5, jackpot: $(12.5) },
-    { id: 'om-1', gameId: 'omaha', stakes: $(2), players: 3, jackpot: $(9.05) },
-    { id: 'ba-1', gameId: 'baccarat', stakes: $(5), players: 7, jackpot: $(4.2) },
-    { id: 'nn-1', gameId: 'niu-niu', stakes: $(2), players: 5, jackpot: $(3.1) },
-    { id: 'nn-2', gameId: 'niu-niu', stakes: $(1), players: 2, jackpot: $(0.9) },
-    { id: 'ddz-1', gameId: 'dou-di-zhu', stakes: $(1), players: 3, jackpot: $(1.7) },
-    { id: 'sz-1', gameId: 'san-zhang', stakes: $(2), players: 4, jackpot: $(2.05) },
-    { id: 'rp-1', gameId: 'red-packet', stakes: $(0.5), players: 9, jackpot: $(6.4) },
-    { id: 'cb-1', gameId: 'cowboy-beauty', stakes: $(1), players: 18, jackpot: $(5.3) },
-    { id: 'lo-1', gameId: 'lottery', stakes: $(0.2), players: 240, jackpot: $(41) },
-    { id: 'sl-1', gameId: 'slots', stakes: $(0.5), players: 1, jackpot: 0 },
-  ];
-  for (const t of tables) l.addTable(t);
-  return l;
-}
 
 const lobby = seedLobby();
 

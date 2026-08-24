@@ -1,18 +1,13 @@
 {
   "expo": {
     "name": "MYPOKER",
-    "slug": "mypoker",
+    "slug": "my-poker",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "mypoker",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0d0d1a"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.mypoker.app",
@@ -33,7 +28,11 @@
       },
       "permissions": [
         "RECORD_AUDIO",
-        "INTERNET"
+        "INTERNET",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ],
       "blockedPermissions": [
         "ACCESS_FINE_LOCATION",
@@ -41,11 +40,25 @@
       ]
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-localization",
+      "expo-sharing",
+      "expo-audio",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0d0d1a",
+          "imageWidth": 200
+        }
+      ]
     ],
+    "owner": "xantle-application",
     "extra": {
       "eas": {
-        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+        "projectId": "e2999632-d12b-4ea0-bd08-21c995e9c8ad"
       }
     }
   }

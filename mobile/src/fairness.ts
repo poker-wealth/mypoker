@@ -1,0 +1,430 @@
+/**
+ * The 6-step verifier, running natively on the player's device (FairPlay v6.0
+ * UltraFair) — the mobile port of `frontend/src/lib/fairness.ts`.
+ *
+ * This is deliberately a re-implementation rather than a call to the server. Asking
+ * the platform "was this hand fair?" and printing its answer proves nothing — the
+ * whole point of provable fairness is that the player recomputes the hashes
+ * themselves and needs to trust nobody. Every value below is public round data;
+ * none of it is taken on faith.
+ *
+ * It therefore has to match game-server/src/fairness/ (and, transitively, the
+ * web verifier) exactly — byte for byte. A drift would tell an honest player
+ * their hand was rigged, which is the worst failure this feature has. The port
+ * is covered by `mobile/scripts/check-fairness.mjs`, run against the same
+ * server-generated vector the web module's tests use
+ * (`frontend/src/lib/__fixtures__/round-vector.json`).
+ *
+ * Async throughout because the one primitive everything is built on —
+ * `expo-crypto`'s `digest` — is async (it crosses into native code). React
+ * Native has no `crypto.subtle` and no global `TextEncoder`/`TextDecoder`, so
+ * both are replaced here: `expo-crypto` for the hashing, a small hand-rolled
+ * UTF-8 encoder for turning strings into the bytes it hashes.
+ */
+
+import { digest, CryptoDigestAlgorithm } from 'expo-crypto';
+
+export interface ProofNode {
+  hash: string;
+  /** true if the sibling sits to the right of the current node. */
+  right: boolean;
+}
+
+export interface SeatedClientSeed {
+  seatOrder: number;
+  clientSeed: string;
+}
+
+export interface RoundVerificationData {
+  roundId: string;
+  serverSeed: string;
+  serverCommit: string;
+  allClientSeeds: string;
+  futureBlockHash: string;
+  finalSeed: string;
+  cards: string[];
+  timestamp: number;
+  roundHash: string;
+  merkleProof: ProofNode[];
+  merkleRoot: string;
+  seatedClientSeeds: SeatedClientSeed[];
+  /**
+   * The viewing player's OWN seed and seat, when they sat in this round.
+   *
+   * Step 3 is not really about the aggregate hash — it is about the player
+   * confirming their own contribution survived into it (v6.0 §6, "verify own
+   * ClientSeed at correct seat position"). Without this, a platform could
+   * substitute a player's seed for one it chose, merge the result honestly,
+   * and every hash in the round would still reconcile.
+   *
+   * Absent when verifying a round you did not play — the tool is public and
+   * any historical round can be checked by anyone. Step 3 then reports what it
+   * could and could not establish rather than passing silently.
+   */
+  mine?: SeatedClientSeed;
+  /**
+   * Where this batch's Merkle root was anchored, when it has been (step 6b).
+   *
+   * 6a — the proof rebuilds the root — is computed locally. 6b — "the on-chain
+   * root matches" — is a chain query the player makes themselves via the
+   * explorer link; handing them the transaction is the tool's whole part in
+   * it. Absent (or carrying a dev/local token) the page says the root is not
+   * yet anchored rather than pretending a permanence that isn't there.
+   */
+  notarization?: { chain: 'solana' | 'polygon' | 'rfc3161'; tx: string };
+}
+
+/**
+ * The explorer URL for a notarization, or null when there is nothing real to
+ * link — dev fakes (`fake-tx-…`) and local RFC 3161 tokens (`rfc3161-…`) are
+ * not on any chain, and a link that 404s reads as tampering to the one player
+ * who actually clicks it.
+ */
+export function explorerUrl(n: { chain: string; tx: string } | undefined): string | null {
+  if (!n || n.tx.startsWith('fake-tx-') || n.tx.startsWith('rfc3161-')) return null;
+  // Devnet now, mainnet at launch (W3 plan) — the cluster param goes then.
+  if (n.chain === 'solana') return `https://explorer.solana.com/tx/${n.tx}?cluster=devnet`;
+  if (n.chain === 'polygon') return `https://polygonscan.com/tx/${n.tx}`;
+  return null;
+}
+
+export type StepId = 1 | 2 | 3 | 4 | 5 | 6;
+
+export interface StepResult {
+  step: StepId;
+  pass: boolean;
+  /** What the player's own device computed. */
+  computed: string;
+  /** What the round data claims. Equal to `computed` when the step passes. */
+  expected: string;
+  /**
+   * Set when a step proved less than its full form — currently only Step 3
+   * verifying a round the viewer did not sit in. A passing step with a note is
+   * NOT the same as a passing step without one, and the UI says so.
+   */
+  note?: 'OWN_SEED_NOT_CHECKED';
+}
+
+export interface VerificationResult {
+  steps: StepResult[];
+  allPass: boolean;
+}
+
+// ─── primitives — must mirror node:crypto's (and fairness.ts's) behaviour exactly
+
+function toHex(bytes: Uint8Array): string {
+  let out = '';
+  for (const b of bytes) out += b.toString(16).padStart(2, '0');
+  return out;
+}
+
+/**
+ * Decode a hex digest, rejecting anything malformed.
+ *
+ * The naive version writes NaN — silently 0 — for any non-hex pair, which would
+ * make a corrupt Merkle proof hash to a plausible-looking wrong value and read as
+ * "this round was tampered with". A verifier must not manufacture evidence of
+ * fraud out of a malformed input; failing loudly is the only honest option.
+ */
+function fromHex(hex: string): Uint8Array {
+  if (hex.length % 2 !== 0 || !/^[0-9a-fA-F]*$/.test(hex)) {
+    throw new Error(`not a hex digest: ${hex.slice(0, 24)}…`);
+  }
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+  return out;
+}
+
+/**
+ * UTF-8 encode a JS string into bytes — a hand-rolled `TextEncoder`.
+ *
+ * React Native / Hermes does not expose a global `TextEncoder`, so this is
+ * written out rather than assumed. It has to produce the exact same bytes
+ * `new TextEncoder().encode(s)` would on the web, since that is what
+ * `sha256Hex`/`sha256Raw` feed to the digest there — any divergence here would
+ * make this port hash different bytes than the browser for the same input.
+ * Standard UTF-8: code points below 0x80 encode to one byte, below 0x800 to
+ * two, below 0x10000 to three (the common case — round data is otherwise
+ * hex/ASCII), and above that — astral plane, via a surrogate pair — to four.
+ */
+function utf8Encode(input: string): Uint8Array<ArrayBuffer> {
+  const bytes: number[] = [];
+  for (let i = 0; i < input.length; i++) {
+    let codePoint = input.codePointAt(i)!;
+    if (codePoint > 0xffff) i++; // this codePointAt already consumed the low surrogate
+    if (codePoint < 0x80) {
+      bytes.push(codePoint);
+    } else if (codePoint < 0x800) {
+      bytes.push(0xc0 | (codePoint >> 6), 0x80 | (codePoint & 0x3f));
+    } else if (codePoint < 0x10000) {
+      bytes.push(
+        0xe0 | (codePoint >> 12),
+        0x80 | ((codePoint >> 6) & 0x3f),
+        0x80 | (codePoint & 0x3f),
+      );
+    } else {
+      bytes.push(
+        0xf0 | (codePoint >> 18),
+        0x80 | ((codePoint >> 12) & 0x3f),
+        0x80 | ((codePoint >> 6) & 0x3f),
+        0x80 | (codePoint & 0x3f),
+      );
+    }
+  }
+  return new Uint8Array(bytes);
+}
+
+/** SHA-256 of a UTF-8 string, hex — matches createHash('sha256').update(s).digest('hex'). */
+async function sha256Hex(input: string): Promise<string> {
+  const data = utf8Encode(input);
+  const out = await digest(CryptoDigestAlgorithm.SHA256, data);
+  return toHex(new Uint8Array(out));
+}
+
+/** SHA-256 of raw bytes, returned as bytes — used by the seeded RNG's pool. */
+async function sha256Raw(input: string): Promise<Uint8Array<ArrayBuffer>> {
+  const data = utf8Encode(input);
+  const out = await digest(CryptoDigestAlgorithm.SHA256, data);
+  return new Uint8Array(out);
+}
+
+// ─── the seed pipeline ───────────────────────────────────────────────────────
+
+export const serverCommitOf = (serverSeed: string): Promise<string> => sha256Hex(serverSeed);
+
+/** all_client_seeds = SHA256(C1 ‖ C2 ‖ … ‖ Cn), concatenated in seat order. */
+export function mergeClientSeeds(seeds: readonly SeatedClientSeed[]): Promise<string> {
+  const ordered = [...seeds].sort((a, b) => a.seatOrder - b.seatOrder).map((s) => s.clientSeed);
+  return sha256Hex(ordered.join(''));
+}
+
+/**
+ * Is the player's own seed present, at the seat they actually occupied?
+ *
+ * Both halves matter. A seed that appears at someone else's seat changes the
+ * concatenation order and so changes every card dealt — finding it "somewhere"
+ * in the list is not the same as finding it where it belongs.
+ */
+export function ownSeedAtSeat(
+  seeds: readonly SeatedClientSeed[],
+  mine: SeatedClientSeed,
+): boolean {
+  const seated = seeds.find((s) => s.seatOrder === mine.seatOrder);
+  return seated?.clientSeed === mine.clientSeed;
+}
+
+/** final_seed = SHA256(server_seed + all_client_seeds + future_block_hash + round_id). */
+export function computeFinalSeed(
+  serverSeed: string,
+  allClientSeeds: string,
+  futureBlockHash: string,
+  roundId: string,
+): Promise<string> {
+  return sha256Hex(serverSeed + allClientSeeds + futureBlockHash + roundId);
+}
+
+/** round_hash — the 7-field digest of a whole round. Field order is the contract. */
+export function computeRoundHash(input: {
+  roundId: string;
+  serverCommit: string;
+  allClientSeeds: string;
+  futureBlockHash: string;
+  finalSeed: string;
+  cards: readonly string[];
+  timestamp: number;
+}): Promise<string> {
+  return sha256Hex(
+    input.roundId +
+      input.serverCommit +
+      input.allClientSeeds +
+      input.futureBlockHash +
+      input.finalSeed +
+      JSON.stringify(input.cards) +
+      input.timestamp.toString(),
+  );
+}
+
+// ─── the deterministic shuffle ───────────────────────────────────────────────
+
+/**
+ * Counter-based hash stream feeding Fisher-Yates.
+ *
+ * Refill boundary, byte order and rejection sampling all have to match the server
+ * exactly: consume one uint32 too many, or read little-endian, and every deck
+ * diverges from the second card onward.
+ */
+class SeededRng {
+  private blockIndex = 0;
+  private pool = new Uint8Array(0);
+  private offset = 0;
+  private readonly seed: string;
+
+  // Written out rather than a TS parameter property so this module stays plain
+  // strippable TypeScript. Anyone auditing a hand should be able to run this file
+  // directly — under `node fairness.ts`, in a REPL, anywhere — without a build
+  // step standing between them and checking the platform's arithmetic.
+  constructor(seed: string) {
+    this.seed = seed;
+  }
+
+  private async refill(): Promise<void> {
+    this.pool = await sha256Raw(`${this.seed}:${this.blockIndex}`);
+    this.blockIndex += 1;
+    this.offset = 0;
+  }
+
+  private async nextUint32(): Promise<number> {
+    if (this.offset + 4 > this.pool.length) await this.refill();
+    // Big-endian, matching Buffer.readUInt32BE.
+    const view = new DataView(this.pool.buffer, this.pool.byteOffset, this.pool.byteLength);
+    const value = view.getUint32(this.offset, false);
+    this.offset += 4;
+    return value;
+  }
+
+  /** Uniform integer in [0, n) via rejection sampling — no modulo bias. */
+  async nextIntBelow(n: number): Promise<number> {
+    const limit = Math.floor(0x1_0000_0000 / n) * n;
+    let x = await this.nextUint32();
+    while (x >= limit) x = await this.nextUint32();
+    return x % n;
+  }
+}
+
+const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'] as const;
+const SUITS = ['c', 'd', 'h', 's'] as const;
+
+export function standardDeck(): string[] {
+  const deck: string[] = [];
+  for (const rank of RANKS) {
+    for (const suit of SUITS) deck.push(`${rank}${suit}`);
+  }
+  return deck;
+}
+
+export async function shuffle(deck: readonly string[], seed: string): Promise<string[]> {
+  const out = [...deck];
+  const rng = new SeededRng(seed);
+  for (let i = out.length - 1; i >= 1; i--) {
+    const j = await rng.nextIntBelow(i + 1);
+    const tmp = out[i]!;
+    out[i] = out[j]!;
+    out[j] = tmp;
+  }
+  return out;
+}
+
+export const shuffledDeck = (seed: string): Promise<string[]> => shuffle(standardDeck(), seed);
+
+// ─── the Merkle proof ────────────────────────────────────────────────────────
+
+/** SHA-256 over the concatenated RAW bytes of two hex digests — not their text. */
+async function hashPair(a: string, b: string): Promise<string> {
+  const left = fromHex(a);
+  const right = fromHex(b);
+  const joined = new Uint8Array(left.length + right.length);
+  joined.set(left, 0);
+  joined.set(right, left.length);
+  const out = await digest(CryptoDigestAlgorithm.SHA256, joined);
+  return toHex(new Uint8Array(out));
+}
+
+/**
+ * Walk the proof path and return the root it rebuilds.
+ *
+ * Returns the computed root rather than a boolean, so the caller can show the
+ * player what their own machine derived next to what the platform published. A
+ * bare `false` would be a verdict; two roots side by side are evidence.
+ */
+export async function verifyMerkleProof(
+  leaf: string,
+  proof: readonly ProofNode[],
+): Promise<string> {
+  let computed = leaf;
+  for (const node of proof) {
+    computed = node.right
+      ? await hashPair(computed, node.hash)
+      : await hashPair(node.hash, computed);
+  }
+  return computed;
+}
+
+// ─── the verifier ────────────────────────────────────────────────────────────
+
+/**
+ * Run all six steps.
+ *
+ * Every step returns what was computed alongside what was claimed, so a failure
+ * shows the player the two hashes rather than just the word "failed" — that
+ * difference is the evidence, and evidence is the entire product here.
+ */
+export async function verifyRound(d: RoundVerificationData): Promise<VerificationResult> {
+  const steps: StepResult[] = [];
+
+  const commit = await serverCommitOf(d.serverSeed);
+  steps.push({ step: 1, pass: commit === d.serverCommit, computed: commit, expected: d.serverCommit });
+
+  const finalSeed = await computeFinalSeed(
+    d.serverSeed,
+    d.allClientSeeds,
+    d.futureBlockHash,
+    d.roundId,
+  );
+  steps.push({
+    step: 2,
+    pass: finalSeed === d.finalSeed,
+    computed: finalSeed,
+    expected: d.finalSeed,
+  });
+
+  // Step 3 is two claims, not one: the aggregate is well-formed, AND the
+  // viewer's own seed is inside it at their seat. The merge alone proves only
+  // that the platform hashed *some* list consistently — swapping a player's
+  // seed for one of its own and re-merging passes that check every time. The
+  // own-seed half is the entire reason v6.0 added this step.
+  const merged = await mergeClientSeeds(d.seatedClientSeeds);
+  const mergeOk = merged === d.allClientSeeds;
+  const ownSeedOk = d.mine ? ownSeedAtSeat(d.seatedClientSeeds, d.mine) : null;
+  steps.push({
+    step: 3,
+    pass: mergeOk && ownSeedOk !== false,
+    computed: ownSeedOk === false ? `seat ${d.mine?.seatOrder}: seed not found` : merged,
+    expected: ownSeedOk === false ? (d.mine?.clientSeed ?? '') : d.allClientSeeds,
+    // A round the viewer did not play still verifies — anyone may check any
+    // historical round — but it proves strictly less, and saying so is the
+    // difference between a verifier and a green tick.
+    ...(ownSeedOk === null ? { note: 'OWN_SEED_NOT_CHECKED' as const } : {}),
+  });
+
+  // Step 4 compares whole decks; the hashes above are per-value, so summarise the
+  // deck as its first few cards — enough to see it differs, short enough to read.
+  const deck = await shuffledDeck(d.finalSeed);
+  const deckMatches = deck.length === d.cards.length && deck.every((c, i) => c === d.cards[i]);
+  steps.push({
+    step: 4,
+    pass: deckMatches,
+    computed: deck.slice(0, 5).join(' '),
+    expected: d.cards.slice(0, 5).join(' '),
+  });
+
+  const roundHash = await computeRoundHash({
+    roundId: d.roundId,
+    serverCommit: d.serverCommit,
+    allClientSeeds: d.allClientSeeds,
+    futureBlockHash: d.futureBlockHash,
+    finalSeed: d.finalSeed,
+    cards: d.cards,
+    timestamp: d.timestamp,
+  });
+  steps.push({
+    step: 5,
+    pass: roundHash === d.roundHash,
+    computed: roundHash,
+    expected: d.roundHash,
+  });
+
+  const root = await verifyMerkleProof(d.roundHash, d.merkleProof);
+  steps.push({ step: 6, pass: root === d.merkleRoot, computed: root, expected: d.merkleRoot });
+
+  return { steps, allPass: steps.every((s) => s.pass) };
+}
