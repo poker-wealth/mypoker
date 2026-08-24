@@ -89,6 +89,13 @@ function TabsScreen() {
   const { t } = useTranslation();
   return (
     <Tabs.Navigator
+      // Tab ORDER and the LANDING screen are separate decisions. The web's bar
+      // puts Alliance first (frontend/src/components/BottomNav.tsx) but its
+      // router still opens on Lobby (frontend/src/router.tsx:32-33 — "Lobby
+      // stays the landing route; Alliance is tab 1 but not the entry screen").
+      // Without this, React Navigation defaults to the first REGISTERED tab,
+      // which is Alliance — every cold start landed on the wrong screen.
+      initialRouteName="Tables"
       screenOptions={{
         headerStyle: { backgroundColor: theme.bg },
         headerTitleStyle: { color: theme.text },

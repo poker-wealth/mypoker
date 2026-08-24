@@ -80,6 +80,23 @@ export async function getApiBase(): Promise<string> {
 }
 
 /**
+ * The WebSocket origin for the API base actually in use.
+ *
+ * The table socket must resolve the SAME base as every REST call. Reading
+ * the build-time constant instead produced `"/ws"` in `device` builds — an
+ * invalid URL — so REST worked through the runtime override while every
+ * table silently failed to connect.
+ *
+ * Returns null when no base is configured, so the caller can say so rather
+ * than opening a socket to a nonsense address.
+ */
+export async function getSocketBase(): Promise<string | null> {
+  const base = await getApiBase();
+  if (!base) return null;
+  return `${base.replace(/^http/, 'ws')}/ws`;
+}
+
+/**
  * The API base actually in use, resolved once on mount.
  *
  * Displays must show the EFFECTIVE base, not the build-time constant: in a

@@ -59,14 +59,26 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     clearTimeout(timer);
   }
 
-  if (res.status === 401) {
-    // The token is gone or expired. Drop it so the app stops presenting a
-    // signed-in shell over a session the server has already forgotten.
-    await clearToken();
-    throw new ApiError(401, 'Your session has expired. Sign in again.');
-  }
-
   const body: unknown = await res.json().catch(() => null);
+
+  if (res.status === 401) {
+    // A 401 means two different things depending on whether this request carried a token. With a
+    // token, the server is telling us a session it once accepted no longer exists — drop it so the
+    // app stops presenting a signed-in shell over a session the server has already forgotten. With
+    // NO token, there was never a session to expire — this is a login (or other unauthenticated
+    // call) being refused, and the server's own message is the reason (a wrong password, say), not
+    // a session ending mid-login. Clearing the token and firing session-lost here would wipe the
+    // cached player and the query cache for someone who was never signed in.
+    if (token) {
+      await clearToken();
+      throw new ApiError(401, 'Your session has expired. Sign in again.');
+    }
+    const message =
+      body && typeof body === 'object' && 'error' in body
+        ? String((body as { error: unknown }).error)
+        : 'Sign in failed.';
+    throw new ApiError(401, message);
+  }
 
   if (!res.ok) {
     // Prefer the server's own message: it is the one that knows WHY, and the

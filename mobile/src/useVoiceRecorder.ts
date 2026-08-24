@@ -174,9 +174,12 @@ export function useVoiceRecorder(): UseVoiceRecorder {
 
       // Belt and braces: the bitrate should prevent this, but an encoder is
       // free to ignore the hint and the socket is not free to survive an
-      // oversized frame.
-      const size = file.size ?? 0;
-      if (size > MAX_BYTES) {
+      // oversized frame. An unreadable size is not a free pass — the whole
+      // reason this check exists is that a frame gets no chance to fail
+      // gracefully once it hits the socket, so a clip we cannot measure is
+      // treated as over budget rather than let through.
+      const size = file.size;
+      if (size === null || size > MAX_BYTES) {
         setError('recordingTooLong');
         return null;
       }

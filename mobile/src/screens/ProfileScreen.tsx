@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { api } from '../api';
+import { useAuth } from '../auth';
 import type { RootStackParamList } from '../navigation';
 import { moneyFromDecimal } from '../money';
 import { radius, space, theme, weight } from '../theme';
@@ -15,28 +16,36 @@ import { Badge, Card, ListRow, Screen, Skeleton } from '../ui';
  * replaces AccountScreen, which its own comment called "a minimal stand-in"
  * for exactly this screen.
  *
- * Left out, deliberately, because what they depend on does not exist in the
- * shell yet:
+ * The menu mirrors the web's Menu component (frontend/src/pages/Profile.tsx
+ * ~308-380) — same order, same t() keys: Wallet · VIP · Fairness · Invite
+ * Friends · Message Center · Settings · Sign Out. Three of the web's rows are
+ * deliberately not here:
  *
- *   Identity (avatar, display name, sign-in card, sign-out) — there is no
- *   reactive session/player store here, only a token (see session.ts). Every
- *   other ported screen (Vip, Settings, Wallet) handles that the same way:
- *   no gate, just ask the server and let a 401 speak for itself. This screen
- *   follows suit rather than inventing a player identity to show.
+ *   Identity (avatar, display name, sign-in card) — there is no reactive
+ *   session/player store here, only a token (see session.ts). Every other
+ *   ported screen (Vip, Settings, Wallet) handles that the same way: no gate,
+ *   just ask the server and let a 401 speak for itself.
  *
- *   Personal Info, Fairness, Invite Friends, Support, Language — each is its
- *   own unported screen or unavailable config (no SUPPORT_URL, no language
- *   picker; i18n.ts reads the device language once and says switching
- *   "belongs with Settings, not here"). Rows for pages that do not exist
- *   would be dead taps.
+ *   Personal Info — on the web this row navigates to the same /settings
+ *   destination as its own "Settings" row further down the same menu; adding
+ *   it here would just be a second row to the screen already one tap away.
  *
- *   Deposit / Withdraw buttons — WalletScreen has no deposit or withdraw flow
- *   yet, only a balance read. A button wired to nothing is worse than no
- *   button.
+ *   Support — the web's row opens SUPPORT_URL (frontend/src/config.ts), built
+ *   from VITE_SUPPORT_URL / VITE_TELEGRAM_BOT_NAME. Neither exists on the
+ *   mobile side (no config.ts, no env plumbing), so there is no URL to open
+ *   and no toast-only row worth adding either — a row that always shows
+ *   "connecting" is a dead tap on every locale.
+ *
+ *   Language — i18n.ts reads the device language once at startup; there is no
+ *   picker to route to.
+ *
+ * Sign Out is here now too (it was Settings-only before) — the web has it in
+ * both places, via the same useAuth().signOut() Settings already calls.
  *
  * What is left is exactly what can be shown honestly: the real balance, the
  * real VIP progress (same endpoint and cache key as VipScreen, so the two
- * screens can never disagree), and the same menu AccountScreen had.
+ * screens can never disagree), and a menu matching the web's own admission of
+ * what does not exist yet.
  */
 
 interface Balance {
@@ -56,6 +65,7 @@ interface VipPreviewData {
 export function ProfileScreen() {
   const { t } = useTranslation();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { signOut } = useAuth();
   const [hidden, setHidden] = useState(false);
 
   const balance = useQuery({
@@ -127,6 +137,18 @@ export function ProfileScreen() {
               onPress={() => navigation.navigate('Vip')}
             />
             <ListRow
+              label={t('account.fairness')}
+              onPress={() => navigation.navigate('Fairness')}
+            />
+            {/* Web's "Invite Friends" row, same keys and same destination
+                (AgentCenter) — was t('agent.title') here, which is a
+                different string in all eight locales for the same screen. */}
+            <ListRow
+              label={t('account.inviteFriends')}
+              hint={t('account.earnRewards')}
+              onPress={() => navigation.navigate('AgentCenter')}
+            />
+            <ListRow
               label={t('account.messageCenter')}
               onPress={() => navigation.navigate('Notifications')}
               right={
@@ -135,15 +157,8 @@ export function ProfileScreen() {
                 ) : undefined
               }
             />
-            <ListRow
-              label={t('agent.title')}
-              onPress={() => navigation.navigate('AgentCenter')}
-            />
-            <ListRow
-              label={t('account.fairness')}
-              onPress={() => navigation.navigate('Fairness')}
-            />
             <ListRow label={t('account.settings')} onPress={() => navigation.navigate('Settings')} />
+            <ListRow label={t('account.signOut')} onPress={() => void signOut()} />
           </Card>
 
           <Text style={styles.buildLine}>{t('account.buildLine')}</Text>
