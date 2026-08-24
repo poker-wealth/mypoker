@@ -243,12 +243,18 @@ function TableRow({ table, onOpen }: { table: LobbyTable; onOpen: () => void }) 
   const name = table.name || t(`gameNames.${table.gameId}`, { defaultValue: table.gameId });
 
   // Seats first — it is what decides whether to tap — then the blinds as the
-  // small/big pair, the way the web lobby prints them. `stakes` is micro-USD;
-  // the raw field here rendered "Blinds 2000000" where "1/2" was meant — the
-  // exact unit bug money() exists to prevent, caught in the task-8 audit.
-  const blinds =
-    `${money(table.stakes / 2, { symbol: false, decimals: 0 })}` +
-    `/${money(table.stakes, { symbol: false, decimals: 0 })}`;
+  // small/big pair, the way the web lobby prints them. `stakes` is the big
+  // blind in TABLE CHIPS, not micro-USD: it comes straight from the room's
+  // own `bigBlind` (game-server/src/live/poker-room.ts) by way of
+  // `syncLobbyWithLiveTables` (game-server/src/lobby/live-sync.ts, `stakes =
+  // s.bigBlind`). It was micro-USD only back when a placeholder seeder fed
+  // this screen with invented tables; that seeder is gone. money() divides by
+  // 1,000,000, so it turns a real 10/20 table into "0/0" — silently, since 0
+  // still renders. Feeding it an actual micro value here would do the
+  // opposite: print "1000000/2000000" for a 1/2 table. Chips are not
+  // currency, so no money() and no micro conversion — just a formatted
+  // integer.
+  const blinds = `${(table.stakes / 2).toLocaleString()}/${table.stakes.toLocaleString()}`;
   const hint =
     `${t('lobby.colPlayers')} ${table.players}/${table.maxPlayers}` +
     ` · ${t('lobby.colBlinds')} ${blinds}`;

@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.mypoker.app",
+      "bundleIdentifier": "com.mypoker777",
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -18,7 +18,7 @@
       }
     },
     "android": {
-      "package": "com.mypoker.app",
+      "package": "com.mypoker777",
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -60,6 +60,12 @@
       "eas": {
         "projectId": "e2999632-d12b-4ea0-bd08-21c995e9c8ad"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e2999632-d12b-4ea0-bd08-21c995e9c8ad"
     }
   }
 }

@@ -42,23 +42,72 @@ export const BUILD_API_URL = (process.env.EXPO_PUBLIC_API_URL ?? '').replace(/\/
  */
 let cached: string | null | undefined;
 
+/**
+ * Every request built from this override carries the session token in its
+ * `Authorization` header (see the API client). An unvalidated base URL is
+ * therefore a token-exfiltration primitive: whatever string ends up stored
+ * here is where that token goes next. This control is already gated to
+ * `device` builds, which bounds who can trigger it, but validating is nearly
+ * free and also turns a typo'd value into a clear error instead of a
+ * confusing silent failure later.
+ *
+ * Only an absolute `http:`/`https:` URL with a non-empty host is accepted —
+ * not `javascript:`, not `file:`, not a scheme-relative `//host` (which
+ * inherits the app's own scheme and would still resolve).
+ */
+function parseApiUrl(candidate: string): URL | null {
+  try {
+    return new URL(candidate);
+  } catch {
+    return null;
+  }
+}
+
+function isValidApiUrl(candidate: string): boolean {
+  const parsed = parseApiUrl(candidate);
+  return parsed !== null && (parsed.protocol === 'http:' || parsed.protocol === 'https:') && parsed.hostname.length > 0;
+}
+
+function assertValidApiUrl(candidate: string): void {
+  const parsed = parseApiUrl(candidate);
+  if (!parsed) {
+    throw new Error('Enter a full URL, e.g. https://example.trycloudflare.com');
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('URL must start with http:// or https://');
+  }
+  if (!parsed.hostname) {
+    throw new Error('URL must include a host, e.g. https://example.trycloudflare.com');
+  }
+}
+
 export async function getApiOverride(): Promise<string | null> {
   if (!OVERRIDE_ALLOWED) return null;
   if (cached !== undefined) return cached;
+  let stored: string | null;
   try {
-    cached = (await SecureStore.getItemAsync(OVERRIDE_KEY)) ?? null;
+    stored = (await SecureStore.getItemAsync(OVERRIDE_KEY)) ?? null;
   } catch {
     // A keychain read can fail on a locked device. Treat it as "no override"
     // for this attempt but do NOT cache the failure as an answer — the next
     // call should try again rather than inherit a wrong null for the session.
     return null;
   }
+  // Re-validate on read, not just on write: a value could have been written
+  // before this validation existed, or by something other than
+  // `setApiOverride` (e.g. a manual keychain edit while debugging). Since
+  // this value flows straight into the Authorization-bearing base URL for
+  // every request, an invalid stored value is treated as absent rather than
+  // trusted — same token-exfiltration concern as at write time, just closing
+  // the gap for values that never went through `setApiOverride`.
+  cached = stored !== null && isValidApiUrl(stored) ? stored : null;
   return cached;
 }
 
 export async function setApiOverride(url: string): Promise<void> {
   if (!OVERRIDE_ALLOWED) return;
   const trimmed = url.trim().replace(/\/$/, '');
+  assertValidApiUrl(trimmed);
   cached = trimmed;
   await SecureStore.setItemAsync(OVERRIDE_KEY, trimmed);
 }
@@ -77,6 +126,23 @@ export async function clearApiOverride(): Promise<void> {
 export async function getApiBase(): Promise<string> {
   const override = await getApiOverride();
   return override ?? BUILD_API_URL;
+}
+
+/**
+ * The WebSocket origin for the API base actually in use.
+ *
+ * The table socket must resolve the SAME base as every REST call. Reading
+ * the build-time constant instead produced `"/ws"` in `device` builds — an
+ * invalid URL — so REST worked through the runtime override while every
+ * table silently failed to connect.
+ *
+ * Returns null when no base is configured, so the caller can say so rather
+ * than opening a socket to a nonsense address.
+ */
+export async function getSocketBase(): Promise<string | null> {
+  const base = await getApiBase();
+  if (!base) return null;
+  return `${base.replace(/^http/, 'ws')}/ws`;
 }
 
 /**

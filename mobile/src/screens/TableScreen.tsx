@@ -146,13 +146,26 @@ export function TableScreen({ route }: TableScreenProps) {
         }}
       />
 
+      {/* `snapshot.you` is null until the server's balance directory has warmed
+          (see poker-room.ts buildSnapshot), not only when a balance is truly
+          zero. BuyInSheet's `available` prop is a plain number with no way to
+          say "unknown", so the sheet must not open on that null — opening it
+          would coerce the unknown into a fabricated ₮0, disable the confirm
+          button, and tell a funded player to go deposit. Deferring the open
+          until `snapshot.you` exists costs nothing: a re-render fires the
+          moment it warms, and `available` below is only ever shown while
+          that condition holds. */}
       <BuyInSheet
-        open={buyInFor !== false}
+        open={buyInFor !== false && snapshot.you != null}
         onClose={() => setBuyInFor(false)}
         min={snapshot.minBuyIn}
         max={snapshot.maxBuyIn}
         bigBlind={snapshot.bigBlind}
-        available={snapshot.you?.available ?? 0}
+        // Only ever read while `open` (above) has already proven `snapshot.you`
+        // is non-null, so this fallback is never actually shown or computed
+        // against — it exists purely to satisfy BuyInSheet's non-nullable
+        // `available: number` prop while the sheet sits hidden.
+        available={snapshot.you ? snapshot.you.available : 0}
         seatIndex={typeof buyInFor === 'number' ? buyInFor : null}
         onConfirm={(amount) => {
           if (typeof buyInFor === 'number') {

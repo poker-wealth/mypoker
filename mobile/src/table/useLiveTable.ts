@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { TableSocket, type SocketStatus } from './tableSocket';
-import { API_URL } from '../api';
+import { getSocketBase } from '../apiConfig';
 import type { TableCommand, TableSnapshot } from '../lib/liveTable';
 
 /**
@@ -10,11 +11,10 @@ import type { TableCommand, TableSnapshot } from '../lib/liveTable';
  * commands. Everything on screen is the server's answer — this never computes a stack, a pot or a
  * legal move of its own.
  *
- * The socket URL is the gateway's, with the scheme swapped and `/ws` appended, exactly as the web
- * client derives it. One API URL, not a second one to keep in step.
+ * The socket URL is resolved through `getSocketBase()` — the SAME effective base every REST call
+ * uses (override included). Reading the build-time constant here once produced `"/ws"` on `device`
+ * builds and every table silently failed to connect while the rest of the app worked fine.
  */
-
-export const socketUrl = (): string => `${API_URL.replace(/^http/, 'ws')}/ws`;
 
 export interface LiveTable {
   snapshot: TableSnapshot | null;
@@ -33,6 +33,7 @@ export interface LiveTable {
 }
 
 export function useLiveTable(tableId: string, token: string | null): LiveTable {
+  const { t } = useTranslation();
   const [snapshot, setSnapshot] = useState<TableSnapshot | null>(null);
   const [status, setStatus] = useState<SocketStatus>('connecting');
   const [error, setError] = useState<string | null>(null);
@@ -46,24 +47,44 @@ export function useLiveTable(tableId: string, token: string | null): LiveTable {
       return;
     }
 
-    const next = new TableSocket(socketUrl(), token, tableId, {
-      onSnapshot: (s) => {
-        setSnapshot(s);
-        setError(null);
-      },
-      onStatus: setStatus,
-      onError: setError,
+    // getSocketBase() is a native round-trip (SecureStore), so the socket cannot be built
+    // synchronously here the way it used to be. `cancelled` stops a resolve that lands after this
+    // effect has already torn down (unmount, or tableId/token changed) from opening a socket nobody
+    // will ever close.
+    let cancelled = false;
+
+    void getSocketBase().then((base) => {
+      if (cancelled) return;
+
+      if (!base) {
+        // No build-time URL and no runtime override — there is nowhere to open a socket to. This is
+        // not the server refusing us, so it belongs on the same error channel as a real connection
+        // failure rather than leaving the screen stuck on "connecting" forever.
+        setStatus('error');
+        setError(t('table.connectionLost'));
+        return;
+      }
+
+      const next = new TableSocket(base, token, tableId, {
+        onSnapshot: (s) => {
+          setSnapshot(s);
+          setError(null);
+        },
+        onStatus: setStatus,
+        onError: setError,
+      });
+      socketRef.current = next;
+      setSocket(next);
+      next.connect();
     });
-    socketRef.current = next;
-    setSocket(next);
-    next.connect();
 
     return () => {
-      next.close();
+      cancelled = true;
+      socketRef.current?.close();
       socketRef.current = null;
       setSocket(null);
     };
-  }, [tableId, token]);
+  }, [tableId, token, t]);
 
   return { snapshot, status, error, socket, command: (cmd) => socketRef.current?.send(cmd) };
 }
