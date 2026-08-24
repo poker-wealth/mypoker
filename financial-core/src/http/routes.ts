@@ -67,6 +67,7 @@ import {
   joinLeague,
   leaveLeague,
   leaguesFor,
+  membersOf,
   discoverLeagues,
   putLeagueSettings,
   leaguesWithDueRakeChange,
@@ -295,6 +296,32 @@ export function buildRouter(): Router {
     asyncHandler(async (req: Request, res: Response) => {
       await joinLeague(req.params.leagueId!, req.dataScope!.playerId);
       res.json(await getLeague(req.params.leagueId!));
+    }),
+  );
+
+  /**
+   * One league's roster.
+   *
+   * MEMBERS ONLY. The roster is the membership list of a private club, and a
+   * league can be invite-only precisely so that who is in it is not public.
+   * `/leagues/:leagueId` is unauthenticated because a league's name and size
+   * are its shop window; who is inside it is not.
+   *
+   * A non-member gets 404, not 403 — the same shape as an unknown league, so
+   * the response cannot be used to confirm that a private league exists.
+   *
+   * ASSUMPTION (spec is silent on roster visibility): any member may read it.
+   * Restricting to owner/admin was the alternative; a club whose members
+   * cannot see who else is in it is the stranger of the two.
+   */
+  r.get(
+    '/leagues/:leagueId/members',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const leagueId = req.params.leagueId!;
+      const role = await membershipOf(leagueId, req.dataScope!.playerId);
+      if (role === null) throw new ApiError(404, 'no such league');
+      res.json({ members: await membersOf(leagueId) });
     }),
   );
 

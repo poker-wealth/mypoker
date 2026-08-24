@@ -223,4 +223,66 @@ describe('Financial Core HTTP API (/api/v1)', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ roundId: 'rt-1', applied: true });
   });
+
+  /**
+   * The roster is the membership list of a private club. A league can be
+   * invite-only precisely so that who is in it is not public, so this route is
+   * the one league read that is NOT open — and the refusal has to be shaped so
+   * it cannot be used to probe for private leagues.
+   */
+  describe('GET /leagues/:leagueId/members', () => {
+    const OWNER = 'tg-roster-owner';
+    const MEMBER = 'tg-roster-member';
+    const OUTSIDER = 'tg-roster-outsider';
+
+    async function seedLeague(): Promise<void> {
+      await post('/leagues', { leagueId: 'lg-roster', name: 'Roster Test' }, playerToken(OWNER));
+      await post('/leagues/lg-roster/join', {}, playerToken(MEMBER));
+    }
+
+    it('gives a member the roster', async () => {
+      await seedLeague();
+      const res = await fetch(url('/leagues/lg-roster/members'), {
+        headers: playerToken(MEMBER),
+      });
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as { members: { playerId: string; role: string }[] };
+      expect(body.members.map((m) => m.playerId).sort()).toEqual([MEMBER, OWNER].sort());
+    });
+
+    it('404s a non-member — the SAME answer as an unknown league', async () => {
+      await seedLeague();
+
+      const outsider = await fetch(url('/leagues/lg-roster/members'), {
+        headers: playerToken(OUTSIDER),
+      });
+      const missing = await fetch(url('/leagues/lg-does-not-exist/members'), {
+        headers: playerToken(OUTSIDER),
+      });
+
+      // Identical status AND body: a 403 here would confirm that a private
+      // league exists, which is exactly what invite-only is meant to prevent.
+      expect(outsider.status).toBe(404);
+      expect(missing.status).toBe(404);
+      expect(await outsider.json()).toEqual(await missing.json());
+    });
+
+    it('refuses an unauthenticated caller', async () => {
+      await seedLeague();
+      const res = await fetch(url('/leagues/lg-roster/members'));
+      expect(res.status).toBeGreaterThanOrEqual(400);
+      expect(res.status).toBeLessThan(500);
+    });
+
+    it('never returns a balance for anyone', async () => {
+      await seedLeague();
+      const res = await fetch(url('/leagues/lg-roster/members'), {
+        headers: playerToken(OWNER),
+      });
+      const body = (await res.json()) as { members: Record<string, unknown>[] };
+      for (const m of body.members) {
+        expect(Object.keys(m).sort()).toEqual(['joinedAt', 'playerId', 'role']);
+      }
+    });
+  });
 });
