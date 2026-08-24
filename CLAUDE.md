@@ -16,6 +16,16 @@ Telegram Mini App poker platform. Three packages, one repo:
 4. **Facts vs rules.** financial-core returns figures and holds no opinion; game-server derives reputation bands, VIP tiers, alert severity, rake bands. A second copy of a rule eventually gives a second answer.
 5. **Money-touching code is senior-reviewed before merge.** Say so in the PR.
 
+## Read `docs/TRAPS.md` before writing code
+
+Bugs this project has actually shipped, grouped by pattern: money units that
+look identical in a debugger, `?? 0` turning "unknown" into a claim, the
+doubled currency mark, build-time constants read where a runtime value was
+meant, checks that pass because they don't do the real thing.
+
+It is short and every entry is a real incident. Reading it costs less than
+rediscovering one of them.
+
 ## The spec is the authority
 
 `docs_extracted/*.txt` — the real specs. Generated, not committed: run `python extract_docx.py` against the `.docx` files at the repo root if missing.

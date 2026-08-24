@@ -19,9 +19,13 @@ import { Button, Card, ListRow, Screen, Toggle } from '../ui';
  * dark-only here, see theme.ts) and its language picker (LanguageSheet is a
  * web component; mobile's i18n.ts reads the device language once at start and
  * says switching languages "belongs with [Settings], not here" — a picker for
- * a future change, not this one). What's here — Preferences, Notifications and
- * the sign-out control at the bottom — is everything this screen can honestly
- * do today.
+ * a future change, not this one). The web's About section (frontend/src/pages/Settings.tsx
+ * ~181-198) is here, minus its Support row — that row opens SUPPORT_URL
+ * (frontend/src/config.ts), built from env that has no mobile-side
+ * equivalent (no config.ts, no VITE_SUPPORT_URL/VITE_TELEGRAM_BOT_NAME
+ * plumbing), so there is no URL to open. What's here — Preferences,
+ * Notifications, About and the sign-out control at the bottom — is everything
+ * this screen can honestly do today.
  *
  * The rule this screen exists to honour: a toggle must never show a confident
  * value before the real one has loaded. Every Toggle below is rendered only
@@ -103,6 +107,10 @@ export function SettingsScreen() {
                 label={t('settings.notifyPromos')}
                 right={<Toggle value={data.notifyPromos} onChange={(v) => set({ notifyPromos: v })} />}
               />
+            </Section>
+
+            <Section title={t('settings.about')}>
+              <ListRow label={t('account.fairness')} onPress={() => navigation.navigate('Fairness')} />
             </Section>
 
             {/* Developer tools. `__DEV__` is false in any release build, so this section does not
