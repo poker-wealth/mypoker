@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import type { LegalActions, TableCommand } from '../../lib/liveTable';
 
 /**
@@ -26,6 +27,7 @@ export interface ActionBarProps {
 const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(n, hi));
 
 export function ActionBar({ legal, bet, pot, onCommand }: ActionBarProps) {
+  const { t } = useTranslation();
   const minRaiseTo = legal.minRaiseTo ?? 0;
   const maxRaiseTo = legal.maxRaiseTo ?? 0;
   const canRaise = legal.minRaiseTo !== null && maxRaiseTo > minRaiseTo;
@@ -46,16 +48,16 @@ export function ActionBar({ legal, bet, pot, onCommand }: ActionBarProps) {
       {canRaise && (
         <View style={styles.sizing}>
           {([
-            ['½', 0.5],
-            ['¾', 0.75],
-            ['POT', 1],
-          ] as const).map(([label, f]) => (
-            <Pressable key={label} onPress={() => sizeTo(f)} style={styles.chip}>
-              <Text style={styles.chipText}>{label}</Text>
+            ['table.halfPot', 0.5],
+            ['table.threeQuarterPot', 0.75],
+            ['table.pot', 1],
+          ] as const).map(([key, f]) => (
+            <Pressable key={key} onPress={() => sizeTo(f)} style={styles.chip}>
+              <Text style={styles.chipText}>{t(key)}</Text>
             </Pressable>
           ))}
           <Pressable onPress={() => setRaiseTo(maxRaiseTo)} style={styles.chip}>
-            <Text style={styles.chipText}>ALL-IN</Text>
+            <Text style={styles.chipText}>{t('table.allIn')}</Text>
           </Pressable>
           <Text style={styles.amount}>₮{amount}</Text>
         </View>
@@ -67,7 +69,7 @@ export function ActionBar({ legal, bet, pot, onCommand }: ActionBarProps) {
             onPress={() => onCommand({ kind: 'act', action: { type: 'fold' } })}
             style={[styles.action, styles.fold]}
           >
-            <Text style={styles.actionText}>Fold</Text>
+            <Text style={styles.actionText}>{t('table.fold')}</Text>
           </Pressable>
         )}
 
@@ -76,7 +78,7 @@ export function ActionBar({ legal, bet, pot, onCommand }: ActionBarProps) {
             onPress={() => onCommand({ kind: 'act', action: { type: 'check' } })}
             style={[styles.action, styles.call]}
           >
-            <Text style={styles.actionText}>Check</Text>
+            <Text style={styles.actionText}>{t('table.check')}</Text>
           </Pressable>
         ) : (
           legal.callAmount !== null && (
@@ -84,7 +86,7 @@ export function ActionBar({ legal, bet, pot, onCommand }: ActionBarProps) {
               onPress={() => onCommand({ kind: 'act', action: { type: 'call' } })}
               style={[styles.action, styles.call]}
             >
-              <Text style={styles.actionText}>Call ₮{legal.callAmount}</Text>
+              <Text style={styles.actionText}>{t('table.call', { amount: `₮${legal.callAmount}` })}</Text>
             </Pressable>
           )
         )}
@@ -94,7 +96,7 @@ export function ActionBar({ legal, bet, pot, onCommand }: ActionBarProps) {
             onPress={() => onCommand({ kind: 'act', action: { type: 'raise', amount } })}
             style={[styles.action, styles.raise]}
           >
-            <Text style={styles.actionText}>Raise ₮{amount}</Text>
+            <Text style={styles.actionText}>{t('table.raise')} ₮{amount}</Text>
           </Pressable>
         )}
       </View>

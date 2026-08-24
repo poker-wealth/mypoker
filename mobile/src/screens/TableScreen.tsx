@@ -131,7 +131,21 @@ export function TableScreen({ route }: TableScreenProps) {
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         {Felt ? (
-          <Felt snapshot={snapshot} onCommand={command} onSit={(seat) => setBuyInFor(seat)} />
+          // The ActionBar gate below only covers Hold'em: its Fold/Call/Raise row is the one
+          // control that routes through `command`. Every other felt (Baccarat, SideBet/
+          // CowboyBeauty/SanZhang, NiuNiu, RedPacket, Lottery, Slots, DouDiZhu, TexasCowboy)
+          // carries its own bet buttons, market cells, packet taps or SPIN control drawn inside
+          // the felt itself, calling `onCommand` directly — gating ActionBar does nothing for
+          // those. `sendInner` in tableSocket.ts silently drops any command sent while the
+          // socket isn't OPEN, so during a reconnect an ungated felt control is a button that
+          // lies: it looks live and tappable but goes nowhere. Mirror the ActionBar treatment
+          // here so the same tap-does-nothing failure can't happen for any other game. Unlike
+          // the ActionBar, the felt must stay readable while disconnected — a player still needs
+          // to see their hand, the board and stacks — so this uses a lighter opacity than
+          // `actionBarDisabled`'s 0.4 (which would obscure card faces here).
+          <View style={disconnected ? styles.feltDisabled : undefined} pointerEvents={disconnected ? 'none' : 'auto'}>
+            <Felt snapshot={snapshot} onCommand={command} onSit={(seat) => setBuyInFor(seat)} />
+          </View>
         ) : (
           <Text style={styles.note}>
             {snapshot.name} has no felt on mobile yet. It is playable in the Mini App.
@@ -318,6 +332,9 @@ const styles = StyleSheet.create({
   },
   actionBarInset: { backgroundColor: '#14142a' },
   actionBarDisabled: { opacity: 0.4 },
+  // Lighter than actionBarDisabled: the felt's cards, board and stacks must stay readable
+  // during a reconnect, only its embedded controls need to read as dead.
+  feltDisabled: { opacity: 0.6 },
   // Absolutely positioned over the ScrollView (not inside its content) so it stays put — visible
   // and unmissable — regardless of scroll position, without covering the felt beneath it.
   connectionBanner: {
