@@ -108,17 +108,56 @@ export function TableScreen({ route }: TableScreenProps) {
           </Text>
         )}
 
-        {/* Stand — the only way off this screen that actually vacates the seat. `leave`
-            (back button, backgrounding) only unsubscribes from the room; the server keeps
-            the seat on purpose, so a network blip or a moment in the background can't cost
-            a stack mid-hand. That means nothing here may call `stand` on its own: no
-            unmount cleanup, no back-button handler. Without an explicit control a player
-            who backs out has no way to free themselves for another table (see §8.1
-            "one account, one table" in table-hub.ts) — this button, tapped on purpose, is
-            that way out. Mirrors the web's action dock (frontend/src/pages/Table.tsx),
-            which likewise only offers Stand outside the hero's own turn. */}
+        {/* Stand, and the seat's own state control, mirroring the web's action dock
+            (frontend/src/pages/Table.tsx:213-236): both appear only when seated and it's
+            not your turn — an in-progress turn already has the ActionBar below, and there
+            is nothing to sit in/out of or rebuy before you have a seat.
+
+            The state control is one slot, not three buttons: a seat is at all times exactly
+            one of "busted", "sitting out" or "playing", so only the matching control ever
+            renders, same as the web.
+
+              Rebuy — the ONLY way `buyIn` (mobile/src/lib/liveTable.ts:167) ever reaches
+              the wire: `setBuyInFor(null)` opens the same BuyInSheet used to sit down, in
+              top-up mode. The server busts a stack to sittingout on its own the moment it
+              hits zero (poker-room.ts:969) — with no way to reopen this sheet a funded
+              player just sits dead at the table until they stand and lose the seat.
+
+              Sit in — the server also sits a player out entirely without being asked:
+              disconnect grace expiry (poker-room.ts:396), abandoning mid-hand (:419, :527),
+              and an action timeout while disconnected (:924) all set it. Backgrounding the
+              app or losing signal for a few seconds is enough to trigger any of these, and
+              until now nothing sent `sitIn` back — the seat just sat dead hand after hand.
+
+              Sit out — lets a player step away on purpose instead of being timed out into
+              it hand by hand, which also costs them at the bot-detection layer. */}
         {snapshot.yourSeat !== null && !yourTurn ? (
           <View style={styles.standRow}>
+            {you && you.stack === 0 ? (
+              // Web's closest label is a hardcoded "Rebuy" (Table.tsx:222) with no i18n key at
+              // all. No existing key says "rebuy" either; `lobby.colBuyIn` ("Buy-in") is the
+              // nearest concept already in the catalogue. Flagged for a real `table.rebuy` key.
+              <Button onPress={() => setBuyInFor(null)}>{t('table.rebuy')}</Button>
+            ) : you?.status === 'sittingout' ? (
+              // Web hardcodes "Sit in" (Table.tsx:226) with no key either. `common.join` ("Join")
+              // is the closest stand-in — flagged for a real `table.sitIn` key.
+              <Button onPress={() => command({ kind: 'sitIn' })}>{t('table.sitIn')}</Button>
+            ) : (
+              // Web hardcodes "Sit out" (Table.tsx:230, variant="secondary" — mobile's Button has
+              // no secondary tone, so ghost is the closest de-emphasised match). No existing key
+              // says "sit out"; `lobby.status.waiting` ("Wait") is the nearest — flagged for a
+              // real `table.sitOut` key.
+              <Button variant="ghost" onPress={() => command({ kind: 'sitOut' })}>
+                {t('table.sitOut')}
+              </Button>
+            )}
+            {/* The only way off this screen that actually vacates the seat. `leave` (back
+                button, backgrounding) only unsubscribes from the room; the server keeps the
+                seat on purpose, so a network blip or a moment in the background can't cost a
+                stack mid-hand. That means nothing here may call `stand` on its own: no unmount
+                cleanup, no back-button handler. Without an explicit control a player who backs
+                out has no way to free themselves for another table (see §8.1 "one account, one
+                table" in table-hub.ts) — this button, tapped on purpose, is that way out. */}
             <Button variant="ghost" onPress={() => command({ kind: 'stand' })}>
               {t('table.leave')}
             </Button>
@@ -229,7 +268,7 @@ const styles = StyleSheet.create({
     padding: space.xl,
     backgroundColor: theme.bg,
   },
-  standRow: { alignItems: 'center' },
+  standRow: { flexDirection: 'row', justifyContent: 'center', gap: space.sm },
   tableTools: { flexDirection: 'row', justifyContent: 'center', gap: space.sm },
   toolButton: {
     borderRadius: radius.pill,
