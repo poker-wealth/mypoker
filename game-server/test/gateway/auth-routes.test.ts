@@ -2,12 +2,12 @@ import { createHmac } from 'node:crypto';
 import request from 'supertest';
 import { createGatewayApp } from '../../src/gateway/app';
 import { loadConfig } from '../../src/gateway/config';
-import { verifyToken } from '../../src/gateway/tokens';
+import { verifyToken, signToken } from '../../src/gateway/tokens';
 import { userStore } from '../../src/auth/user-store';
 
-// The Google routes call through to userStore.oauth(), which otherwise hits a
-// real Mongoose connection this test suite never sets up. Only the /google
-// tests below rely on this; nothing else in this file touches userStore.
+// userStore is mocked: the Google routes call userStore.oauth() and /me calls
+// userStore.byPlayerId(), both of which would otherwise hit a real Mongoose
+// connection this suite never sets up.
 jest.mock('../../src/auth/user-store', () => ({
   userStore: {
     signup: jest.fn(),
@@ -101,6 +101,14 @@ describe('POST /auth/telegram', () => {
 });
 
 describe('GET /auth/me', () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function tokenFor(playerId: string): string {
+    return signToken({ playerId, role: 'player' }, JWT_SECRET, 3600);
+  }
+
   it('returns the player for a valid token', async () => {
     const app = appWith();
     const login = await request(app).post('/auth/telegram').send({ initData: freshInitData() });
@@ -113,9 +121,53 @@ describe('GET /auth/me', () => {
     expect(res.body.telegramId).toBe(4242);
   });
 
+  it('returns the stored display name and photo for a web-signed-up player', async () => {
+    (userStore.byPlayerId as jest.Mock).mockResolvedValueOnce({
+      playerId: 'player-abc123',
+      displayName: 'Real Name',
+      photoUrl: 'https://example.com/real.jpg',
+    });
+
+    const res = await request(appWith())
+      .get('/auth/me')
+      .set('authorization', `Bearer ${tokenFor('player-abc123')}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.displayName).toBe('Real Name');
+    expect(res.body.photoUrl).toBe('https://example.com/real.jpg');
+    expect(res.body.displayName).not.toBe('player-abc123');
+  });
+
+  it('falls back to the derived shape for a Telegram player, who has no stored document', async () => {
+    (userStore.byPlayerId as jest.Mock).mockResolvedValueOnce(null);
+
+    const res = await request(appWith())
+      .get('/auth/me')
+      .set('authorization', `Bearer ${tokenFor('tg-12345')}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.displayName).toBe('tg-12345');
+    expect(res.body.telegramId).toBe(12345);
+  });
+
+  it('falls back to the playerId when the stored identity has no displayName', async () => {
+    (userStore.byPlayerId as jest.Mock).mockResolvedValueOnce({
+      playerId: 'player-noname',
+      photoUrl: null,
+    });
+
+    const res = await request(appWith())
+      .get('/auth/me')
+      .set('authorization', `Bearer ${tokenFor('player-noname')}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.displayName).toBe('player-noname');
+  });
+
   it('401s with no token', async () => {
     const res = await request(appWith()).get('/auth/me');
     expect(res.status).toBe(401);
+    expect(userStore.byPlayerId).not.toHaveBeenCalled();
   });
 
   it('401s with a token signed by someone else', async () => {

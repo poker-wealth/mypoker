@@ -333,20 +333,31 @@ export function buildAuthRouter(config: GatewayConfig): Router {
   });
 
   // ── Who am I ─────────────────────────────────────────────────────────────────
-  // Confirms a stored token is still good after a reload. The profile fields come
-  // from the token holder's id only — display name and photo are re-sent by the
-  // client at each login, since Telegram is their source of truth, not us.
-  r.get('/me', requireAuth(config), (req: Request, res: Response) => {
-    const playerId = req.player!.playerId;
-    const telegramId = playerId.startsWith('tg-') ? Number(playerId.slice(3)) : NaN;
-    res.json({
-      playerId,
-      displayName: playerId,
-      username: null,
-      photoUrl: null,
-      telegramId: Number.isFinite(telegramId) ? telegramId : null,
-      vipTier: 0,
-    } satisfies PlayerProfile);
+  // Confirms a stored token is still good after a reload.
+  r.get('/me', requireAuth(config), async (req: Request, res: Response) => {
+    try {
+      const playerId = req.player!.playerId;
+      const telegramId = playerId.startsWith('tg-') ? Number(playerId.slice(3)) : NaN;
+
+      // A missing document is not an error here — Telegram players never have
+      // one (see the comment on `userStore.search`): their playerId is derived
+      // from the Telegram user id and nothing is ever written for them. For
+      // that case only, the profile is derived from the token itself, same as
+      // before this lookup existed.
+      const stored = await userStore.byPlayerId(playerId);
+
+      res.json({
+        playerId,
+        displayName: stored?.displayName || playerId,
+        username: null,
+        photoUrl: stored ? stored.photoUrl ?? null : null,
+        telegramId: Number.isFinite(telegramId) ? telegramId : null,
+        vipTier: 0,
+      } satisfies PlayerProfile);
+    } catch (err) {
+      console.error('[auth] /me lookup failed:', err);
+      res.status(500).json({ error: 'internal error' });
+    }
   });
 
   return r;
