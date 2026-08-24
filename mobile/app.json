@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.mypoker.app",
+      "bundleIdentifier": "com.mypoker777",
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -23,7 +23,7 @@
       }
     },
     "android": {
-      "package": "com.mypoker.app",
+      "package": "com.mypoker777",
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/android-icon-foreground.png",
