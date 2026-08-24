@@ -243,6 +243,7 @@
     "handLine": "ハンド {{hand}} · ブラインド {{blinds}}",
     "waiting": "他のプレイヤーを待っています…",
     "nextHand": "次のハンドを開始します…",
+    "leave": "退席",
     "connecting": "接続中…",
     "connectingTable": "テーブルに接続中…",
     "reconnecting": "テーブルに再接続中…",

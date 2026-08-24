@@ -243,6 +243,7 @@
     "handLine": "Hand {{hand}} · Blinds {{blinds}}",
     "waiting": "Waiting for other players…",
     "nextHand": "Next hand starting…",
+    "leave": "Leave",
     "connecting": "Connecting…",
     "connectingTable": "Connecting to the table…",
     "reconnecting": "Reconnecting to the table…",

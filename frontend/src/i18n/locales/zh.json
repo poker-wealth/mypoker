@@ -243,6 +243,7 @@
     "handLine": "第 {{hand}} 手 · 盲注 {{blinds}}",
     "waiting": "等待其他玩家…",
     "nextHand": "下一局即将开始…",
+    "leave": "离开",
     "connecting": "连接中…",
     "connectingTable": "正在连接牌桌…",
     "reconnecting": "正在重新连接牌桌…",

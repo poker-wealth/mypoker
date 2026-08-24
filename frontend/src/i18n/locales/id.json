@@ -243,6 +243,7 @@
     "handLine": "Ronde {{hand}} · Blind {{blinds}}",
     "waiting": "Menunggu pemain lain…",
     "nextHand": "Ronde berikutnya dimulai…",
+    "leave": "Keluar",
     "connecting": "Menghubungkan…",
     "connectingTable": "Menghubungkan ke meja…",
     "reconnecting": "Menyambung ulang ke meja…",

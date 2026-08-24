@@ -243,6 +243,7 @@
     "handLine": "{{hand}}번째 핸드 · 블라인드 {{blinds}}",
     "waiting": "다른 플레이어를 기다리는 중…",
     "nextHand": "다음 핸드를 시작합니다…",
+    "leave": "나가기",
     "connecting": "연결 중…",
     "connectingTable": "테이블에 연결 중…",
     "reconnecting": "테이블에 재연결 중…",

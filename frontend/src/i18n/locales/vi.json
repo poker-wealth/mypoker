@@ -243,6 +243,7 @@
     "handLine": "Ván {{hand}} · Mù {{blinds}}",
     "waiting": "Đang chờ người chơi khác…",
     "nextHand": "Ván tiếp theo sắp bắt đầu…",
+    "leave": "Rời bàn",
     "connecting": "Đang kết nối…",
     "connectingTable": "Đang kết nối tới bàn…",
     "reconnecting": "Đang kết nối lại tới bàn…",

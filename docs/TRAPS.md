@@ -166,6 +166,13 @@ If you make something throw, wire the catch in the same change.
 
 ## 9. Parity is enumerated, never assumed
 
+**There is now a check for this: `npm run check:parity` in `mobile/`, wired into
+`npm run verify`.** It reads the web's router and bottom nav, reads the mobile
+navigator, and fails on a missing screen, an extra tab, a wrong tab order, or a
+different landing screen. Run it before claiming parity. Do not re-derive the
+comparison by hand and do not trust memory — that is precisely what failed.
+
+
 "Every non-game screen is ported" was reported repeatedly while three whole
 pages (Games, Fairness, Jackpot) had no mobile equivalent, the tab bar carried
 a Wallet tab the web does not have, was missing the Games tab, ordered the tabs
@@ -210,3 +217,46 @@ is exactly when to look.
 - **`JWT_SECRET` must match** between financial-core and the gateway or
   everything 401s.
 - **PowerShell has no `export`**, and `&&` is not available in 5.1.
+
+---
+
+## 12. A rule that is correct on the server can still trap the user
+
+Two deliberate, individually-correct server behaviours combined into a dead end
+that only a physical device found:
+
+- `leave` (sent on unmount) **only unsubscribes** from a room. It deliberately
+  does NOT vacate the seat — a network blip or a backgrounded app must not cost
+  a player their stack mid-hand.
+- `sit` enforces §8.1, one account one table, refusing while `hasSeated()` is
+  true anywhere else.
+
+So a mobile player sat down, pressed back, and was then refused at every other
+table with "stand up at your other table first" — with **no way to stand up**,
+because mobile never got the web's Stand button. Neither rule is wrong. The gap
+was the missing affordance between them.
+
+When a server rule holds state on the player's behalf, check the client offers
+a way to release it. And note the tempting wrong fix: standing automatically on
+unmount would recreate exactly the failure the server's design avoids.
+
+---
+
+## 13. Why the mobile port is not copy-paste (and which failures that excuses)
+
+React DOM and React Native share a language, not a platform. No `<div>`, no CSS
+cascade, no Tailwind classes, no `window`, no `localStorage`, no Web Crypto, no
+canvas, no toast library. Routing is react-router URLs versus react-navigation
+stacks. Chart.js had to be rebuilt as SVG; the socket's crypto needed a
+different provider entirely, with an SPKI prefix trap that silently derives the
+wrong key.
+
+That is real, and it is why each screen is a rewrite rather than a copy.
+
+**It does not excuse a single one of the parity misses in §9.** Those needed no
+React Native knowledge — only opening `router.tsx` and `BottomNav.tsx`, listing
+what is there, and comparing. Ten minutes, never done, while "every non-game
+screen is ported" was reported repeatedly.
+
+Keep the two apart when explaining a delay. Difficulty explains time. It never
+explains a claim that something is finished.

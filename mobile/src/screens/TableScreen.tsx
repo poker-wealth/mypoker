@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import type { TableScreenProps } from '../navigation';
 import { getToken } from '../session';
-import { Sheet } from '../ui';
+import { Button, Sheet } from '../ui';
 import { radius, space, theme } from '../theme';
 import { useLiveTable } from '../table/useLiveTable';
 import { ActionBar } from '../components/poker/ActionBar';
@@ -29,6 +30,7 @@ import { useChallengePrompt } from '../table/useChallengePrompt';
  */
 export function TableScreen({ route }: TableScreenProps) {
   const { tableId } = route.params;
+  const { t } = useTranslation();
   const [token, setToken] = useState<string | null>(null);
   const [tokenChecked, setTokenChecked] = useState(false);
 
@@ -105,6 +107,23 @@ export function TableScreen({ route }: TableScreenProps) {
             {snapshot.name} has no felt on mobile yet. It is playable in the Mini App.
           </Text>
         )}
+
+        {/* Stand — the only way off this screen that actually vacates the seat. `leave`
+            (back button, backgrounding) only unsubscribes from the room; the server keeps
+            the seat on purpose, so a network blip or a moment in the background can't cost
+            a stack mid-hand. That means nothing here may call `stand` on its own: no
+            unmount cleanup, no back-button handler. Without an explicit control a player
+            who backs out has no way to free themselves for another table (see §8.1
+            "one account, one table" in table-hub.ts) — this button, tapped on purpose, is
+            that way out. Mirrors the web's action dock (frontend/src/pages/Table.tsx),
+            which likewise only offers Stand outside the hero's own turn. */}
+        {snapshot.yourSeat !== null && !yourTurn ? (
+          <View style={styles.standRow}>
+            <Button variant="ghost" onPress={() => command({ kind: 'stand' })}>
+              {t('table.leave')}
+            </Button>
+          </View>
+        ) : null}
 
         <View style={styles.tableTools}>
           <Pressable onPress={() => setChatOpen(true)} style={styles.toolButton}>
@@ -210,6 +229,7 @@ const styles = StyleSheet.create({
     padding: space.xl,
     backgroundColor: theme.bg,
   },
+  standRow: { alignItems: 'center' },
   tableTools: { flexDirection: 'row', justifyContent: 'center', gap: space.sm },
   toolButton: {
     borderRadius: radius.pill,
