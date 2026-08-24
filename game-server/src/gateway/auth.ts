@@ -195,7 +195,13 @@ export function buildAuthRouter(config: GatewayConfig): Router {
         return;
       }
 
-      let payload: { sub: string; email: string; name?: string; picture?: string } | null = null;
+      let payload: {
+        sub: string;
+        email: string;
+        emailVerified: boolean;
+        name?: string;
+        picture?: string;
+      } | null = null;
 
       // A JWT idToken verifies offline; the implicit-flow access_token instead
       // resolves through Google's tokeninfo + userinfo endpoints. Tell them
@@ -211,7 +217,18 @@ export function buildAuthRouter(config: GatewayConfig): Router {
             audience: allowedClientIds,
           });
           const p = ticket.getPayload();
-          if (p?.email) payload = { sub: p.sub, email: p.email, ...(p.name ? { name: p.name } : {}), ...(p.picture ? { picture: p.picture } : {}) };
+          if (p?.email) {
+            // Google sets this false, or omits it, for an address that hasn't
+            // completed verification — treat both as unverified (fail closed)
+            // rather than assuming an absent flag means "trusted".
+            payload = {
+              sub: p.sub,
+              email: p.email,
+              emailVerified: p.email_verified === true,
+              ...(p.name ? { name: p.name } : {}),
+              ...(p.picture ? { picture: p.picture } : {}),
+            };
+          }
         } catch {
           // Well-formed JWT, but it failed verification (bad signature, wrong
           // audience, expired, ...) — reject it outright rather than falling
@@ -242,14 +259,25 @@ export function buildAuthRouter(config: GatewayConfig): Router {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
         if (userinfoRes.ok) {
-          const info = (await userinfoRes.json()) as Record<string, string>;
+          // userinfo's fields are documented as strings/booleans but the wire
+          // shape has been observed to vary by endpoint version, so this is
+          // read as `unknown` and each field cast only after use is safe.
+          const info = (await userinfoRes.json()) as Record<string, unknown>;
           if (info['email'] && info['sub']) {
-            const displayName = info['name'] || info['given_name'] || info['email'].split('@')[0] || 'Player';
+            const email = info['email'] as string;
+            const displayName =
+              (info['name'] as string) || (info['given_name'] as string) || email.split('@')[0] || 'Player';
+            // `email_verified` arrives as a real boolean from some responses
+            // and as the literal string "true"/"false" from others — check
+            // both forms explicitly rather than assuming one, and treat
+            // anything else (including absent) as unverified (fail closed).
+            const emailVerified = info['email_verified'] === true || info['email_verified'] === 'true';
             payload = {
-              sub: info['sub'],
-              email: info['email'],
+              sub: info['sub'] as string,
+              email,
+              emailVerified,
               name: displayName,
-              ...(info['picture'] ? { picture: info['picture'] } : {}),
+              ...(info['picture'] ? { picture: info['picture'] as string } : {}),
             };
           }
         }
@@ -260,7 +288,13 @@ export function buildAuthRouter(config: GatewayConfig): Router {
         return;
       }
 
-      const u = await authClient.oauth(payload.sub, payload.email, payload.name, payload.picture);
+      const u = await authClient.oauth(
+        payload.sub,
+        payload.email,
+        payload.emailVerified,
+        payload.name,
+        payload.picture,
+      );
       res.json(issue(asProfile(u)));
     } catch (err) {
       console.error('[auth] Google authentication error:', err);

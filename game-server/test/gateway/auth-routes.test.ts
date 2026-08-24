@@ -1,5 +1,6 @@
 import { createHmac } from 'node:crypto';
 import request from 'supertest';
+import { OAuth2Client } from 'google-auth-library';
 import { createGatewayApp } from '../../src/gateway/app';
 import { loadConfig } from '../../src/gateway/config';
 import { verifyToken } from '../../src/gateway/tokens';
@@ -263,6 +264,165 @@ describe('POST /auth/google', () => {
     expect(res.status).toBe(200);
     expect(typeof res.body.token).toBe('string');
     expect(res.body.player.displayName).toBe('Ada');
+  });
+
+  it('adopts an existing account when the Google email is verified', async () => {
+    process.env['GOOGLE_CLIENT_ID'] = 'good-client.apps.googleusercontent.com';
+    const fetchSpy = jest.fn(async (url: string) => {
+      if (url.includes('tokeninfo')) {
+        return { ok: true, json: async () => ({ aud: 'good-client.apps.googleusercontent.com' }) };
+      }
+      if (url.includes('userinfo')) {
+        return {
+          ok: true,
+          json: async () => ({
+            sub: 'g-200',
+            email: 'existing@example.com',
+            name: 'Existing',
+            email_verified: true,
+          }),
+        };
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    global.fetch = fetchSpy as unknown as typeof fetch;
+    (userStore.oauth as jest.Mock).mockResolvedValue({
+      playerId: 'existing-1',
+      email: 'existing@example.com',
+      displayName: 'Existing',
+      photoUrl: null,
+    });
+
+    const res = await request(appWith()).post('/auth/google').send({ token: 'some-access-token' });
+
+    expect(res.status).toBe(200);
+    expect(userStore.oauth).toHaveBeenCalledWith('g-200', 'existing@example.com', true, 'Existing', undefined);
+  });
+
+  it('refuses to adopt an existing account when the Google email is unverified (account takeover)', async () => {
+    process.env['GOOGLE_CLIENT_ID'] = 'good-client.apps.googleusercontent.com';
+    const fetchSpy = jest.fn(async (url: string) => {
+      if (url.includes('tokeninfo')) {
+        return { ok: true, json: async () => ({ aud: 'good-client.apps.googleusercontent.com' }) };
+      }
+      if (url.includes('userinfo')) {
+        return {
+          ok: true,
+          json: async () => ({
+            sub: 'attacker-1',
+            email: 'victim@example.com',
+            name: 'Attacker',
+            email_verified: false,
+          }),
+        };
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    global.fetch = fetchSpy as unknown as typeof fetch;
+    (userStore.oauth as jest.Mock).mockRejectedValue(
+      new Error('This email is registered. Sign in with your password, or verify your email with Google first.'),
+    );
+
+    const res = await request(appWith()).post('/auth/google').send({ token: 'some-access-token' });
+
+    expect(res.status).toBe(401);
+    expect(res.body.token).toBeUndefined();
+    expect(userStore.oauth).toHaveBeenCalledWith('attacker-1', 'victim@example.com', false, 'Attacker', undefined);
+  });
+
+  it('still creates a brand-new account when the email is unverified and no account exists for it', async () => {
+    process.env['GOOGLE_CLIENT_ID'] = 'good-client.apps.googleusercontent.com';
+    const fetchSpy = jest.fn(async (url: string) => {
+      if (url.includes('tokeninfo')) {
+        return { ok: true, json: async () => ({ aud: 'good-client.apps.googleusercontent.com' }) };
+      }
+      if (url.includes('userinfo')) {
+        return {
+          ok: true,
+          json: async () => ({
+            sub: 'g-300',
+            email: 'brandnew@example.com',
+            name: 'Brand New',
+            email_verified: false,
+          }),
+        };
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    global.fetch = fetchSpy as unknown as typeof fetch;
+    (userStore.oauth as jest.Mock).mockResolvedValue({
+      playerId: 'g-300',
+      email: 'brandnew@example.com',
+      displayName: 'Brand New',
+      photoUrl: null,
+    });
+
+    const res = await request(appWith()).post('/auth/google').send({ token: 'some-access-token' });
+
+    expect(res.status).toBe(200);
+    expect(userStore.oauth).toHaveBeenCalledWith('g-300', 'brandnew@example.com', false, 'Brand New', undefined);
+  });
+
+  it('treats a JWT payload with email_verified absent as unverified', async () => {
+    process.env['GOOGLE_CLIENT_ID'] = 'good-client.apps.googleusercontent.com';
+    const fetchSpy = jest.fn();
+    global.fetch = fetchSpy as unknown as typeof fetch;
+    (userStore.oauth as jest.Mock).mockResolvedValue({
+      playerId: 'g-400',
+      email: 'noflag@example.com',
+      displayName: 'No Flag',
+      photoUrl: null,
+    });
+
+    const verifyIdTokenSpy = jest.spyOn(OAuth2Client.prototype, 'verifyIdToken') as unknown as jest.SpyInstance;
+    verifyIdTokenSpy.mockResolvedValue({
+      getPayload: () => ({
+        sub: 'g-400',
+        email: 'noflag@example.com',
+        name: 'No Flag',
+        // email_verified deliberately absent
+      }),
+    });
+
+    const fakeJwt = 'header.payload.signature';
+    const res = await request(appWith()).post('/auth/google').send({ credential: fakeJwt });
+
+    expect(res.status).toBe(200);
+    expect(userStore.oauth).toHaveBeenCalledWith('g-400', 'noflag@example.com', false, 'No Flag', undefined);
+    verifyIdTokenSpy.mockRestore();
+  });
+
+  it('passes the flag through when userinfo reports email_verified as the string "true"', async () => {
+    process.env['GOOGLE_CLIENT_ID'] = 'good-client.apps.googleusercontent.com';
+    const fetchSpy = jest.fn(async (url: string) => {
+      if (url.includes('tokeninfo')) {
+        return { ok: true, json: async () => ({ aud: 'good-client.apps.googleusercontent.com' }) };
+      }
+      if (url.includes('userinfo')) {
+        return {
+          ok: true,
+          json: async () => ({
+            sub: 'g-500',
+            email: 'stringflag@example.com',
+            name: 'String Flag',
+            email_verified: 'true',
+          }),
+        };
+      }
+      throw new Error(`unexpected fetch: ${url}`);
+    });
+    global.fetch = fetchSpy as unknown as typeof fetch;
+    (userStore.oauth as jest.Mock).mockResolvedValue({
+      playerId: 'g-500',
+      email: 'stringflag@example.com',
+      displayName: 'String Flag',
+      photoUrl: null,
+    });
+
+    const res = await request(appWith()).post('/auth/google').send({ token: 'some-access-token' });
+
+    expect(res.status).toBe(200);
+    expect(userStore.oauth).toHaveBeenCalledWith('g-500', 'stringflag@example.com', true, 'String Flag', undefined);
   });
 
   it('rejects a JWT-shaped token that fails audience verification, without retrying it as an access token', async () => {

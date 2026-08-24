@@ -47,6 +47,7 @@ async function verifyCredentials(identifier: string, passwordPlain: string): Pro
 async function findOrCreateGoogle(
   googleId: string,
   email: string,
+  emailVerified: boolean,
   displayName?: string,
   photoUrl?: string,
 ): Promise<UserDoc> {
@@ -55,6 +56,20 @@ async function findOrCreateGoogle(
 
   const existingEmail = await findByIdentifier(email);
   if (existingEmail) {
+    // Bonding a Google identity to an ALREADY-REGISTERED account hands whoever
+    // holds that Google token everything the account owns — balance and
+    // registered withdrawal address included — not just a login. The only
+    // thing standing between "any Google account claiming this address" and
+    // "the real owner of the mailbox" is Google's own `email_verified` flag,
+    // so adoption is refused unless it is true. Creating a brand-new account
+    // below is deliberately NOT gated the same way: an unlinked account with
+    // an unverified email can't take anything from anyone, so there is no
+    // takeover to prevent there.
+    if (!emailVerified) {
+      throw new Error(
+        'This email is registered. Sign in with your password, or verify your email with Google first.',
+      );
+    }
     const updated = await UserModel.findOneAndUpdate(
       { _id: existingEmail._id },
       { $set: { googleId, photoUrl: photoUrl || existingEmail.photoUrl } },
@@ -102,10 +117,11 @@ export const userStore = {
   async oauth(
     googleId: string,
     email: string,
+    emailVerified: boolean,
     displayName?: string,
     photoUrl?: string,
   ): Promise<StoredIdentity> {
-    return toIdentity(await findOrCreateGoogle(googleId, email, displayName, photoUrl));
+    return toIdentity(await findOrCreateGoogle(googleId, email, emailVerified, displayName, photoUrl));
   },
 
   /**
