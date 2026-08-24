@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import type { TableScreenProps } from '../navigation';
 import { getToken } from '../session';
-import { Button, Sheet } from '../ui';
+import { Badge, Button, Sheet } from '../ui';
 import { radius, space, theme } from '../theme';
 import { useLiveTable } from '../table/useLiveTable';
 import { ActionBar } from '../components/poker/ActionBar';
@@ -31,6 +32,7 @@ import { useChallengePrompt } from '../table/useChallengePrompt';
 export function TableScreen({ route }: TableScreenProps) {
   const { tableId } = route.params;
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const [token, setToken] = useState<string | null>(null);
   const [tokenChecked, setTokenChecked] = useState(false);
 
@@ -95,8 +97,36 @@ export function TableScreen({ route }: TableScreenProps) {
   // The server alone decides whose turn it is: `legal` is present only when it is yours.
   const yourTurn = Boolean(you) && snapshot.toActSeat === you?.index && snapshot.legal !== null;
 
+  /**
+   * `status` used to be consulted only in the pre-snapshot branch above. Once a snapshot has
+   * arrived, everything below rendered from that last snapshot with nothing tied to connection
+   * state — so a reconnect (a lift, a tunnel, a moment backgrounded) left the felt, stacks and pot
+   * looking perfectly live while frozen on the last hand. `sendInner` in tableSocket.ts also
+   * silently drops any command sent while the socket isn't OPEN, so a tap on Fold or Call during
+   * that window goes nowhere and nothing tells the player — the server's turn timer just runs them
+   * down. This makes the state visible instead: a persistent banner while `status !== 'ready'`, and
+   * the ActionBar below gated so it doesn't look tappable while disconnected.
+   */
+  const disconnected = status !== 'ready';
+  const retryableStatus = status === 'error' || status === 'closed';
+
   return (
     <View style={styles.screen}>
+      {disconnected ? (
+        <View style={styles.connectionBanner} pointerEvents="box-none">
+          <View style={styles.connectionBannerInner}>
+            <Badge tone="warn">
+              {retryableStatus ? t('table.connectionLost') : t('states.reconnecting')}
+            </Badge>
+            {retryableStatus ? (
+              <Button variant="ghost" onPress={() => socket?.connect()}>
+                {t('common.retry')}
+              </Button>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
+
       <ScrollView contentContainerStyle={styles.content}>
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -245,13 +275,31 @@ export function TableScreen({ route }: TableScreenProps) {
         />
       ) : null}
 
+      {/* Bottom-inset wrapper, not padding inside ActionBar (out of scope, see ActionBar.tsx):
+          on a home-indicator iPhone the Fold/Call/Raise row would otherwise sit inside the
+          system swipe-up zone, where a swipe-to-home during your turn risks a fold-by-timeout. */}
       {yourTurn && snapshot.legal ? (
-        <ActionBar
-          legal={snapshot.legal}
-          bet={you?.bet ?? 0}
-          pot={snapshot.pot}
-          onCommand={command}
-        />
+        // Background matches ActionBar's own bar colour (`#14142a`, ActionBar.tsx) so the inset
+        // padding reads as the bar extending under the home indicator, not a mismatched stripe
+        // of the screen background (`theme.bg`, `#0d0d1a`) beneath it.
+        <View style={[styles.actionBarInset, { paddingBottom: insets.bottom }]}>
+          {/* ActionBar itself (out of scope here — see ActionBar.tsx) has no disabled prop, so
+              disconnected is enforced from outside: dim it and swallow every touch so a tap
+              during a reconnect cannot look like it did something. `sendInner` in tableSocket.ts
+              would silently drop the command anyway; this stops the tap from ever reaching it
+              and makes that true at a glance, not just in the wire code. */}
+          <View
+            style={disconnected ? styles.actionBarDisabled : undefined}
+            pointerEvents={disconnected ? 'none' : 'auto'}
+          >
+            <ActionBar
+              legal={snapshot.legal}
+              bet={you?.bet ?? 0}
+              pot={snapshot.pot}
+              onCommand={command}
+            />
+          </View>
+        </View>
       ) : null}
     </View>
   );
@@ -267,6 +315,31 @@ const styles = StyleSheet.create({
     gap: space.md,
     padding: space.xl,
     backgroundColor: theme.bg,
+  },
+  actionBarInset: { backgroundColor: '#14142a' },
+  actionBarDisabled: { opacity: 0.4 },
+  // Absolutely positioned over the ScrollView (not inside its content) so it stays put — visible
+  // and unmissable — regardless of scroll position, without covering the felt beneath it.
+  connectionBanner: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    alignItems: 'center',
+    paddingTop: space.sm,
+  },
+  connectionBannerInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    backgroundColor: theme.surface,
+    borderColor: theme.border,
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingLeft: space.sm,
+    paddingRight: space.xs,
+    paddingVertical: space.xs,
   },
   standRow: { flexDirection: 'row', justifyContent: 'center', gap: space.sm },
   tableTools: { flexDirection: 'row', justifyContent: 'center', gap: space.sm },

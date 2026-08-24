@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -180,12 +182,32 @@ export function Sheet({
 }) {
   return (
     <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={styles.sheet}>
-        <View style={styles.grabber} />
-        {title !== undefined && <Text style={styles.sheetTitle}>{title}</Text>}
-        <View style={styles.sheetBody}>{children}</View>
-      </View>
+      {/* On iOS the keyboard slides OVER a bottom-anchored Modal rather than resizing it —
+          without this, a field like the withdrawal amount input ends up hidden behind the
+          keyboard with no way to scroll it back into view. Android already resizes via
+          `windowSoftInputMode="adjustResize"`, so `behavior` is undefined there; stacking
+          RN's own padding on top of that resize would shift the sheet twice. */}
+      <KeyboardAvoidingView
+        style={styles.backdropWrap}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <Pressable style={styles.backdrop} onPress={onClose} />
+        <View style={styles.sheet}>
+          <View style={styles.grabber} />
+          {title !== undefined && <Text style={styles.sheetTitle}>{title}</Text>}
+          {/* Scrollable so content taller than the sheet — or pushed up by the keyboard —
+              stays reachable; `keyboardShouldPersistTaps="handled"` so the first tap on a
+              button in here (e.g. confirm) actually fires instead of just dismissing the
+              keyboard. */}
+          <ScrollView
+            style={styles.sheetBody}
+            contentContainerStyle={styles.sheetBodyContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            {children}
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -338,6 +360,7 @@ const styles = StyleSheet.create({
   segmentActive: { backgroundColor: theme.surface2 },
   segmentText: { color: theme.dim, fontSize: 12, fontFamily: weight('700') },
   segmentTextActive: { color: theme.text },
+  backdropWrap: { flex: 1 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
   sheet: {
     backgroundColor: theme.bg,
@@ -365,5 +388,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     fontFamily: weight('700'),
   },
-  sheetBody: { padding: space.lg, gap: space.md },
+  // `flexShrink` (not `flex: 1`) so the ScrollView sizes to its content, shrinking to fit
+  // under `sheet`'s maxHeight only when the content — or the keyboard — demands it, rather
+  // than always stretching to fill it.
+  sheetBody: { flexShrink: 1 },
+  sheetBodyContent: { padding: space.lg, gap: space.md },
 });
