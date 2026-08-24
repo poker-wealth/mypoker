@@ -1381,8 +1381,8 @@ export function buildRouter(): Router {
     playerId: z.string().min(1),
     amount: money,
     grantedBy: z.string().min(1),
-    /** Idempotency reference; a retried request must not pay twice. */
-    reference: z.string().min(1).optional(),
+    /** Idempotency key — REQUIRED. Without it a double-submit pays twice. */
+    reference: z.string().min(1).max(100),
   });
   r.post(
     '/internal/leagues/:leagueId/grants',
@@ -1400,7 +1400,7 @@ export function buildRouter(): Router {
           playerId: b.playerId,
           amount: Money.fromDecimalString(b.amount),
           grantedBy: b.grantedBy,
-          ...(b.reference ? { reference: b.reference } : {}),
+          reference: b.reference,
         }),
       );
     }),
