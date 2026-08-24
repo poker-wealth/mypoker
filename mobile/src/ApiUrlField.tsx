@@ -17,9 +17,11 @@ import { Button } from './ui';
  * only exists in `device` builds behind `OVERRIDE_ALLOWED`, is never shown to
  * a player, and the eight-locale rule covers user-facing copy.
  */
+type Status = { kind: 'saved' } | { kind: 'reset' } | { kind: 'error'; message: string } | null;
+
 export function ApiUrlField() {
   const [value, setValue] = useState('');
-  const [status, setStatus] = useState<'saved' | 'reset' | null>(null);
+  const [status, setStatus] = useState<Status>(null);
 
   useEffect(() => {
     if (!OVERRIDE_ALLOWED) return;
@@ -29,14 +31,29 @@ export function ApiUrlField() {
   if (!OVERRIDE_ALLOWED) return null;
 
   const save = (): void => {
-    void setApiOverride(value).then(() => setStatus('saved'));
+    // `setApiOverride` validates the URL and throws on a bad one. Without this
+    // catch, that throw would reject a void-ed promise with no handler — an
+    // unhandled rejection instead of the visible, actionable message a tester
+    // needs to fix their input.
+    setApiOverride(value)
+      .then(() => setStatus({ kind: 'saved' }))
+      .catch((err: unknown) => {
+        setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
+      });
   };
 
   const reset = (): void => {
-    void clearApiOverride().then(() => {
-      setValue('');
-      setStatus('reset');
-    });
+    // `clearApiOverride` doesn't currently throw (it swallows its own
+    // delete failures), but it shares the same void-ed `.then()` shape as
+    // `save` did — catch here too so that never silently changes underfoot.
+    clearApiOverride()
+      .then(() => {
+        setValue('');
+        setStatus({ kind: 'reset' });
+      })
+      .catch((err: unknown) => {
+        setStatus({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
+      });
   };
 
   return (
@@ -61,8 +78,9 @@ export function ApiUrlField() {
           Reset
         </Button>
       </View>
-      {status !== null && (
-        <Text style={styles.status}>{status === 'saved' ? 'Saved — restart the app' : 'Reset — restart the app'}</Text>
+      {status !== null && status.kind === 'error' && <Text style={styles.statusError}>{status.message}</Text>}
+      {status !== null && status.kind !== 'error' && (
+        <Text style={styles.status}>{status.kind === 'saved' ? 'Saved — restart the app' : 'Reset — restart the app'}</Text>
       )}
     </View>
   );
@@ -82,4 +100,5 @@ const styles = StyleSheet.create({
     fontSize: 15, fontFamily: weight('400') },
   row: { flexDirection: 'row', gap: space.sm },
   status: { color: theme.dim, fontSize: 11, fontFamily: weight('400') },
+  statusError: { color: theme.danger, fontSize: 11, fontFamily: weight('400') },
 });
