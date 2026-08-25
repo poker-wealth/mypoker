@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { TableScreenProps } from '../navigation';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '../api';
 import { getToken } from '../session';
 import { Sheet } from '../ui';
+import { ChatIcon } from '../icons';
 import { radius, space, theme } from '../theme';
 import { useLiveTable } from '../table/useLiveTable';
 import { ActionBar } from '../components/poker/ActionBar';
@@ -60,6 +63,24 @@ export function TableScreen({ route }: TableScreenProps) {
    */
   const designable = Felt === HoldemFelt;
 
+  /**
+   * Buy-in budget, read from the server rather than from the snapshot.
+   *
+   * `snapshot.you` cannot gate the buy-in sheet. Poker builds it from the balance DIRECTORY, so it
+   * is present before you sit. The other NINE rooms build it from the SEAT — `you: seat ? … : null`
+   * — so it is null until you are already seated. Gating the sheet on it made sitting IMPOSSIBLE on
+   * every non-poker game: tap Join, nothing opens, nothing explains why.
+   *
+   * /api/live/chips answers for an unseated player, which is exactly the question the sheet
+   * needs answered.
+   */
+  const chips = useQuery({
+    queryKey: ['live', 'chips'],
+    queryFn: () => api.get<{ available: number }>('/api/live/chips'),
+    enabled: token !== null,
+    staleTime: 10_000,
+  });
+
   if (!tokenChecked) {
     return (
       <View style={styles.centre}>
@@ -106,19 +127,37 @@ export function TableScreen({ route }: TableScreenProps) {
           </Text>
         )}
 
-        <View style={styles.tableTools}>
-          <Pressable onPress={() => setChatOpen(true)} style={styles.toolButton}>
-            <Text style={styles.toolText}>
-              Chat{messages.length > 0 ? ` (${messages.length})` : ''}
-            </Text>
-          </Pressable>
-          {designable ? (
+        {designable ? (
+          <View style={styles.tableTools}>
             <Pressable onPress={() => setDesignOpen(true)} style={styles.toolButton}>
               <Text style={styles.toolText}>Table design</Text>
             </Pressable>
-          ) : null}
-        </View>
+          </View>
+        ) : null}
       </ScrollView>
+
+      {/*
+        Chat is a FLOATING button, bottom-right, with an icon — the Mini App's own arrangement
+        (frontend/src/pages/Table.tsx: `absolute bottom-[4.5rem] right-4`, size-12, rounded-full,
+        MessageSquare, brand-coloured while open). It was an inline pill labelled "Chat" in a row
+        under the felt, which is a different control in a different place.
+
+        Unread count rides on the button rather than in the label, so the button stays a circle.
+      */}
+      <Pressable
+        onPress={() => setChatOpen((o) => !o)}
+        style={[styles.chatFab, chatOpen && styles.chatFabOn]}
+        accessibilityLabel="Table chat"
+      >
+        <ChatIcon color={chatOpen ? '#fff' : theme.dim} size={20} />
+        {messages.length > 0 && !chatOpen ? (
+          <View style={styles.chatBadge}>
+            <Text style={styles.chatBadgeText}>
+              {messages.length > 99 ? '99+' : messages.length}
+            </Text>
+          </View>
+        ) : null}
+      </Pressable>
 
       <TableDesignSheet open={designOpen} onClose={() => setDesignOpen(false)} />
 
@@ -156,16 +195,21 @@ export function TableScreen({ route }: TableScreenProps) {
           moment it warms, and `available` below is only ever shown while
           that condition holds. */}
       <BuyInSheet
-        open={buyInFor !== false && snapshot.you != null}
+        /*
+         * Gated on the CHIPS query, not on `snapshot.you` — see the note by that query. The
+         * original reasoning still holds and is preserved: never open against an unknown balance,
+         * because `available: number` has no way to say "unknown" and a coerced 0 tells a funded
+         * player to go and deposit. The change is only WHERE the known balance comes from, so that
+         * a player who has not sat yet can still be told what they have.
+         */
+        open={buyInFor !== false && chips.data !== undefined}
         onClose={() => setBuyInFor(false)}
         min={snapshot.minBuyIn}
         max={snapshot.maxBuyIn}
         bigBlind={snapshot.bigBlind}
-        // Only ever read while `open` (above) has already proven `snapshot.you`
-        // is non-null, so this fallback is never actually shown or computed
-        // against — it exists purely to satisfy BuyInSheet's non-nullable
-        // `available: number` prop while the sheet sits hidden.
-        available={snapshot.you ? snapshot.you.available : 0}
+        // Only read while `open` above has proven `chips.data` exists; the 0 is unreachable and
+        // exists solely to satisfy the non-nullable prop while the sheet is closed.
+        available={chips.data?.available ?? 0}
         seatIndex={typeof buyInFor === 'number' ? buyInFor : null}
         onConfirm={(amount) => {
           if (typeof buyInFor === 'number') {
@@ -210,6 +254,35 @@ const styles = StyleSheet.create({
     padding: space.xl,
     backgroundColor: theme.bg,
   },
+  // Floating, bottom-right, clear of the ActionBar that appears on your turn.
+  chatFab: {
+    position: 'absolute',
+    right: 16,
+    bottom: 72,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 50,
+  },
+  chatFabOn: { backgroundColor: theme.brand, borderColor: theme.brand },
+  chatBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: theme.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatBadgeText: { color: '#fff', fontSize: 10, fontWeight: '900' },
   tableTools: { flexDirection: 'row', justifyContent: 'center', gap: space.sm },
   toolButton: {
     borderRadius: radius.pill,
