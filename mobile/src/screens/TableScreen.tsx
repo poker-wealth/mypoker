@@ -29,7 +29,7 @@ import { useChallengePrompt } from '../table/useChallengePrompt';
  * a default. The Mini App spent a day rendering every game as poker because a lost registry did
  * exactly that, and nothing failed while it happened.
  */
-export function TableScreen({ route }: TableScreenProps) {
+export function TableScreen({ route, navigation }: TableScreenProps) {
   const { tableId } = route.params;
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -49,6 +49,20 @@ export function TableScreen({ route }: TableScreenProps) {
   }, []);
 
   const { snapshot, status, error, command, socket } = useLiveTable(tableId, token);
+
+  /**
+   * App.tsx registers this screen with no `options`, so React Navigation's header falls back to
+   * the literal route name "Table" — every one of the five poker tables (texas, texas-high,
+   * short-deck, omaha, texas-cowboy) read the same word, indistinguishable once opened. That cost
+   * real time during live device testing tonight: neither the tester nor I could tell which room
+   * he was in. Before the snapshot arrives there's nothing better than `tableId` to show, so use
+   * that rather than a blank or invented placeholder; once the snapshot lands, prefer its `name`
+   * (matching the web's header, frontend/src/pages/Table.tsx:103), falling back to `tableId` if
+   * the server ever sends an empty name.
+   */
+  useEffect(() => {
+    navigation.setOptions({ title: snapshot?.name || tableId });
+  }, [navigation, snapshot?.name, tableId]);
   const { messages, sendChat } = useTableChat(socket);
   const { challengerId, clear: clearChallenge } = useChallengePrompt(socket);
   const [chatOpen, setChatOpen] = useState(false);

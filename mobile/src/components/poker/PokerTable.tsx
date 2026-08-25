@@ -1,11 +1,18 @@
-import { Image, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { PlayingCard } from './PlayingCard';
 import { PlayerSeat } from './PlayerSeat';
 import { designById, ringFor, type TableDesign } from '../../table/tableDesigns';
 import { useTableDesign } from '../../table/tableDesignStore';
 import { PotToWinner } from './PotToWinner';
 import { theme } from '../../theme';
-import type { TableSnapshot } from '../../lib/liveTable';
+import type { LiveSeat, TableSnapshot } from '../../lib/liveTable';
+
+/** One position on the rail: the seat index and whoever the server says is sitting there, if
+ * anyone. `seat` is `null` for a chair no one occupies — never a fabricated `LiveSeat`. */
+interface RingSlot {
+  index: number;
+  seat: LiveSeat | null;
+}
 
 /**
  * The Hold'em table.
@@ -38,11 +45,23 @@ export function PokerTable({ snapshot, onSit, design: override }: PokerTableProp
   const tableHeight = tableWidth / design.aspect;
 
   const you = snapshot.seats.find((s) => s.isYou);
-  const seats = snapshot.seats;
-  const ring = ringFor(design, Math.max(2, seats.length));
 
-  const yourPlace = you ? seats.findIndex((s) => s.index === you.index) : -1;
-  const ordered = yourPlace > 0 ? [...seats.slice(yourPlace), ...seats.slice(0, yourPlace)] : seats;
+  // The server sends only OCCUPIED seats (game-server/src/live/poker-room.ts builds the snapshot
+  // from `this.occupied()`, unlike other room types that pad their seat list with placeholders);
+  // `maxSeats` is the real chair count, reported separately. Build the full ring of `maxSeats`
+  // positions up front and overlay whichever ones the server did report onto it by `index` —
+  // otherwise an empty (or partly empty) table renders as bare felt with no way to sit down.
+  const seatCount = Math.max(2, snapshot.maxSeats || 0);
+  const byIndex = new Map(snapshot.seats.map((s) => [s.index, s]));
+  const slots: RingSlot[] = Array.from({ length: seatCount }, (_, index) => ({
+    index,
+    seat: byIndex.get(index) ?? null,
+  }));
+  const ring = ringFor(design, seatCount);
+
+  const yourIndex = you?.index ?? snapshot.yourSeat ?? -1;
+  const yourPlace = yourIndex >= 0 ? slots.findIndex((s) => s.index === yourIndex) : -1;
+  const ordered = yourPlace > 0 ? [...slots.slice(yourPlace), ...slots.slice(0, yourPlace)] : slots;
 
   const board = snapshot.board ?? [];
 
@@ -77,23 +96,45 @@ export function PokerTable({ snapshot, onSit, design: override }: PokerTableProp
         {snapshot.message ? <Text style={styles.message}>{snapshot.message}</Text> : null}
       </View>
 
-      {ordered.map((seat, place) => {
-        const slot = ring[place % ring.length]!;
-        const canSit = !seat.playerId && !you && onSit ? () => onSit(seat.index) : undefined;
+      {ordered.map((ringSlot, place) => {
+        const pos = ring[place % ring.length]!;
+        const style = [
+          styles.seat,
+          { left: (pos.left / 100) * tableWidth, top: (pos.top / 100) * tableHeight },
+        ];
+
+        if (ringSlot.seat) {
+          const seat = ringSlot.seat;
+          return (
+            <View key={ringSlot.index} style={style}>
+              <PlayerSeat seat={seat} toAct={snapshot.toActSeat === seat.index} accent={design.accent} />
+            </View>
+          );
+        }
+
+        // An empty chair. `LiveSeat` requires a playerId/name/stack, so there is no such thing as
+        // an empty one — inventing one just to hand it to `PlayerSeat` would mean carrying a fake
+        // zero stack around as if it were real data. Render the same "+ SIT" affordance PlayerSeat
+        // draws for an unoccupied seat, directly, and hand `onSit` the RING index — the seat index
+        // the server expects.
+        const sit = !you && onSit ? () => onSit(ringSlot.index) : undefined;
         return (
-          <View
-            key={seat.index}
-            style={[
-              styles.seat,
-              { left: (slot.left / 100) * tableWidth, top: (slot.top / 100) * tableHeight },
-            ]}
-          >
-            <PlayerSeat
-              seat={seat}
-              {...(canSit ? { onSit: canSit } : {})}
-              toAct={snapshot.toActSeat === seat.index}
-              accent={design.accent}
-            />
+          <View key={`empty-${ringSlot.index}`} style={style}>
+            {sit ? (
+              <Pressable
+                onPress={sit}
+                style={({ pressed }) => [
+                  styles.emptyAvatar,
+                  styles.emptyOpen,
+                  { borderColor: design.accent },
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={[styles.sitText, { color: design.accent }]}>+ SIT</Text>
+              </Pressable>
+            ) : (
+              <View style={[styles.emptyAvatar, styles.emptyInert]} />
+            )}
           </View>
         );
       })}
@@ -105,7 +146,7 @@ export function PokerTable({ snapshot, onSit, design: override }: PokerTableProp
         handId={snapshot.handId}
         amount={snapshot.pot}
         winners={ordered
-          .map((seat, place) => (seat.isWinner ? ring[place % ring.length]! : null))
+          .map((slot, place) => (slot.seat?.isWinner ? ring[place % ring.length]! : null))
           .filter((p): p is NonNullable<typeof p> => p !== null)}
         tableWidth={tableWidth}
         tableHeight={tableHeight}
@@ -149,4 +190,16 @@ const styles = StyleSheet.create({
   },
   // Seats are placed by their centre, so shift each by half its own size.
   seat: { position: 'absolute', marginLeft: -37, marginTop: -34 },
+  // Matches PlayerSeat's own AVATAR / emptyOpen / emptyInert / sitText treatment for an
+  // unoccupied chair, so a ring slot with no `LiveSeat` still looks like the rest of the rail.
+  emptyAvatar: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center' },
+  emptyOpen: { borderWidth: 2, borderStyle: 'dashed', backgroundColor: 'rgba(0,0,0,0.55)' },
+  emptyInert: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
+  pressed: { opacity: 0.7 },
+  sitText: { fontSize: 10, fontWeight: '900', letterSpacing: 1 },
 });

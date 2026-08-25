@@ -292,6 +292,13 @@ async function main(): Promise<void> {
    * Seat 0,1,2… only works on a table nobody is using. A run that stalled earlier leaves its
    * players sitting there, and the next run then fails to seat with no clue why — which looked
    * exactly like the game being broken.
+   *
+   * THE FREE SEAT IS NOT IN `snapshot.seats`. A poker room builds that array from
+   * `occupied()` (game-server/src/live/poker-room.ts), so it holds ONLY the chairs
+   * that are taken — searching it for a free one can never succeed. On an empty
+   * table it is `[]`, and the old code then reported "full of players from an
+   * earlier run" about a table with nobody at it. The real chair count is
+   * `maxSeats`, reported separately; enumerate that and subtract what is taken.
    */
   for (const c of clients) {
     const taken = new Set(
@@ -299,9 +306,18 @@ async function main(): Promise<void> {
         (c.snapshot?.seats ?? []).filter((s) => s.playerId).map((s) => s.index),
       ),
     );
-    const free = (c.snapshot?.seats ?? []).find((s) => !taken.has(s.index));
-    if (!free) throw new Error('no free seat — the table is full of players from an earlier run');
-    c.command({ kind: 'sit', seat: free.index, buyIn });
+    const maxSeats = c.snapshot?.maxSeats ?? 0;
+    let freeIndex = -1;
+    for (let i = 0; i < maxSeats; i += 1) {
+      if (!taken.has(i)) { freeIndex = i; break; }
+    }
+    if (freeIndex < 0) {
+      throw new Error(
+        `no free seat — ${taken.size} of ${maxSeats} chairs are taken` +
+          (maxSeats === 0 ? ' (the snapshot reported no seats at all)' : ''),
+      );
+    }
+    c.command({ kind: 'sit', seat: freeIndex, buyIn });
     await sleep(400);
   }
   await until('everyone seated', () => clients.every((c) => c.seat() !== undefined), 10_000);
