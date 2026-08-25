@@ -84,7 +84,7 @@ export function Games() {
         />
         <div className="relative text-white z-10 flex flex-col items-center pl-20">
           <div className="text-[0.7rem] font-bold uppercase tracking-wider text-white/90">
-            Grand Jackpot
+            {t('lobby.grandJackpot')}
           </div>
           {lobby.isPending ? (
             <div className="mt-1 flex justify-center">

@@ -561,6 +561,27 @@
     "isolationNote": "리그 테이블과 지갑만 표시됩니다. 플랫폼 테이블은 숨겨집니다.",
     "backToPlatform": "플랫폼 로비로 돌아가기"
   },
+  "grants": {
+    "title": "멤버에게 지급",
+    "fund": "멤버에게 지급",
+    "blurb": "얼라이언스 보유분에서 멤버의 얼라이언스 지갑으로 칩을 옮깁니다. 플레이에는 사용할 수 있지만 출금은 불가합니다.",
+    "recipient": "멤버",
+    "amount": "금액",
+    "amountInvalid": "금액을 입력하세요 (소수점 6자리까지)",
+    "send": "칩 보내기",
+    "sent": "칩을 보냈습니다",
+    "confirmTitle": "이 칩을 보낼까요?",
+    "confirmBody": "얼라이언스 보유분에서 {{player}}에게 {{amount}}을(를) 보냅니다.",
+    "noMembers": "지급할 멤버가 없습니다",
+    "noMembersBlurb": "먼저 얼라이언스에 플레이어를 초대하세요.",
+    "notAllowed": "소유자 또는 관리자만 지급할 수 있습니다",
+    "notAllowedBlurb": "얼라이언스 소유자에게 지급을 요청하세요.",
+    "role": {
+      "OWNER": "소유자",
+      "ADMIN": "관리자",
+      "MEMBER": "멤버"
+    }
+  },
   "security": {
     "deviceModifiedTitle": "이 기기는 변조된 것으로 보입니다",
     "deviceModifiedBody": "루팅 또는 탈옥 도구가 감지되었습니다. 계속 플레이할 수 있지만 변조된 기기는 조작에 취약하므로 입출금 시 주의하세요."

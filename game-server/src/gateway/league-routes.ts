@@ -27,6 +27,13 @@ export function buildLeagueRouter(config: GatewayConfig): Router {
   r.get('/', (req, res) => void forwardTo(config, req, res, '/leagues'));
   r.get('/:leagueId', (req, res) => void forwardTo(config, req, res, leaguePath(req)));
 
+  // Authenticated, unlike the two reads above: the roster is members-only, and
+  // financial-core decides that from the caller's identity. Forwarding it
+  // without requireAuth would send an anonymous request and always 404.
+  r.get('/:leagueId/members', requireAuth(config), (req: Request, res: Response) =>
+    void forwardTo(config, req, res, `${leaguePath(req)}/members`),
+  );
+
   r.post('/', requireAuth(config), (req: Request, res: Response) =>
     void forwardTo(config, req, res, '/leagues'),
   );

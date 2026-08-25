@@ -8,11 +8,6 @@
     "scheme": "mypoker",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0d0d1a"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.mypoker777",
@@ -49,13 +44,28 @@
       "expo-localization",
       "expo-sharing",
       "expo-audio",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0d0d1a",
+          "imageWidth": 200
+        }
+      ]
     ],
     "owner": "xantle-application",
     "extra": {
       "eas": {
         "projectId": "e2999632-d12b-4ea0-bd08-21c995e9c8ad"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/e2999632-d12b-4ea0-bd08-21c995e9c8ad"
     }
   }
 }

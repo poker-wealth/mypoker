@@ -40,12 +40,15 @@ async function fundedLeague(inventory = '1000'): Promise<void> {
   });
 }
 
+let refCounter = 0;
+/** A distinct reference per call unless a test pins one — that is the point of the key. */
 const grant = (amount: string, over: Partial<Parameters<typeof grantToMember>[0]> = {}) =>
   grantToMember({
     leagueId: LEAGUE,
     playerId: MEMBER,
     amount: Money.fromDecimalString(amount),
     grantedBy: 'owner-1',
+    reference: `ref-${++refCounter}`,
     ...over,
   });
 
@@ -81,6 +84,36 @@ describe('[money] a league grants chips to a member', () => {
     expect(entries).toHaveLength(2); // a transfer is a balanced pair
     expect(entries.every((e) => e.idempotencyKey === `league:grant:${res.grantId}`)).toBe(true);
     expect(entries[0]!.metadata).toMatchObject({ leagueId: LEAGUE, grantedBy: 'admin-7' });
+  });
+
+  it('refuses a grant with no reference', async () => {
+    // The bug this replaced: `reference` was optional and fell back to a fresh
+    // UUID per call, so two identical submits charged the league twice. An
+    // un-retryable money mutation should not be callable at all.
+    await fundedLeague();
+    await expect(
+      grantToMember({
+        leagueId: LEAGUE,
+        playerId: MEMBER,
+        amount: Money.fromDecimalString('10'),
+        grantedBy: 'owner-1',
+        reference: '',
+      }),
+    ).rejects.toThrow(LeagueGrantError);
+  });
+
+  it('collapses a double-submit of the same grant onto one transfer', async () => {
+    // The double-click an admin actually performs: same intent, same key.
+    await fundedLeague('1000');
+    await Promise.all([
+      grant('100', { reference: 'double-submit' }),
+      grant('100', { reference: 'double-submit' }),
+    ]);
+
+    const inv = await AccountModel.findById(leagueInventoryId(LEAGUE)).lean();
+    expect(Money.fromDecimal128(inv!.availableBalance).toString()).toBe('900.000000');
+    const wallet = await getOrCreatePlayerAccount(MEMBER, LEAGUE);
+    expect(Money.fromDecimal128(wallet.availableBalance).toString()).toBe('100.000000');
   });
 
   it('is idempotent on its reference — a retry does not pay twice', async () => {

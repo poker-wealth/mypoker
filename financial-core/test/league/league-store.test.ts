@@ -4,6 +4,7 @@ import {
   joinLeague,
   leaveLeague,
   membershipOf,
+  membersOf,
   leaguesFor,
   discoverLeagues,
   assertContextAccess,
@@ -167,5 +168,52 @@ describe('IRON RULE: platform and league stay isolated', () => {
     for (const l of leagues) {
       expect(accountScopeFor(leagueContext(l._id))).not.toBe('PLATFORM');
     }
+  });
+});
+
+describe('membersOf — the roster', () => {
+  it('lists everyone, oldest first, with their role', async () => {
+    await makeLeague();
+    await joinLeague('lg-1', MEMBER);
+    await joinLeague('lg-1', OUTSIDER);
+
+    const members = await membersOf('lg-1');
+
+    expect(members.map((m) => m.playerId)).toEqual([OWNER, MEMBER, OUTSIDER]);
+    expect(members[0]!.role).toBe('OWNER');
+    expect(members[1]!.role).toBe('MEMBER');
+    // A date the UI can render without inventing one.
+    expect(Number.isNaN(Date.parse(members[0]!.joinedAt))).toBe(false);
+  });
+
+  it('carries no balance field — an owner funding a league cannot see holdings', async () => {
+    await makeLeague();
+    await joinLeague('lg-1', MEMBER);
+
+    const [first] = await membersOf('lg-1');
+
+    // Structural, not filtered: the shape simply has no such field. If someone
+    // later selects one into it, this fails rather than quietly leaking.
+    expect(Object.keys(first!).sort()).toEqual(['joinedAt', 'playerId', 'role']);
+  });
+
+  it('is scoped to one league', async () => {
+    await makeLeague();
+    await makeLeague({ leagueId: 'lg-2', name: 'Other', ownerId: OUTSIDER });
+    await joinLeague('lg-1', MEMBER);
+
+    expect((await membersOf('lg-2')).map((m) => m.playerId)).toEqual([OUTSIDER]);
+  });
+
+  it('is empty for a league that does not exist', async () => {
+    expect(await membersOf('lg-nope')).toEqual([]);
+  });
+
+  it('drops someone who left', async () => {
+    await makeLeague();
+    await joinLeague('lg-1', MEMBER);
+    await leaveLeague('lg-1', MEMBER);
+
+    expect((await membersOf('lg-1')).map((m) => m.playerId)).toEqual([OWNER]);
   });
 });
