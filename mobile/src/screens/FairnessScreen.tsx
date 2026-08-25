@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Linking, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { api } from '../api';
 import {
   explorerUrl,
@@ -131,58 +131,66 @@ export function FairnessScreen() {
   };
 
   return (
-    <View style={styles.screen}>
-      <View style={styles.content}>
-        <Card style={styles.introCard}>
-          <View style={styles.introRow}>
-            <View style={styles.introIcon}>
-              <Text style={styles.introIconText}>🛡️</Text>
-            </View>
-            <View style={styles.introBody}>
-              <Text style={styles.title}>{t('fairness.title')}</Text>
-              <Text style={styles.dim}>{t('fairness.intro')}</Text>
-            </View>
+    // A plain ScrollView, not the shared `Screen` primitive: `Screen` wraps a
+    // single react-query result, and this screen is not — it's local parse
+    // state (`input`/`parsed`) plus `GameFairnessList` below, which owns two
+    // queries of its own further down the tree. The six verification steps
+    // (`RoundSteps`) sit below the fold and are the entire reason this screen
+    // exists, so it must scroll to reach them.
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+    >
+      <Card style={styles.introCard}>
+        <View style={styles.introRow}>
+          <View style={styles.introIcon}>
+            <Text style={styles.introIconText}>🛡️</Text>
           </View>
-        </Card>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>{t('fairness.roundData')}</Text>
-          <TextInput
-            value={input}
-            onChangeText={setInput}
-            placeholder={t('fairness.paste')}
-            placeholderTextColor={theme.dim}
-            multiline
-            spellCheck={false}
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={styles.textArea}
-          />
-          <View style={styles.buttonRow}>
-            <View style={styles.buttonFlex}>
-              <Button onPress={() => run(input)} disabled={!input.trim()}>
-                {t('fairness.verify')}
-              </Button>
-            </View>
-            <Button variant="ghost" onPress={loadSample}>
-              {t('fairness.sample')}
-            </Button>
+          <View style={styles.introBody}>
+            <Text style={styles.title}>{t('fairness.title')}</Text>
+            <Text style={styles.dim}>{t('fairness.intro')}</Text>
           </View>
         </View>
+      </Card>
 
-        {parseError && (
-          <Card style={styles.errorCard}>
-            <Text style={styles.errorText}>
-              {t('fairness.couldNotRead')} <Text style={styles.mono}>{parseError}</Text>
-            </Text>
-          </Card>
-        )}
-
-        <GameFairnessList />
-
-        {parsed && <RoundSteps data={parsed} />}
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>{t('fairness.roundData')}</Text>
+        <TextInput
+          value={input}
+          onChangeText={setInput}
+          placeholder={t('fairness.paste')}
+          placeholderTextColor={theme.dim}
+          multiline
+          spellCheck={false}
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={styles.textArea}
+        />
+        <View style={styles.buttonRow}>
+          <View style={styles.buttonFlex}>
+            <Button onPress={() => run(input)} disabled={!input.trim()}>
+              {t('fairness.verify')}
+            </Button>
+          </View>
+          <Button variant="ghost" onPress={loadSample}>
+            {t('fairness.sample')}
+          </Button>
+        </View>
       </View>
-    </View>
+
+      {parseError && (
+        <Card style={styles.errorCard}>
+          <Text style={styles.errorText}>
+            {t('fairness.couldNotRead')} <Text style={styles.mono}>{parseError}</Text>
+          </Text>
+        </Card>
+      )}
+
+      <GameFairnessList />
+
+      {parsed && <RoundSteps data={parsed} />}
+    </ScrollView>
   );
 }
 
