@@ -45,8 +45,20 @@ function render(value: number, options: MoneyOptions): string {
   })}`;
 }
 
-/** Money for display, from micro-USD integers. */
-export function money(micros: number, options: MoneyOptions = {}): string {
+/**
+ * Money for display, from micro-USD integers.
+ *
+ * `micros` widened to allow `null`/`undefined` because callers read this
+ * straight off API payloads, and a missing or not-yet-loaded field is a real
+ * shape those payloads take. Non-finite input (missing, null, undefined,
+ * NaN, Infinity) renders as an em dash: this project's rule is that an
+ * absent figure must never be confused with a real one, and `₮0` is itself a
+ * claim ("this balance is zero") the caller has no basis to make. An em dash
+ * says "not shown", not "zero" — matching how the rest of this codebase
+ * already handles an unknown balance (see WalletScreen's `available` prop).
+ */
+export function money(micros: number | null | undefined, options: MoneyOptions = {}): string {
+  if (typeof micros !== 'number' || !Number.isFinite(micros)) return '—';
   return render(micros / 1_000_000, options);
 }
 

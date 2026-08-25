@@ -144,7 +144,7 @@ export function Vip() {
                         {t(`gameNames.${g.gameId}`, { defaultValue: g.gameId })}
                       </div>
                       <div className="truncate text-[0.66rem] text-dim tabular-nums">
-                        {t('vip.roundsStaked', { rounds: g.rounds, staked: money(g.staked) })}
+                        {t('vip.roundsStaked', { rounds: g.rounds, staked: money(g.staked, { symbol: false }) })}
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
