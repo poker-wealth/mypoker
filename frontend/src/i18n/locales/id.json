@@ -296,7 +296,10 @@
     "signedOut": "Berhasil keluar",
     "signInFailed": "Gagal masuk",
     "copied": "Tersalin",
-    "copyFailed": "Gagal menyalin"
+    "copyFailed": "Gagal menyalin",
+    "signUpFailed": "Pendaftaran gagal",
+    "codeResent": "Kode baru sedang dikirim",
+    "codeResendFailed": "Tidak dapat mengirim kode baru"
   },
   "settings": {
     "appearance": "Tampilan",
@@ -601,6 +604,15 @@
     "passwordTooShort": "Kata sandi minimal 8 karakter",
     "signedOut": "Anda telah keluar",
     "continueWithGoogle": "Lanjutkan dengan Google",
-    "or": "atau"
+    "or": "atau",
+    "confirmTitle": "Konfirmasi email Anda",
+    "confirmSubtitle": "Masukkan kode 6 digit yang kami kirim ke {{email}}.",
+    "confirmCode": "Kode konfirmasi",
+    "confirmButton": "Konfirmasi email",
+    "confirming": "Mengonfirmasi…",
+    "confirmResend": "Kirim kode baru",
+    "confirmResendIn": "Kirim kode baru dalam {{seconds}} detik",
+    "confirmResendUnavailable": "Kami belum dapat mengirim kode baru saat ini.",
+    "confirmBack": "Kembali"
   }
 }

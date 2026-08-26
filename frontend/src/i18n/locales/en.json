@@ -296,7 +296,10 @@
     "signedOut": "Signed out",
     "signInFailed": "Sign-in failed",
     "copied": "Copied",
-    "copyFailed": "Could not copy"
+    "copyFailed": "Could not copy",
+    "signUpFailed": "Sign-up failed",
+    "codeResent": "A new code is on its way",
+    "codeResendFailed": "Could not send a new code"
   },
   "settings": {
     "appearance": "Appearance",
@@ -601,6 +604,15 @@
     "passwordTooShort": "Password must be at least 8 characters",
     "signedOut": "You are signed out",
     "continueWithGoogle": "Continue with Google",
-    "or": "or"
+    "or": "or",
+    "confirmTitle": "Confirm your email",
+    "confirmSubtitle": "Enter the 6-digit code we sent to {{email}}.",
+    "confirmCode": "Confirmation code",
+    "confirmButton": "Confirm email",
+    "confirming": "Confirming…",
+    "confirmResend": "Send a new code",
+    "confirmResendIn": "Send a new code in {{seconds}}s",
+    "confirmResendUnavailable": "We could not send a new code just now.",
+    "confirmBack": "Back"
   }
 }

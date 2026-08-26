@@ -7,7 +7,10 @@ import {
   loginWithGoogle,
   loginWithEmail,
   signupWithEmail,
+  confirmEmailCode,
+  resendEmailCode,
   type LoginResponse,
+  type PendingConfirmation,
   type Player,
 } from '@/api/auth';
 import { initData } from '@/lib/telegram';
@@ -55,8 +58,38 @@ interface SessionState {
   /** Browser sign-in: exchange a Google OAuth access token for a session. */
   signInWithGoogle: (accessToken: string) => Promise<void>;
   signInWithEmail: (email: string, passwordPlain: string) => Promise<void>;
-  signUpWithEmail: (email: string, passwordPlain: string, displayName?: string) => Promise<void>;
+  /**
+   * Start an email sign-up.
+   *
+   * Returns a PENDING CONFIRMATION, not a session — nothing is stored and
+   * nobody is signed in until `confirmEmail` succeeds. The return type is what
+   * makes that impossible to miss at the call site.
+   */
+  signUpWithEmail: (
+    email: string,
+    passwordPlain: string,
+    displayName?: string,
+  ) => Promise<PendingConfirmation>;
+  /** Finish a sign-up: exchange the emailed code for a session. */
+  confirmEmail: (email: string, code: string) => Promise<void>;
+  /** Ask for another code for a confirmation already in flight. */
+  resendCode: (email: string) => Promise<PendingConfirmation>;
   signOut: () => void;
+}
+
+/**
+ * The email address a failed sign-in says still needs confirming, or null.
+ *
+ * The gateway answers 403 with `code: 'email_unverified'` when the PASSWORD WAS
+ * CORRECT but the address was never confirmed. Matched on that field rather
+ * than on the message text: the message is player-facing copy and will be
+ * reworded, and a rewording must not quietly turn "confirm your email" back
+ * into "wrong password".
+ */
+export function unconfirmedEmailFrom(error: unknown): string | null {
+  if (!(error instanceof ApiError) || error.status !== 403) return null;
+  const body = error.body as { code?: string; email?: string } | undefined;
+  return body?.code === 'email_unverified' ? (body.email ?? null) : null;
 }
 
 const storedToken = localStorage.getItem(TOKEN_KEY);
@@ -125,7 +158,39 @@ export const useSession = create<SessionState>((set, get) => {
   },
 
   signUpWithEmail: async (email, passwordPlain, displayName) => {
-    await settle(() => signupWithEmail(email, passwordPlain, displayName));
+    // Deliberately NOT `settle`. There is no token to store and nobody to greet
+    // — the account exists but is unconfirmed. Routing this through the
+    // sign-in path would toast "Signed in as ..." over a screen asking for a
+    // code, and would have to invent a session out of a response that has none.
+    set({ status: 'authenticating', error: null });
+    try {
+      const pending = await signupWithEmail(email, passwordPlain, displayName);
+      set({ status: 'anonymous', error: null });
+      return pending;
+    } catch (e) {
+      const message = e instanceof ApiError ? e.message : i18n.t('toasts.signUpFailed');
+      set({ status: 'error', error: message });
+      toast.error(message);
+      throw e;
+    }
+  },
+
+  confirmEmail: async (email, code) => {
+    await settle(() => confirmEmailCode(email, code));
+  },
+
+  resendCode: async (email) => {
+    try {
+      const pending = await resendEmailCode(email);
+      toast.success(i18n.t('toasts.codeResent'));
+      return pending;
+    } catch (e) {
+      // Rate limiting arrives here as a 429 whose message already says how long
+      // to wait, in the server's own words. Kept rather than replaced.
+      const message = e instanceof ApiError ? e.message : i18n.t('toasts.codeResendFailed');
+      toast.error(message);
+      throw e;
+    }
   },
 
   signOut: () => {

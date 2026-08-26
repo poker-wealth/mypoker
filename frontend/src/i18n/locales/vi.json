@@ -296,7 +296,10 @@
     "signedOut": "Đã đăng xuất",
     "signInFailed": "Đăng nhập thất bại",
     "copied": "Đã sao chép",
-    "copyFailed": "Không thể sao chép"
+    "copyFailed": "Không thể sao chép",
+    "signUpFailed": "Đăng ký thất bại",
+    "codeResent": "Mã mới đang được gửi",
+    "codeResendFailed": "Không thể gửi mã mới"
   },
   "settings": {
     "appearance": "Giao diện",
@@ -601,6 +604,15 @@
     "passwordTooShort": "Mật khẩu phải có ít nhất 8 ký tự",
     "signedOut": "Bạn đã đăng xuất",
     "continueWithGoogle": "Tiếp tục với Google",
-    "or": "hoặc"
+    "or": "hoặc",
+    "confirmTitle": "Xác nhận email của bạn",
+    "confirmSubtitle": "Nhập mã 6 chữ số chúng tôi đã gửi đến {{email}}.",
+    "confirmCode": "Mã xác nhận",
+    "confirmButton": "Xác nhận email",
+    "confirming": "Đang xác nhận…",
+    "confirmResend": "Gửi mã mới",
+    "confirmResendIn": "Gửi mã mới sau {{seconds}} giây",
+    "confirmResendUnavailable": "Hiện chưa thể gửi mã mới.",
+    "confirmBack": "Quay lại"
   }
 }

@@ -296,7 +296,10 @@
     "signedOut": "साइन आउट हो गए",
     "signInFailed": "साइन इन विफल",
     "copied": "कॉपी हो गया",
-    "copyFailed": "कॉपी नहीं हो सका"
+    "copyFailed": "कॉपी नहीं हो सका",
+    "signUpFailed": "साइन-अप विफल",
+    "codeResent": "नया कोड भेजा जा रहा है",
+    "codeResendFailed": "नया कोड नहीं भेजा जा सका"
   },
   "settings": {
     "appearance": "दिखावट",
@@ -601,6 +604,15 @@
     "passwordTooShort": "पासवर्ड कम से कम 8 अक्षरों का होना चाहिए",
     "signedOut": "आप साइन आउट हो गए हैं",
     "continueWithGoogle": "Google से जारी रखें",
-    "or": "या"
+    "or": "या",
+    "confirmTitle": "अपना ईमेल सत्यापित करें",
+    "confirmSubtitle": "{{email}} पर भेजा गया 6 अंकों का कोड दर्ज करें।",
+    "confirmCode": "सत्यापन कोड",
+    "confirmButton": "ईमेल सत्यापित करें",
+    "confirming": "सत्यापित हो रहा है…",
+    "confirmResend": "नया कोड भेजें",
+    "confirmResendIn": "{{seconds}} सेकंड में नया कोड भेजें",
+    "confirmResendUnavailable": "अभी नया कोड नहीं भेजा जा सका।",
+    "confirmBack": "वापस"
   }
 }

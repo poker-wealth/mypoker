@@ -296,7 +296,10 @@
     "signedOut": "已退出登录",
     "signInFailed": "登录失败",
     "copied": "已复制",
-    "copyFailed": "复制失败"
+    "copyFailed": "复制失败",
+    "signUpFailed": "注册失败",
+    "codeResent": "新的验证码已发送",
+    "codeResendFailed": "无法发送新的验证码"
   },
   "settings": {
     "appearance": "外观",
@@ -601,6 +604,15 @@
     "passwordTooShort": "密码至少需要 8 个字符",
     "signedOut": "您已退出登录",
     "continueWithGoogle": "使用 Google 继续",
-    "or": "或"
+    "or": "或",
+    "confirmTitle": "确认您的邮箱",
+    "confirmSubtitle": "请输入我们发送到 {{email}} 的 6 位验证码。",
+    "confirmCode": "验证码",
+    "confirmButton": "确认邮箱",
+    "confirming": "确认中…",
+    "confirmResend": "重新发送验证码",
+    "confirmResendIn": "{{seconds}} 秒后可重新发送",
+    "confirmResendUnavailable": "暂时无法发送新的验证码。",
+    "confirmBack": "返回"
   }
 }

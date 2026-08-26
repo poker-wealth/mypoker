@@ -296,7 +296,10 @@
     "signedOut": "ログアウトしました",
     "signInFailed": "ログインに失敗しました",
     "copied": "コピーしました",
-    "copyFailed": "コピーできませんでした"
+    "copyFailed": "コピーできませんでした",
+    "signUpFailed": "登録に失敗しました",
+    "codeResent": "新しいコードを送信しました",
+    "codeResendFailed": "新しいコードを送信できませんでした"
   },
   "settings": {
     "appearance": "外観",
@@ -601,6 +604,15 @@
     "passwordTooShort": "パスワードは8文字以上で入力してください",
     "signedOut": "ログアウトしました",
     "continueWithGoogle": "Google で続ける",
-    "or": "または"
+    "or": "または",
+    "confirmTitle": "メールアドレスの確認",
+    "confirmSubtitle": "{{email}} に送信した6桁のコードを入力してください。",
+    "confirmCode": "確認コード",
+    "confirmButton": "メールを確認",
+    "confirming": "確認中…",
+    "confirmResend": "コードを再送信",
+    "confirmResendIn": "{{seconds}}秒後に再送信できます",
+    "confirmResendUnavailable": "現在、新しいコードを送信できません。",
+    "confirmBack": "戻る"
   }
 }

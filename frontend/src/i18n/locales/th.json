@@ -296,7 +296,10 @@
     "signedOut": "ออกจากระบบแล้ว",
     "signInFailed": "เข้าสู่ระบบไม่สำเร็จ",
     "copied": "คัดลอกแล้ว",
-    "copyFailed": "คัดลอกไม่สำเร็จ"
+    "copyFailed": "คัดลอกไม่สำเร็จ",
+    "signUpFailed": "สมัครสมาชิกไม่สำเร็จ",
+    "codeResent": "กำลังส่งรหัสใหม่",
+    "codeResendFailed": "ส่งรหัสใหม่ไม่สำเร็จ"
   },
   "settings": {
     "appearance": "การแสดงผล",
@@ -601,6 +604,15 @@
     "passwordTooShort": "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร",
     "signedOut": "คุณออกจากระบบแล้ว",
     "continueWithGoogle": "ดำเนินการต่อด้วย Google",
-    "or": "หรือ"
+    "or": "หรือ",
+    "confirmTitle": "ยืนยันอีเมลของคุณ",
+    "confirmSubtitle": "กรอกรหัส 6 หลักที่เราส่งไปยัง {{email}}",
+    "confirmCode": "รหัสยืนยัน",
+    "confirmButton": "ยืนยันอีเมล",
+    "confirming": "กำลังยืนยัน…",
+    "confirmResend": "ส่งรหัสใหม่",
+    "confirmResendIn": "ส่งรหัสใหม่ได้ในอีก {{seconds}} วินาที",
+    "confirmResendUnavailable": "ขณะนี้ยังส่งรหัสใหม่ไม่ได้",
+    "confirmBack": "ย้อนกลับ"
   }
 }
