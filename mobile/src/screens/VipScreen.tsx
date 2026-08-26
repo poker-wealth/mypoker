@@ -81,7 +81,9 @@ export function VipScreen() {
                 </View>
                 <View style={styles.barRow}>
                   <Text style={styles.dimSmall}>{data.progressPct}%</Text>
-                  <Text style={styles.dimSmall}>
+                  {/* flexShrink so an unbounded money amount wraps instead of overflowing past
+                      the card edge — a Text in a row needs flex/flexShrink or it will not wrap. */}
+                  <Text style={[styles.dimSmall, styles.barRemaining]}>
                     {t('vip.remaining', {
                       amount: money(data.next.remaining, { symbol: false }),
                       tier: data.next.tier,
@@ -160,6 +162,7 @@ const styles = StyleSheet.create({
   barFill: { height: '100%', borderRadius: radius.pill, backgroundColor: theme.brand },
   barRow: { marginTop: space.xs, flexDirection: 'row', justifyContent: 'space-between' },
   dimSmall: { color: theme.dim, fontSize: 11, fontFamily: weight('400') },
+  barRemaining: { flexShrink: 1, textAlign: 'right' },
   estimate: { marginTop: space.xs, color: theme.dim, fontSize: 10, fontFamily: weight('400') },
   topTier: { marginTop: space.sm, color: theme.accent, fontSize: 12, fontFamily: weight('700') },
   section: { gap: space.sm },
