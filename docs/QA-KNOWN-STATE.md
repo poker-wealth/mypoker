@@ -42,15 +42,49 @@ deposit/withdraw block was **English-only in all 7 non-English locales** until
 
 ## 4. Authentication
 
+Re-verified 26 Aug 2026 **in a browser**, against a full local stack: gateway +
+financial-core on a shared in-memory MongoDB, with a throwaway SMTP server
+capturing every message. 78 checks, all passing — 59 flow checks plus 19 that
+need a real clock (the resend cooldown elapsing, a stale sign-up returning).
+
+**Sign-up is now two steps.** `POST /auth/signup` creates the account and mails
+a six-digit code but returns **no token**; only `POST /auth/verify-otp` mints a
+session. An unconfirmed account cannot hold a session at all, so it can never
+reach a money route — the control is the absence of a token, not a flag some
+later call has to remember to check.
+
 | # | Line | Status | Note |
 |---|---|---|---|
-| 1 | Email sign-up | **P** | Verified on device. |
-| 3 | Email login | **P** | Verified on device. |
-| 4 | Wrong password rejected clearly | **P** | Fixed — previously reported as "session expired". |
-| 5 | Google sign-in | **B** | Client code is in and hides itself when unconfigured. **Waiting on client IDs.** Server-side audience check and fail-closed path are written but sit on an unmerged branch. |
-| 7 | Real display name, not playerId | **P** | Fixed. `/auth/me` rebuilt the profile from the JWT; every cold start read "Guest Player". |
+| 1 | Email sign-up | **P** | Verified in a browser. Returns `{ pending, expiresAt, resendAvailableAt }` and never a token; the code is never in the response body. A real message was captured over SMTP: correct sender, subject carrying the code, both text and HTML parts. |
+| 2 | Confirmation code | **P** | New. Correct code → session. Wrong code → 400. Six digits, ten-minute expiry, five guesses, five sends per challenge, sixty-second resend cooldown. A spent code cannot be spent twice. |
+| 3 | Email login | **P** | Verified in a browser, including a mixed-case address. |
+| 4 | Wrong password rejected clearly | **P** | Confirmed still true: 401 "invalid email or password", not "session expired". A wrong password on an *unconfirmed* account is also a flat 401 — confirmation state is only disclosed once the right password has been supplied. |
+| 5 | Google sign-in | **B** | Still waiting on client IDs. **But the server-side fix is NOT unmerged — it is on `origin/main`** and confirmed live: an unconfigured gateway answers 503 "Google sign-in is not configured" and never calls out to Google. See TRAPS §6, which has been corrected. |
+| 6 | Phone sign-up | **F → closed deliberately** | Refused with `email_required`. It used to be accepted, and with confirmation mandatory it would create an account no code could ever reach — there is no SMS provider. Phone sign-*in* still works for accounts that predate this. |
+| 7 | Real display name, not playerId | **P** | Verified through both the confirm response and `/auth/me`. |
 | 8 | Session persists | **P** | Verified. |
-| 9 | Expiry returns to Login | **P** | Verified. |
+| 9 | Expiry returns to Login | **P** | Verified: no token → 401, forged signature → 401. |
+| 10 | CORS | **P** | The dev origin passes preflight; an unknown origin is not echoed. Browser-only behaviour, so it had not been exercised before. |
+
+**Not verified, and needs a person:** nobody has clicked through the rendered
+screens. There is no browser driver and no DOM test harness in this repo
+(vitest runs pure logic only, no jsdom, no testing-library), so every check
+above drives the same HTTP the browser drives — which covers the server
+completely and the React state machine not at all. `npm run dev` with
+`VITE_API_URL` pointed at a gateway running this branch is the remaining step.
+
+**Still blocked on the owner: there is no SMTP account.** `financial-core/.env`
+has no `SMTP_HOST`/`USER`/`PASS`, so no confirmation code has ever reached a
+real inbox — everything above ran against a local capture. That is enough to
+prove the message nodemailer builds is correct, and not enough to prove
+Hostinger accepts it or that it survives a spam filter. **SAMUEL_V2 task 1
+("email notifications — verify it actually works") is still open for the same
+reason**, and both unblock together the moment the mailbox exists.
+
+Until then the gateway **fails closed in production**: no SMTP means sign-up is
+refused with a 503, never allowed through unconfirmed. Outside production, with
+`DEV_AUTH_BYPASS` already on, the code is written to the server console instead
+— and to the console only, never to the HTTP response.
 
 ---
 
@@ -144,5 +178,9 @@ to any spectator as though it had been rolled.
 1. **No deployed gateway.** Blocks all of section 1, all of iOS, and store review.
 2. **Chat and voice exist only in poker rooms.** Eight games silently discard chat.
 3. **No privacy policy or gambling licence.** Neither store will accept a submission.
+4. **No SMTP account.** Added 26 Aug 2026. Now blocks sign-up itself, not just
+   receipts: email confirmation is mandatory and fails closed in production, so
+   **nobody can create an account on a deployed build until the mailbox
+   exists.** One Hostinger mailbox and five environment variables.
 
-None of the three is a code fix, and all three need an owner.
+None of the four is a code fix, and all four need an owner.

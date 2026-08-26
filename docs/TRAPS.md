@@ -131,6 +131,15 @@ Related: merge checks against a stale local `main` reported six branches as
 clean when they conflicted. Always `git fetch` and compare against
 `origin/main`.
 
+**Update, 26 Aug 2026: the Google fix IS on `origin/main` now.** The audience
+allow-list and the fail-closed 503 are both there — checked with
+`git show origin/main:game-server/src/gateway/auth.ts`, and confirmed against a
+running gateway, which answers 503 "Google sign-in is not configured" rather
+than accepting a token. Session handoffs were still describing it as unmerged
+and exploitable weeks after it landed, which is the same failure in the other
+direction: the note outlived the bug. **Check `origin/main` before repeating
+either claim** — that this entry had to be corrected is the point of it.
+
 ---
 
 ## 7. Comments that describe intentions, not code
@@ -361,3 +370,38 @@ When adding any input, ask what the keyboard covers, and put
 `keyboardShouldPersistTaps="handled"` on the scroller — without it the first
 tap on a button only dismisses the keyboard.
 
+---
+
+## 19. It compiled, it typechecked, and it could never have worked
+
+Two defects in one change, both invisible to `tsc`, `eslint` and the unit
+tests, both found within minutes of running the real thing against a real
+server.
+
+**A regex built in a template literal silently lost its backslash.** The code
+read ``new RegExp(`^\d{${OTP_LENGTH}}$`)`` — which looks exactly right. A
+template literal eats the escape, so the pattern compiled to `^d{6}$` and
+matched the literal string "dddddd" and nothing else. Every genuine
+confirmation code was rejected. It failed *closed*, so nothing crashed and no
+type was wrong; a unit test on the helper is what caught it, and only because
+the test asserted on real six-digit input rather than on the regex.
+
+Build patterns from a plain literal (`/^\d+$/`) and check length separately.
+If a pattern must be interpolated, `String.raw` it.
+
+**A service-to-service URL was missing its mount prefix.** financial-core
+mounts its ENTIRE router under `/api/v1` (`http/app.ts`), and every existing
+gateway → core call carries it. A new call written as `${base}/internal/...`
+typechecked, linted, and passed its tests — the tests inject a fake mailer, so
+the URL is never exercised — and would have 404'd in production, turning every
+sign-up into "we could not send the confirmation email" with nothing saying
+why. Note the trap underneath: the reverse direction genuinely has no prefix,
+because the gateway mounts its internal routes at the root. Two services, two
+mount points, no convention to lean on.
+
+**The pattern:** a string that is only ever read by another process is not
+covered by any check that runs in this one. The way to find out is to run both
+and watch the call happen. Both of these were found by standing the stack up
+locally — in-memory Mongo shared over TCP, a throwaway SMTP server capturing
+the actual message — which took less time than either bug would have taken to
+diagnose from a production report.
