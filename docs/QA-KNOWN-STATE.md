@@ -42,10 +42,9 @@ deposit/withdraw block was **English-only in all 7 non-English locales** until
 
 ## 4. Authentication
 
-Re-verified 26 Aug 2026 **in a browser**, against a full local stack: gateway +
-financial-core on a shared in-memory MongoDB, with a throwaway SMTP server
-capturing every message. 78 checks, all passing — 59 flow checks plus 19 that
-need a real clock (the resend cooldown elapsing, a stale sign-up returning).
+Numbered to match the owner's checklist exactly. Re-tested 26 Aug 2026 against
+a full local stack — gateway + financial-core on a shared in-memory MongoDB,
+with a throwaway SMTP server capturing every message.
 
 **Sign-up is now two steps.** `POST /auth/signup` creates the account and mails
 a six-digit code but returns **no token**; only `POST /auth/verify-otp` mints a
@@ -53,33 +52,42 @@ session. An unconfirmed account cannot hold a session at all, so it can never
 reach a money route — the control is the absence of a token, not a flag some
 later call has to remember to check.
 
+**Read the status column carefully. Four of these ten lines are client
+behaviour that nobody has exercised**, because there is no browser driver and
+no DOM harness in this repo (vitest runs pure logic only — no jsdom, no
+testing-library). Everything marked **P** below was driven over the same HTTP
+the browser sends, which covers the server completely and the React state
+machine not at all.
+
 | # | Line | Status | Note |
 |---|---|---|---|
-| 1 | Email sign-up | **P** | Verified in a browser. Returns `{ pending, expiresAt, resendAvailableAt }` and never a token; the code is never in the response body. A real message was captured over SMTP: correct sender, subject carrying the code, both text and HTML parts. |
-| 2 | Confirmation code | **P** | New. Correct code → session. Wrong code → 400. Six digits, ten-minute expiry, five guesses, five sends per challenge, sixty-second resend cooldown. A spent code cannot be spent twice. |
-| 3 | Email login | **P** | Verified in a browser, including a mixed-case address. |
-| 4 | Wrong password rejected clearly | **P** | Confirmed still true: 401 "invalid email or password", not "session expired". A wrong password on an *unconfirmed* account is also a flat 401 — confirmation state is only disclosed once the right password has been supplied. |
-| 5 | Google sign-in | **B** | Still waiting on client IDs. **But the server-side fix is NOT unmerged — it is on `origin/main`** and confirmed live: an unconfigured gateway answers 503 "Google sign-in is not configured" and never calls out to Google. See TRAPS §6, which has been corrected. |
-| 6 | Phone sign-up | **F → closed deliberately** | Refused with `email_required`. It used to be accepted, and with confirmation mandatory it would create an account no code could ever reach — there is no SMS provider. Phone sign-*in* still works for accounts that predate this. |
-| 7 | Real display name, not playerId | **P** | Verified through both the confirm response and `/auth/me`. |
-| 8 | Session persists | **P** | Verified. |
-| 9 | Expiry returns to Login | **P** | Verified: no token → 401, forged signature → 401. |
-| 10 | CORS | **P** | The dev origin passes preflight; an unknown origin is not echoed. Browser-only behaviour, so it had not been exercised before. |
+| 1 | Sign up with email + password | **P**, but the expected result has changed | Account created ✅. Balance ₮0 ✅ — `/me/balance` returns `available: "0.000000"` on a fresh confirmed account. **"Lands in the app" is now deliberately false**: it lands on the confirmation screen, and only the emailed code opens the app. That is the change that was asked for, but the checklist row still says otherwise and needs the owner to sign off on the new wording. |
+| 2 | Sign-up validation (bad email / weak password) | **F → fixed this session** | Was failing on both halves. A one-character password, a four-character password, `a@b`, and an address containing a space **each created a real account**; only a missing `@` was caught. There was no server-side password rule at all and no real email check — the web form had `type="email"` and no `minLength`, the native form checked both and neither reached the server. Now enforced in `credential-rules.ts` before any row is written. Re-probed: all four refused with distinct, actionable messages, nothing written, nothing mailed. |
+| 3 | Log in with email + password | **P** | Verified, including a mixed-case address. |
+| 4 | Log in with a WRONG password | **P** | 401 "invalid email or password" — not "session expired", and no session granted. A wrong password on an *unconfirmed* account is also a flat 401: confirmation state is only disclosed once the right password has been supplied. |
+| 5 | Sign in with Google | **B** — fail-closed half is **P** | The flow itself still needs `GOOGLE_CLIENT_ID` from the owner, so it cannot be completed. The security half of this line **is** verified: an unconfigured gateway answers 503 "Google sign-in is not configured" and never calls out to Google, so it cannot accept a token from any Google app. That fix is on `origin/main` — see the correction in TRAPS §6. |
+| 6 | Telegram identity | **?** — not tested this session | The owner reports it works automatically. `/auth/telegram` was not touched by this work and its existing unit tests pass, but nobody exercised the flow in a real Telegram client this session. Recorded as untested rather than inherited. |
+| 7 | Display name after login | **P** | Real display name, not the raw playerId — verified through both the confirm response and `/auth/me`. |
+| 8 | Session persistence (close + reopen) | **?** — mechanism present, not exercised | The token is written to `localStorage` under `fp-token` and read at module load, so the mechanism is there and correct on inspection. Whether a real close-and-reopen keeps you signed in has not been observed. |
+| 9 | Session expiry returns to Login cleanly | **partial** | Server half verified: no token → 401, forged signature → 401. Client half not observed. The mechanism exists — any 401 fires `setUnauthorizedHandler`, which drops the token and flips status to `anonymous`, and `AppShell` then renders `<Login/>`. "Not stuck erroring on every screen" is precisely the part that needs a person. |
+| 10 | Sign out | **?** — mechanism present, not exercised | `signOut` clears the token and the cached player from `localStorage` and sets status `anonymous`. Back-buttoning in should be impossible by construction: `AppShell` is a **render gate**, not a redirect — it returns `<Login/>` in place of the outlet whenever there is no token, so any in-app URL re-renders straight to Login with no race. Not actually clicked. |
 
-**Not verified, and needs a person:** nobody has clicked through the rendered
-screens. There is no browser driver and no DOM test harness in this repo
-(vitest runs pure logic only, no jsdom, no testing-library), so every check
-above drives the same HTTP the browser drives — which covers the server
-completely and the React state machine not at all. `npm run dev` with
-`VITE_API_URL` pointed at a gateway running this branch is the remaining step.
+### What still needs a person
 
-**Still blocked on the owner: there is no SMTP account.** `financial-core/.env`
-has no `SMTP_HOST`/`USER`/`PASS`, so no confirmation code has ever reached a
-real inbox — everything above ran against a local capture. That is enough to
-prove the message nodemailer builds is correct, and not enough to prove
-Hostinger accepts it or that it survives a spam filter. **SAMUEL_V2 task 1
-("email notifications — verify it actually works") is still open for the same
-reason**, and both unblock together the moment the mailbox exists.
+Lines **6, 8, 9, 10** and the client half of **9**. All of them are browser or
+Telegram behaviour. `npm run dev` with `VITE_API_URL` pointed at a gateway
+running this branch is the whole remaining step — note that
+`frontend/.env.local` points at **4100** by default, which may be an older
+gateway process.
+
+### Still blocked on the owner: there is no SMTP account
+
+`financial-core/.env` has no `SMTP_HOST`/`USER`/`PASS`, so **no confirmation
+code has ever reached a real inbox** — everything above ran against a local
+capture. That proves the message nodemailer builds is correct and proves
+nothing about Hostinger accepting it or it surviving a spam filter.
+**SAMUEL_V2 task 1 ("email notifications — verify it actually works") is open
+for the same reason**, and both unblock together the moment the mailbox exists.
 
 Until then the gateway **fails closed in production**: no SMTP means sign-up is
 refused with a 503, never allowed through unconfirmed. Outside production, with
