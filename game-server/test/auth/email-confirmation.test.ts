@@ -703,6 +703,63 @@ describe('signing up for an address that is already known', () => {
 
 // ── what is no longer accepted ──────────────────────────────────────────────
 
+describe('sign-up validation', () => {
+  // Checklist section 4 line 2: "clear error, no account created". Both halves
+  // were false before this — a one-character password and an address of `a@b`
+  // each created a real account, and so did one containing a space.
+  it.each([
+    ['a one-character password', { email: 'ada@example.com', password: 'a' }, 'password_too_short'],
+    ['a seven-character password', { email: 'ada@example.com', password: '1234567' }, 'password_too_short'],
+    ['an address with no dot', { email: 'a@b', password: 'a good long password' }, 'email_invalid'],
+    ['an address with a space', { email: 'a b@example.com', password: 'a good long password' }, 'email_invalid'],
+    ['an address with no local part', { email: '@example.com', password: 'a good long password' }, 'email_invalid'],
+  ])('refuses %s', async (_label, body, expected) => {
+    const h = harness();
+    const res = await request(h.app).post('/auth/signup').send(body);
+
+    expect(res.status).toBe(400);
+    expect(res.body.code).toBe(expected);
+    // The half that is easy to forget: nothing was written, and nothing mailed.
+    expect(h.users.rows.size).toBe(0);
+    expect(h.outbox).toHaveLength(0);
+  });
+
+  it('accepts a password of exactly the minimum length', async () => {
+    // The boundary in the direction that locks people out, not just the one
+    // that lets them in.
+    const h = harness();
+    const res = await request(h.app)
+      .post('/auth/signup')
+      .send({ email: 'ada@example.com', password: '12345678' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.pending).toBe(true);
+  });
+
+  it('leaves existing accounts with short passwords able to log in', async () => {
+    // The rule is a SIGN-UP rule. Applying it at login would lock out every
+    // account created before it existed, which is the same migration hazard as
+    // the emailVerified default.
+    const h = harness({
+      seed: [
+        {
+          playerId: 'player-legacy',
+          email: 'old@example.com',
+          password: 'short',
+          displayName: 'Old Timer',
+        },
+      ],
+    });
+
+    const res = await request(h.app)
+      .post('/auth/login')
+      .send({ email: 'old@example.com', password: 'short' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.token).toBeDefined();
+  });
+});
+
 describe('phone sign-up', () => {
   it('is refused, rather than creating an account no code can reach', async () => {
     const h = harness();

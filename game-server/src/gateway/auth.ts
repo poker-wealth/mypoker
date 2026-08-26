@@ -4,6 +4,7 @@ import type { GatewayConfig } from './config';
 import { userStore } from '../auth/user-store';
 import { otpStore, type OtpStore } from '../auth/otp-store';
 import { OTP_TTL_MS } from '../auth/otp-rules';
+import { validateSignupCredentials } from '../auth/credential-rules';
 import {
   financialCoreOtpMailer,
   resolveDeliveryFailure,
@@ -318,6 +319,18 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
           error: 'An email address is required - phone sign-up is not available.',
           code: 'email_required',
         });
+        return;
+      }
+
+      // Everything else about the credentials, checked BEFORE a row is written.
+      // The checklist line is "clear error, no account created", and the second
+      // half of that is only true if this runs first: `startSignup` creates the
+      // account, and the address is not validated again until financial-core
+      // renders the mail, by which point the row exists and the caller gets an
+      // unexplained 503 instead of "that is not a valid email address".
+      const verdict = validateSignupCredentials(email, password);
+      if (!verdict.ok) {
+        res.status(400).json({ error: verdict.message, code: verdict.code });
         return;
       }
 

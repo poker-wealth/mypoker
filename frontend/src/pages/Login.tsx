@@ -10,6 +10,9 @@ import { GoogleAuthButton } from '@/components/GoogleAuthButton';
 /** Digits in a confirmation code. Must match OTP_LENGTH on the gateway. */
 const CODE_LENGTH = 6;
 
+/** Must match MIN_PASSWORD_LENGTH on the gateway, and `auth.passwordTooShort`. */
+const MIN_PASSWORD_LENGTH = 8;
+
 /** Seconds until `iso`, floored at zero. Zero for a missing or past date. */
 function secondsUntil(iso: string | null): number {
   if (!iso) return 0;
@@ -306,6 +309,12 @@ export function Login() {
                       <input
                         type={showPassword ? 'text' : 'password'}
                         required
+                        // Sign-up only. The server enforces this either way
+                        // (credential-rules.ts) — this just saves a round trip
+                        // to learn it. On SIGN-IN there must be no minimum, or
+                        // accounts created before the rule existed could not
+                        // type their own password.
+                        {...(view === 'signup' ? { minLength: MIN_PASSWORD_LENGTH } : {})}
                         autoComplete={view === 'login' ? 'current-password' : 'new-password'}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
