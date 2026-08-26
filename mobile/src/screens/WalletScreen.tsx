@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Trans, useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -84,6 +84,35 @@ const TXN_LABEL: Record<string, string> = {
   RAKE: 'Rake',
   JACKPOT_PAYOUT: 'Jackpot',
 };
+
+// Mirrors financial-core's own decimal check exactly (`Money.fromDecimalString`,
+// `financial-core/src/domain/money.ts`: `^(-?)(\d+)(?:\.(\d+))?$` plus a
+// 6-place scale check) — minus the leading-sign group, since a withdrawal
+// amount must be positive. A bare, non-negative decimal string with at most
+// 6 fractional digits. No leading `+`, no scientific notation, no trailing
+// dot, no locale decimal comma (which `decimal-pad` produces on some Android
+// locales) — every one of those 400s server-side today and used to come back
+// mislabelled as an invalid ADDRESS (see submit() below).
+//
+// Deliberately NOT `Number()`/`parseFloat`: this project's iron rule is that
+// no float ever touches a money value, even to validate one — a string
+// check is both sufficient and correct here.
+const DECIMAL_AMOUNT_RE = /^(\d+)(?:\.(\d+))?$/;
+
+/** True for a positive decimal string financial-core will accept as a
+ *  withdrawal amount. Rejects empty, zero, negative, `+`-prefixed,
+ *  scientific notation, a trailing dot, more than 6 fractional digits, and
+ *  a locale decimal comma. */
+function isValidWithdrawAmount(raw: string): boolean {
+  const match = DECIMAL_AMOUNT_RE.exec(raw);
+  if (!match) return false;
+  const whole = match[1];
+  const frac = match[2] ?? '';
+  if (frac.length > 6) return false;
+  // Zero and "0.00...0" are syntactically valid decimals but not a
+  // withdrawable amount — true only if some digit is non-zero.
+  return /[1-9]/.test(whole + frac);
+}
 
 export function WalletScreen() {
   const { t } = useTranslation();
@@ -352,6 +381,15 @@ function WithdrawSheet({
   const [addressMsg, setAddressMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [withdrawMsg, setWithdrawMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // Synchronous double-submit guards. `mutation.isPending` is React state —
+  // it only flips true on the NEXT render, so two taps landing in the same
+  // frame both read it as false and both call mutate(). A `ref` is not
+  // state: it is readable/writable synchronously, mid-event-handler, so the
+  // second tap sees the flag the first one just set. On a withdrawal form
+  // that render-cycle gap is the difference between one request and two.
+  const withdrawGuard = useRef(false);
+  const addressGuard = useRef(false);
+
   const reg = registered.data;
   const openAt = reg?.withdrawableAt ? new Date(reg.withdrawableAt) : null;
   const inCooldown = openAt !== null && openAt.getTime() > Date.now();
@@ -359,10 +397,18 @@ function WithdrawSheet({
   const needsAddress = !reg?.configured || changing;
 
   const submitAddress = (): void => {
+    // Guard first, synchronously, before any of the checks below run — a
+    // second tap arriving before this function returns must bail here, not
+    // fall through and fire a second POST.
+    if (addressGuard.current) return;
     const next = address.trim();
     if (!next) return;
+    addressGuard.current = true;
     setAddressMsg(null);
     saveAddress.mutate(next, {
+      onSettled: () => {
+        addressGuard.current = false;
+      },
       onSuccess: () => {
         setAddressMsg({ ok: true, text: t('wallet.addressSaved') });
         setAddress('');
@@ -377,14 +423,40 @@ function WithdrawSheet({
   };
 
   const submit = (): void => {
+    // Same synchronous guard as submitAddress — see the comment on
+    // withdrawGuard above. This is the higher-stakes one: two taps here are
+    // two genuine withdrawal requests, each individually valid, both
+    // landing in the ops approval queue. The ledger's own idempotency key
+    // (withdrawal-state-machine.ts) only stops one being PAID twice; it
+    // never sees this race because each POST mints a fresh withdrawal id.
+    if (withdrawGuard.current) return;
     if (!amount.trim() || !reg?.address) return;
+
+    const trimmed = amount.trim();
+    // Validate client-side before this ever reaches the server. The server
+    // 400s on the same family of bad amounts (non-numeric, scientific
+    // notation, a leading '+', a trailing dot, a locale decimal comma, >6
+    // decimal places, negative or zero) and until now that 400 was always
+    // read back as "invalid address" below — telling someone who mistyped
+    // an amount that their (non-editable) address is the problem.
+    if (!isValidWithdrawAmount(trimmed)) {
+      setWithdrawMsg({ ok: false, text: t('wallet.withdrawFailed') });
+      return;
+    }
+
+    withdrawGuard.current = true;
     setWithdrawMsg(null);
     withdraw.mutate(
       // The address is the REGISTERED one, never a typed one — sending
       // anything else is refused, and offering a free-text field would
-      // invite exactly the mistake the rule exists to prevent.
-      { amount: amount.trim(), address: reg.address },
+      // invite exactly the mistake the rule exists to prevent. The amount
+      // travels as the same trimmed string the input held, exactly as
+      // before — only now it has been checked, never parsed to a float.
+      { amount: trimmed, address: reg.address },
       {
+        onSettled: () => {
+          withdrawGuard.current = false;
+        },
         onSuccess: () => {
           setWithdrawMsg({ ok: true, text: t('wallet.withdrawRequested') });
           setAmount('');
@@ -392,15 +464,17 @@ function WithdrawSheet({
         onError: (e) => {
           // 403 is the §3.6 refusal (no address, or still in cooldown) and it
           // carries a message worth showing verbatim — it names the moment
-          // withdrawals open.
+          // withdrawals open. Any remaining 400 is no longer asserted to be
+          // the address: the client-side check above already caught the
+          // amount problems that used to land here, so what's left is
+          // whatever else the server refused — call it what it is, a failed
+          // withdrawal, rather than guessing which field was wrong.
           const msg =
             e instanceof ApiError && e.status === 403
               ? e.message
               : e instanceof ApiError && e.status === 409
                 ? t('wallet.insufficient')
-                : e instanceof ApiError && e.status === 400
-                  ? t('wallet.invalidAddress')
-                  : t('wallet.withdrawFailed');
+                : t('wallet.withdrawFailed');
           setWithdrawMsg({ ok: false, text: msg });
         },
       },
@@ -517,7 +591,39 @@ function WithdrawSheet({
         <Text style={withdrawMsg.ok ? styles.confirmOk : styles.confirmErr}>{withdrawMsg.text}</Text>
       )}
 
-      {/* Status list */}
+      {/* Status list. A failed query and "never withdrawn" must never look
+          the same — this is the money screen, so silence here reads as
+          reassurance ("nothing to see") when it may mean the list is
+          simply broken. Loading gets its own Skeleton state and a failure
+          gets the reason plus retry, same pattern the rest of this file
+          already uses for balance/transactions/registered-address. A
+          genuinely empty list (isSuccess, zero rows) still renders nothing
+          below — that is an honest "no withdrawals yet", not a broken one. */}
+      {withdrawals.isPending && (
+        <View style={styles.stackSm}>
+          <Text style={styles.sectionTitleSm}>{t('wallet.withdrawalsTitle')}</Text>
+          <Card style={styles.listCard}>
+            {[0, 1].map((i) => (
+              <View key={i} style={styles.wdRow}>
+                <Skeleton width={100} />
+                <Skeleton width={56} />
+              </View>
+            ))}
+          </Card>
+        </View>
+      )}
+
+      {withdrawals.isError && (
+        <View style={styles.stackSm}>
+          <Text style={styles.sectionTitleSm}>{t('wallet.withdrawalsTitle')}</Text>
+          <ErrorState
+            message={withdrawals.error instanceof Error ? withdrawals.error.message : t('states.error')}
+            onRetry={() => void withdrawals.refetch()}
+            retryLabel={t('common.retry')}
+          />
+        </View>
+      )}
+
       {withdrawals.isSuccess && withdrawals.data.withdrawals.length > 0 && (
         <View style={styles.stackSm}>
           <Text style={styles.sectionTitleSm}>{t('wallet.withdrawalsTitle')}</Text>

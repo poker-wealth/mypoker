@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiUrlField } from '../ApiUrlField';
 import { useAuth } from '../auth';
 import { GOOGLE_ENABLED } from '../googleAuth';
@@ -19,6 +20,9 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function LoginScreen() {
   const { t } = useTranslation();
   const { signIn, signUp, signInWithGoogle, error, clearError, busy } = useAuth();
+  // Rendered outside NavigationContainer (see App.tsx), so nothing upstream applies safe-area
+  // insets here the way a screen inside the navigator gets them automatically.
+  const insets = useSafeAreaInsets();
 
   const [mode, setMode] = useState<'signIn' | 'signUp'>('signIn');
   const [email, setEmail] = useState('');
@@ -55,13 +59,27 @@ export function LoginScreen() {
   };
 
   return (
-    <View style={styles.screen}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{t('auth.title')}</Text>
-        <Text style={styles.subtitle}>{t('auth.subtitle')}</Text>
-      </View>
+    // Sign-up mode has three fields, an error box, and two or three buttons — on a small phone
+    // with the keyboard up, a plain centred View leaves the submit button unreachable and
+    // unseen. KeyboardAvoidingView + a scrolling body fixes that; `flexGrow: 1` on the content
+    // container keeps the existing centred look whenever there's room to spare.
+    <KeyboardAvoidingView
+      style={styles.screen}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingTop: insets.top + space.lg, paddingBottom: insets.bottom + space.lg },
+        ]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.header}>
+          <Text style={styles.title}>{t('auth.title')}</Text>
+          <Text style={styles.subtitle}>{t('auth.subtitle')}</Text>
+        </View>
 
-      <Card style={styles.card}>
+        <Card style={styles.card}>
         {/* Hidden rather than disabled when GOOGLE_ENABLED is false: a
             disabled control with no explanation is worse than no control at
             all, and a build with no Google client ID configured yet is a
@@ -160,12 +178,14 @@ export function LoginScreen() {
           tunnel URL is unrecoverable without a full rebuild. Renders nothing
           outside a `device` build — see ApiUrlField.tsx. */}
       <ApiUrlField />
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: theme.bg, justifyContent: 'center', padding: space.lg, gap: space.lg },
+  screen: { flex: 1, backgroundColor: theme.bg },
+  scrollContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: space.lg, gap: space.lg },
   header: { gap: space.xs },
   title: { color: theme.text, fontSize: 24, fontFamily: weight('900') },
   subtitle: { color: theme.dim, fontSize: 13, lineHeight: 19, fontFamily: weight('400') },

@@ -23,14 +23,18 @@ export type FeltComponent = (props: {
   snapshot: TableSnapshot;
   onCommand: (cmd: TableCommand) => void;
   /**
-   * Taking a seat. Optional because most felts seat you as part of a bet, while the poker family
-   * goes through the buy-in sheet — the screen owns that, not the felt.
+   * Taking a seat — opens the buy-in sheet, which the screen owns.
+   *
+   * REQUIRED, and it was optional until an audit found eight felts sending a sit command with
+   * `buyIn: snapshot.minBuyIn` straight from a button — money moved at an amount the player was
+   * never shown and never chose. Optional is what made that reachable; required turns it into a
+   * compile error.
    */
-  onSit?: (seatIndex: number) => void;
+  onSit: (seatIndex: number) => void;
 }) => React.ReactElement;
 
 /** Cowboy & Beauty: one card each, parimutuel odds that move as the pools fill. */
-function CowboyBeautyFelt({ snapshot, onCommand }: Parameters<FeltComponent>[0]) {
+function CowboyBeautyFelt({ snapshot, onCommand, onSit }: Parameters<FeltComponent>[0]) {
   const round = snapshot.gameState as
     | {
         pools?: Record<string, number>;
@@ -44,6 +48,7 @@ function CowboyBeautyFelt({ snapshot, onCommand }: Parameters<FeltComponent>[0])
     <SideBetFelt
       snapshot={snapshot}
       onCommand={onCommand}
+      onSit={onSit}
       title="COWBOY & BEAUTY"
       outcome={round?.winner ? `${round.winner} WINS` : null}
       reveal={[
@@ -59,11 +64,12 @@ function CowboyBeautyFelt({ snapshot, onCommand }: Parameters<FeltComponent>[0])
 }
 
 /** San Zhang: three cards, player-banked, one stake against the bank. */
-function SanZhangFelt({ snapshot, onCommand }: Parameters<FeltComponent>[0]) {
+function SanZhangFelt({ snapshot, onCommand, onSit }: Parameters<FeltComponent>[0]) {
   return (
     <SideBetFelt
       snapshot={snapshot}
       onCommand={onCommand}
+      onSit={onSit}
       title="SAN ZHANG"
       outcome={snapshot.phase === 'SHOWDOWN' ? (snapshot.message ?? null) : null}
       bankerCannotBet

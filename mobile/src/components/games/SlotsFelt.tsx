@@ -27,9 +27,21 @@ const CHIPS = [50, 100, 500, 1_000];
 export function SlotsFelt({
   snapshot,
   onCommand,
+  onSit,
 }: {
   snapshot: TableSnapshot;
   onCommand: (cmd: TableCommand) => void;
+  /**
+   * Taking a seat opens the buy-in sheet — it does NOT commit one.
+   *
+   * Every one of these felts used to send { kind: 'sit', buyIn: snapshot.minBuyIn } straight
+   * from the button, so a tap moved money at an amount the player was never shown and never
+   * chose. The poker felt has always gone through BuyInSheet; the other eight did not. An audit
+   * found all eight.
+   *
+   * Required, not optional: a felt that cannot open the sheet must not fall back to spending.
+   */
+  onSit: (seatIndex: number) => void;
 }) {
   const [wager, setWager] = useState(100);
 
@@ -41,7 +53,7 @@ export function SlotsFelt({
   /** Take the first free chair, at the table's own minimum — seat 0 is usually already taken. */
   const sitDown = (): void => {
     const free = seats.find((s) => !s.playerId);
-    onCommand({ kind: 'sit', seat: free?.index ?? 0, buyIn: snapshot.minBuyIn });
+    onSit(free?.index ?? 0);
   };
 
   return (

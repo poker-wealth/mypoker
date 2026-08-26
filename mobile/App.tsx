@@ -1,7 +1,8 @@
+import { Component, useEffect, type ErrorInfo, type ReactNode } from 'react';
 import { NavigationContainer, type Theme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 // Per-weight entry points, NOT the package barrel. The barrel `require`s every
 // variant Nunito ships — 16 faces including italics — and Metro cannot tree
@@ -14,9 +15,10 @@ import { Nunito_600SemiBold } from '@expo-google-fonts/nunito/600SemiBold';
 import { Nunito_700Bold } from '@expo-google-fonts/nunito/700Bold';
 import { Nunito_800ExtraBold } from '@expo-google-fonts/nunito/800ExtraBold';
 import { Nunito_900Black } from '@expo-google-fonts/nunito/900Black';
-import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Button } from './src/ui';
 import { WalletScreen } from './src/screens/WalletScreen';
 import { TableScreen } from './src/screens/TableScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
@@ -38,10 +40,11 @@ import { useApiBase } from './src/apiConfig';
 import { space, theme } from './src/theme';
 import { AccountIcon, AllianceIcon, DataIcon, GamesIcon, TablesIcon } from './src/icons';
 import { headerRightFor } from './src/HeaderActions';
-// Side-effect import: initialises i18next before any screen calls
-// useTranslation(). Nothing pulled this in until now — WalletScreen and
-// TableScreen predate it and hardcode their copy in English.
-import './src/i18n';
+// Initialises i18next before any screen calls useTranslation() — WalletScreen and TableScreen
+// predate it and hardcode their copy in English. The default export (the i18next instance
+// itself) is also what ErrorBoundary below reaches for: it is a class component, so it cannot
+// use the useTranslation() hook, but i18n.t() works anywhere.
+import i18n from './src/i18n';
 
 /**
  * The app shell (SAMUEL_V2 task 8).
@@ -77,6 +80,75 @@ const queryClient = new QueryClient({
 
 const Tabs = createBottomTabNavigator();
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+/**
+ * `refetchOnWindowFocus` and `refetchOnReconnect` both default to `true` on `queryClient` above —
+ * we never set them, so they're on. On the web that's enough: the browser fires a real `focus`
+ * event and React Query listens for it. On React Native there is no `window`, so that listener
+ * never fires and these options are silently inert — worse than being off, because the code reads
+ * as if backgrounding-and-returning refetches everything, and it never does. A screen backgrounded
+ * for an hour reopens frozen on hour-old data unless it happens to carry its own `refetchInterval`.
+ *
+ * This wires `focusManager` to `AppState` per React Query's documented RN setup, so focus-refetch
+ * actually fires on resume.
+ *
+ * `onlineManager` (the `refetchOnReconnect` half) is NOT wired here: the documented approach needs
+ * `@react-native-community/netinfo`, which is not a dependency of this project, and neither is
+ * `expo-network` (checked: absent from package.json and node_modules). Do not add it speculatively.
+ * Net effect: reconnecting after a real network outage (as opposed to just backgrounding the app)
+ * still will not trigger an automatic refetch — only the focus-on-resume path above, or a screen's
+ * own `refetchInterval`, will pick up fresh data.
+ */
+function useReactQueryAppStateFocus(): void {
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (status) => {
+      focusManager.setFocused(status === 'active');
+    });
+    return () => subscription.remove();
+  }, []);
+}
+
+interface ErrorBoundaryState {
+  error: Error | null;
+}
+
+/**
+ * One null field on one row — `hit.accountId.length`, `seat.stack.toLocaleString()`, that kind of
+ * unguarded read on server data — currently takes the entire app down in release: nothing sits
+ * between a render-time throw and a dead screen with no recovery but a force-quit.
+ *
+ * React has no hook equivalent for catching a render error; this has to be a class component. It
+ * wraps the whole app (see `App()` below) so any one screen's crash lands here instead of taking
+ * everything with it, and offers a retry that just clears the caught error rather than requiring
+ * the user to force-quit and relaunch.
+ */
+class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { error: null };
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo): void {
+    // Never swallowed: visible in a dev build's console today, and the hook a future crash
+    // reporter attaches to tomorrow.
+    console.error('[ErrorBoundary]', error, info.componentStack);
+  }
+
+  private reset = (): void => this.setState({ error: null });
+
+  render(): ReactNode {
+    if (this.state.error) {
+      return (
+        <View style={styles.loading}>
+          <Text style={styles.errorTitle}>{i18n.t('states.error')}</Text>
+          <Button onPress={this.reset}>{i18n.t('common.retry')}</Button>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const navTheme: Theme = {
   dark: true,
@@ -306,17 +378,34 @@ function Root() {
 }
 
 export default function App() {
+  useReactQueryAppStateFocus();
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Root />
-      </AuthProvider>
-    </QueryClientProvider>
+    // NavigationContainer does NOT supply this on its own, and LoginScreen renders outside
+    // it entirely — so it goes here, once, above everything, to cover both. Without it,
+    // useSafeAreaInsets() in TableScreen and LoginScreen has no provider to read from (e.g.
+    // the ActionBar's home-indicator padding, see TableScreen.tsx).
+    <SafeAreaProvider>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <Root />
+          </AuthProvider>
+        </QueryClientProvider>
+      </ErrorBoundary>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.bg },
+  errorTitle: {
+    color: theme.text,
+    fontSize: 15,
+    textAlign: 'center',
+    paddingHorizontal: space.xl,
+    marginBottom: space.md,
+  },
   devBanner: {
     color: theme.dim,
     fontSize: 10,

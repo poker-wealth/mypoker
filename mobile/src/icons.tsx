@@ -140,3 +140,18 @@ export function HelpIcon(p: IconProps) {
     </Frame>
   );
 }
+
+/**
+ * Chat — a speech square, matching the Mini App's `MessageSquare`.
+ *
+ * Used by the table's floating chat button. Drawn here with the others rather than pulled from an
+ * icon set, for the same reason as the rest: five glyphs do not justify a font, and the <100MB
+ * store budget counts every one that ships unused.
+ */
+export function ChatIcon(p: IconProps) {
+  return (
+    <Frame {...p}>
+      <Path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9.5 9.5 0 0 1-3.6-.7L3 21l1.9-5A8.2 8.2 0 0 1 4 11.5a8.4 8.4 0 0 1 9-8.4 8.4 8.4 0 0 1 8 8.4Z" />
+    </Frame>
+  );
+}

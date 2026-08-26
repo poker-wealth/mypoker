@@ -18,7 +18,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "http://10.0.2.2:4100",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "183763358080-gdksnp9288rgq7falqlvvms0bvhm2fvm.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "183763358080-gdksnp9288rgq7falqlvvms0bvhm2fvm.apps.googleusercontent.com",
+        "EXPO_PUBLIC_ALLOW_API_OVERRIDE": "true"
       }
     },
     "device": {
