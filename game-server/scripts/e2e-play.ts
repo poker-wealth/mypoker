@@ -18,6 +18,8 @@
 import WebSocket from 'ws';
 import { signToken } from '../src/gateway/tokens';
 import { generateEphemeralKeyPair, deriveSessionKey, signMessage } from '../src/transport/crypto';
+import { defaultTables } from '../src/live/server';
+import { gameSpec, type GameId } from '../src/lobby/game-catalog';
 
 const TABLES_URL = process.env.TABLES_URL ?? 'http://127.0.0.1:4200';
 const WS_URL = TABLES_URL.replace(/^http/, 'ws') + '/ws';
@@ -258,9 +260,31 @@ function movesFor(tableId: string, snap: Snapshot, me: Snapshot['seats'][number]
 
 let live: Client[] = [];
 
+/**
+ * How many players this table needs before it will do anything.
+ *
+ * The 2-player default silently fails the games that need more — Dou Di Zhu is landlord + two
+ * farmers or no hand at all, Niu Niu needs a banker and two bettors — and the run then reports
+ * "NEVER GOT A MOVE IN" about a game that is working exactly as designed.
+ *
+ * Read from GAME_CATALOG rather than a table in this file. `minPlayers` is already stated there,
+ * per game, and iron rule 4 is that a second copy of a rule eventually gives a second answer — a
+ * hard-coded 3 here would go stale the day someone changes the catalog, and the harness would then
+ * be wrong in the direction that looks like a broken game.
+ *
+ * `defaultTables()` maps the table id to its game id, because those are not the same thing:
+ * `texas-high` is a texas table.
+ */
+function playersNeededFor(tableId: string): number {
+  const table = defaultTables().find((t) => t.id === tableId);
+  if (!table) return 2; // not one of ours (a league room, a hand-made id) — caller's problem
+  return gameSpec(table.game as GameId).minPlayers;
+}
+
 async function main(): Promise<void> {
   const tableId = process.argv[2] ?? 'texas';
-  const count = Number(process.argv[3] ?? 2);
+  // Explicit count still wins: raising it is how you test a fuller table.
+  const count = process.argv[3] !== undefined ? Number(process.argv[3]) : playersNeededFor(tableId);
 
   const stamp = Date.now();
   const ids = Array.from({ length: count }, (_, i) => `e2e-${tableId}-${stamp}-${i}`);
@@ -318,7 +342,20 @@ async function main(): Promise<void> {
       );
     }
     c.command({ kind: 'sit', seat: freeIndex, buyIn });
-    await sleep(400);
+    /**
+     * Wait for the SEAT, not for 400ms.
+     *
+     * `sit` is not cheap on the server: it calls financial-core over HTTP and commits a ledger
+     * transaction BEFORE the seat exists (poker-room.ts — "money first: if the lock fails, no seat
+     * is created"). When that round-trip runs long, the fixed sleep expires with the seat still
+     * uncreated, the next player computes `taken` from a snapshot that has not caught up, picks the
+     * SAME chair, and is refused with "seat taken". The run then dies at `everyone seated` — which
+     * names the symptom and hides the cause, because the refusal is on the wire, not in the throw.
+     *
+     * Timing-dependent by construction, so it reproduces on a slow ledger and not on a fast one.
+     * Waiting on the acknowledgement removes the dependency instead of widening the sleep.
+     */
+    await until(`${c.playerId} to take seat ${freeIndex}`, () => c.seat() !== undefined, 10_000);
   }
   await until('everyone seated', () => clients.every((c) => c.seat() !== undefined), 10_000);
   console.log(`seated    : ${clients.length} players`);
@@ -437,6 +474,11 @@ main().then(
   () => process.exit(0),
   async (err) => {
     console.error('E2E FAILED:', err instanceof Error ? err.message : err);
+    // The server almost always SAID why — every refusal arrives as an `error` frame and is kept in
+    // `c.errors`. The failure path used to drop all of it and print only the timeout, so
+    // "timed out waiting for everyone seated" was the whole diagnosis for a room that had
+    // answered "buy-in must be between 400 and 4000" three times. Print what we were told.
+    diagnose(live);
     await cleanUp(live);
     process.exit(1);
   },
