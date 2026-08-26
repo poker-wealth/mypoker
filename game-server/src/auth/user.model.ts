@@ -15,6 +15,17 @@ export interface UserDoc {
   /** bcrypt hash; absent for OAuth-only accounts. */
   passwordHash?: string;
   googleId?: string;
+  /**
+   * Whether the address on this document has been confirmed by email OTP.
+   *
+   * OPTIONAL ON PURPOSE, and read only through `isSignInAllowed` in
+   * `sign-in-rules.ts`: only an explicit `false` blocks a sign-in. Every
+   * account created before confirmation existed has no field at all, and
+   * treating `undefined` as "unconfirmed" would lock out every one of them on
+   * deploy — a migration disguised as a default. Google accounts are written
+   * `true` explicitly, because Google has already confirmed the address.
+   */
+  emailVerified?: boolean;
   displayName?: string;
   photoUrl?: string;
   createdAt: Date;
@@ -30,6 +41,11 @@ const userSchema = new Schema<UserDoc>(
     phone: { type: String, unique: true, sparse: true, index: true },
     passwordHash: { type: String },
     googleId: { type: String, unique: true, sparse: true, index: true },
+    // No `default` — see the interface. A default would be applied on create
+    // only, leaving existing documents undefined anyway, so the rule that reads
+    // this has to handle undefined regardless; better that it is the single
+    // place the question is answered.
+    emailVerified: { type: Boolean },
     displayName: { type: String },
     photoUrl: { type: String },
   },

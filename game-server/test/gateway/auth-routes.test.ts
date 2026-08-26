@@ -10,12 +10,21 @@ import { userStore } from '../../src/auth/user-store';
 // connection this suite never sets up.
 jest.mock('../../src/auth/user-store', () => ({
   userStore: {
-    signup: jest.fn(),
+    startSignup: jest.fn(),
     verifyPassword: jest.fn(),
+    markEmailVerified: jest.fn(),
     oauth: jest.fn(),
     search: jest.fn(),
     byPlayerId: jest.fn(),
   },
+}));
+
+// The email-confirmation store is mocked too, for the same reason. The flow it
+// backs is exercised for real in test/auth/email-confirmation.test.ts, against
+// an in-memory implementation rather than these stubs -- see docs/TRAPS.md #1
+// on what a suite of mocks does and does not prove.
+jest.mock('../../src/auth/otp-store', () => ({
+  otpStore: { issue: jest.fn(), verify: jest.fn(), peek: jest.fn() },
 }));
 
 const BOT_TOKEN = '123456:TEST-BOT-TOKEN-not-a-real-one';

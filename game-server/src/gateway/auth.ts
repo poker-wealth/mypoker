@@ -2,6 +2,13 @@ import { Router, type NextFunction, type Request, type Response } from 'express'
 import { OAuth2Client } from 'google-auth-library';
 import type { GatewayConfig } from './config';
 import { userStore } from '../auth/user-store';
+import { otpStore, type OtpStore } from '../auth/otp-store';
+import { OTP_TTL_MS } from '../auth/otp-rules';
+import {
+  financialCoreOtpMailer,
+  resolveDeliveryFailure,
+  type OtpMailer,
+} from './mailer';
 import { signToken, verifyToken, TokenError } from './tokens';
 import {
   verifyInitData,
@@ -104,14 +111,44 @@ export function requireAdmin() {
   };
 }
 
-export function buildAuthRouter(config: GatewayConfig): Router {
+/** Exactly the identity operations these routes perform. Nothing wider. */
+export type AuthUserStore = Pick<
+  typeof userStore,
+  'startSignup' | 'verifyPassword' | 'markEmailVerified' | 'oauth'
+>;
+
+/**
+ * Seams for testing the confirmation flow.
+ *
+ * All four default to the real thing, so nothing about production wiring
+ * changes. They exist because the flow's interesting behaviour is about time
+ * (expiry, cooldown) and about what leaves the process (the code, by email) —
+ * neither of which can be observed by calling the routes and hoping.
+ */
+export interface AuthDeps {
+  mailer?: OtpMailer;
+  /** Injectable clock, so expiry and cooldown are testable without waiting. */
+  now?: () => number;
+  otps?: OtpStore;
+  users?: AuthUserStore;
+}
+
+export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Router {
   const r = Router();
+  const sendOtpMail =
+    deps.mailer ??
+    financialCoreOtpMailer({
+      financialCoreUrl: config.financialCoreUrl,
+      internalSecret: config.internalApiSecret,
+    });
+  const now = deps.now ?? ((): number => Date.now());
+  const otps = deps.otps ?? otpStore;
 
   // Web identity (email/password + Google) — the browser sign-in path. The user
   // store lives HERE in the gateway (financial-core is money-only and just
   // verifies the JWT). This verifies the Google token / checks credentials, then
   // signs the same JWT every other login flavour gets.
-  const authClient = userStore;
+  const authClient: AuthUserStore = deps.users ?? userStore;
   const googleClient = new OAuth2Client();
 
   const issue = (player: PlayerProfile): { token: string; player: PlayerProfile } => ({
@@ -137,35 +174,319 @@ export function buildAuthRouter(config: GatewayConfig): Router {
     vipTier: 0,
   });
 
-  r.post('/signup', (req: Request, res: Response) => {
-    const body = (req.body ?? {}) as Record<string, string>;
-    const email = body['email'] || body['phone'] || body['identifier'];
-    const password = body['password'];
-    const displayName = body['displayName'];
+  // -- Email confirmation ---------------------------------------------------
+  //
+  // Sign-up is TWO STEPS. `/signup` writes an unconfirmed account and returns
+  // NO TOKEN; only `/verify-otp`, given the code that was mailed, mints a
+  // session. Nothing else changes about what a session is -- the same JWT, the
+  // same claims -- so every route downstream is unaffected.
+  //
+  // The reason the token is withheld rather than a flag being set on a live
+  // session: a flag has to be re-checked at every place that matters, and
+  // docs/TRAPS.md #1 is a list of checks that were added and then not reached.
+  // No token is a control that cannot be forgotten at a call site, because
+  // there is no call site.
 
-    if (!email || !password) {
-      res.status(400).json({ error: 'email or phone number and password are required' });
+  const normalizeEmail = (raw: string): string => raw.trim().toLowerCase();
+
+  const OTP_TTL_MINUTES = Math.round(OTP_TTL_MS / 60_000);
+
+  /** What came of trying to get a code to somebody. */
+  type MintOutcome =
+    | { status: 'sent'; expiresAt: number; resendAvailableAt: number }
+    | { status: 'rate_limited'; reason: 'cooldown' | 'too_many_sends'; retryAfterMs: number }
+    | { status: 'undeliverable' };
+
+  /**
+   * Mint a code and mail it. Decides nothing about the HTTP response.
+   *
+   * Three callers need this and each answers differently: `/signup` turns a
+   * failure into a refusal, `/resend-otp` into a 429, and `/login` into extra
+   * fields on a 403 it was going to send anyway. Keeping the mechanics in one
+   * place and the status codes at the call sites is what stops the rate limits
+   * and the dev-console fallback being reimplemented three times.
+   */
+  const mintAndSend = async (email: string, playerId: string): Promise<MintOutcome> => {
+    const at = now();
+    const minted = await otps.issue(email, playerId, at);
+
+    if (!minted.ok) {
+      return { status: 'rate_limited', reason: minted.reason, retryAfterMs: minted.retryAfterMs };
+    }
+
+    const { code, expiresAt, resendAvailableAt, sends } = minted.issued;
+    const delivery = await sendOtpMail({
+      to: email,
+      code,
+      expiresInMinutes: OTP_TTL_MINUTES,
+      // Unique per code, not per address: `expiresAt` moves on every issue and
+      // `sends` distinguishes resends within one challenge. A constant key
+      // would let the dedupe swallow every resend; a random one would defeat
+      // the dedupe altogether.
+      eventId: `otp:${email}:${expiresAt}:${sends}`,
+    });
+
+    if (delivery.outcome !== 'sent') {
+      const resolved = resolveDeliveryFailure({
+        outcome: delivery.outcome,
+        ...(delivery.outcome === 'failed' ? { detail: delivery.detail } : {}),
+        to: email,
+        code,
+        devAuthBypass: config.devAuthBypass,
+      });
+      if (!resolved.allow) {
+        // Drop the challenge: it exists to track a code somebody received, and
+        // nobody did. Left in place it would charge the resend cooldown to a
+        // player who has nothing to type in, and answer their retry a minute
+        // later with the same failure.
+        await otps.discard(email);
+        return { status: 'undeliverable' };
+      }
+    }
+
+    return { status: 'sent', expiresAt, resendAvailableAt };
+  };
+
+  /**
+   * The 200/429/503 answer for `/signup` and `/resend-otp`, from one outcome.
+   *
+   * `/login` deliberately does NOT use this — an unconfirmed sign-in is a 403
+   * whatever became of the code, and turning it into a 429 or a 503 would tell
+   * the client the login failed for a reason that has nothing to do with the
+   * login.
+   */
+  const answerWithOutcome = (res: Response, email: string, outcome: MintOutcome): void => {
+    if (outcome.status === 'rate_limited') {
+      const seconds = Math.ceil(outcome.retryAfterMs / 1000);
+      // Retry-After is in seconds and is what a well-behaved client actually
+      // reads; the millisecond field is for our own UI countdown.
+      res.set('Retry-After', String(seconds));
+      res.status(429).json({
+        error:
+          outcome.reason === 'cooldown'
+            ? `Please wait ${seconds}s before requesting another code.`
+            : 'Too many codes have been requested for this address. Try again later.',
+        code: outcome.reason,
+        retryAfterMs: outcome.retryAfterMs,
+      });
       return;
     }
-    authClient
-      .signup(email, password, displayName)
-      .then((u) => res.json(issue(asProfile(u))))
-      .catch((err: Error) => res.status(400).json({ error: err.message }));
+
+    if (outcome.status === 'undeliverable') {
+      // The unconfirmed ACCOUNT row stays, deliberately. It is reclaimable by
+      // design -- a later signup for the same address overwrites it -- so
+      // leaving it costs nothing and deleting it here would race a concurrent
+      // attempt for the same address.
+      res.status(503).json({
+        error: 'We could not send the confirmation email. Please try again shortly.',
+        code: 'email_undeliverable',
+      });
+      return;
+    }
+
+    res.json({
+      pending: true,
+      email,
+      expiresAt: new Date(outcome.expiresAt).toISOString(),
+      resendAvailableAt: new Date(outcome.resendAvailableAt).toISOString(),
+    });
+  };
+
+  r.post('/signup', (req: Request, res: Response) => {
+    void (async (): Promise<void> => {
+      const body = (req.body ?? {}) as Record<string, string>;
+      // `phone` is read only so that a phone sign-up gets the explicit refusal
+      // below rather than a bare "email is required" that never mentions why
+      // the field they filled in was ignored.
+      const raw = body['email'] || body['identifier'] || body['phone'];
+      const password = body['password'];
+      const displayName = body['displayName'];
+
+      if (!raw || !password) {
+        res.status(400).json({ error: 'email and password are required' });
+        return;
+      }
+
+      // Phone sign-up is refused HERE, before an account exists. It used to be
+      // accepted, and with confirmation now mandatory it would create an
+      // account that no code can ever reach: there is no SMS provider, so the
+      // row would be permanently unconfirmable and permanently unsignable-in.
+      // Better a clear refusal than an account that silently cannot be used.
+      const email = normalizeEmail(raw);
+      if (!email.includes('@')) {
+        res.status(400).json({
+          error: 'An email address is required - phone sign-up is not available.',
+          code: 'email_required',
+        });
+        return;
+      }
+
+      let identity;
+      try {
+        identity = await authClient.startSignup(email, password, displayName);
+      } catch (err) {
+        res.status(400).json({ error: err instanceof Error ? err.message : 'sign-up failed' });
+        return;
+      }
+
+      answerWithOutcome(res, email, await mintAndSend(email, identity.playerId));
+    })().catch((err: unknown) => {
+      console.error('[auth] signup failed:', err);
+      res.status(500).json({ error: 'internal error' });
+    });
+  });
+
+  /**
+   * Exchange a correct code for a session.
+   *
+   * The playerId comes from the CHALLENGE, never from the request. A client
+   * that sends someone else's email with a code it somehow holds confirms that
+   * address's account and no other -- there is no field it can supply that
+   * redirects the result.
+   */
+  r.post('/verify-otp', (req: Request, res: Response) => {
+    void (async (): Promise<void> => {
+      const body = (req.body ?? {}) as Record<string, string>;
+      const raw = body['email'] || body['identifier'];
+      const code = body['code'];
+
+      if (!raw || !code) {
+        res.status(400).json({ error: 'email and code are required' });
+        return;
+      }
+      const email = normalizeEmail(raw);
+
+      const result = await otps.verify(email, code, now());
+      if (!result.ok) {
+        const status = result.reason === 'too_many_attempts' ? 429 : 400;
+        const message: Record<typeof result.reason, string> = {
+          no_challenge: 'No confirmation is pending for this address. Sign up again.',
+          expired: 'That code has expired. Request a new one.',
+          too_many_attempts: 'Too many incorrect codes. Request a new one.',
+          incorrect: 'That code is not correct.',
+        };
+        res.status(status).json({ error: message[result.reason], code: result.reason });
+        return;
+      }
+
+      const identity = await authClient.markEmailVerified(result.playerId);
+      if (!identity) {
+        // The challenge outlived the account it was for -- only reachable if
+        // the row was deleted between signup and confirmation. Not an internal
+        // error; there is simply nothing to sign in to.
+        res
+          .status(400)
+          .json({ error: 'That account no longer exists. Sign up again.', code: 'no_account' });
+        return;
+      }
+
+      res.json(issue(asProfile(identity)));
+    })().catch((err: unknown) => {
+      console.error('[auth] verify-otp failed:', err);
+      res.status(500).json({ error: 'internal error' });
+    });
+  });
+
+  /**
+   * Another code for a confirmation already in flight.
+   *
+   * Requires a LIVE CHALLENGE and refuses otherwise, rather than looking the
+   * address up and minting one. Minting on demand would turn this into a way to
+   * send mail from our domain to any address anyone types, with no account
+   * involved -- the rate limits would cap the volume but not the fact.
+   */
+  r.post('/resend-otp', (req: Request, res: Response) => {
+    void (async (): Promise<void> => {
+      const body = (req.body ?? {}) as Record<string, string>;
+      const raw = body['email'] || body['identifier'];
+      if (!raw) {
+        res.status(400).json({ error: 'email is required' });
+        return;
+      }
+      const email = normalizeEmail(raw);
+
+      const pending = await otps.peek(email);
+      if (!pending) {
+        res.status(400).json({
+          error: 'No confirmation is pending for this address. Sign up again.',
+          code: 'no_challenge',
+        });
+        return;
+      }
+
+      answerWithOutcome(res, email, await mintAndSend(email, pending.playerId));
+    })().catch((err: unknown) => {
+      console.error('[auth] resend-otp failed:', err);
+      res.status(500).json({ error: 'internal error' });
+    });
   });
 
   r.post('/login', (req: Request, res: Response) => {
-    const body = (req.body ?? {}) as Record<string, string>;
-    const email = body['email'] || body['phone'] || body['identifier'];
-    const password = body['password'];
+    void (async (): Promise<void> => {
+      const body = (req.body ?? {}) as Record<string, string>;
+      const raw = body['email'] || body['phone'] || body['identifier'];
+      const password = body['password'];
 
-    if (!email || !password) {
-      res.status(400).json({ error: 'email or phone number and password are required' });
-      return;
-    }
-    authClient
-      .verifyPassword(email, password)
-      .then((u) => res.json(issue(asProfile(u))))
-      .catch((err: Error) => res.status(401).json({ error: err.message }));
+      if (!raw || !password) {
+        res.status(400).json({ error: 'email or phone number and password are required' });
+        return;
+      }
+      // Phone sign-IN stays: accounts created before confirmation existed may
+      // hold a phone number, and refusing them here would lock out people whose
+      // account is perfectly valid. Only new phone sign-UPS are closed.
+      const identifier = raw.includes('@') ? normalizeEmail(raw) : raw.trim();
+
+      const check = await authClient.verifyPassword(identifier, password);
+
+      if (check.ok) {
+        res.json(issue(asProfile(check.identity)));
+        return;
+      }
+
+      if (check.reason === 'invalid_credentials') {
+        res.status(401).json({ error: 'invalid email or password' });
+        return;
+      }
+
+      // 403, not 401. The password was right -- this is a known account that
+      // has not finished signing up, and the client needs to tell those apart
+      // to send the player to the code screen instead of retrying the password.
+      // Safe to disclose: it took the correct password to get here.
+      //
+      // A FRESH CODE GOES OUT HERE, and that is the whole point of this branch.
+      // Someone who signed up yesterday and never confirmed has no live
+      // challenge any more, so sending them to a code screen with a resend
+      // button would be a dead end: resend refuses when nothing is pending, and
+      // sign-up refuses because... nothing, it would reclaim the account -- but
+      // only if they guessed that re-registering was the way back in. Two
+      // individually-correct rules meeting in a corner with no way out is
+      // docs/TRAPS.md #12, and this is where that corner would have been.
+      //
+      // Mailing from a login is safe precisely because it took the right
+      // password to reach: it cannot be aimed at an address the caller does not
+      // already control the account for, and the same per-address rate limits
+      // apply. `sent` is reported honestly so the screen does not promise a
+      // mail that a cooldown or an outage stopped.
+      const confirmEmail = check.identity.email ?? identifier;
+      const outcome = await mintAndSend(confirmEmail, check.identity.playerId);
+
+      res.status(403).json({
+        error: 'Confirm your email address to finish signing up.',
+        code: 'email_unverified',
+        email: confirmEmail,
+        sent: outcome.status === 'sent',
+        ...(outcome.status === 'sent'
+          ? {
+              expiresAt: new Date(outcome.expiresAt).toISOString(),
+              resendAvailableAt: new Date(outcome.resendAvailableAt).toISOString(),
+            }
+          : {}),
+        ...(outcome.status === 'rate_limited' ? { retryAfterMs: outcome.retryAfterMs } : {}),
+      });
+    })().catch((err: unknown) => {
+      console.error('[auth] login failed:', err);
+      res.status(500).json({ error: 'internal error' });
+    });
   });
 
   r.post('/google', async (req: Request, res: Response) => {
