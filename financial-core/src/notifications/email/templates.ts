@@ -55,13 +55,27 @@ const esc = (value: string): string =>
  * Every event fills the middle and nothing else, so a deposit receipt and a
  * withdrawal receipt are recognisably the same family of message.
  */
-function layout(input: {
+interface LayoutInput {
   heading: string;
+  /** The one big line. An amount for money mail; the code for a confirmation. */
   amount: string;
   amountNote: string;
   rows: DetailRow[];
   supportUrl: string;
-}): string {
+  /**
+   * Why this person is being written to. Defaults to the wallet-activity line,
+   * which is true of every money email and false of a confirmation code — the
+   * recipient of one of those has no wallet activity and may have no account.
+   */
+  footerNote?: string;
+  /** Renders the big line as spaced monospace. For codes, not amounts. */
+  mono?: boolean;
+}
+
+const DEFAULT_FOOTER =
+  'You are receiving this because this address is on a MYPOKER account with wallet activity.';
+
+function layout(input: LayoutInput): string {
   const rows = input.rows
     .map(
       (r) => `
@@ -90,7 +104,11 @@ function layout(input: {
           <tr>
             <td style="padding:18px 24px 0 24px;">
               <div style="font-size:15px;color:${C.text};">${esc(input.heading)}</div>
-              <div style="font-size:34px;font-weight:800;color:${C.text};padding-top:6px;">${esc(input.amount)}</div>
+              <div style="font-size:34px;font-weight:800;color:${C.text};padding-top:6px;${
+                input.mono
+                  ? `font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;letter-spacing:6px;`
+                  : ''
+              }">${esc(input.amount)}</div>
               <div style="font-size:12px;color:${C.dim};padding-top:4px;">${esc(input.amountNote)}</div>
             </td>
           </tr>
@@ -106,7 +124,7 @@ function layout(input: {
             <td style="padding:22px 24px 24px 24px;">
               <div style="font-size:11px;color:${C.dim};line-height:1.6;">
                 Questions? <a href="${esc(input.supportUrl)}" style="color:${C.accent};text-decoration:none;">Contact support</a>.<br>
-                You are receiving this because this address is on a MYPOKER account with wallet activity.
+                ${esc(input.footerNote ?? DEFAULT_FOOTER)}
               </div>
               <div style="font-size:10px;color:${C.dim};padding-top:14px;letter-spacing:1px;">
                 Fair. On-Chain. Always.
@@ -122,13 +140,7 @@ function layout(input: {
 }
 
 /** The text half, built from the same inputs so the two cannot drift. */
-function plain(input: {
-  heading: string;
-  amount: string;
-  amountNote: string;
-  rows: DetailRow[];
-  supportUrl: string;
-}): string {
+function plain(input: LayoutInput): string {
   const rows = input.rows.map((r) => `${r.label}: ${r.value}`).join('\n');
   return [
     'MYPOKER',
@@ -140,7 +152,7 @@ function plain(input: {
     rows,
     '',
     `Questions? ${input.supportUrl}`,
-    'You are receiving this because this address is on a MYPOKER account with wallet activity.',
+    input.footerNote ?? DEFAULT_FOOTER,
     '',
     'Fair. On-Chain. Always.',
   ].join('\n');
@@ -228,4 +240,52 @@ export function withdrawalSent(input: {
     supportUrl: SUPPORT,
   };
   return { subject: `${amount} sent`, html: layout(body), text: plain(body) };
+}
+
+// ── identity ─────────────────────────────────────────────────────────────────
+
+/**
+ * The email-confirmation code.
+ *
+ * Not a money email, but the same shell on purpose: someone who has seen a
+ * MYPOKER deposit receipt should recognise this one as coming from the same
+ * place, and a confirmation mail that looks unlike the rest of the brand is
+ * indistinguishable from a phishing attempt.
+ *
+ * A CODE, NOT A LINK. Corporate mail scanners and some clients pre-fetch every
+ * URL in a message, which would silently consume a one-click confirmation link
+ * before the recipient ever saw it. A code cannot be spent by a scanner.
+ *
+ * Says plainly what to do if it was not you. That sentence is the only
+ * protection the person whose address was typed in by mistake — or on purpose —
+ * actually has.
+ */
+export function emailConfirmationCode(input: {
+  code: string;
+  expiresInMinutes: number;
+}): EmailTemplate {
+  const body = {
+    heading: 'Confirm your email address',
+    amount: input.code,
+    amountNote: `This code expires in ${input.expiresInMinutes} minutes.`,
+    mono: true,
+    rows: [
+      { label: 'Code', value: input.code },
+      { label: 'Valid for', value: `${input.expiresInMinutes} minutes` },
+    ],
+    supportUrl: SUPPORT,
+    // "nobody can sign in without it", NOT "no account is created without it".
+    // The account row IS written before this email is sent — it just cannot
+    // hold a session and is reclaimed by the next sign-up for the address. The
+    // shorter sentence read better and was false, which is docs/TRAPS.md #7 in
+    // a place a player actually reads.
+    footerNote:
+      'You are receiving this because someone entered this address when signing up for MYPOKER. ' +
+      'If that was not you, ignore this email — the code expires on its own and nobody can sign in without it.',
+  };
+  return {
+    subject: `${input.code} is your MYPOKER confirmation code`,
+    html: layout(body),
+    text: plain(body),
+  };
 }

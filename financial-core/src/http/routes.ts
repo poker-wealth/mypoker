@@ -92,6 +92,8 @@ import {
   listNotifications,
   markRead,
 } from '../notifications/notification-store';
+import { sendEmail } from '../notifications/email/send-email';
+import { emailConfirmationCode } from '../notifications/email/templates';
 import { getVolumeFacts, recordVolume, getPublicRtp } from '../vip/volume-tracker';
 import { AccountModel } from '../wallet/account.model';
 import { WithdrawalModel } from '../withdrawal/withdrawal.model';
@@ -724,6 +726,49 @@ export function buildRouter(): Router {
       // 'suppressed' is not a failure — the player asked not to be told, and the
       // caller should be able to tell that apart from an error.
       res.json({ stored, suppressed: !stored });
+    }),
+  );
+
+  /**
+   * Send an email-confirmation code on the gateway's behalf.
+   *
+   * WHY THE MONEY SERVICE SENDS AN IDENTITY EMAIL: there is one mailbox, and
+   * the transport, its connection pool and the per-event dedupe all live here
+   * already. A second nodemailer in the gateway would be a second copy of the
+   * port/TLS rules — the pair that hangs rather than fails when they disagree —
+   * and a second place for the owner to keep credentials in step.
+   *
+   * NARROW BY DESIGN. It takes an address, a code and a lifetime; the body is
+   * rendered here from a fixed template. It does NOT accept a subject, HTML or
+   * text. The internal secret is shared with more processes than a general
+   * "send this email" capability should be, and the difference between this
+   * endpoint and a spam relay operating from our own domain is precisely that
+   * the caller cannot choose the content.
+   *
+   * The outcome is REPORTED, not swallowed. Money receipts are best-effort
+   * because the credit matters and the receipt is a courtesy; a confirmation
+   * code is the control itself, and the gateway refuses the signup when it did
+   * not go out.
+   */
+  const otpEmailBody = z.object({
+    // Format-checked, not merely non-empty: this is the one field that decides
+    // where mail from our domain lands, and it arrives from a signup form.
+    to: z.string().email(),
+    code: z.string().regex(/^\d{4,10}$/),
+    expiresInMinutes: z.number().int().positive().max(60),
+    eventId: z.string().min(1).max(200),
+  });
+  r.post(
+    '/internal/email/otp',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const body = otpEmailBody.parse(req.body);
+      const outcome = await sendEmail(
+        body.to,
+        emailConfirmationCode({ code: body.code, expiresInMinutes: body.expiresInMinutes }),
+        body.eventId,
+      );
+      res.json({ outcome });
     }),
   );
 
