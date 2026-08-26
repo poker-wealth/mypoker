@@ -20,9 +20,25 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
+    /**
+     * The parsed error body, when the server sent one.
+     *
+     * The message alone is player-facing copy, and branching on it means
+     * branching on a sentence somebody will reword. The gateway puts a stable
+     * machine field next to it — `code: 'email_unverified'`, and the address
+     * and resend timing that go with it — and that is only reachable if the
+     * body survives the throw. It did not, so it does now.
+     */
+    readonly body?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';
+  }
+
+  /** One field off the error body, or undefined. Never throws. */
+  detail<T = unknown>(field: string): T | undefined {
+    if (!this.body || typeof this.body !== 'object') return undefined;
+    return (this.body as Record<string, unknown>)[field] as T | undefined;
   }
 }
 
@@ -77,7 +93,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       body && typeof body === 'object' && 'error' in body
         ? String((body as { error: unknown }).error)
         : 'Sign in failed.';
-    throw new ApiError(401, message);
+    throw new ApiError(401, message, body);
   }
 
   if (!res.ok) {
@@ -88,7 +104,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       body && typeof body === 'object' && 'error' in body
         ? String((body as { error: unknown }).error)
         : `Request failed (${res.status})`;
-    throw new ApiError(res.status, message);
+    throw new ApiError(res.status, message, body);
   }
 
   return body as T;
