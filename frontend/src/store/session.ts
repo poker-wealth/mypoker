@@ -13,7 +13,8 @@ import {
   type PendingConfirmation,
   type Player,
 } from '@/api/auth';
-import { initData } from '@/lib/telegram';
+import { initData, telegramStartParam } from '@/lib/telegram';
+import { bindReferral } from '@/api/referral';
 import { DEV_AUTH_BYPASS } from '@/config';
 import { toast } from '@/lib/toast';
 
@@ -92,6 +93,34 @@ export function unconfirmedEmailFrom(error: unknown): string | null {
   return body?.code === 'email_unverified' ? (body.email ?? null) : null;
 }
 
+/**
+ * Fire the referral bind the moment a session first exists, for whichever of
+ * the three sign-in paths just produced one (Telegram, email confirm, email
+ * sign-in — see `signIn` and `settle` below). Only fires when the Mini App was
+ * actually opened via a referral link; otherwise there is no `start_param` and
+ * nothing to send.
+ *
+ * Deliberately not awaited by its callers and errors are swallowed here: a
+ * referral is attribution, not something the player did or can fix, so it must
+ * never block or interrupt sign-in. `/me/referral` is also set-once and
+ * idempotent server-side, so there is no "already bound?" check on purpose —
+ * calling it on every login and letting the server decide is simpler and
+ * cannot double-bind.
+ *
+ * Commercial note: this also means a pre-existing, unattributed player who
+ * later opens a referral link gets bound to it — the set-once endpoint makes
+ * that safe (an already-attributed player is untouched), but whether a
+ * returning player should be attributable at all like this is a policy call
+ * for the owner to confirm, not something decided here.
+ */
+function bindReferralIfLaunchedFromOne(): void {
+  const linkId = telegramStartParam();
+  if (!linkId) return;
+  bindReferral(linkId).catch((e: unknown) => {
+    console.warn('Referral bind failed (non-fatal):', e);
+  });
+}
+
 const storedToken = localStorage.getItem(TOKEN_KEY);
 setAuthToken(storedToken);
 
@@ -106,6 +135,7 @@ export const useSession = create<SessionState>((set, get) => {
       setAuthToken(token);
       persist(token, player);
       set({ token, player, status: 'authenticated', error: null });
+      bindReferralIfLaunchedFromOne();
       toast.success(i18n.t('toasts.signedIn', { name: player.displayName }));
     } catch (e) {
       const message = e instanceof ApiError ? e.message : i18n.t('toasts.signInFailed');
@@ -139,6 +169,7 @@ export const useSession = create<SessionState>((set, get) => {
       setAuthToken(token);
       persist(token, player);
       set({ token, player, status: 'authenticated', error: null });
+      bindReferralIfLaunchedFromOne();
       // i18n.t(), not the hook — this runs outside React, and a raw key would
       // surface on screen as literal `toasts.signedIn`.
       toast.success(i18n.t('toasts.signedIn', { name: player.displayName }));

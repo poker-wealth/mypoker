@@ -17,7 +17,7 @@ interface TelegramWebApp {
    * Safe for cosmetic decisions like which language to open in; never for
    * identity — that comes from the server verifying `initData`.
    */
-  initDataUnsafe?: { user?: { language_code?: string } };
+  initDataUnsafe?: { user?: { language_code?: string }; start_param?: string };
   onEvent: (event: string, handler: () => void) => void;
   offEvent: (event: string, handler: () => void) => void;
   HapticFeedback?: { impactOccurred: (style: string) => void };
@@ -52,6 +52,19 @@ export const telegramColorScheme = (): 'light' | 'dark' | null => tg()?.colorSch
  */
 export const telegramLanguageCode = (): string | null =>
   tg()?.initDataUnsafe?.user?.language_code ?? null;
+
+/**
+ * The `start_param` a referral link launched the Mini App with (the id after
+ * `?start=` in `t.me/<bot>?start=<id>`), or null outside Telegram / with none.
+ *
+ * Read from the unsigned payload on purpose, same as the language code above:
+ * a referral link id is not identity and not money, just an attribution hint
+ * that the server treats as untrusted input and validates before binding
+ * anything to it. That's why it's safe to read here rather than needing the
+ * signed `initData` round-trip.
+ */
+export const telegramStartParam = (): string | null =>
+  tg()?.initDataUnsafe?.start_param ?? null;
 
 export function haptic(style: 'light' | 'medium' | 'heavy' = 'light'): void {
   tg()?.HapticFeedback?.impactOccurred(style);
