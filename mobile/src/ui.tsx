@@ -96,11 +96,20 @@ export function Button({
   onPress,
   variant = 'primary',
   disabled,
+  style,
 }: {
   children: ReactNode;
   onPress: () => void;
   variant?: 'primary' | 'ghost' | 'danger';
   disabled?: boolean;
+  /**
+   * Layout only, for the caller's row — never colour, which stays with `variant`.
+   *
+   * Added so buttons sharing a row can stretch to a common height. Without it each button sized to
+   * its own label, so the lobby's two-line "CREATE PRIVATE TABLE" rendered visibly taller than the
+   * "Quick join" beside it.
+   */
+  style?: ViewStyle;
 }) {
   const palette =
     variant === 'primary'
@@ -115,6 +124,7 @@ export function Button({
       style={({ pressed }) => [
         styles.button,
         { backgroundColor: palette.bg },
+        style,
         (pressed || disabled) && styles.dim,
       ]}
     >
@@ -327,6 +337,10 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 10, textTransform: 'uppercase', fontFamily: weight('800') },
   button: {
     alignItems: 'center',
+    // Centred vertically and given a floor, so buttons in a row read as the same control even
+    // when one label runs to two lines.
+    justifyContent: 'center',
+    minHeight: 48,
     borderRadius: radius.pill,
     paddingHorizontal: space.lg,
     paddingVertical: space.md,

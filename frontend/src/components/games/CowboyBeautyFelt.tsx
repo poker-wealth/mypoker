@@ -87,7 +87,7 @@ export function CowboyBeautyFelt({ snapshot, onCommand }: CowboyBeautyFeltProps)
           </span>
         </div>
         <div className="text-xs text-slate-300">
-          Pot <span className="font-bold text-amber-300">₮{snapshot?.pot ?? 0}</span>
+          Pot <span className="font-bold text-amber-300">${snapshot?.pot ?? 0}</span>
         </div>
       </div>
 
@@ -141,12 +141,12 @@ export function CowboyBeautyFelt({ snapshot, onCommand }: CowboyBeautyFeltProps)
                     betAmount === amt ? 'bg-amber-400 text-black' : 'bg-slate-800 text-slate-200'
                   }`}
                 >
-                  ₮{amt}
+                  ${amt}
                 </button>
               ))}
             </div>
             <Button variant="primary" size="sm" onClick={() => back(side)}>
-              {staked > 0 ? `Staked ₮${staked} on ${side}` : `Back ${side} for ₮${betAmount}`}
+              {staked > 0 ? `Staked $${staked} on ${side}` : `Back ${side} for $${betAmount}`}
             </Button>
           </>
         ) : isSeated ? (
@@ -201,13 +201,13 @@ function SideCard({
 
       {/* The price. It drifts while the pools fill, then stops when betting closes. */}
       <div className="font-mono text-2xl font-black text-white">{asMultiple(odds)}</div>
-      <div className="text-[0.7rem] text-slate-400">pool ₮{pool}</div>
+      <div className="text-[0.7rem] text-slate-400">pool ${pool}</div>
 
       <PlayingCard {...(card ? { card } : {})} size="md" />
 
       {yours > 0 && (
         <span className="absolute -top-2 rounded-full bg-amber-400 px-2 text-[0.65rem] font-black text-black">
-          ₮{yours}
+          ${yours}
         </span>
       )}
     </button>

@@ -2,9 +2,9 @@
  * Currency and number formatting — one home for it (Phase E #7).
  *
  * Before this there were fifteen call sites across three different
- * `toLocaleString` shapes, each hardcoding the ₮ symbol: some showed two
+ * `toLocaleString` shapes, each hardcoding the $ symbol: some showed two
  * decimals, some none, some whatever the locale defaulted to. The same balance
- * could read ₮1,234.5 on one screen and ₮1,234.50 on the next.
+ * could read $1,234.5 on one screen and $1,234.50 on the next.
  *
  * Two units exist in this app and confusing them is the expensive mistake:
  *
@@ -17,25 +17,25 @@
  */
 
 /** The platform's currency mark (USDT). Never write this inline. */
-export const SYMBOL = '₮';
+export const SYMBOL = '$';
 
 /**
  * Money for display, from micro-USD.
  *
  * Two decimals by default because that is what a currency looks like; a balance
- * that renders ₮12.5 reads like a typo next to ₮12.50.
+ * that renders $12.5 reads like a typo next to $12.50.
  */
 export function money(
   micros: number,
   options: { decimals?: number; sign?: boolean; symbol?: boolean } = {},
 ): string {
   // `symbol: false` for strings whose TRANSLATION already carries the currency
-  // mark. Every locale places it differently ("₮{{amount}} to V2" in English,
-  // "{{tier}} まで ₮{{amount}}" in Japanese), so the template owns the symbol and the
+  // mark. Every locale places it differently ("${{amount}} to V2" in English,
+  // "{{tier}} まで ${{amount}}" in Japanese), so the template owns the symbol and the
   // formatter must not add a second one.
   const { decimals = 2, sign = false, symbol = true } = options;
   const value = micros / 1_000_000;
-  // The minus goes OUTSIDE the currency mark: -₮1.50, not ₮-1.50. That is what
+  // The minus goes OUTSIDE the currency mark: -$1.50, not $-1.50. That is what
   // every locale-aware formatter does, and a losing round on the Data tab is
   // where it shows.
   const prefix = value < 0 ? '-' : sign && value > 0 ? '+' : '';
@@ -84,11 +84,11 @@ export const percent = (value: string | null, decimals = 1): string =>
  * The NUMBER part of a ledger decimal string, formatted for display — no symbol.
  *
  * For strings that already sit inside a translated sentence carrying its own
- * currency mark, like `notifications.deposit`: "Deposit of ₮{{amount}} credited".
+ * currency mark, like `notifications.deposit`: "Deposit of ${{amount}} credited".
  * financial-core sends six decimals ('500.000000') because that is the ledger's
- * precision; showing a player "₮500.000000" reads like a bug in the amount
- * rather than a faithful figure, and prepending another ₮ via moneyFromDecimal
- * would render "₮₮500.00".
+ * precision; showing a player "$500.000000" reads like a bug in the amount
+ * rather than a faithful figure, and prepending another $ via moneyFromDecimal
+ * would render "$$500.00".
  *
  * Display only — the ledger string remains the truth, and nothing here is ever
  * fed back into a calculation.

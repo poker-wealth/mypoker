@@ -32,9 +32,21 @@ function formatCard(card: string): { rank: string; suit: string; red: boolean } 
 export function DouDiZhuFelt({
   snapshot,
   onCommand,
+  onSit,
 }: {
   snapshot: TableSnapshot;
   onCommand: (cmd: TableCommand) => void;
+  /**
+   * Taking a seat opens the buy-in sheet — it does NOT commit one.
+   *
+   * Every one of these felts used to send { kind: 'sit', buyIn: snapshot.minBuyIn } straight
+   * from the button, so a tap moved money at an amount the player was never shown and never
+   * chose. The poker felt has always gone through BuyInSheet; the other eight did not. An audit
+   * found all eight.
+   *
+   * Required, not optional: a felt that cannot open the sheet must not fall back to spending.
+   */
+  onSit: (seatIndex: number) => void;
 }) {
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
 
@@ -68,7 +80,7 @@ export function DouDiZhuFelt({
   /** Take the first free chair. Dou Di Zhu deals at three, so the table waits until it has them. */
   const sitDown = (): void => {
     const free = seats.find((s) => !s.playerId);
-    onCommand({ kind: 'sit', seat: free?.index ?? 0, buyIn: snapshot.minBuyIn });
+    onSit(free?.index ?? 0);
   };
 
   return (

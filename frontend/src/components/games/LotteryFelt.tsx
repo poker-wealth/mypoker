@@ -65,7 +65,7 @@ export function LotteryFelt({ snapshot, onCommand }: LotteryFeltProps) {
                   betAmount === amt ? 'bg-amber-400 text-black' : 'bg-purple-900 text-purple-200'
                 }`}
               >
-                ₮{amt}
+                ${amt}
               </button>
             ))}
             <Button
@@ -73,7 +73,7 @@ export function LotteryFelt({ snapshot, onCommand }: LotteryFeltProps) {
               size="sm"
               onClick={() => onCommand?.({ kind: 'act', action: { type: String(selectedNum), amount: betAmount } })}
             >
-              Buy Ticket #{selectedNum} (₮{betAmount})
+              Buy Ticket #{selectedNum} (${betAmount})
             </Button>
           </div>
         ) : isSeated ? (
