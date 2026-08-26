@@ -34,7 +34,10 @@ export function SeatStrip({
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>{seat.isBot ? 'AI' : seat.name.slice(0, 1).toUpperCase()}</Text>
           </View>
-          <View>
+          {/* flexShrink + a maxWidth so a long player name actually gets to truncate under
+              numberOfLines rather than growing the row (row children don't shrink to wrap/
+              truncate without one) — `seat` is otherwise unbounded and just grows with it. */}
+          <View style={styles.info}>
             <Text style={styles.name} numberOfLines={1}>
               {seat.name}
               {seat.isYou ? ' (you)' : seat.isBot ? ' · AI' : ''}
@@ -79,6 +82,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: { color: theme.text, fontSize: 10, fontWeight: '800' },
+  info: { flexShrink: 1, minWidth: 0, maxWidth: 150 },
   name: { color: theme.text, fontSize: 12, fontWeight: '700' },
   meta: { color: 'rgba(255,255,255,0.6)', fontSize: 11 },
 });

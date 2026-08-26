@@ -253,7 +253,7 @@ function RoundSteps({ data }: { data: RoundVerificationData }) {
             <Badge tone={result.allPass ? 'success' : 'warn'}>
               {result.allPass ? t('fairness.verified') : t('fairness.failed')}
             </Badge>
-            <Text style={styles.dim}>
+            <Text style={[styles.dim, styles.bannerText]}>
               {result.allPass ? t('fairness.verifiedBlurb') : t('fairness.failedBlurb')}
             </Text>
           </View>
@@ -558,6 +558,10 @@ const styles = StyleSheet.create({
   bannerOk: { borderColor: theme.success, backgroundColor: theme.surface },
   bannerFail: { borderColor: theme.danger, backgroundColor: theme.surface },
   bannerRow: { flexDirection: 'row', gap: space.sm, alignItems: 'center' },
+  // A `Text` in a `flexDirection: 'row'` row needs `flex: 1` (or `flexShrink: 1`)
+  // or it overflows past the card edge instead of wrapping — RN does not wrap
+  // row children by default.
+  bannerText: { flex: 1 },
   stepList: { gap: space.sm },
   stepCard: { gap: space.sm },
   stepHeader: { flexDirection: 'row', gap: space.sm, alignItems: 'flex-start' },
