@@ -101,7 +101,7 @@ export function AdminPlayers() {
                     </div>
                     <div className="shrink-0 text-right">
                       {/*
-                        A dash, not ₮0.00. No account is a different fact from
+                        A dash, not $0.00. No account is a different fact from
                         an empty one, and an admin reading zero would conclude
                         the player had funds and spent them. And "no account" is
                         only claimed when financial-core actually ANSWERED —

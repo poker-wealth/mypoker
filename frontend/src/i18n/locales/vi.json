@@ -375,7 +375,7 @@
   "jackpot": {
     "totalPools": "Tổng quỹ thưởng",
     "paysOut": "trả {{pct}}%",
-    "needsMore": "Cần thêm ₮{{amount}} để hạng này có thể trả thưởng",
+    "needsMore": "Cần thêm ${{amount}} để hạng này có thể trả thưởng",
     "windowOpen": "Khung giờ Grand đang mở",
     "windowClosed": "Khung giờ Grand đã đóng",
     "opensIn": "Mở sau {{time}}",
@@ -419,11 +419,11 @@
   "vip": {
     "signInToSee": "Đăng nhập để xem hạng VIP của bạn",
     "effectiveVolume": "Doanh số hiệu quả",
-    "remaining": "Còn ₮{{amount}} đến {{tier}}",
+    "remaining": "Còn ${{amount}} đến {{tier}}",
     "topTier": "Đã đạt hạng cao nhất",
     "byGame": "Nguồn doanh số",
     "counted": "được tính",
-    "roundsStaked": "{{rounds}} ván · đặt ₮{{staked}}",
+    "roundsStaked": "{{rounds}} ván · đặt ${{staked}}",
     "coefficientNote": "Mỗi trò tính vào VIP khác nhau: Texas ×1,0, Niu Niu ×0,5, Baccarat ×0,3, còn lại ×0,4. Điều này ngăn các trò rake thấp trở thành lối tắt lên hạng.",
     "tiers": "Các hạng",
     "title": {
@@ -447,17 +447,17 @@
     "signInToSee": "Đăng nhập để xem thông báo",
     "empty": "Chưa có gì",
     "emptyBlurb": "Kết quả, nạp tiền và thông báo sẽ hiện ở đây.",
-    "handWon": "Bạn thắng ₮{{amount}}",
-    "handLost": "Ván đã kết toán — ₮{{amount}}",
-    "deposit": "Đã ghi có khoản nạp ₮{{amount}}",
-    "withdrawal": "Đã gửi khoản rút ₮{{amount}}",
-    "jackpot": "Jackpot! Bạn thắng ₮{{amount}}",
+    "handWon": "Bạn thắng ${{amount}}",
+    "handLost": "Ván đã kết toán — ${{amount}}",
+    "deposit": "Đã ghi có khoản nạp ${{amount}}",
+    "withdrawal": "Đã gửi khoản rút ${{amount}}",
+    "jackpot": "Jackpot! Bạn thắng ${{amount}}",
     "vipUp": "Bạn đã đạt {{tier}}",
     "addressChanged": "Địa chỉ rút tiền của bạn đã thay đổi",
     "promo": "{{text}}",
-    "depositCredited": "Đã ghi có khoản nạp ₮{{amount}}",
-    "withdrawalRequested": "Đã yêu cầu rút ₮{{amount}}",
-    "withdrawalSent": "Đã gửi khoản rút ₮{{amount}}"
+    "depositCredited": "Đã ghi có khoản nạp ${{amount}}",
+    "withdrawalRequested": "Đã yêu cầu rút ${{amount}}",
+    "withdrawalSent": "Đã gửi khoản rút ${{amount}}"
   },
   "agent": {
     "title": "Trung tâm Đại lý",
@@ -551,7 +551,7 @@
     "odds": "Tỷ lệ",
     "payout": "Chi trả tối đa",
     "decline": "Không, cảm ơn",
-    "accept": "Mua bảo hiểm ₮{{premium}}",
+    "accept": "Mua bảo hiểm ${{premium}}",
     "taken": "Đã mua bảo hiểm"
   },
   "context": {

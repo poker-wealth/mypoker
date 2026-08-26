@@ -68,7 +68,7 @@ export function ActionBar({ state, onAction }: ActionBarProps) {
                 {t('table.allIn')}
               </button>
             </div>
-            <div className="ml-auto text-sm font-bold tabular-nums">₮{clamped.toLocaleString()}</div>
+            <div className="ml-auto text-sm font-bold tabular-nums">${clamped.toLocaleString()}</div>
           </div>
 
           <input
@@ -92,13 +92,13 @@ export function ActionBar({ state, onAction }: ActionBarProps) {
           </Button>
         ) : (
           <Button variant="secondary" full onClick={() => fire({ type: 'call' })}>
-            {t('table.call', { amount: `₮${state.toCall.toLocaleString()}` })}
+            {t('table.call', { amount: `$${state.toCall.toLocaleString()}` })}
           </Button>
         )}
         <motion.div whileTap={{ scale: 0.97 }}>
           <Button full disabled={!canRaise} onClick={() => fire({ type: 'raise', to: clamped })}>
             {canCheck ? t('table.bet') : t('table.raise')}{' '}
-            {canRaise ? `₮${clamped.toLocaleString()}` : ''}
+            {canRaise ? `$${clamped.toLocaleString()}` : ''}
           </Button>
         </motion.div>
       </div>

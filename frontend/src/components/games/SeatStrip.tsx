@@ -33,8 +33,8 @@ export function SeatStrip({ seats, accent = 'amber' }: { seats: LiveSeat[]; acce
               {seat.isYou ? ' (you)' : seat.isBot ? ' · AI' : ''}
             </div>
             <div className="text-white/60 tabular-nums">
-              ₮{seat.stack.toLocaleString()}
-              {seat.bet > 0 ? ` · bet ₮${seat.bet.toLocaleString()}` : ''}
+              ${seat.stack.toLocaleString()}
+              {seat.bet > 0 ? ` · bet $${seat.bet.toLocaleString()}` : ''}
               {seat.lastAction ? ` · ${seat.lastAction}` : ''}
             </div>
           </div>

@@ -375,7 +375,7 @@
   "jackpot": {
     "totalPools": "총 적립금",
     "paysOut": "{{pct}}% 지급",
-    "needsMore": "이 등급이 지급되려면 ₮{{amount}} 더 필요합니다",
+    "needsMore": "이 등급이 지급되려면 ${{amount}} 더 필요합니다",
     "windowOpen": "그랜드 시간대 열림",
     "windowClosed": "그랜드 시간대 종료",
     "opensIn": "{{time}} 후 시작",
@@ -419,11 +419,11 @@
   "vip": {
     "signInToSee": "로그인하면 VIP 등급을 확인할 수 있습니다",
     "effectiveVolume": "유효 볼륨",
-    "remaining": "{{tier}}까지 ₮{{amount}}",
+    "remaining": "{{tier}}까지 ${{amount}}",
     "topTier": "최고 등급 달성",
     "byGame": "게임별 내역",
     "counted": "반영",
-    "roundsStaked": "{{rounds}} 라운드 · ₮{{staked}} 베팅",
+    "roundsStaked": "{{rounds}} 라운드 · ${{staked}} 베팅",
     "coefficientNote": "VIP 환산 비율은 게임마다 다릅니다. 텍사스 ×1.0, 뉴뉴 ×0.5, 바카라 ×0.3, 기타 ×0.4. 레이크가 낮은 게임이 승급의 지름길이 되지 않도록 하기 위함입니다.",
     "tiers": "등급",
     "title": {
@@ -447,17 +447,17 @@
     "signInToSee": "로그인하면 알림을 볼 수 있습니다",
     "empty": "아직 알림이 없습니다",
     "emptyBlurb": "게임 결과, 입금, 공지가 여기에 표시됩니다.",
-    "handWon": "₮{{amount}}을(를) 획득했습니다",
-    "handLost": "핸드 정산 — ₮{{amount}}",
-    "deposit": "₮{{amount}} 입금이 반영되었습니다",
-    "withdrawal": "₮{{amount}} 출금이 전송되었습니다",
-    "jackpot": "잭팟! ₮{{amount}} 획득",
+    "handWon": "${{amount}}을(를) 획득했습니다",
+    "handLost": "핸드 정산 — ${{amount}}",
+    "deposit": "${{amount}} 입금이 반영되었습니다",
+    "withdrawal": "${{amount}} 출금이 전송되었습니다",
+    "jackpot": "잭팟! ${{amount}} 획득",
     "vipUp": "{{tier}}에 도달했습니다",
     "addressChanged": "출금 주소가 변경되었습니다",
     "promo": "{{text}}",
-    "depositCredited": "₮{{amount}} 입금이 반영되었습니다",
-    "withdrawalRequested": "₮{{amount}} 출금이 요청되었습니다",
-    "withdrawalSent": "₮{{amount}} 출금이 전송되었습니다"
+    "depositCredited": "${{amount}} 입금이 반영되었습니다",
+    "withdrawalRequested": "${{amount}} 출금이 요청되었습니다",
+    "withdrawalSent": "${{amount}} 출금이 전송되었습니다"
   },
   "agent": {
     "title": "에이전트 센터",
@@ -551,7 +551,7 @@
     "odds": "배당",
     "payout": "최대 보장",
     "decline": "괜찮습니다",
-    "accept": "₮{{premium}}에 가입",
+    "accept": "${{premium}}에 가입",
     "taken": "보험에 가입했습니다"
   },
   "context": {

@@ -375,7 +375,7 @@
   "jackpot": {
     "totalPools": "ยอดรวมในกองรางวัล",
     "paysOut": "จ่าย {{pct}}%",
-    "needsMore": "ต้องการอีก ₮{{amount}} ก่อนระดับนี้จะจ่ายได้",
+    "needsMore": "ต้องการอีก ${{amount}} ก่อนระดับนี้จะจ่ายได้",
     "windowOpen": "ช่วงแกรนด์เปิดอยู่",
     "windowClosed": "ช่วงแกรนด์ปิดแล้ว",
     "opensIn": "เปิดในอีก {{time}}",
@@ -419,11 +419,11 @@
   "vip": {
     "signInToSee": "เข้าสู่ระบบเพื่อดูระดับ VIP ของคุณ",
     "effectiveVolume": "ยอดเล่นที่นับได้",
-    "remaining": "อีก ₮{{amount}} ถึง {{tier}}",
+    "remaining": "อีก ${{amount}} ถึง {{tier}}",
     "topTier": "ถึงระดับสูงสุดแล้ว",
     "byGame": "ที่มาของยอด",
     "counted": "ที่นับ",
-    "roundsStaked": "{{rounds}} ตา · เดิมพัน ₮{{staked}}",
+    "roundsStaked": "{{rounds}} ตา · เดิมพัน ${{staked}}",
     "coefficientNote": "แต่ละเกมนับเข้า VIP ไม่เท่ากัน: เท็กซัส ×1.0, หนิวหนิว ×0.5, บาคาร่า ×0.3, อื่นๆ ×0.4 เพื่อไม่ให้เกมที่เก็บค่าน้ำต่ำกลายเป็นทางลัดเลื่อนระดับ",
     "tiers": "ระดับ",
     "title": {
@@ -447,17 +447,17 @@
     "signInToSee": "เข้าสู่ระบบเพื่อดูการแจ้งเตือน",
     "empty": "ยังไม่มีอะไร",
     "emptyBlurb": "ผลการเล่น การฝากเงิน และประกาศจะแสดงที่นี่",
-    "handWon": "คุณชนะ ₮{{amount}}",
-    "handLost": "ตาจบแล้ว — ₮{{amount}}",
-    "deposit": "เติมเงิน ₮{{amount}} เข้าบัญชีแล้ว",
-    "withdrawal": "ส่งการถอน ₮{{amount}} แล้ว",
-    "jackpot": "แจ็กพอต! คุณชนะ ₮{{amount}}",
+    "handWon": "คุณชนะ ${{amount}}",
+    "handLost": "ตาจบแล้ว — ${{amount}}",
+    "deposit": "เติมเงิน ${{amount}} เข้าบัญชีแล้ว",
+    "withdrawal": "ส่งการถอน ${{amount}} แล้ว",
+    "jackpot": "แจ็กพอต! คุณชนะ ${{amount}}",
     "vipUp": "คุณถึงระดับ {{tier}} แล้ว",
     "addressChanged": "ที่อยู่ถอนเงินของคุณถูกเปลี่ยน",
     "promo": "{{text}}",
-    "depositCredited": "เติมเงิน ₮{{amount}} เข้าบัญชีแล้ว",
-    "withdrawalRequested": "ส่งคำขอถอน ₮{{amount}} แล้ว",
-    "withdrawalSent": "ส่งการถอน ₮{{amount}} แล้ว"
+    "depositCredited": "เติมเงิน ${{amount}} เข้าบัญชีแล้ว",
+    "withdrawalRequested": "ส่งคำขอถอน ${{amount}} แล้ว",
+    "withdrawalSent": "ส่งการถอน ${{amount}} แล้ว"
   },
   "agent": {
     "title": "ศูนย์ตัวแทน",
@@ -551,7 +551,7 @@
     "odds": "อัตราต่อรอง",
     "payout": "คุ้มครองสูงสุด",
     "decline": "ไม่เป็นไร",
-    "accept": "ทำประกัน ₮{{premium}}",
+    "accept": "ทำประกัน ${{premium}}",
     "taken": "ทำประกันแล้ว"
   },
   "context": {

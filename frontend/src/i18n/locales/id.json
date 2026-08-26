@@ -375,7 +375,7 @@
   "jackpot": {
     "totalPools": "Total dalam pool",
     "paysOut": "membayar {{pct}}%",
-    "needsMore": "Perlu ₮{{amount}} lagi sebelum tingkat ini bisa membayar",
+    "needsMore": "Perlu ${{amount}} lagi sebelum tingkat ini bisa membayar",
     "windowOpen": "Jendela Grand terbuka",
     "windowClosed": "Jendela Grand tertutup",
     "opensIn": "Buka dalam {{time}}",
@@ -419,11 +419,11 @@
   "vip": {
     "signInToSee": "Masuk untuk melihat status VIP Anda",
     "effectiveVolume": "Volume efektif",
-    "remaining": "₮{{amount}} lagi ke {{tier}}",
+    "remaining": "${{amount}} lagi ke {{tier}}",
     "topTier": "Tingkat tertinggi tercapai",
     "byGame": "Asal volume",
     "counted": "dihitung",
-    "roundsStaked": "{{rounds}} ronde · ₮{{staked}} dipertaruhkan",
+    "roundsStaked": "{{rounds}} ronde · ${{staked}} dipertaruhkan",
     "coefficientNote": "Setiap permainan dihitung berbeda untuk VIP: Texas ×1,0, Niu Niu ×0,5, Bakarat ×0,3, lainnya ×0,4. Ini mencegah permainan ber-rake rendah menjadi jalan pintas naik tingkat.",
     "tiers": "Tingkatan",
     "title": {
@@ -447,17 +447,17 @@
     "signInToSee": "Masuk untuk melihat notifikasi Anda",
     "empty": "Belum ada apa pun",
     "emptyBlurb": "Hasil, setoran, dan pengumuman akan muncul di sini.",
-    "handWon": "Anda memenangkan ₮{{amount}}",
-    "handLost": "Ronde diselesaikan — ₮{{amount}}",
-    "deposit": "Setoran ₮{{amount}} telah masuk",
-    "withdrawal": "Penarikan ₮{{amount}} telah dikirim",
-    "jackpot": "Jackpot! Anda menang ₮{{amount}}",
+    "handWon": "Anda memenangkan ${{amount}}",
+    "handLost": "Ronde diselesaikan — ${{amount}}",
+    "deposit": "Setoran ${{amount}} telah masuk",
+    "withdrawal": "Penarikan ${{amount}} telah dikirim",
+    "jackpot": "Jackpot! Anda menang ${{amount}}",
     "vipUp": "Anda mencapai {{tier}}",
     "addressChanged": "Alamat penarikan Anda telah diubah",
     "promo": "{{text}}",
-    "depositCredited": "Setoran ₮{{amount}} telah masuk",
-    "withdrawalRequested": "Penarikan ₮{{amount}} telah diminta",
-    "withdrawalSent": "Penarikan ₮{{amount}} telah dikirim"
+    "depositCredited": "Setoran ${{amount}} telah masuk",
+    "withdrawalRequested": "Penarikan ${{amount}} telah diminta",
+    "withdrawalSent": "Penarikan ${{amount}} telah dikirim"
   },
   "agent": {
     "title": "Pusat Agen",
@@ -551,7 +551,7 @@
     "odds": "Peluang",
     "payout": "Menanggung hingga",
     "decline": "Tidak usah",
-    "accept": "Asuransikan ₮{{premium}}",
+    "accept": "Asuransikan ${{premium}}",
     "taken": "Asuransi diambil"
   },
   "context": {

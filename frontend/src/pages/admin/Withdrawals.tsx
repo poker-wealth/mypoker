@@ -18,7 +18,7 @@ import type { QueuedWithdrawal } from '@/api/admin';
 /**
  * Admin — the withdrawal review queue (SAMUEL.md task 3, screen 2).
  *
- * Over ₮10,000 the UI makes an administrator confirm twice. That confirm is a
+ * Over $10,000 the UI makes an administrator confirm twice. That confirm is a
  * courtesy, NOT the control: `approveWithdrawal` refuses a single signature
  * server-side, so a client that skipped the dialog would still be refused. The
  * doc described the backend rule as already enforced when it was not — a
@@ -84,7 +84,7 @@ export function AdminWithdrawals() {
         {(
           [
             ['all', `All (${all.length})`],
-            ['large', `Over ₮10,000`],
+            ['large', `Over $10,000`],
             ['awaiting-second', 'Awaiting 2nd'],
             ['approved', 'Held, not sent'],
           ] as const
@@ -258,7 +258,7 @@ function ReviewSheet({
         */}
         {isLarge && (
           <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[0.66rem] leading-relaxed text-danger">
-            Over ₮10,000 — two administrators must approve. The server enforces this; it is not
+            Over $10,000 — two administrators must approve. The server enforces this; it is not
             only a prompt.
           </div>
         )}

@@ -55,20 +55,20 @@ export function Wallet() {
           {balance.isPending ? (
             <Skeleton className="mt-1 h-9 w-40 bg-white/25" />
           ) : balance.isError ? (
-            <div className="mt-1 text-lg font-bold">₮ —</div>
+            <div className="mt-1 text-lg font-bold">$ —</div>
           ) : (
             <div className="mt-1 text-[2.4rem] font-black leading-none tabular-nums">
-              ₮{balance.data.total}
+              ${balance.data.total}
             </div>
           )}
           <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-xl bg-black/20 px-3 py-2">
               <div className="text-[0.68rem] text-white/70">{t('wallet.available')}</div>
-              <div className="font-bold tabular-nums">₮{balance.data?.available ?? '0.000000'}</div>
+              <div className="font-bold tabular-nums">${balance.data?.available ?? '0.000000'}</div>
             </div>
             <div className="rounded-xl bg-black/20 px-3 py-2">
               <div className="text-[0.68rem] text-white/70">{t('wallet.inPlay')}</div>
-              <div className="font-bold tabular-nums">₮{balance.data?.locked ?? '0.000000'}</div>
+              <div className="font-bold tabular-nums">${balance.data?.locked ?? '0.000000'}</div>
             </div>
           </div>
         </div>
@@ -122,7 +122,7 @@ export function Wallet() {
                     <div className="text-[0.66rem] text-dim">{new Date(tx.at).toLocaleString()}</div>
                   </div>
                   <div className={`text-sm font-bold tabular-nums ${credit ? 'text-success' : 'text-text'}`}>
-                    {credit ? '+' : '−'}₮{tx.amount}
+                    {credit ? '+' : '−'}${tx.amount}
                   </div>
                 </div>
               );
@@ -266,7 +266,7 @@ function WithdrawSheet({
     <Sheet open={open} onClose={onClose} title={t('wallet.withdrawTitle')}>
       <div className="space-y-3 p-4">
         <div className="text-[0.72rem] text-dim">
-          {t('wallet.availableToWithdraw', { amount: `₮${available}` })}
+          {t('wallet.availableToWithdraw', { amount: `$${available}` })}
         </div>
 
         <label className="block">
@@ -345,7 +345,7 @@ function WithdrawSheet({
               {withdrawals.data.withdrawals.slice(0, 5).map((w) => (
                 <div key={w.id} className="flex items-center justify-between px-3 py-2">
                   <div>
-                    <div className="text-sm font-bold tabular-nums">₮{w.amount}</div>
+                    <div className="text-sm font-bold tabular-nums">${w.amount}</div>
                     <div className="text-[0.62rem] text-dim">{new Date(w.at).toLocaleString()}</div>
                   </div>
                   <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[0.62rem] font-bold text-brand">

@@ -375,7 +375,7 @@
   "jackpot": {
     "totalPools": "奖池总额",
     "paysOut": "派彩 {{pct}}%",
-    "needsMore": "还需 ₮{{amount}} 该等级才能派彩",
+    "needsMore": "还需 ${{amount}} 该等级才能派彩",
     "windowOpen": "大奖时段开放中",
     "windowClosed": "大奖时段已关闭",
     "opensIn": "{{time}} 后开放",
@@ -419,11 +419,11 @@
   "vip": {
     "signInToSee": "登录以查看您的 VIP 等级",
     "effectiveVolume": "有效流水",
-    "remaining": "距 {{tier}} 还差 ₮{{amount}}",
+    "remaining": "距 {{tier}} 还差 ${{amount}}",
     "topTier": "已达最高等级",
     "byGame": "流水来源",
     "counted": "计入",
-    "roundsStaked": "{{rounds}} 局 · 投注 ₮{{staked}}",
+    "roundsStaked": "{{rounds}} 局 · 投注 ${{staked}}",
     "coefficientNote": "VIP 计算权重因游戏而异：德州 ×1.0、牛牛 ×0.5、百家乐 ×0.3、其他 ×0.4，以防低抽水游戏成为升级捷径。",
     "tiers": "等级",
     "title": {
@@ -447,17 +447,17 @@
     "signInToSee": "登录以查看通知",
     "empty": "暂无通知",
     "emptyBlurb": "牌局结果、充值与公告将显示在此处。",
-    "handWon": "您赢得 ₮{{amount}}",
-    "handLost": "牌局结算 — ₮{{amount}}",
-    "deposit": "充值 ₮{{amount}} 已到账",
-    "withdrawal": "提现 ₮{{amount}} 已发出",
-    "jackpot": "中奖！您赢得 ₮{{amount}}",
+    "handWon": "您赢得 ${{amount}}",
+    "handLost": "牌局结算 — ${{amount}}",
+    "deposit": "充值 ${{amount}} 已到账",
+    "withdrawal": "提现 ${{amount}} 已发出",
+    "jackpot": "中奖！您赢得 ${{amount}}",
     "vipUp": "您已达到 {{tier}}",
     "addressChanged": "您的提现地址已变更",
     "promo": "{{text}}",
-    "depositCredited": "充值 ₮{{amount}} 已到账",
-    "withdrawalRequested": "已提交 ₮{{amount}} 提现申请",
-    "withdrawalSent": "提现 ₮{{amount}} 已发出"
+    "depositCredited": "充值 ${{amount}} 已到账",
+    "withdrawalRequested": "已提交 ${{amount}} 提现申请",
+    "withdrawalSent": "提现 ${{amount}} 已发出"
   },
   "agent": {
     "title": "代理中心",
@@ -551,7 +551,7 @@
     "odds": "赔率",
     "payout": "最高赔付",
     "decline": "不用了",
-    "accept": "投保 ₮{{premium}}",
+    "accept": "投保 ${{premium}}",
     "taken": "已购买保险"
   },
   "context": {

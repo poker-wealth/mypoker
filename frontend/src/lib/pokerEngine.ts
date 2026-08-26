@@ -205,7 +205,7 @@ function advance(s: EngineState): EngineState {
     const winner = activeSeats(s)[0];
     s.winners = [winner.id];
     winner.stack += s.pot;
-    s.message = `${winner.name} wins ₮${s.pot.toLocaleString()}`;
+    s.message = `${winner.name} wins $${s.pot.toLocaleString()}`;
     s.pot = 0;
     s.phase = 'handover';
     s.toAct = -1;
@@ -282,7 +282,7 @@ function showdown(s: EngineState): EngineState {
   const handName = winners[0].hs.name;
   s.message =
     winners.length === 1
-      ? `${winners[0].p.name} wins ₮${pot.toLocaleString()} with ${handName}`
+      ? `${winners[0].p.name} wins $${pot.toLocaleString()} with ${handName}`
       : `Split pot — ${handName}`;
   s.pot = 0;
   s.phase = 'handover';

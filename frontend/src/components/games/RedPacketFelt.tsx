@@ -77,7 +77,7 @@ export function RedPacketFelt({ snapshot, onCommand }: RedPacketFeltProps) {
       {/* The banner across the top: what is in the middle and how many mines are in it */}
       <div className="relative z-10 flex items-center justify-center gap-3 px-3 pt-3 text-xs font-bold">
         <span className="rounded-full border border-amber-400/40 bg-black/40 px-3 py-1 text-amber-200">
-          POT <span className="text-white">₮{snapshot?.pot ?? 0}</span>
+          POT <span className="text-white">${snapshot?.pot ?? 0}</span>
         </span>
         <span className="rounded-full border border-amber-400/40 bg-black/40 px-3 py-1 text-amber-200">
           PACKETS <span className="text-white">{size}</span>
@@ -162,7 +162,7 @@ export function RedPacketFelt({ snapshot, onCommand }: RedPacketFeltProps) {
         <div className="min-w-40 rounded-xl border border-amber-400/50 bg-black/45 px-3 py-1.5 text-center">
           <div className="text-[0.6rem] font-black tracking-widest text-amber-300">👑 BANKER</div>
           <div className="truncate text-xs font-bold text-white">{banker?.name ?? '—'}</div>
-          {banker && <div className="text-[0.7rem] text-amber-200">₮{banker.stack}</div>}
+          {banker && <div className="text-[0.7rem] text-amber-200">${banker.stack}</div>}
         </div>
 
         {!you ? (
@@ -192,9 +192,9 @@ export function RedPacketFelt({ snapshot, onCommand }: RedPacketFeltProps) {
               {yourCell !== undefined
                 ? `You hold packet #${yourCell}`
                 : phase === 'IN_HAND'
-                  ? `Tap a packet to claim it for ₮${betAmount}`
+                  ? `Tap a packet to claim it for $${betAmount}`
                   : 'Waiting for the next round'}
-              <div className="font-bold text-white">Balance ₮{you.stack}</div>
+              <div className="font-bold text-white">Balance ${you.stack}</div>
             </div>
           </div>
         )}
@@ -230,7 +230,7 @@ function PlayerColumn({
           >
             <div className="min-w-0">
               <div className="truncate text-[0.7rem] font-bold text-amber-100">{p.name}</div>
-              <div className="text-[0.65rem] text-amber-300/80">₮{p.stack}</div>
+              <div className="text-[0.65rem] text-amber-300/80">${p.stack}</div>
             </div>
             <div className="shrink-0 text-right">
               {info?.cell !== undefined && (

@@ -256,8 +256,8 @@ export function TexasCowboyFelt({
               ))}
             </div>
             <div className="text-[0.7rem] text-emerald-200/80">
-              {isBettingOpen ? `Tap a market to stake ₮${chip}` : 'Betting is closed'}
-              <div className="font-bold text-white">Balance ₮{you.stack}</div>
+              {isBettingOpen ? `Tap a market to stake $${chip}` : 'Betting is closed'}
+              <div className="font-bold text-white">Balance ${you.stack}</div>
             </div>
           </>
         )}
@@ -349,7 +349,7 @@ function MarketCell({
 
       {yours > 0 && (
         <span className="absolute top-1 right-1 rounded-full bg-amber-400 px-1.5 text-[0.6rem] font-black text-black shadow">
-          ₮{yours}
+          ${yours}
         </span>
       )}
     </button>

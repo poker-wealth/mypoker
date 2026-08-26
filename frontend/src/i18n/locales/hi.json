@@ -375,7 +375,7 @@
   "jackpot": {
     "totalPools": "कुल पूल राशि",
     "paysOut": "{{pct}}% भुगतान",
-    "needsMore": "इस स्तर के भुगतान से पहले ₮{{amount}} और चाहिए",
+    "needsMore": "इस स्तर के भुगतान से पहले ${{amount}} और चाहिए",
     "windowOpen": "ग्रैंड विंडो खुली है",
     "windowClosed": "ग्रैंड विंडो बंद",
     "opensIn": "{{time}} में खुलेगी",
@@ -419,11 +419,11 @@
   "vip": {
     "signInToSee": "अपनी VIP स्थिति देखने के लिए साइन इन करें",
     "effectiveVolume": "प्रभावी वॉल्यूम",
-    "remaining": "{{tier}} तक ₮{{amount}}",
+    "remaining": "{{tier}} तक ${{amount}}",
     "topTier": "सर्वोच्च स्तर प्राप्त",
     "byGame": "यह कहाँ से आया",
     "counted": "गिना गया",
-    "roundsStaked": "{{rounds}} राउंड · ₮{{staked}} लगाया",
+    "roundsStaked": "{{rounds}} राउंड · ${{staked}} लगाया",
     "coefficientNote": "VIP के लिए हर गेम अलग तरह से गिना जाता है: टेक्सास ×1.0, नियू नियू ×0.5, बकारा ×0.3, अन्य ×0.4। इससे कम-रेक वाले गेम स्तर बढ़ाने का शॉर्टकट नहीं बनते।",
     "tiers": "स्तर",
     "title": {
@@ -447,17 +447,17 @@
     "signInToSee": "अपनी सूचनाएँ देखने के लिए साइन इन करें",
     "empty": "अभी कुछ नहीं",
     "emptyBlurb": "परिणाम, जमा और घोषणाएँ यहाँ दिखेंगी।",
-    "handWon": "आपने ₮{{amount}} जीते",
-    "handLost": "हाथ निपटा — ₮{{amount}}",
-    "deposit": "₮{{amount}} की जमा राशि जोड़ी गई",
-    "withdrawal": "₮{{amount}} की निकासी भेजी गई",
-    "jackpot": "जैकपॉट! आपने ₮{{amount}} जीते",
+    "handWon": "आपने ${{amount}} जीते",
+    "handLost": "हाथ निपटा — ${{amount}}",
+    "deposit": "${{amount}} की जमा राशि जोड़ी गई",
+    "withdrawal": "${{amount}} की निकासी भेजी गई",
+    "jackpot": "जैकपॉट! आपने ${{amount}} जीते",
     "vipUp": "आपने {{tier}} प्राप्त किया",
     "addressChanged": "आपका निकासी पता बदल दिया गया",
     "promo": "{{text}}",
-    "depositCredited": "₮{{amount}} की जमा राशि जोड़ी गई",
-    "withdrawalRequested": "₮{{amount}} की निकासी का अनुरोध किया गया",
-    "withdrawalSent": "₮{{amount}} की निकासी भेजी गई"
+    "depositCredited": "${{amount}} की जमा राशि जोड़ी गई",
+    "withdrawalRequested": "${{amount}} की निकासी का अनुरोध किया गया",
+    "withdrawalSent": "${{amount}} की निकासी भेजी गई"
   },
   "agent": {
     "title": "एजेंट सेंटर",
@@ -551,7 +551,7 @@
     "odds": "ऑड्स",
     "payout": "अधिकतम कवर",
     "decline": "नहीं चाहिए",
-    "accept": "₮{{premium}} में बीमा करें",
+    "accept": "${{premium}} में बीमा करें",
     "taken": "बीमा ले लिया"
   },
   "context": {

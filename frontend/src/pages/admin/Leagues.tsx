@@ -117,7 +117,7 @@ export function AdminLeagues() {
 
       <p className="flex items-start gap-1.5 px-1 text-[0.62rem] leading-relaxed text-dim">
         <Lock size={11} className="mt-0.5 shrink-0" />
-        Requests move no money. A separate review executes them, and a top-up over ₮10,000 needs a
+        Requests move no money. A separate review executes them, and a top-up over $10,000 needs a
         second administrator.
       </p>
 
@@ -189,7 +189,7 @@ function RequestSheet({ action, onClose }: { action: PendingAction | null; onClo
 
           <p className="rounded-lg bg-surface-2 px-3 py-2 text-[0.66rem] leading-relaxed text-dim">
             {isTopUp
-              ? 'This records a request only. Confirm the TRC-20 receipt before executing it, and a top-up over ₮10,000 needs a second administrator.'
+              ? 'This records a request only. Confirm the TRC-20 receipt before executing it, and a top-up over $10,000 needs a second administrator.'
               : "This records a request only. A league may raise one cash-out per 24 hours, and the amount is checked against the league's balance at execution."}
           </p>
 

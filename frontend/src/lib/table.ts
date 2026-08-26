@@ -22,7 +22,7 @@ export interface Seat {
   isWinner?: boolean;
 
   // ── Live tables only (the demo engine leaves these undefined) ──
-  /** What they last did this street — the bubble over the seat ("Call", "Raise ₮120"). */
+  /** What they last did this street — the bubble over the seat ("Call", "Raise $120"). */
   lastAction?: string;
   /** False while their socket is down; they still have their seat and their clock. */
   connected?: boolean;

@@ -101,7 +101,7 @@ export function BaccaratFelt({ snapshot, onCommand }: BaccaratFeltProps) {
           </span>
         </div>
         <div className="text-xs text-slate-300">
-          Pot <span className="font-bold text-amber-300">₮{snapshot?.pot ?? 0}</span>
+          Pot <span className="font-bold text-amber-300">${snapshot?.pot ?? 0}</span>
         </div>
       </div>
 
@@ -151,7 +151,7 @@ export function BaccaratFelt({ snapshot, onCommand }: BaccaratFeltProps) {
               <span className="text-xs text-slate-400">{s.pays}</span>
               {yours && (
                 <span className="absolute -top-2 rounded-full bg-amber-400 px-2 text-[0.65rem] font-black text-black">
-                  ₮{staked}
+                  ${staked}
                 </span>
               )}
             </button>
@@ -176,12 +176,12 @@ export function BaccaratFelt({ snapshot, onCommand }: BaccaratFeltProps) {
                     betAmount === amt ? 'bg-amber-400 text-black' : 'bg-slate-800 text-slate-200'
                   }`}
                 >
-                  ₮{amt}
+                  ${amt}
                 </button>
               ))}
             </div>
             <Button variant="primary" size="sm" onClick={() => placeBet(spot)}>
-              {staked > 0 ? `Staked ₮${staked}` : `Back ${spot.toUpperCase()} for ₮${betAmount}`}
+              {staked > 0 ? `Staked $${staked}` : `Back ${spot.toUpperCase()} for $${betAmount}`}
             </Button>
           </>
         ) : isSeated ? (

@@ -193,7 +193,7 @@ export function PlayerSeat({ seat, align = 'bottom', onSit, onClick, accent = 'v
       <div className="relative z-20 -mt-2 w-[74px] rounded-full border border-white/10 bg-black/80 px-1 py-0.5 text-center backdrop-blur-sm">
         <div className="truncate text-[0.5rem] font-bold leading-tight text-white/90">{seat.name}</div>
         <div className="text-[0.6rem] font-black leading-tight tabular-nums" style={{ color: accent }}>
-          ₮{seat.stack.toLocaleString()}
+          ${seat.stack.toLocaleString()}
         </div>
       </div>
 
