@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { UserEditor } from './UserEditor';
 import { usePlayerSearch, usePlayerDetail } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
 import { moneyFromDecimal, money } from '@/lib/money';
@@ -14,10 +15,11 @@ import { useDebounced } from '@/lib/useDebounced';
 /**
  * Admin — Players.
  *
- * Read-only, and that is enforced by there being nothing to write with: no
- * endpoint, no mutation hook, no form. The doc says "no balance editing from
- * the UI — ever", and the way that survives a future refactor is for the write
- * path not to exist rather than for it to be hidden.
+ * Identity IS editable here (see `UserEditor`); BALANCE is not, and that is
+ * enforced by there being nothing to write with: no endpoint, no mutation hook,
+ * no form. The spec's acceptance criteria are explicit — "DBA direct balance
+ * update attempt → MongoDB RBAC rejects" — and the way that survives a future
+ * refactor is for the write path not to exist rather than for it to be hidden.
  *
  * An admin who needs to move a player's money uses the withdrawal and
  * settlement paths, which are audited, idempotent and double-entry.
@@ -227,11 +229,20 @@ function PlayerDetail({ playerId }: { playerId: string }) {
         </div>
       )}
 
+      {/*
+        The balance note stays exactly as it was, now that the rest of the record
+        IS editable. It has become more necessary rather than less: on a screen
+        with save buttons, the one figure without one needs to say why.
+      */}
       <p className="flex items-start gap-1.5 text-[0.62rem] leading-relaxed text-dim">
         <Lock size={11} className="mt-0.5 shrink-0" />
-        Read-only. Balances move through the withdrawal and settlement paths, which are
-        audited and double-entry — never edited from here.
+        Balances are not editable here. They move through the withdrawal and settlement
+        paths, which are audited and double-entry.
       </p>
+
+      <div className="border-t border-border pt-4">
+        <UserEditor playerId={playerId} />
+      </div>
     </div>
   );
 }

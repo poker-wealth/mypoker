@@ -54,6 +54,21 @@ export function validatePasswordStrength(password: string): CredentialVerdict {
 }
 
 /**
+ * The email half on its own, for callers that change an address without setting
+ * a password — the admin edit form.
+ *
+ * Exported so an administrator's edit meets EXACTLY the bar a sign-up does. An
+ * admin panel with a looser rule is how an address that no code can reach gets
+ * onto a confirmed account.
+ */
+export function validateEmailAddress(email: string): CredentialVerdict {
+  if (!EMAIL.test(email)) {
+    return { ok: false, code: 'email_invalid', message: 'Enter a valid email address.' };
+  }
+  return { ok: true };
+}
+
+/**
  * Check a sign-up before any account row exists.
  *
  * Order matters only for which message is shown first, and email comes first

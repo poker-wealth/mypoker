@@ -103,6 +103,84 @@ export const searchPlayers = (q: string): Promise<PlayerSearchResult> =>
 export const fetchPlayerDetail = (playerId: string): Promise<AdminPlayerDetail> =>
   api.get<AdminPlayerDetail>(`/admin/players/${encodeURIComponent(playerId)}`);
 
+/**
+ * One account as the edit form sees it.
+ *
+ * `hasPassword` and `hasGoogle` rather than the credentials themselves — the
+ * form needs to know whether there is a password to replace, never what it is.
+ *
+ * `emailVerified` is `boolean | null`, and the null matters: an account created
+ * before confirmation existed has never been asked the question, which is not
+ * the same as having failed to confirm. Rendering that third state as "no" would
+ * invite an admin to "fix" something that was never broken.
+ */
+export interface AdminUserRecord {
+  playerId: string;
+  email: string | null;
+  phone: string | null;
+  displayName: string | null;
+  photoUrl: string | null;
+  emailVerified: boolean | null;
+  role: 'player' | 'league_admin' | 'ops';
+  hasPassword: boolean;
+  hasGoogle: boolean;
+  suspendedAt: string | null;
+  suspendedReason: string | null;
+  suspendedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Absent = leave alone, null = clear, value = set. The server reads it the same way. */
+export interface AdminUserPatch {
+  displayName?: string;
+  email?: string | null;
+  phone?: string | null;
+  emailVerified?: boolean;
+  role?: 'player' | 'league_admin' | 'ops';
+  reason?: string;
+}
+
+export interface AdminAuditEntry {
+  id: string;
+  actorPlayerId: string;
+  subjectPlayerId: string;
+  action: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  reason: string | null;
+  at: string;
+}
+
+export const fetchUserRecord = (playerId: string): Promise<AdminUserRecord> =>
+  api.get<AdminUserRecord>(`/admin/players/${encodeURIComponent(playerId)}/account`);
+
+export const fetchUserAudit = (playerId: string): Promise<{ entries: AdminAuditEntry[] }> =>
+  api.get<{ entries: AdminAuditEntry[] }>(`/admin/players/${encodeURIComponent(playerId)}/audit`);
+
+export const updateUser = (playerId: string, patch: AdminUserPatch): Promise<AdminUserRecord> =>
+  api.patch<AdminUserRecord>(`/admin/players/${encodeURIComponent(playerId)}`, patch);
+
+export const setUserSuspension = (
+  playerId: string,
+  suspended: boolean,
+  reason?: string,
+): Promise<AdminUserRecord> =>
+  api.post<AdminUserRecord>(`/admin/players/${encodeURIComponent(playerId)}/suspension`, {
+    suspended,
+    ...(reason ? { reason } : {}),
+  });
+
+export const setUserPassword = (
+  playerId: string,
+  newPassword: string,
+  reason?: string,
+): Promise<{ ok: true }> =>
+  api.post<{ ok: true }>(`/admin/players/${encodeURIComponent(playerId)}/password`, {
+    newPassword,
+    ...(reason ? { reason } : {}),
+  });
+
 export interface AdminAlert {
   id: string;
   at: string;

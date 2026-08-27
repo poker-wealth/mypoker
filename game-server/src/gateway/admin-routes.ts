@@ -1,6 +1,12 @@
 import { Router, type Request, type Response } from 'express';
 import { requireAuth, requireAdmin } from './auth';
-import { userStore } from '../auth/user-store';
+import { userStore, type AdminUserPatch } from '../auth/user-store';
+import { adminAudit, changedFields } from '../auth/admin-audit-store';
+import {
+  validateDisplayName,
+  validateEmailAddress,
+  validatePasswordStrength,
+} from '../auth/credential-rules';
 import { scoreFor, tierOf, tierForVolume, type FindingReason } from '../players/index';
 import { severityOf, labelOf } from '../ops/alert-severity';
 import type { GatewayConfig } from './config';
@@ -368,6 +374,268 @@ export function buildAdminRouter(config: GatewayConfig): Router {
         reputation: { roundsPlayed, findings, score, band: tierOf(score) },
         vip: { tier: tier.tier, title: tier.title },
       });
+    }),
+  );
+
+  /**
+   * ── Editing a user ────────────────────────────────────────────────────────
+   *
+   * Everything below is a write, and everything below is audited. Three rules
+   * hold across all of them, and they are the reason this surface is safe to
+   * hand an administrator:
+   *
+   *  1. The acting admin comes from `actor(req)` — the verified token — never
+   *     the body. Same rule as `approvedBy` on a withdrawal.
+   *  2. Every write records a before/after pair in the admin audit log, and the
+   *     audit write is AWAITED. An action taken with no record of it is the one
+   *     outcome this whole surface exists to prevent.
+   *  3. Validation is the SAME function the player's own self-service route
+   *     calls. An admin form with a looser rule is how a display name of 900
+   *     characters or an unreachable email address gets onto a live account.
+   *
+   * Two fields are deliberately absent, and both are specification, not
+   * caution:
+   *
+   *  - BALANCE. "DBA direct balance update attempt → MongoDB RBAC rejects
+   *    (permission denied logged)" (12-week plan, acceptance criteria). Money
+   *    moves through `transfer()` and leaves a double-entry pair; a figure typed
+   *    into a form leaves a balance no ledger explains, which
+   *    `scripts/ledger-integrity.ts` would then report as a real discrepancy.
+   *  - WITHDRAWAL ADDRESS. "Withdrawal address modification: 48-hour cooldown,
+   *    player must execute via link (CS cannot directly modify)", asserted as
+   *    "CS attempt to modify withdrawal address via API: 403 Forbidden". An
+   *    admin who can retarget a payout address is the entire threat model of an
+   *    insider attack on a poker platform.
+   */
+
+  /** What an administrator may see and edit about one account. */
+  r.get(
+    '/players/:playerId/account',
+    handle(async (req, res) => {
+      const record = await userStore.adminGet(String(req.params.playerId));
+      if (!record) {
+        // Not an error: a Telegram player genuinely has no identity document.
+        // Said in words, because "null" and "failed to load" look identical in
+        // a UI that does not distinguish them.
+        res.status(404).json({
+          error: 'no web identity for this player',
+          code: 'no_identity',
+          note: 'Telegram players have no identity record — nothing here is editable for them.',
+        });
+        return;
+      }
+      res.json(record);
+    }),
+  );
+
+  /** The audit trail for one account. Read-only; there is no delete path. */
+  r.get(
+    '/players/:playerId/audit',
+    handle(async (req, res) => {
+      const entries = await adminAudit.forSubject(String(req.params.playerId), 100);
+      res.json({ entries });
+    }),
+  );
+
+  /**
+   * Edit the identity fields.
+   *
+   * CHANGING AN EMAIL RESETS CONFIRMATION unless the admin explicitly says
+   * otherwise. Carrying `emailVerified: true` across an address change would
+   * mark an address confirmed that nobody has ever proved control of — the
+   * admin typed it, which is not the same thing. The override exists because
+   * support legitimately needs it (a player who changed provider and can prove
+   * identity another way), but it has to be asked for.
+   */
+  r.patch(
+    '/players/:playerId',
+    handle(async (req, res) => {
+      const playerId = String(req.params.playerId);
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const patch: AdminUserPatch = {};
+
+      if (body.displayName !== undefined) {
+        if (typeof body.displayName !== 'string') {
+          res.status(400).json({ error: 'displayName must be a string' });
+          return;
+        }
+        const verdict = validateDisplayName(body.displayName);
+        if (!verdict.ok) {
+          res.status(400).json({ error: verdict.message, code: verdict.code });
+          return;
+        }
+        patch.displayName = verdict.displayName;
+      }
+
+      if (body.email !== undefined) {
+        if (body.email === null) {
+          patch.email = null;
+        } else if (typeof body.email === 'string') {
+          const verdict = validateEmailAddress(body.email.trim());
+          if (!verdict.ok) {
+            res.status(400).json({ error: verdict.message, code: verdict.code });
+            return;
+          }
+          patch.email = body.email.trim();
+        } else {
+          res.status(400).json({ error: 'email must be a string or null' });
+          return;
+        }
+      }
+
+      if (body.phone !== undefined) {
+        if (body.phone === null) patch.phone = null;
+        else if (typeof body.phone === 'string') patch.phone = body.phone;
+        else {
+          res.status(400).json({ error: 'phone must be a string or null' });
+          return;
+        }
+      }
+
+      if (body.role !== undefined) {
+        if (body.role !== 'player' && body.role !== 'league_admin' && body.role !== 'ops') {
+          res.status(400).json({ error: 'role must be player, league_admin or ops' });
+          return;
+        }
+        patch.role = body.role;
+      }
+
+      if (typeof body.emailVerified === 'boolean') {
+        patch.emailVerified = body.emailVerified;
+      } else if (patch.email !== undefined && patch.email !== null) {
+        // The address changed and the admin did not speak to confirmation —
+        // so it is unconfirmed. See the route comment.
+        patch.emailVerified = false;
+      }
+
+      const result = await userStore.adminUpdate(playerId, patch);
+      if (!result.ok) {
+        const status = result.reason === 'no_account' ? 404 : 409;
+        res.status(status).json({ error: result.reason, code: result.reason });
+        return;
+      }
+
+      const diff = changedFields(
+        result.before as unknown as Record<string, unknown>,
+        result.after as unknown as Record<string, unknown>,
+      );
+
+      // Only write an audit entry when something actually moved. A log full of
+      // no-op saves is a log nobody scrolls through, and the entries that matter
+      // are the ones lost in it.
+      if (Object.keys(diff.after).length > 0) {
+        await adminAudit.record({
+          actorPlayerId: actor(req),
+          subjectPlayerId: playerId,
+          action: 'user.update',
+          before: diff.before,
+          after: diff.after,
+          ...(typeof body.reason === 'string' && body.reason.trim()
+            ? { reason: body.reason.trim() }
+            : {}),
+        });
+      }
+
+      res.json(result.after);
+    }),
+  );
+
+  /**
+   * Suspend or reinstate.
+   *
+   * Its own route rather than a field on the patch above, so the acting
+   * administrator is recorded ON THE ACCOUNT (`suspendedBy`) and not only in the
+   * audit log. The first question about a locked-out player is who locked them
+   * out, and it should be answerable from the record in front of you.
+   */
+  r.post(
+    '/players/:playerId/suspension',
+    handle(async (req, res) => {
+      const playerId = String(req.params.playerId);
+      const body = (req.body ?? {}) as { suspended?: unknown; reason?: unknown };
+
+      if (typeof body.suspended !== 'boolean') {
+        res.status(400).json({ error: 'suspended must be true or false' });
+        return;
+      }
+
+      // An administrator suspending themselves locks the panel behind an account
+      // that can no longer sign in to unlock it. Refused here rather than
+      // discovered afterwards.
+      if (body.suspended && playerId === actor(req)) {
+        res.status(400).json({
+          error: 'you cannot suspend your own account',
+          code: 'self_suspend',
+        });
+        return;
+      }
+
+      const reason = typeof body.reason === 'string' ? body.reason.trim() : undefined;
+      const result = await userStore.adminSetSuspended(
+        playerId,
+        body.suspended,
+        actor(req),
+        reason,
+      );
+      if (!result) {
+        res.status(404).json({ error: 'no web identity for this player', code: 'no_identity' });
+        return;
+      }
+
+      await adminAudit.record({
+        actorPlayerId: actor(req),
+        subjectPlayerId: playerId,
+        action: body.suspended ? 'user.suspend' : 'user.reinstate',
+        before: { suspendedAt: result.before.suspendedAt },
+        after: { suspendedAt: result.after.suspendedAt },
+        ...(reason ? { reason } : {}),
+      });
+
+      res.json(result.after);
+    }),
+  );
+
+  /**
+   * Set a password on behalf of a player.
+   *
+   * The new password is read from the body, hashed, and never returned, logged
+   * or stored in the audit entry — the entry records THAT a password was set and
+   * by whom, which is the auditable fact. Writing the value would put a live
+   * credential in a collection built to be read by people.
+   */
+  r.post(
+    '/players/:playerId/password',
+    handle(async (req, res) => {
+      const playerId = String(req.params.playerId);
+      const body = (req.body ?? {}) as { newPassword?: unknown; reason?: unknown };
+
+      if (typeof body.newPassword !== 'string') {
+        res.status(400).json({ error: 'newPassword is required' });
+        return;
+      }
+      const verdict = validatePasswordStrength(body.newPassword);
+      if (!verdict.ok) {
+        res.status(400).json({ error: verdict.message, code: verdict.code });
+        return;
+      }
+
+      const result = await userStore.adminSetPassword(playerId, body.newPassword);
+      if (!result.ok) {
+        const status = result.reason === 'no_account' ? 404 : 400;
+        res.status(status).json({ error: result.reason, code: result.reason });
+        return;
+      }
+
+      await adminAudit.record({
+        actorPlayerId: actor(req),
+        subjectPlayerId: playerId,
+        action: 'user.set_password',
+        ...(typeof body.reason === 'string' && body.reason.trim()
+          ? { reason: body.reason.trim() }
+          : {}),
+      });
+
+      res.json({ ok: true });
     }),
   );
 

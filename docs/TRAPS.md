@@ -405,3 +405,32 @@ and watch the call happen. Both of these were found by standing the stack up
 locally — in-memory Mongo shared over TCP, a throwaway SMTP server capturing
 the actual message — which took less time than either bug would have taken to
 diagnose from a production report.
+
+## 20. A rule enforced on one door is not enforced
+
+**Suspension was checked on the password sign-in and not on Google.**
+`/auth/login` runs `isSignInAllowed`; `/auth/google` took whatever
+`userStore.oauth` returned and minted a session from it. So an administrator
+could suspend an account and the player would be back in one click on "Sign in
+with Google" — a ban that any banned player would discover was optional within
+about thirty seconds.
+
+Nothing in the suite would have caught it. Every existing sign-in test used the
+password path, so the Google route had full coverage of the questions it was
+already being asked and none of the new one.
+
+The fix that mattered was not adding the check — it was changing `oauth()` to
+return a **verdict** rather than an identity, so the caller cannot reach the
+identity without stepping past the refusal. A third sign-in method now cannot
+skip it by accident; it will not compile.
+
+**And the near-miss underneath:** the first version of that fix re-read
+`user.suspendedAt` inline instead of calling `isSignInAllowed` — a second copy
+of the rule, three lines from the file that exists to be the only copy. It was
+caught by mutation-testing the shared rule and noticing the Google path stayed
+green, which is the whole reason to break a guard on purpose rather than trust
+that a passing suite means it is load-bearing.
+
+**The pattern:** when you add a rule, enumerate the doors. Auth had two and only
+one was counted. Then make the type system carry the rule, because the next door
+will be added by someone who never read this.

@@ -368,10 +368,13 @@ describe('POST /auth/google', () => {
     });
     global.fetch = fetchSpy as unknown as typeof fetch;
     (userStore.oauth as jest.Mock).mockResolvedValue({
-      playerId: 'victim-1',
-      email: 'victim@example.com',
-      displayName: 'Victim',
-      photoUrl: null,
+      ok: true,
+      identity: {
+        playerId: 'victim-1',
+        email: 'victim@example.com',
+        displayName: 'Victim',
+        photoUrl: null,
+      },
     });
 
     const res = await request(appWith()).post('/auth/google').send({ token: 'some-access-token' });
@@ -398,11 +401,17 @@ describe('POST /auth/google', () => {
       throw new Error(`unexpected fetch: ${url}`);
     });
     global.fetch = fetchSpy as unknown as typeof fetch;
+    // `oauth` returns a VERDICT now, not a bare identity — suspension is
+    // enforced on the Google path too. The fake has to match, or the route
+    // reads `ok: undefined` and refuses a sign-in that should succeed.
     (userStore.oauth as jest.Mock).mockResolvedValue({
-      playerId: 'g-100',
-      email: 'ada@example.com',
-      displayName: 'Ada',
-      photoUrl: null,
+      ok: true,
+      identity: {
+        playerId: 'g-100',
+        email: 'ada@example.com',
+        displayName: 'Ada',
+        photoUrl: null,
+      },
     });
 
     const res = await request(appWith()).post('/auth/google').send({ token: 'some-access-token' });

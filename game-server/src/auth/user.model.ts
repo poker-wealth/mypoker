@@ -28,6 +28,30 @@ export interface UserDoc {
   emailVerified?: boolean;
   displayName?: string;
   photoUrl?: string;
+  /**
+   * Platform role. ABSENT MEANS PLAYER — the same reasoning as `emailVerified`:
+   * every account predates this field, and a `default` would only apply on
+   * create, so the read has to handle undefined regardless.
+   *
+   * `ops` is what `requireAdmin` demands, and this document is the ONLY place it
+   * can be granted. There is deliberately no HTTP route that writes it: an
+   * endpoint that promotes an account to administrator is the single most
+   * valuable thing on the platform to compromise. Use `scripts/grant-ops.ts`,
+   * which requires shell access to the server.
+   */
+  role?: 'player' | 'league_admin' | 'ops';
+  /**
+   * Set when an administrator suspends the account; absent means active.
+   *
+   * A TIMESTAMP RATHER THAN A BOOLEAN, so "when" is answerable without a
+   * separate audit lookup — the first question asked about a locked-out player
+   * is when it happened.
+   */
+  suspendedAt?: Date;
+  /** Shown to the player at sign-in, so a suspension is never silent. */
+  suspendedReason?: string;
+  /** The playerId of the administrator who suspended. Never the request body. */
+  suspendedBy?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -48,6 +72,12 @@ const userSchema = new Schema<UserDoc>(
     emailVerified: { type: Boolean },
     displayName: { type: String },
     photoUrl: { type: String },
+    // No `default: 'player'`, for the reason given on `emailVerified` above:
+    // it would apply on create only, so undefined must be handled anyway.
+    role: { type: String, enum: ['player', 'league_admin', 'ops'] },
+    suspendedAt: { type: Date },
+    suspendedReason: { type: String },
+    suspendedBy: { type: String },
   },
   { timestamps: true, versionKey: false, collection: 'users' },
 );

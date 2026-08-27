@@ -18,6 +18,12 @@ import {
   fetchWithdrawalQueue,
   approveWithdrawal,
   rejectWithdrawal,
+  fetchUserRecord,
+  fetchUserAudit,
+  updateUser,
+  setUserSuspension,
+  setUserPassword,
+  type AdminUserPatch,
 } from './admin';
 import { fetchVip } from './vip';
 import {
@@ -705,6 +711,73 @@ export function usePlayerDetail(playerId: string | null) {
     staleTime: 10_000,
     retry: false,
   });
+}
+
+/**
+ * The editable account record behind the admin player drawer.
+ *
+ * `retry: false` because the two failures here are both permanent answers: 404
+ * means this player has no web identity (a Telegram account), and a role
+ * rejection does not change on repetition. Retrying either just delays the
+ * message.
+ */
+export function useAdminUserRecord(playerId: string | null) {
+  return useQuery({
+    queryKey: ['admin', 'user', playerId],
+    queryFn: () => fetchUserRecord(playerId!),
+    enabled: Boolean(playerId),
+    retry: false,
+  });
+}
+
+/** The audit trail for one account. */
+export function useAdminUserAudit(playerId: string | null) {
+  return useQuery({
+    queryKey: ['admin', 'audit', playerId],
+    queryFn: () => fetchUserAudit(playerId!),
+    enabled: Boolean(playerId),
+    retry: false,
+  });
+}
+
+/**
+ * The three admin writes, sharing one invalidation.
+ *
+ * EVERY MUTATION INVALIDATES THE AUDIT QUERY as well as the record. The audit
+ * entry is written by the same request that made the change, so a panel showing
+ * a fresh record beside a stale trail would show an edit that apparently nobody
+ * made — which is precisely the impression the audit log exists to prevent.
+ *
+ * The search results are invalidated too: a changed display name or email must
+ * not leave the list behind it reading the old value.
+ */
+export function useAdminUserMutations(playerId: string | null) {
+  const qc = useQueryClient();
+  const after = async (): Promise<void> => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ['admin', 'user', playerId] }),
+      qc.invalidateQueries({ queryKey: ['admin', 'audit', playerId] }),
+      qc.invalidateQueries({ queryKey: ['admin', 'player', playerId] }),
+      qc.invalidateQueries({ queryKey: ['admin', 'players'] }),
+    ]);
+  };
+
+  return {
+    update: useMutation({
+      mutationFn: (patch: AdminUserPatch) => updateUser(playerId!, patch),
+      onSuccess: after,
+    }),
+    suspension: useMutation({
+      mutationFn: (v: { suspended: boolean; reason?: string }) =>
+        setUserSuspension(playerId!, v.suspended, v.reason),
+      onSuccess: after,
+    }),
+    password: useMutation({
+      mutationFn: (v: { newPassword: string; reason?: string }) =>
+        setUserPassword(playerId!, v.newPassword, v.reason),
+      onSuccess: after,
+    }),
+  };
 }
 
 /**

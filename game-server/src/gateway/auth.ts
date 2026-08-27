@@ -187,12 +187,23 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
   const authClient: AuthUserStore = deps.users ?? userStore;
   const googleClient = new OAuth2Client();
 
-  const issue = (player: PlayerProfile): { token: string; player: PlayerProfile } => ({
-    token: signToken(
-      { playerId: player.playerId, role: 'player' },
-      config.jwtSecret,
-      config.jwtTtlSeconds,
-    ),
+  /**
+   * Mint a session.
+   *
+   * THE ROLE COMES FROM THE STORED IDENTITY, and this is the only place an `ops`
+   * token is created anywhere in the platform. Before this, every sign-in path
+   * hardcoded `role: 'player'`, so `requireAdmin` — which demands `ops` — could
+   * never pass for anyone: the admin API was unreachable by every human alive.
+   *
+   * `role` is read off the document the store returned, never off the request.
+   * A client that could name its own role would grant itself the admin panel.
+   * Absent means player, matching `UserDoc.role`'s absent-means-player rule.
+   */
+  const issue = (
+    player: PlayerProfile,
+    role: 'player' | 'league_admin' | 'ops' = 'player',
+  ): { token: string; player: PlayerProfile } => ({
+    token: signToken({ playerId: player.playerId, role }, config.jwtSecret, config.jwtTtlSeconds),
     player,
   });
 
@@ -428,7 +439,7 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
         return;
       }
 
-      res.json(issue(asProfile(identity)));
+      res.json(issue(asProfile(identity), identity.role));
     })().catch((err: unknown) => {
       console.error('[auth] verify-otp failed:', err);
       res.status(500).json({ error: 'internal error' });
@@ -487,12 +498,31 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
       const check = await authClient.verifyPassword(identifier, password);
 
       if (check.ok) {
-        res.json(issue(asProfile(check.identity)));
+        res.json(issue(asProfile(check.identity), check.identity.role));
         return;
       }
 
       if (check.reason === 'invalid_credentials') {
         res.status(401).json({ error: 'invalid email or password' });
+        return;
+      }
+
+      // Suspended by an administrator. 403 like the unconfirmed branch, but with
+      // a `code` the client switches on — the two must not share a message.
+      // "Confirm your email" shown to a suspended player sends them round a
+      // confirmation loop that can never end in a session, and they would call
+      // support about the wrong thing entirely.
+      //
+      // The reason is included when an admin wrote one. A lockout with no
+      // explanation is a support ticket every single time, and the admin typed
+      // that sentence for this exact moment.
+      if (check.reason === 'suspended') {
+        res.status(403).json({
+          error: check.suspendedReason
+            ? `This account is suspended: ${check.suspendedReason}`
+            : 'This account is suspended. Contact support.',
+          code: 'account_suspended',
+        });
         return;
       }
 
@@ -865,7 +895,18 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
       }
 
       const u = await authClient.oauth(payload.sub, payload.email, payload.name, payload.picture);
-      res.json(issue(asProfile(u)));
+      if (!u.ok) {
+        // Same words and the same `code` as the password path — a suspended
+        // player must not learn that one door is softer than the other.
+        res.status(403).json({
+          error: u.suspendedReason
+            ? `This account is suspended: ${u.suspendedReason}`
+            : 'This account is suspended. Contact support.',
+          code: 'account_suspended',
+        });
+        return;
+      }
+      res.json(issue(asProfile(u.identity), u.identity.role));
     } catch (err) {
       console.error('[auth] Google authentication error:', err);
       res.status(401).json({ error: err instanceof Error ? err.message : 'Google authentication failed' });
