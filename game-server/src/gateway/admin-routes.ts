@@ -371,6 +371,40 @@ export function buildAdminRouter(config: GatewayConfig): Router {
     }),
   );
 
+  /**
+   * Admins — list and create platform administrators.
+   *
+   * Gated by requireAdmin like everything here, so only an existing ops account
+   * can mint another (the default seed is the bootstrap; real admins are made
+   * here). Email + password only — an admin never signs in with Telegram or
+   * Google — and the new account carries role 'ops' from creation.
+   */
+  r.get(
+    '/admins',
+    handle(async (_req, res) => {
+      res.json({ admins: await userStore.listAdmins() });
+    }),
+  );
+
+  r.post(
+    '/admins',
+    handle(async (req, res) => {
+      const body = (req.body ?? {}) as Record<string, string>;
+      const email = (body.email ?? '').trim();
+      const password = body.password ?? '';
+      if (!email || !password) {
+        res.status(400).json({ error: 'email and password are required' });
+        return;
+      }
+      try {
+        const admin = await userStore.createAdmin(email, password, body.displayName);
+        res.json({ admin });
+      } catch (err) {
+        res.status(400).json({ error: err instanceof Error ? err.message : 'could not create admin' });
+      }
+    }),
+  );
+
   return r;
 }
 

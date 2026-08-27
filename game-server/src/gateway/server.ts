@@ -13,6 +13,7 @@ import { loadConfig } from './config';
 import { createGatewayApp } from './app';
 import { LobbyService } from '../lobby';
 import { connectDb } from '../db/connection';
+import { seedDefaultAdmin } from '../auth/user-store';
 import type { TableHub } from '../live/table-hub';
 
 loadDotenv();
@@ -22,7 +23,15 @@ const config = loadConfig();
 // Connect the gateway's own database (the user store) before accepting requests —
 // web sign-in needs it, and failing loudly on boot beats 500s at login time.
 connectDb(config.mongoUri, config.mongoTls)
-  .then(() => {
+  .then(async () => {
+    // Ensure a platform administrator exists before serving — otherwise the
+    // admin panel is unreachable (nothing else mints an ops token). Idempotent:
+    // a no-op once any ops account exists. Failing here is non-fatal — the
+    // player app must still come up — so a seed error is logged, not thrown.
+    await seedDefaultAdmin().catch((err: unknown) =>
+      console.error('[admin] default-admin seed failed:', err instanceof Error ? err.message : err),
+    );
+
     // An EMPTY lobby, filled from the live hub inside createGatewayApp.
     //
     // It used to be seedLobby() — a file that calls itself a PLACEHOLDER and says the lobby

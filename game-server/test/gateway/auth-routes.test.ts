@@ -63,6 +63,9 @@ describe('POST /auth/telegram', () => {
       photoUrl: 'https://x/a.jpg',
       telegramId: 4242,
       vipTier: 0,
+      // Telegram sign-in is never an administrator — the profile now carries the
+      // role explicitly, and for a Mini App launch it is always 'player'.
+      role: 'player',
     });
     expect(typeof res.body.token).toBe('string');
   });

@@ -17,6 +17,13 @@ export interface UserDoc {
   googleId?: string;
   displayName?: string;
   photoUrl?: string;
+  /**
+   * Platform authority. `'ops'` is a platform administrator (the admin panel);
+   * absent means a normal player. Deliberately narrow — this is the ONLY thing
+   * that lifts an account into the withdrawal queue and treasury, so there is no
+   * `'ops' | 'league_admin' | …` here until each of those is actually built.
+   */
+  role?: 'ops';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -32,6 +39,7 @@ const userSchema = new Schema<UserDoc>(
     googleId: { type: String, unique: true, sparse: true, index: true },
     displayName: { type: String },
     photoUrl: { type: String },
+    role: { type: String, enum: ['ops'], index: true },
   },
   { timestamps: true, versionKey: false, collection: 'users' },
 );
