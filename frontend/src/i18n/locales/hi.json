@@ -613,6 +613,34 @@
     "confirmResend": "नया कोड भेजें",
     "confirmResendIn": "{{seconds}} सेकंड में नया कोड भेजें",
     "confirmResendUnavailable": "अभी नया कोड नहीं भेजा जा सका।",
-    "confirmBack": "वापस"
+    "confirmBack": "वापस",
+    "forgotPassword": "पासवर्ड भूल गए?",
+    "forgotPasswordTitle": "पासवर्ड रीसेट करें",
+    "forgotPasswordSubtitle": "अपने खाते का ईमेल दर्ज करें। अगर यह किसी खाते से मेल खाता है, तो हम उस पर एक रीसेट कोड भेजेंगे।",
+    "forgotPasswordSubmit": "रीसेट कोड भेजें",
+    "forgotPasswordSending": "भेजा जा रहा है…",
+    "forgotPasswordSent": "अगर उस पते पर कोई खाता है, तो रीसेट कोड जल्द ही भेजा जाएगा।",
+    "forgotPasswordFailed": "रीसेट कोड नहीं भेजा जा सका। फिर से कोशिश करें।",
+    "resetPasswordTitle": "नया पासवर्ड चुनें",
+    "resetPasswordSubtitle": "अगर {{email}} से कोई खाता जुड़ा है, तो उस पर एक कोड भेजा गया है। कोड और अपना नया पासवर्ड दर्ज करें।",
+    "resetCode": "रीसेट कोड",
+    "newPassword": "नया पासवर्ड",
+    "resetPasswordSubmit": "पासवर्ड रीसेट करें",
+    "resetting": "रीसेट हो रहा है…",
+    "resetPasswordSuccess": "पासवर्ड रीसेट हो गया। अपने नए पासवर्ड से साइन इन करें।",
+    "resetPasswordFailed": "आपका पासवर्ड रीसेट नहीं हो सका। फिर से कोशिश करें।"
+  },
+  "personalInfo": {
+    "saveDisplayName": "नाम सहेजें",
+    "displayNameSaved": "प्रदर्शित नाम अपडेट हो गया",
+    "emailNotice": "ईमेल बदलना अभी समर्थित नहीं है — ईमेल बदलना खातों पर कब्ज़ा करने का एक आम तरीका है, इसलिए इसे जानबूझकर अभी शामिल नहीं किया गया है।",
+    "emailUnavailable": "इस खाते के लिए कोई ईमेल पता दर्ज नहीं है।",
+    "passwordTitle": "पासवर्ड",
+    "currentPassword": "मौजूदा पासवर्ड",
+    "changePassword": "पासवर्ड बदलें",
+    "passwordChanged": "पासवर्ड बदल दिया गया",
+    "noPasswordNotice": "इस खाते के लिए कोई पासवर्ड सेट नहीं है, इसलिए यहाँ बदलने के लिए कुछ नहीं है।",
+    "saveFailed": "सहेजा नहीं जा सका। फिर से कोशिश करें।",
+    "signInRequired": "अपनी व्यक्तिगत जानकारी प्रबंधित करने के लिए साइन इन करें।"
   }
 }

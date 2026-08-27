@@ -309,7 +309,7 @@ function Menu({
       <Row
         icon={<User size={17} className="text-dim" />}
         title={t('account.personalInfo')}
-        onClick={() => navigate('/settings')}
+        onClick={() => navigate('/personal')}
       />
       <Row
         icon={<Crown size={17} className="text-jackpot" />}

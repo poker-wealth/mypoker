@@ -152,6 +152,21 @@ export type PasswordCheck =
   | { ok: false; reason: 'invalid_credentials' }
   | { ok: false; reason: 'email_unverified'; identity: StoredIdentity };
 
+/**
+ * The result of an authenticated password change.
+ *
+ * `no_password` is its own reason, distinct from `invalid_current_password`:
+ * a Google-linked account with no `passwordHash` has nothing to check the
+ * supplied "current password" against, and telling them their password was
+ * wrong would send them looking for a password they never set. See the class
+ * comment on the change-password route in `gateway/auth.ts`.
+ */
+export type ChangePasswordResult =
+  | { ok: true }
+  | { ok: false; reason: 'no_account' }
+  | { ok: false; reason: 'no_password' }
+  | { ok: false; reason: 'invalid_current_password' };
+
 /** Same surface the gateway used to call over HTTP — now local. */
 export const userStore = {
   /**
@@ -203,6 +218,87 @@ export const userStore = {
   },
 
   /**
+   * Change the display name on an existing account. New name only — this is
+   * not signup, so there is nothing else to re-validate here. The caller
+   * (`gateway/auth.ts`) runs `validateDisplayName` before this is reached;
+   * this trusts that and just writes the field.
+   */
+  async updateDisplayName(playerId: string, displayName: string): Promise<StoredIdentity | null> {
+    const updated = await UserModel.findOneAndUpdate(
+      { _id: playerId },
+      { $set: { displayName } },
+      { new: true },
+    ).lean();
+    return updated ? toIdentity(updated as UserDoc) : null;
+  },
+
+  /**
+   * Change the password on an AUTHENTICATED account, given the current one.
+   *
+   * The current-password check is the entire point of this endpoint — see
+   * `gateway/auth.ts` — and it runs through `userStore.verifyPassword`,
+   * the exact path `/auth/login` uses, rather than a second `bcrypt.compare`
+   * written here that could quietly drift from it.
+   *
+   * Refuses with `no_password`, not `invalid_current_password`, for a
+   * Google-linked account that has never set one: there is nothing to check
+   * a supplied password against, and the two failures need different words at
+   * the route.
+   */
+  async changePassword(
+    playerId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<ChangePasswordResult> {
+    const user = await UserModel.findById(playerId).lean();
+    if (!user) return { ok: false, reason: 'no_account' };
+    if (!user.passwordHash) return { ok: false, reason: 'no_password' };
+
+    const identifier = user.email || user.phone;
+    if (!identifier) return { ok: false, reason: 'no_account' };
+
+    const check = await userStore.verifyPassword(identifier, currentPassword);
+    if (!check.ok) return { ok: false, reason: 'invalid_current_password' };
+
+    const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    await UserModel.updateOne({ _id: playerId }, { $set: { passwordHash } });
+    return { ok: true };
+  },
+
+  /**
+   * What the forgot-password flow needs to know about an address, in a shape
+   * that lets the ROUTE answer identically whether or not it exists.
+   *
+   * `hasPassword` is reported rather than assumed: a Google-linked account
+   * may still hold no `passwordHash`, and the route must neither mail it a
+   * code nor create one — see the Google-account comment in `gateway/auth.ts`.
+   */
+  async findForPasswordReset(
+    email: string,
+  ): Promise<{ playerId: string; hasPassword: boolean } | null> {
+    const user = await findByIdentifier(email);
+    if (!user) return null;
+    return { playerId: user._id, hasPassword: Boolean(user.passwordHash) };
+  },
+
+  /**
+   * Set a new password after a correct forgot-password code.
+   *
+   * Keyed on the playerId the OTP CHALLENGE named, never on anything the
+   * client sent directly — same discipline as `markEmailVerified` — so a
+   * correct code can only ever reset the account it was issued for.
+   */
+  async resetPassword(playerId: string, newPassword: string): Promise<StoredIdentity | null> {
+    const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    const updated = await UserModel.findOneAndUpdate(
+      { _id: playerId },
+      { $set: { passwordHash } },
+      { new: true },
+    ).lean();
+    return updated ? toIdentity(updated as UserDoc) : null;
+  },
+
+  /**
    * Admin player search — by display name, email, phone, or playerId.
    *
    * Takes a compiled RegExp rather than a raw string, so escaping is the
@@ -233,10 +329,24 @@ export const userStore = {
     }));
   },
 
-  /** One identity by playerId, or null for a Telegram player (who has none). */
-  async byPlayerId(playerId: string): Promise<(StoredIdentity & { createdAt: string }) | null> {
+  /**
+   * One identity by playerId, or null for a Telegram player (who has none).
+   *
+   * `hasPassword` is reported alongside identity, not just inside
+   * `findForPasswordReset`, because `/auth/me` needs the same fact: whether a
+   * Google-linked account can render a change-password form at all. It is a
+   * boolean derived from `passwordHash` -- the hash itself is never part of
+   * this or any other return value here.
+   */
+  async byPlayerId(
+    playerId: string,
+  ): Promise<(StoredIdentity & { createdAt: string; hasPassword: boolean }) | null> {
     const doc = await UserModel.findById(playerId).lean();
     if (!doc) return null;
-    return { ...toIdentity(doc as UserDoc), createdAt: doc.createdAt.toISOString() };
+    return {
+      ...toIdentity(doc as UserDoc),
+      createdAt: doc.createdAt.toISOString(),
+      hasPassword: Boolean(doc.passwordHash),
+    };
   },
 };

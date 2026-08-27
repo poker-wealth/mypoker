@@ -6,6 +6,9 @@ import { Mail, Lock, ChevronLeft, User, Eye, EyeOff, ShieldCheck } from 'lucide-
 import { Button } from '@/components/ui/Button';
 import { useSession, unconfirmedEmailFrom } from '@/store/session';
 import { GoogleAuthButton } from '@/components/GoogleAuthButton';
+import { useForgotPassword, useResetPassword } from '@/api/hooks';
+import { ApiError } from '@/api/client';
+import { toast } from '@/store/toast';
 
 /** Digits in a confirmation code. Must match OTP_LENGTH on the gateway. */
 const CODE_LENGTH = 6;
@@ -24,8 +27,12 @@ export function Login() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { signInWithEmail, signUpWithEmail, confirmEmail, resendCode } = useSession();
+  const forgotPassword = useForgotPassword();
+  const resetPassword = useResetPassword();
 
-  const [view, setView] = useState<'initial' | 'login' | 'signup' | 'confirm'>('initial');
+  const [view, setView] = useState<
+    'initial' | 'login' | 'signup' | 'confirm' | 'forgotRequest' | 'forgotReset'
+  >('initial');
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -40,6 +47,15 @@ export function Login() {
   const [resendAt, setResendAt] = useState<string | null>(null);
   const [resendSeconds, setResendSeconds] = useState(0);
   const [resendNote, setResendNote] = useState<string | null>(null);
+
+  // Forgot-password: a separate two-step flow, not the confirmation one above.
+  // Confirmation always has a real, just-created account to talk about; a
+  // forgot-password request must not, or it becomes an oracle for "does this
+  // email exist" (see the comment on `handleForgotRequest`).
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [resetCode, setResetCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   /**
    * The real double-submit guard.
@@ -152,6 +168,67 @@ export function Login() {
     }
   };
 
+  const enterForgotReset = (email: string): void => {
+    setForgotEmail(email);
+    setResetCode('');
+    setNewPassword('');
+    setView('forgotReset');
+  };
+
+  /**
+   * Forgot-password, step 1.
+   *
+   * The server answers with the exact same body whether or not `forgotEmail`
+   * belongs to an account (`/auth/forgot-password` in gateway/auth.ts is a
+   * deliberate enumeration guard — same status, same shape, same rough
+   * timing). This handler must not undo that: it always moves on to the code
+   * screen and always shows the same deliberately vague line
+   * (`auth.forgotPasswordSent`), never "no account with that email". Someone
+   * WILL want to "improve" this into a clearer error one day — don't. The
+   * vagueness is the point, not a rough edge.
+   */
+  const handleForgotRequest = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault();
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setIsSubmitting(true);
+    try {
+      const pending = await forgotPassword.mutateAsync(forgotEmail.trim());
+      toast.success(t('auth.forgotPasswordSent'));
+      enterForgotReset(pending.email);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : t('auth.forgotPasswordFailed'));
+    } finally {
+      inFlight.current = false;
+      setIsSubmitting(false);
+    }
+  };
+
+  /** Forgot-password, step 2: the mailed code plus a new password. */
+  const handleForgotReset = async (e: React.FormEvent): Promise<void> => {
+    e.preventDefault();
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setIsSubmitting(true);
+    try {
+      await resetPassword.mutateAsync({ email: forgotEmail, code: resetCode, newPassword });
+      toast.success(t('auth.resetPasswordSuccess'));
+      // Land back at sign-in, per the spec — not a session: a reset proves
+      // control of the mailbox, not that this browser should be signed in.
+      setPassword('');
+      setIdentifier(forgotEmail);
+      setView('login');
+    } catch (err) {
+      // Wrong/expired/spent code, or a password the strength rule refuses —
+      // the server's own wording distinguishes all of those.
+      toast.error(err instanceof ApiError ? err.message : t('auth.resetPasswordFailed'));
+      setResetCode('');
+    } finally {
+      inFlight.current = false;
+      setIsSubmitting(false);
+    }
+  };
+
   const codeComplete = code.length === CODE_LENGTH;
 
   return (
@@ -171,11 +248,15 @@ export function Login() {
             <p className="mt-1 text-xs text-dim">
               {view === 'confirm'
                 ? t('auth.confirmTitle')
-                : view === 'signup'
-                  ? t('auth.createAccount')
-                  : view === 'login'
-                    ? t('auth.signIn')
-                    : t('auth.subtitle')}
+                : view === 'forgotRequest'
+                  ? t('auth.forgotPasswordTitle')
+                  : view === 'forgotReset'
+                    ? t('auth.resetPasswordTitle')
+                    : view === 'signup'
+                      ? t('auth.createAccount')
+                      : view === 'login'
+                        ? t('auth.signIn')
+                        : t('auth.subtitle')}
             </p>
           </div>
 
@@ -333,6 +414,19 @@ export function Login() {
                     </div>
                   </div>
 
+                  {view === 'login' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForgotEmail(identifier);
+                        setView('forgotRequest');
+                      }}
+                      className="self-end text-xs font-semibold text-accent hover:text-text"
+                    >
+                      {t('auth.forgotPassword')}
+                    </button>
+                  )}
+
                   <div className="mt-2">
                     <Button full disabled={isSubmitting}>
                       {isSubmitting
@@ -342,6 +436,147 @@ export function Login() {
                         : view === 'login'
                           ? t('auth.signIn')
                           : t('auth.createAccount')}
+                    </Button>
+                  </div>
+                </form>
+              </motion.div>
+            )}
+
+            {view === 'forgotRequest' && (
+              <motion.div
+                key="forgotRequest"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="flex flex-col p-5"
+              >
+                <div className="mb-4 flex items-center">
+                  <button
+                    onClick={() => setView('login')}
+                    className="mr-3 grid size-8 place-items-center rounded-full bg-border/40 text-dim transition-colors hover:bg-border/80 hover:text-text"
+                    aria-label={t('auth.confirmBack')}
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <h2 className="text-base font-bold text-text">{t('auth.forgotPasswordTitle')}</h2>
+                </div>
+
+                <p className="mb-4 text-xs leading-relaxed text-dim">
+                  {t('auth.forgotPasswordSubtitle')}
+                </p>
+
+                <form onSubmit={(e) => void handleForgotRequest(e)} className="flex flex-col gap-3.5">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-dim ml-1">{t('auth.email')}</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 grid w-10 place-items-center text-dim">
+                        <Mail size={16} />
+                      </div>
+                      <input
+                        type="email"
+                        required
+                        autoComplete="email"
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        className="h-11 w-full rounded-xl border border-border bg-black/40 pl-10 pr-4 text-sm text-text placeholder:text-dim focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+                        placeholder="you@example.com"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-2">
+                    <Button full disabled={isSubmitting}>
+                      {isSubmitting ? t('auth.forgotPasswordSending') : t('auth.forgotPasswordSubmit')}
+                    </Button>
+                  </div>
+                </form>
+              </motion.div>
+            )}
+
+            {view === 'forgotReset' && (
+              <motion.div
+                key="forgotReset"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="flex flex-col p-5"
+              >
+                <div className="mb-4 flex items-center">
+                  <button
+                    onClick={() => setView('login')}
+                    className="mr-3 grid size-8 place-items-center rounded-full bg-border/40 text-dim transition-colors hover:bg-border/80 hover:text-text"
+                    aria-label={t('auth.confirmBack')}
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <h2 className="text-base font-bold text-text">{t('auth.resetPasswordTitle')}</h2>
+                </div>
+
+                {/* Deliberately conditional wording ("if an account exists…"),
+                    matching the request step — see the comment on
+                    `handleForgotRequest`. This screen is reached unconditionally
+                    after step 1, whether or not a code was actually sent, so it
+                    must not read as confirmation that {{email}} has an account. */}
+                <p className="mb-4 text-xs leading-relaxed text-dim">
+                  {t('auth.resetPasswordSubtitle', { email: forgotEmail })}
+                </p>
+
+                <form onSubmit={(e) => void handleForgotReset(e)} className="flex flex-col gap-3.5">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-dim ml-1" htmlFor="reset-otp">
+                      {t('auth.resetCode')}
+                    </label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 grid w-10 place-items-center text-dim">
+                        <ShieldCheck size={16} />
+                      </div>
+                      <input
+                        id="reset-otp"
+                        type="text"
+                        required
+                        autoComplete="one-time-code"
+                        inputMode="numeric"
+                        pattern="\d*"
+                        maxLength={CODE_LENGTH}
+                        value={resetCode}
+                        onChange={(e) => setResetCode(e.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH))}
+                        className="h-11 w-full rounded-xl border border-border bg-black/40 pl-10 pr-4 text-center font-mono text-lg tracking-[0.4em] text-text placeholder:tracking-normal placeholder:text-dim focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+                        placeholder="000000"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-dim ml-1">{t('auth.newPassword')}</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 grid w-10 place-items-center text-dim">
+                        <Lock size={16} />
+                      </div>
+                      <input
+                        type={showNewPassword ? 'text' : 'password'}
+                        required
+                        minLength={MIN_PASSWORD_LENGTH}
+                        autoComplete="new-password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="h-11 w-full rounded-xl border border-border bg-black/40 pl-10 pr-10 text-sm text-text placeholder:text-dim focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+                        placeholder="••••••••"
+                      />
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onClick={() => setShowNewPassword((v) => !v)}
+                        aria-label={showNewPassword ? 'Hide password' : 'Show password'}
+                        className="absolute inset-y-0 right-0 grid w-10 place-items-center text-dim hover:text-text"
+                      >
+                        {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-2">
+                    <Button full disabled={isSubmitting}>
+                      {isSubmitting ? t('auth.resetting') : t('auth.resetPasswordSubmit')}
                     </Button>
                   </div>
                 </form>

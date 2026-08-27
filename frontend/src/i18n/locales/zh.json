@@ -613,6 +613,34 @@
     "confirmResend": "重新发送验证码",
     "confirmResendIn": "{{seconds}} 秒后可重新发送",
     "confirmResendUnavailable": "暂时无法发送新的验证码。",
-    "confirmBack": "返回"
+    "confirmBack": "返回",
+    "forgotPassword": "忘记密码？",
+    "forgotPasswordTitle": "重置密码",
+    "forgotPasswordSubtitle": "输入您账户的邮箱地址。如果匹配到账户，我们会向该邮箱发送重置验证码。",
+    "forgotPasswordSubmit": "发送重置验证码",
+    "forgotPasswordSending": "发送中…",
+    "forgotPasswordSent": "如果该邮箱地址对应一个账户，重置验证码即将发送。",
+    "forgotPasswordFailed": "无法发送重置验证码，请重试。",
+    "resetPasswordTitle": "设置新密码",
+    "resetPasswordSubtitle": "如果 {{email}} 对应一个账户，验证码已发送至该邮箱。请输入验证码和您的新密码。",
+    "resetCode": "重置验证码",
+    "newPassword": "新密码",
+    "resetPasswordSubmit": "重置密码",
+    "resetting": "重置中…",
+    "resetPasswordSuccess": "密码已重置，请使用新密码登录。",
+    "resetPasswordFailed": "无法重置密码，请重试。"
+  },
+  "personalInfo": {
+    "saveDisplayName": "保存昵称",
+    "displayNameSaved": "昵称已更新",
+    "emailNotice": "目前暂不支持修改邮箱——更改邮箱是账户被盗用的常见手段，因此这一功能暂时被有意搁置。",
+    "emailUnavailable": "该账户没有登记邮箱地址。",
+    "passwordTitle": "密码",
+    "currentPassword": "当前密码",
+    "changePassword": "修改密码",
+    "passwordChanged": "密码已修改",
+    "noPasswordNotice": "该账户未设置密码，因此这里没有可修改的内容。",
+    "saveFailed": "保存失败，请重试。",
+    "signInRequired": "登录后即可管理您的个人信息。"
   }
 }

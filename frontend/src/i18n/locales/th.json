@@ -613,6 +613,34 @@
     "confirmResend": "ส่งรหัสใหม่",
     "confirmResendIn": "ส่งรหัสใหม่ได้ในอีก {{seconds}} วินาที",
     "confirmResendUnavailable": "ขณะนี้ยังส่งรหัสใหม่ไม่ได้",
-    "confirmBack": "ย้อนกลับ"
+    "confirmBack": "ย้อนกลับ",
+    "forgotPassword": "ลืมรหัสผ่าน?",
+    "forgotPasswordTitle": "รีเซ็ตรหัสผ่าน",
+    "forgotPasswordSubtitle": "กรอกอีเมลของบัญชีคุณ หากตรงกับบัญชีที่มีอยู่ เราจะส่งรหัสรีเซ็ตไปให้",
+    "forgotPasswordSubmit": "ส่งรหัสรีเซ็ต",
+    "forgotPasswordSending": "กำลังส่ง…",
+    "forgotPasswordSent": "หากอีเมลนั้นมีบัญชีอยู่ รหัสรีเซ็ตกำลังจะถูกส่งไป",
+    "forgotPasswordFailed": "ไม่สามารถส่งรหัสรีเซ็ตได้ ลองอีกครั้ง",
+    "resetPasswordTitle": "ตั้งรหัสผ่านใหม่",
+    "resetPasswordSubtitle": "หาก {{email}} มีบัญชีอยู่ เราได้ส่งรหัสไปแล้ว กรอกรหัสและรหัสผ่านใหม่ของคุณ",
+    "resetCode": "รหัสรีเซ็ต",
+    "newPassword": "รหัสผ่านใหม่",
+    "resetPasswordSubmit": "รีเซ็ตรหัสผ่าน",
+    "resetting": "กำลังรีเซ็ต…",
+    "resetPasswordSuccess": "รีเซ็ตรหัสผ่านแล้ว เข้าสู่ระบบด้วยรหัสผ่านใหม่ของคุณ",
+    "resetPasswordFailed": "ไม่สามารถรีเซ็ตรหัสผ่านได้ ลองอีกครั้ง"
+  },
+  "personalInfo": {
+    "saveDisplayName": "บันทึกชื่อ",
+    "displayNameSaved": "อัปเดตชื่อที่แสดงแล้ว",
+    "emailNotice": "การเปลี่ยนอีเมลยังไม่รองรับ เพราะการเปลี่ยนอีเมลเป็นวิธีที่มักถูกใช้ในการยึดบัญชี จึงตั้งใจไม่ทำฟีเจอร์นี้ในตอนนี้",
+    "emailUnavailable": "ไม่มีที่อยู่อีเมลที่บันทึกไว้สำหรับบัญชีนี้",
+    "passwordTitle": "รหัสผ่าน",
+    "currentPassword": "รหัสผ่านปัจจุบัน",
+    "changePassword": "เปลี่ยนรหัสผ่าน",
+    "passwordChanged": "เปลี่ยนรหัสผ่านแล้ว",
+    "noPasswordNotice": "บัญชีนี้ไม่มีการตั้งรหัสผ่าน จึงไม่มีอะไรให้เปลี่ยนที่นี่",
+    "saveFailed": "ไม่สามารถบันทึกได้ ลองอีกครั้ง",
+    "signInRequired": "เข้าสู่ระบบเพื่อจัดการข้อมูลส่วนตัวของคุณ"
   }
 }

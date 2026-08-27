@@ -34,6 +34,26 @@ export type CredentialVerdict =
   | { ok: false; code: 'email_invalid' | 'password_too_short'; message: string };
 
 /**
+ * The password-strength half of sign-up, on its own.
+ *
+ * Pulled out so that change-password and forgot-password confirm apply
+ * EXACTLY this rule rather than a second copy of it — `validateSignupCredentials`
+ * below now calls this too, so there is one rule, not two that can drift.
+ */
+export function validatePasswordStrength(password: string): CredentialVerdict {
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return {
+      ok: false,
+      code: 'password_too_short',
+      // The number comes from the constant, so the sentence cannot drift from
+      // the rule the way a hardcoded "8" eventually does.
+      message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+    };
+  }
+  return { ok: true };
+}
+
+/**
  * Check a sign-up before any account row exists.
  *
  * Order matters only for which message is shown first, and email comes first
@@ -47,14 +67,39 @@ export function validateSignupCredentials(email: string, password: string): Cred
       message: 'Enter a valid email address.',
     };
   }
-  if (password.length < MIN_PASSWORD_LENGTH) {
+  return validatePasswordStrength(password);
+}
+
+/**
+ * Display names. NOT part of sign-up validation before this change — signup
+ * accepts an optional name and falls back to the email's local part with no
+ * rule of its own (`user-store.ts#createUnverifiedWithPassword`). Added HERE,
+ * as its own function, so that the change-display-name route in
+ * `gateway/auth.ts` has one rule to call rather than an inline check — and so
+ * that if signup is ever made to validate the name it typed in, it reuses this
+ * rather than inventing a second one.
+ */
+export const MAX_DISPLAY_NAME_LENGTH = 40;
+
+export type DisplayNameVerdict =
+  | { ok: true; displayName: string }
+  | { ok: false; code: 'display_name_required' | 'display_name_too_long'; message: string };
+
+export function validateDisplayName(raw: string): DisplayNameVerdict {
+  const displayName = raw.trim();
+  if (!displayName) {
     return {
       ok: false,
-      code: 'password_too_short',
-      // The number comes from the constant, so the sentence cannot drift from
-      // the rule the way a hardcoded "8" eventually does.
-      message: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`,
+      code: 'display_name_required',
+      message: 'Enter a display name.',
     };
   }
-  return { ok: true };
+  if (displayName.length > MAX_DISPLAY_NAME_LENGTH) {
+    return {
+      ok: false,
+      code: 'display_name_too_long',
+      message: `Display name must be ${MAX_DISPLAY_NAME_LENGTH} characters or fewer.`,
+    };
+  }
+  return { ok: true, displayName };
 }

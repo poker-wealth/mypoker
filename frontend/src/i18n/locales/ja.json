@@ -613,6 +613,34 @@
     "confirmResend": "コードを再送信",
     "confirmResendIn": "{{seconds}}秒後に再送信できます",
     "confirmResendUnavailable": "現在、新しいコードを送信できません。",
-    "confirmBack": "戻る"
+    "confirmBack": "戻る",
+    "forgotPassword": "パスワードをお忘れですか？",
+    "forgotPasswordTitle": "パスワードを再設定",
+    "forgotPasswordSubtitle": "アカウントのメールアドレスを入力してください。該当するアカウントがあれば、再設定コードを送信します。",
+    "forgotPasswordSubmit": "再設定コードを送信",
+    "forgotPasswordSending": "送信中…",
+    "forgotPasswordSent": "そのアドレスにアカウントがある場合、再設定コードをお送りします。",
+    "forgotPasswordFailed": "再設定コードを送信できませんでした。もう一度お試しください。",
+    "resetPasswordTitle": "新しいパスワードを設定",
+    "resetPasswordSubtitle": "{{email}} にアカウントがある場合、コードを送信しました。コードと新しいパスワードを入力してください。",
+    "resetCode": "再設定コード",
+    "newPassword": "新しいパスワード",
+    "resetPasswordSubmit": "パスワードを再設定",
+    "resetting": "再設定中…",
+    "resetPasswordSuccess": "パスワードを再設定しました。新しいパスワードでログインしてください。",
+    "resetPasswordFailed": "パスワードを再設定できませんでした。もう一度お試しください。"
+  },
+  "personalInfo": {
+    "saveDisplayName": "名前を保存",
+    "displayNameSaved": "表示名を更新しました",
+    "emailNotice": "メールアドレスの変更にはまだ対応していません。メールの変更はアカウント乗っ取りによく使われる手口のため、現時点では意図的に実装していません。",
+    "emailUnavailable": "このアカウントに登録されたメールアドレスはありません。",
+    "passwordTitle": "パスワード",
+    "currentPassword": "現在のパスワード",
+    "changePassword": "パスワードを変更",
+    "passwordChanged": "パスワードを変更しました",
+    "noPasswordNotice": "このアカウントにはパスワードが設定されていないため、変更する項目がありません。",
+    "saveFailed": "保存できませんでした。もう一度お試しください。",
+    "signInRequired": "個人情報を管理するにはログインしてください。"
   }
 }

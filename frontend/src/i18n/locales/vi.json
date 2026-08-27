@@ -613,6 +613,34 @@
     "confirmResend": "Gửi mã mới",
     "confirmResendIn": "Gửi mã mới sau {{seconds}} giây",
     "confirmResendUnavailable": "Hiện chưa thể gửi mã mới.",
-    "confirmBack": "Quay lại"
+    "confirmBack": "Quay lại",
+    "forgotPassword": "Quên mật khẩu?",
+    "forgotPasswordTitle": "Đặt lại mật khẩu",
+    "forgotPasswordSubtitle": "Nhập email của tài khoản. Nếu khớp với một tài khoản, chúng tôi sẽ gửi mã đặt lại đến đó.",
+    "forgotPasswordSubmit": "Gửi mã đặt lại",
+    "forgotPasswordSending": "Đang gửi…",
+    "forgotPasswordSent": "Nếu địa chỉ đó có tài khoản, mã đặt lại sẽ sớm được gửi đến.",
+    "forgotPasswordFailed": "Không thể gửi mã đặt lại. Vui lòng thử lại.",
+    "resetPasswordTitle": "Chọn mật khẩu mới",
+    "resetPasswordSubtitle": "Nếu {{email}} có tài khoản, mã đã được gửi đến đó. Nhập mã và mật khẩu mới của bạn.",
+    "resetCode": "Mã đặt lại",
+    "newPassword": "Mật khẩu mới",
+    "resetPasswordSubmit": "Đặt lại mật khẩu",
+    "resetting": "Đang đặt lại…",
+    "resetPasswordSuccess": "Đã đặt lại mật khẩu. Hãy đăng nhập bằng mật khẩu mới.",
+    "resetPasswordFailed": "Không thể đặt lại mật khẩu. Vui lòng thử lại."
+  },
+  "personalInfo": {
+    "saveDisplayName": "Lưu tên",
+    "displayNameSaved": "Đã cập nhật tên hiển thị",
+    "emailNotice": "Việc đổi email chưa được hỗ trợ — đổi email là cách phổ biến để chiếm đoạt tài khoản, nên tính năng này cố tình chưa được xây dựng.",
+    "emailUnavailable": "Không có địa chỉ email nào được lưu cho tài khoản này.",
+    "passwordTitle": "Mật khẩu",
+    "currentPassword": "Mật khẩu hiện tại",
+    "changePassword": "Đổi mật khẩu",
+    "passwordChanged": "Đã đổi mật khẩu",
+    "noPasswordNotice": "Tài khoản này chưa đặt mật khẩu, nên không có gì để đổi ở đây.",
+    "saveFailed": "Không thể lưu. Vui lòng thử lại.",
+    "signInRequired": "Đăng nhập để quản lý thông tin cá nhân của bạn."
   }
 }

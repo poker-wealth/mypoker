@@ -121,6 +121,18 @@ function memoryUsers(seed: FakeUser[] = []): AuthUserStore & { rows: Map<string,
     async oauth() {
       throw new Error('not used in this suite');
     },
+    async updateDisplayName() {
+      throw new Error('not used in this suite');
+    },
+    async changePassword() {
+      throw new Error('not used in this suite');
+    },
+    async findForPasswordReset() {
+      throw new Error('not used in this suite');
+    },
+    async resetPassword() {
+      throw new Error('not used in this suite');
+    },
   };
 }
 

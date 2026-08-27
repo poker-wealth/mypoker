@@ -1,10 +1,15 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
+import * as bcrypt from 'bcrypt';
 import { OAuth2Client } from 'google-auth-library';
 import type { GatewayConfig } from './config';
 import { userStore } from '../auth/user-store';
 import { otpStore, type OtpStore } from '../auth/otp-store';
 import { OTP_TTL_MS } from '../auth/otp-rules';
-import { validateSignupCredentials } from '../auth/credential-rules';
+import {
+  validateSignupCredentials,
+  validateDisplayName,
+  validatePasswordStrength,
+} from '../auth/credential-rules';
 import {
   financialCoreOtpMailer,
   resolveDeliveryFailure,
@@ -35,6 +40,29 @@ export interface PlayerProfile {
   photoUrl: string | null;
   telegramId: number | null;
   vipTier: number;
+}
+
+/**
+ * What a player is told about their OWN account, at `/auth/me` only.
+ *
+ * `email` and `hasPassword` are deliberately absent from `PlayerProfile`
+ * itself: that shape is also what `/login`, `/signup` (via `/verify-otp`),
+ * `/google` and `/change-display-name` return, and none of those need either
+ * field to do their job. Widening the shared shape would mean every one of
+ * those call sites starts carrying a `hasPassword` boolean and an email
+ * address nobody there asked for -- more blast radius than "a self-lookup can
+ * see its own email" requires. `/auth/me` builds its own response object
+ * rather than going through `asProfile()`, so extending it here costs nothing
+ * elsewhere.
+ *
+ * `email` is `null` for a Telegram player, who has no stored document at all
+ * (see the handler below) -- never a fabricated address. `hasPassword` is
+ * `false` in that same case, and for any Google-linked account with no
+ * `passwordHash`. Neither field is ever the hash itself.
+ */
+export interface SelfProfile extends PlayerProfile {
+  email: string | null;
+  hasPassword: boolean;
 }
 
 declare global {
@@ -115,7 +143,14 @@ export function requireAdmin() {
 /** Exactly the identity operations these routes perform. Nothing wider. */
 export type AuthUserStore = Pick<
   typeof userStore,
-  'startSignup' | 'verifyPassword' | 'markEmailVerified' | 'oauth'
+  | 'startSignup'
+  | 'verifyPassword'
+  | 'markEmailVerified'
+  | 'oauth'
+  | 'updateDisplayName'
+  | 'changePassword'
+  | 'findForPasswordReset'
+  | 'resetPassword'
 >;
 
 /**
@@ -502,6 +537,234 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
     });
   });
 
+  // -- Profile & password self-service --------------------------------------
+  //
+  // Three endpoints. The first two are authenticated and act on the caller's
+  // own account (`req.player.playerId` from the bearer token — never a body
+  // field); the forgot-password pair is unauthenticated by necessity, since
+  // its whole job is recovering an account nobody can currently sign into.
+
+  /**
+   * Change the display name on the signed-in account. New name only.
+   */
+  r.post('/change-display-name', requireAuth(config), (req: Request, res: Response) => {
+    void (async (): Promise<void> => {
+      const body = (req.body ?? {}) as Record<string, string>;
+      const raw = body['displayName'];
+      if (typeof raw !== 'string') {
+        res.status(400).json({ error: 'displayName is required' });
+        return;
+      }
+
+      const verdict = validateDisplayName(raw);
+      if (!verdict.ok) {
+        res.status(400).json({ error: verdict.message, code: verdict.code });
+        return;
+      }
+
+      const identity = await authClient.updateDisplayName(req.player!.playerId, verdict.displayName);
+      if (!identity) {
+        res.status(404).json({ error: 'account not found' });
+        return;
+      }
+      res.json({ player: asProfile(identity) });
+    })().catch((err: unknown) => {
+      console.error('[auth] change-display-name failed:', err);
+      res.status(500).json({ error: 'internal error' });
+    });
+  });
+
+  /**
+   * Change the password on the signed-in account. Requires the CURRENT
+   * password.
+   *
+   * That check is the entire point of this endpoint. Without it, a bearer
+   * token stolen once (a leaked log line, an XSS, a device left unlocked)
+   * becomes permanent account theft: the attacker sets a new password and the
+   * real owner is locked out for good, rather than just exposed for as long
+   * as the token happens to live. The current password is verified through
+   * `userStore.changePassword`, which itself calls `userStore.verifyPassword`
+   * — the identical path `/auth/login` uses — so this is not a second,
+   * possibly-different notion of "the right password".
+   *
+   * GOOGLE-LINKED ACCOUNTS: an account signed up via Google may have no
+   * `passwordHash` at all (see `user.model.ts`). That is refused here with a
+   * clear, honest `no_password` — never a generic "wrong password" that would
+   * send someone hunting for a password they never set, and never silently
+   * treated as a fresh password to create (see the class comment on
+   * `/forgot-password` for why this endpoint does not decide that).
+   */
+  r.post('/change-password', requireAuth(config), (req: Request, res: Response) => {
+    void (async (): Promise<void> => {
+      const body = (req.body ?? {}) as Record<string, string>;
+      const currentPassword = body['currentPassword'];
+      const newPassword = body['newPassword'];
+
+      if (!currentPassword || !newPassword) {
+        res.status(400).json({ error: 'currentPassword and newPassword are required' });
+        return;
+      }
+
+      const verdict = validatePasswordStrength(newPassword);
+      if (!verdict.ok) {
+        res.status(400).json({ error: verdict.message, code: verdict.code });
+        return;
+      }
+
+      const result = await authClient.changePassword(
+        req.player!.playerId,
+        currentPassword,
+        newPassword,
+      );
+
+      if (result.ok) {
+        res.json({ ok: true });
+        return;
+      }
+
+      if (result.reason === 'no_password') {
+        res.status(400).json({
+          error: 'This account signed in with Google and has no password to change.',
+          code: 'no_password',
+        });
+        return;
+      }
+
+      if (result.reason === 'no_account') {
+        res.status(404).json({ error: 'account not found' });
+        return;
+      }
+
+      // invalid_current_password -- the guard described above. 401, the same
+      // status a wrong password gets at /login.
+      res.status(401).json({
+        error: 'Current password is incorrect.',
+        code: 'invalid_current_password',
+      });
+    })().catch((err: unknown) => {
+      console.error('[auth] change-password failed:', err);
+      res.status(500).json({ error: 'internal error' });
+    });
+  });
+
+  /**
+   * Forgot-password, step 1: request a code by email. Unauthenticated, for
+   * the obvious reason that its purpose is recovering access nobody currently
+   * has.
+   *
+   * ENUMERATION GUARD, deliberate: this responds with the SAME body and
+   * status whether the address belongs to an account or not, and — among
+   * accounts that do exist — whether or not that account has a password to
+   * reset. A response that varied on any of those would let anyone learn
+   * which email addresses are registered on this platform just by trying them
+   * here, no password required. A decoy hash runs on every branch that does
+   * not mail a code, so the two paths cost comparable wall-clock time; this
+   * does not close every timing side-channel (mailing a code is a real
+   * network call to financial-core, which a decoy cannot cheaply imitate), but
+   * it removes the cheap, obvious one.
+   *
+   * GOOGLE-LINKED ACCOUNTS: an account with no `passwordHash` gets exactly
+   * this same response, but no code is minted and nothing is mailed. There is
+   * no password on that account for a code to reset, and minting one anyway
+   * would either silently fail later at `/reset-password` (confusing) or
+   * silently give that account a password it never had (a product decision,
+   * not a bug fix — see the note on `/reset-password` below for why this
+   * does not make that call on its own).
+   */
+  r.post('/forgot-password', (req: Request, res: Response) => {
+    void (async (): Promise<void> => {
+      const body = (req.body ?? {}) as Record<string, string>;
+      const raw = body['email'] || body['identifier'];
+      if (!raw) {
+        res.status(400).json({ error: 'email is required' });
+        return;
+      }
+      const email = normalizeEmail(raw);
+
+      const found = await authClient.findForPasswordReset(email);
+      if (found?.hasPassword) {
+        await mintAndSend(email, found.playerId);
+      } else {
+        // Decoy cost only -- see the class comment above. Same hash work as
+        // an OTP send, spent on nothing, so a missing or Google-only address
+        // does not answer measurably faster than one that got a real code.
+        await bcrypt.hash(email, 8);
+      }
+
+      res.json({ pending: true, email });
+    })().catch((err: unknown) => {
+      console.error('[auth] forgot-password failed:', err);
+      res.status(500).json({ error: 'internal error' });
+    });
+  });
+
+  /**
+   * Forgot-password, step 2: email + code + new password. Unauthenticated,
+   * same reason as step 1.
+   *
+   * The playerId comes from the verified OTP CHALLENGE, exactly as
+   * `/verify-otp` does -- never from anything the client sent -- so a correct
+   * code can only ever reset the password of the account it was issued for.
+   *
+   * This is unreachable for a Google-only account through the public API as
+   * built: `/forgot-password` never mints a code for one (see above), so
+   * `otps.verify` here answers `no_challenge` before this reaches
+   * `userStore.resetPassword`. `resetPassword` itself does not re-check
+   * `passwordHash` presence and would happily give such an account its first
+   * password if it were ever reached some other way. That is a deliberate
+   * choice to leave the store method simple and let the route be the one
+   * place that decides who gets a code -- not a claim that letting a Google
+   * user add a password is right or wrong. That product decision has not been
+   * made; if it should be allowed, it needs a real "add a password" flow with
+   * its own explicit UI treatment, not a side effect of this endpoint.
+   */
+  r.post('/reset-password', (req: Request, res: Response) => {
+    void (async (): Promise<void> => {
+      const body = (req.body ?? {}) as Record<string, string>;
+      const raw = body['email'] || body['identifier'];
+      const code = body['code'];
+      const newPassword = body['newPassword'];
+
+      if (!raw || !code || !newPassword) {
+        res.status(400).json({ error: 'email, code and newPassword are required' });
+        return;
+      }
+      const email = normalizeEmail(raw);
+
+      const verdict = validatePasswordStrength(newPassword);
+      if (!verdict.ok) {
+        res.status(400).json({ error: verdict.message, code: verdict.code });
+        return;
+      }
+
+      const result = await otps.verify(email, code, now());
+      if (!result.ok) {
+        const status = result.reason === 'too_many_attempts' ? 429 : 400;
+        const message: Record<typeof result.reason, string> = {
+          no_challenge: 'No password reset is pending for this address. Request a new code.',
+          expired: 'That code has expired. Request a new one.',
+          too_many_attempts: 'Too many incorrect codes. Request a new one.',
+          incorrect: 'That code is not correct.',
+        };
+        res.status(status).json({ error: message[result.reason], code: result.reason });
+        return;
+      }
+
+      const identity = await authClient.resetPassword(result.playerId, newPassword);
+      if (!identity) {
+        res
+          .status(400)
+          .json({ error: 'That account no longer exists.', code: 'no_account' });
+        return;
+      }
+
+      res.json({ ok: true });
+    })().catch((err: unknown) => {
+      console.error('[auth] reset-password failed:', err);
+      res.status(500).json({ error: 'internal error' });
+    });
+  });
+
   r.post('/google', async (req: Request, res: Response) => {
     try {
       // Every OAuth client we accept a token from — web, Android, iOS. Comma
@@ -677,8 +940,16 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
       // one (see the comment on `userStore.search`): their playerId is derived
       // from the Telegram user id and nothing is ever written for them. For
       // that case only, the profile is derived from the token itself, same as
-      // before this lookup existed.
+      // before this lookup existed. `email` and `hasPassword` follow the same
+      // rule: null / false for Telegram, never a fabricated address or a
+      // guessed password state.
       const stored = await userStore.byPlayerId(playerId);
+
+      // `stored.email` can hold a phone number for a legacy phone sign-up (see
+      // `toIdentity` in user-store.ts) — only hand back something that is
+      // actually an email address, same guard `internal-routes.ts` uses for
+      // the identical field.
+      const email = stored?.email?.includes('@') ? stored.email : null;
 
       res.json({
         playerId,
@@ -687,7 +958,9 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
         photoUrl: stored ? stored.photoUrl ?? null : null,
         telegramId: Number.isFinite(telegramId) ? telegramId : null,
         vipTier: 0,
-      } satisfies PlayerProfile);
+        email,
+        hasPassword: stored?.hasPassword ?? false,
+      } satisfies SelfProfile);
     } catch (err) {
       console.error('[auth] /me lookup failed:', err);
       res.status(500).json({ error: 'internal error' });

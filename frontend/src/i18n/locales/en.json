@@ -613,6 +613,34 @@
     "confirmResend": "Send a new code",
     "confirmResendIn": "Send a new code in {{seconds}}s",
     "confirmResendUnavailable": "We could not send a new code just now.",
-    "confirmBack": "Back"
+    "confirmBack": "Back",
+    "forgotPassword": "Forgot password?",
+    "forgotPasswordTitle": "Reset password",
+    "forgotPasswordSubtitle": "Enter the email on your account. If it matches one, we'll send a reset code to it.",
+    "forgotPasswordSubmit": "Send reset code",
+    "forgotPasswordSending": "Sending…",
+    "forgotPasswordSent": "If that address has an account, a reset code is on its way.",
+    "forgotPasswordFailed": "Could not send the reset code. Try again.",
+    "resetPasswordTitle": "Choose a new password",
+    "resetPasswordSubtitle": "If {{email}} has an account, a code was sent to it. Enter the code and your new password.",
+    "resetCode": "Reset code",
+    "newPassword": "New password",
+    "resetPasswordSubmit": "Reset password",
+    "resetting": "Resetting…",
+    "resetPasswordSuccess": "Password reset. Sign in with your new password.",
+    "resetPasswordFailed": "Could not reset your password. Try again."
+  },
+  "personalInfo": {
+    "saveDisplayName": "Save name",
+    "displayNameSaved": "Display name updated",
+    "emailNotice": "Changing your email isn't supported yet — that's a common way accounts get taken over, so it was deliberately left out for now.",
+    "emailUnavailable": "No email address is on file for this account.",
+    "passwordTitle": "Password",
+    "currentPassword": "Current password",
+    "changePassword": "Change password",
+    "passwordChanged": "Password changed",
+    "noPasswordNotice": "This account has no password set, so there's nothing to change here.",
+    "saveFailed": "Could not save. Try again.",
+    "signInRequired": "Sign in to manage your personal info."
   }
 }

@@ -75,6 +75,16 @@ interface SessionState {
   confirmEmail: (email: string, code: string) => Promise<void>;
   /** Ask for another code for a confirmation already in flight. */
   resendCode: (email: string) => Promise<PendingConfirmation>;
+  /**
+   * Merge a fresh player object into the cached one and persist it.
+   *
+   * For self-service edits (change-display-name) that return the settled
+   * profile straight from the server: the response IS the new truth, so this
+   * writes it through rather than waiting for the next `/auth/me` or login to
+   * pick it up — otherwise Settings/Profile would keep showing the old name
+   * until the next full sign-in.
+   */
+  updatePlayer: (patch: Partial<Player>) => void;
   signOut: () => void;
 }
 
@@ -222,6 +232,14 @@ export const useSession = create<SessionState>((set, get) => {
       toast.error(message);
       throw e;
     }
+  },
+
+  updatePlayer: (patch) => {
+    const player = get().player;
+    if (!player) return;
+    const next = { ...player, ...patch };
+    persist(get().token, next);
+    set({ player: next });
   },
 
   signOut: () => {

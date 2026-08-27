@@ -56,6 +56,13 @@ import {
   saveWithdrawalAddress,
 } from './wallet';
 import { fetchLobbyGames, fetchTables, type TableFilter } from './lobby';
+import {
+  changeDisplayName,
+  changePassword,
+  forgotPassword,
+  resetPassword,
+  fetchMe,
+} from './auth';
 import { useSession } from '@/store/session';
 import { useContextStore } from '@/store/context';
 
@@ -251,6 +258,67 @@ export function useVip() {
     queryFn: fetchVip,
     enabled: Boolean(playerId),
     staleTime: 60_000,
+  });
+}
+
+// ── Personal info / password self-service ────────────────────────────────────
+
+/**
+ * Change the signed-in player's display name.
+ *
+ * The response carries the settled profile, so `updatePlayer` writes it
+ * straight into the session cache on success — otherwise every other screen
+ * reading `player.displayName` would keep showing the old one until the next
+ * full sign-in.
+ */
+export function useChangeDisplayName() {
+  return useMutation({
+    mutationFn: (displayName: string) => changeDisplayName(displayName),
+    onSuccess: ({ player }) => useSession.getState().updatePlayer(player),
+  });
+}
+
+/**
+ * The signed-in player's own email and password status — the two fields only
+ * `/auth/me` reports (see `SelfProfile` in api/auth.ts). Personal Info is the
+ * only screen that needs either, so this stays its own query rather than
+ * something folded into the session player object everywhere else reads.
+ *
+ * Cached like settings: this changes only when the player themselves changes
+ * their password (email is not editable at all yet), so a long staleTime
+ * avoids re-fetching it on every visit to the screen.
+ */
+export function useSelfProfile() {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery({
+    queryKey: ['auth', 'me', playerId],
+    queryFn: fetchMe,
+    enabled: Boolean(playerId),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/**
+ * Change the signed-in player's password. No cache to update — a password
+ * is never held client-side, only asked for.
+ */
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: ({ currentPassword, newPassword }: { currentPassword: string; newPassword: string }) =>
+      changePassword(currentPassword, newPassword),
+  });
+}
+
+/** Forgot-password step 1: request a code by email. Unauthenticated. */
+export function useForgotPassword() {
+  return useMutation({ mutationFn: (email: string) => forgotPassword(email) });
+}
+
+/** Forgot-password step 2: email + code + new password. Unauthenticated. */
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: ({ email, code, newPassword }: { email: string; code: string; newPassword: string }) =>
+      resetPassword(email, code, newPassword),
   });
 }
 

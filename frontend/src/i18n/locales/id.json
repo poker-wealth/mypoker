@@ -613,6 +613,34 @@
     "confirmResend": "Kirim kode baru",
     "confirmResendIn": "Kirim kode baru dalam {{seconds}} detik",
     "confirmResendUnavailable": "Kami belum dapat mengirim kode baru saat ini.",
-    "confirmBack": "Kembali"
+    "confirmBack": "Kembali",
+    "forgotPassword": "Lupa kata sandi?",
+    "forgotPasswordTitle": "Atur ulang kata sandi",
+    "forgotPasswordSubtitle": "Masukkan email akun Anda. Jika cocok dengan akun yang ada, kami akan mengirim kode reset ke sana.",
+    "forgotPasswordSubmit": "Kirim kode reset",
+    "forgotPasswordSending": "Mengirim…",
+    "forgotPasswordSent": "Jika alamat itu memiliki akun, kode reset akan segera dikirim.",
+    "forgotPasswordFailed": "Kode reset tidak dapat dikirim. Coba lagi.",
+    "resetPasswordTitle": "Pilih kata sandi baru",
+    "resetPasswordSubtitle": "Jika {{email}} memiliki akun, kode telah dikirim ke sana. Masukkan kode dan kata sandi baru Anda.",
+    "resetCode": "Kode reset",
+    "newPassword": "Kata sandi baru",
+    "resetPasswordSubmit": "Atur ulang kata sandi",
+    "resetting": "Mengatur ulang…",
+    "resetPasswordSuccess": "Kata sandi direset. Masuk dengan kata sandi baru Anda.",
+    "resetPasswordFailed": "Kata sandi tidak dapat direset. Coba lagi."
+  },
+  "personalInfo": {
+    "saveDisplayName": "Simpan nama",
+    "displayNameSaved": "Nama tampilan diperbarui",
+    "emailNotice": "Mengubah email belum didukung — mengubah email adalah cara umum akun diambil alih, jadi ini sengaja belum dibuat.",
+    "emailUnavailable": "Tidak ada alamat email yang tercatat untuk akun ini.",
+    "passwordTitle": "Kata sandi",
+    "currentPassword": "Kata sandi saat ini",
+    "changePassword": "Ubah kata sandi",
+    "passwordChanged": "Kata sandi diubah",
+    "noPasswordNotice": "Akun ini tidak memiliki kata sandi, jadi tidak ada yang bisa diubah di sini.",
+    "saveFailed": "Tidak dapat menyimpan. Coba lagi.",
+    "signInRequired": "Masuk untuk mengelola info pribadi Anda."
   }
 }
