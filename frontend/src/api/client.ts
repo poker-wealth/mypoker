@@ -87,7 +87,11 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     .catch(() => null);
 
   if (!res.ok) {
-    if (res.status === 401) onUnauthorized?.();
+    // A 401 on an AUTHENTICATED call means the token died — drop the session.
+    // A 401 on an anonymous call (login/signup) means "wrong credentials"; that
+    // is the caller's to surface inline, and signing out here would replace the
+    // real "incorrect password" with a confusing "Signed out" toast.
+    if (res.status === 401 && !anonymous) onUnauthorized?.();
     const message =
       (payload as { error?: string } | null)?.error ?? `${res.status} ${res.statusText}`;
     throw new ApiError(res.status, message, payload);
