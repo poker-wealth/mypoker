@@ -257,6 +257,16 @@ export function buildAdminRouter(config: GatewayConfig): Router {
     })),
   );
 
+  // Take an APPROVED withdrawal on-chain — sign + broadcast from the hot wallet.
+  // No actor in the body: the approval already recorded who authorised it; this
+  // is the mechanical broadcast of a decision already made and audited. On a
+  // missing hot-wallet key financial-core answers 500 and the withdrawal stays
+  // APPROVED for a retry, which surfaces to the admin as a failed send.
+  r.post(
+    '/withdrawals/:id/send',
+    post('/internal/withdrawals/:id/sign-broadcast', () => ({})),
+  );
+
   /** Screen 4 — Leagues. */
   r.get(
     '/leagues',

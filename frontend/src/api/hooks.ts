@@ -17,6 +17,7 @@ import {
   fetchWithdrawalQueue,
   approveWithdrawal,
   rejectWithdrawal,
+  sendWithdrawal,
   fetchAdmins,
   createAdmin,
   fetchUsers,
@@ -750,5 +751,7 @@ export function useWithdrawalActions() {
       mutationFn: ({ id, reason }: { id: string; reason: string }) => rejectWithdrawal(id, reason),
       onSuccess: after,
     }),
+    // Sign + broadcast an APPROVED withdrawal on-chain.
+    send: useMutation({ mutationFn: sendWithdrawal, onSuccess: after }),
   };
 }

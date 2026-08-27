@@ -259,6 +259,18 @@ export const approveWithdrawal = (id: string): Promise<WithdrawalApproval> =>
 export const rejectWithdrawal = (id: string, reason: string): Promise<{ state: string }> =>
   api.post<{ state: string }>(`/admin/withdrawals/${encodeURIComponent(id)}/reject`, { reason });
 
+/**
+ * Take an APPROVED withdrawal on-chain: sign + broadcast the USDT transfer from
+ * the hot wallet, moving it to BROADCASTING with a real tx hash. On any failure
+ * the withdrawal rolls back (the clearing hold is released), so a failed send
+ * never strands the player's money.
+ */
+export const sendWithdrawal = (id: string): Promise<{ state: string; txHash: string }> =>
+  api.post<{ state: string; txHash: string }>(
+    `/admin/withdrawals/${encodeURIComponent(id)}/send`,
+    {},
+  );
+
 // ── Admins ───────────────────────────────────────────────────────────────────
 
 /** A platform administrator, as the Admins screen lists them. */
