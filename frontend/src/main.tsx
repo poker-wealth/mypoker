@@ -20,12 +20,13 @@ import './index.css';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'unset-google-client-id';
 
-// On the admin subdomain the app IS the admin panel. Rewrite a bare path to
-// /admin BEFORE the router reads the location, so admin.mypoker777.com lands on
-// the panel (or its login) with no flash of the player app in between.
+// On the admin subdomain the panel lives at the ROOT (no /admin prefix). If an
+// old /admin link is opened here, strip the prefix BEFORE the router reads the
+// location — no visible redirect, just a clean URL (/admin → /, and so on).
 const onAdminHost = isAdminHost();
-if (onAdminHost && !window.location.pathname.startsWith('/admin')) {
-  window.history.replaceState(null, '', '/admin');
+if (onAdminHost && window.location.pathname.startsWith('/admin')) {
+  const rest = window.location.pathname.slice('/admin'.length) || '/';
+  window.history.replaceState(null, '', rest + window.location.search + window.location.hash);
 }
 
 initTelegram();

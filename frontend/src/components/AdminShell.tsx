@@ -16,6 +16,7 @@ import { motion, AnimatePresence, useReducedMotion } from 'motion/react';
 import { cn } from '@/lib/cn';
 import { useSession } from '@/store/session';
 import { AdminLogin } from '@/components/AdminLogin';
+import { isAdminHost } from '@/lib/adminHost';
 
 /**
  * The admin area's shell.
@@ -34,13 +35,16 @@ import { AdminLogin } from '@/components/AdminLogin';
  * learn the panel exists from their own navigation.
  */
 
+// The panel is mounted at the root on the admin host and under /admin on the
+// player host; the nav follows suit so a link is correct on both.
+const BASE = isAdminHost() ? '' : '/admin';
 const SECTIONS = [
-  { to: '/admin', end: true, label: 'Overview', icon: LayoutGrid },
-  { to: '/admin/withdrawals', label: 'Withdrawals', icon: Banknote },
-  { to: '/admin/players', label: 'Players', icon: Users },
-  { to: '/admin/leagues', label: 'Leagues', icon: Shield },
-  { to: '/admin/alerts', label: 'Alerts', icon: TriangleAlert },
-  { to: '/admin/admins', label: 'Admins', icon: UserCog },
+  { to: BASE || '/', end: true, label: 'Overview', icon: LayoutGrid },
+  { to: `${BASE}/withdrawals`, label: 'Withdrawals', icon: Banknote },
+  { to: `${BASE}/players`, label: 'Players', icon: Users },
+  { to: `${BASE}/leagues`, label: 'Leagues', icon: Shield },
+  { to: `${BASE}/alerts`, label: 'Alerts', icon: TriangleAlert },
+  { to: `${BASE}/admins`, label: 'Admins', icon: UserCog },
 ] as const;
 
 export function AdminShell() {
