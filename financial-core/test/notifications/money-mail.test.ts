@@ -7,6 +7,7 @@ import { creditDeposit } from '../../src/deposit/deposit-credit';
 import { requestWithdrawal } from '../../src/withdrawal/withdrawal-state-machine';
 import { setRecipientResolver } from '../../src/notifications/email/money-mail';
 import { EmailSendModel } from '../../src/notifications/email/send-email';
+import { PlayerSettingsModel } from '../../src/settings/player-settings';
 import { startTestDb, stopTestDb, clearCollections, ensureIndexes } from '../db-helper';
 
 /**
@@ -20,7 +21,7 @@ import { startTestDb, stopTestDb, clearCollections, ensureIndexes } from '../db-
 
 beforeAll(async () => {
   await startTestDb();
-  await ensureIndexes(LedgerModel, AccountModel, NotificationModel, EmailSendModel);
+  await ensureIndexes(LedgerModel, AccountModel, NotificationModel, EmailSendModel, PlayerSettingsModel);
 });
 afterAll(stopTestDb);
 afterEach(async () => {
@@ -29,12 +30,19 @@ afterEach(async () => {
   setRecipientResolver(() => Promise.resolve(null));
 });
 
-async function player(ownerId: string, balance = '0'): Promise<string> {
+async function player(ownerId: string, balance = '0', notifyDeposits = true): Promise<string> {
   const acc = await AccountModel.create({
     accountType: AccountType.PLAYER,
     ownerId,
     availableBalance: Money.fromDecimalString(balance).toDecimal128(),
   });
+  
+  // Set the player settings
+  await PlayerSettingsModel.create({
+    _id: ownerId,
+    notifyDeposits
+  });
+
   return acc._id;
 }
 
@@ -104,6 +112,21 @@ describe('deposits announce after the credit', () => {
     });
     expect(again.credited).toBe(false);
     expect(await NotificationModel.countDocuments({})).toBe(0);
+  });
+
+  it('suppresses the notification if the player has opted out in settings', async () => {
+    // Create a player with notifyDeposits = false
+    const accountId = await player('p-dep5', '0', false);
+    await creditDeposit({
+      playerAccountId: accountId,
+      amount: Money.fromDecimalString('20'),
+      txHash: 'tx-dep-5',
+    });
+
+    // Money is still credited, but NO notification is created
+    const acc = await AccountModel.findById(accountId).lean();
+    expect(Money.fromDecimal128(acc!.availableBalance).toString()).toBe('20.000000');
+    expect(await NotificationModel.countDocuments({ _id: 'deposit:tx-dep-5' })).toBe(0);
   });
 });
 

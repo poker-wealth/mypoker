@@ -3,6 +3,7 @@ import { sendEmail } from './send-email';
 import { depositReceived, withdrawalRequested, withdrawalSent } from './templates';
 import { sendTelegram } from '../telegram/send-telegram';
 import * as tg from '../telegram/messages';
+import { getSettings } from '../../settings/player-settings';
 
 /**
  * The money events a player is told about, in one place.
@@ -116,6 +117,11 @@ export async function announceDeposit(input: {
   // the money path we are talking about) must end in a log line, not in a
   // rejected credit.
   try {
+    const settings = await getSettings(input.playerId);
+    if (!settings.notifyDeposits) {
+      return; // The player has opted out of deposit notifications.
+    }
+
     const at = input.at ?? new Date();
     await announce({
       playerId: input.playerId,
