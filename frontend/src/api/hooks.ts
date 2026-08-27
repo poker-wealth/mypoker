@@ -1,5 +1,6 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchSettings, patchSettings, type PlayerSettings, type SettingsPatch } from './settings';
+import { uploadAvatar } from './avatar';
 import { fetchReputation } from './reputation';
 import { fetchJackpot, fetchJackpotHistory } from './jackpot';
 import {
@@ -188,6 +189,35 @@ export function useUpdateSettings() {
       if (context?.previous) queryClient.setQueryData(key, context.previous);
     },
     onSuccess: (settled) => queryClient.setQueryData(key, settled),
+  });
+}
+
+/**
+ * Avatar upload. Deliberately its own mutation rather than folded into
+ * `useUpdateSettings`: the payload is raw image bytes, not a settings patch,
+ * and the server route (`POST /me/avatar`) is a different endpoint entirely
+ * (see api/avatar.ts). No optimistic update — unlike a toggle, there's
+ * nothing honest to show before the server has actually processed the image.
+ *
+ * On success the settings cache is replaced with the settled state the
+ * upload itself returned, same as `useUpdateSettings` — one fewer round trip
+ * than invalidating and refetching. If the upload stored the image but the
+ * settings read-back failed (`settings: null` — see api/avatar.ts), the
+ * cache is invalidated instead so the next read gets the truth rather than
+ * being left showing a stale `avatarId`.
+ */
+export function useUploadAvatar() {
+  const playerId = useSession((s) => s.player?.playerId);
+  const queryClient = useQueryClient();
+  const key = ['settings', playerId];
+
+  return useMutation({
+    mutationFn: ({ file, contentType }: { file: Blob; contentType: string }) =>
+      uploadAvatar(file, contentType),
+    onSuccess: ({ settings }) => {
+      if (settings) queryClient.setQueryData(key, settings);
+      else void queryClient.invalidateQueries({ queryKey: key });
+    },
   });
 }
 

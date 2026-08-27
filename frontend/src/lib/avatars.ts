@@ -31,6 +31,21 @@ export const AVATAR_IDS = [
 
 export type AvatarId = (typeof AVATAR_IDS)[number];
 
+/**
+ * Sentinel meaning "use the player's own uploaded photo" rather than one of
+ * the curated ids above — mirrors `UPLOADED_AVATAR` in
+ * financial-core/src/settings/player-settings.ts exactly. Not part of
+ * `AVATAR_IDS`: `avatarVisual` below intentionally does not recognize it, so
+ * a stray render of this value falls through to the next fallback rather than
+ * silently drawing a blank curated tile. `components/ui/Avatar.tsx` is the
+ * one place that renders it (as `GET /avatars/:playerId`); nowhere else
+ * should compare against this string.
+ */
+export const UPLOADED_AVATAR = 'uploaded' as const;
+
+/** Everything a player's `avatarId` can legitimately hold. */
+export type AvatarRef = AvatarId | typeof UPLOADED_AVATAR;
+
 export interface AvatarDef {
   id: AvatarId;
   glyph: string;

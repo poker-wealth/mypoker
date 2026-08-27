@@ -1,9 +1,18 @@
-import { avatarVisual, type AvatarId } from '@/lib/avatars';
+import { avatarVisual, UPLOADED_AVATAR, type AvatarRef } from '@/lib/avatars';
+import { API_URL } from '@/config';
 import { cn } from '@/lib/cn';
 
 interface AvatarProps {
-  /** The player's chosen avatar id, or null/undefined if they never picked one. */
-  avatarId?: AvatarId | string | null;
+  /** The player's chosen avatar: a curated id, the uploaded-photo sentinel, or null/undefined if they never picked one. */
+  avatarId?: AvatarRef | string | null;
+  /**
+   * Required to render an uploaded photo (`avatarId === UPLOADED_AVATAR`):
+   * that photo has no URL of its own, only `GET /avatars/:playerId`, so this
+   * component needs the id to build it. Every call site already has the
+   * player in scope. Omitting it while `avatarId` is the sentinel falls
+   * through to the next step of the chain rather than rendering nothing.
+   */
+  playerId?: string | null;
   /** OAuth profile photo (Google/Telegram), or null if the account has none. */
   photoUrl?: string | null;
   /** Used for the initial fallback only — not read by assistive tech, see below. */
@@ -18,10 +27,14 @@ interface AvatarProps {
  * this renders, it must render identically.
  *
  * Fallback order, and it matters: a Google or Telegram player keeps their
- * real photo unless they deliberately pick something from the catalogue.
+ * real photo unless they deliberately pick something from the catalogue or
+ * upload their own.
  *   1. Chosen avatarId (catalogue gradient + glyph)
- *   2. OAuth photoUrl
- *   3. The player's initial
+ *   2. Uploaded photo (avatarId === UPLOADED_AVATAR) — GET /avatars/:playerId,
+ *      unauthenticated and public, same threat model as the curated tiles
+ *      (see gateway/avatar-routes.ts). Requires `playerId`.
+ *   3. OAuth photoUrl
+ *   4. The player's initial
  *
  * Purely decorative (aria-hidden) at every call site today: Profile and
  * Settings always render it beside the player's visible display name, and the
@@ -29,7 +42,7 @@ interface AvatarProps {
  * An avatar used standalone in the future should wrap it with its own label
  * rather than rely on this component to supply one.
  */
-export function Avatar({ avatarId, photoUrl, name, size = 64, className }: AvatarProps) {
+export function Avatar({ avatarId, playerId, photoUrl, name, size = 64, className }: AvatarProps) {
   const visual = avatarId ? avatarVisual(avatarId) : undefined;
   const style = { width: size, height: size };
   const initial = name.charAt(0).toUpperCase() || '?';
@@ -47,6 +60,21 @@ export function Avatar({ avatarId, photoUrl, name, size = 64, className }: Avata
       >
         {visual.glyph}
       </div>
+    );
+  }
+
+  if (avatarId === UPLOADED_AVATAR && playerId) {
+    return (
+      <img
+        // No cache-busting param: the gateway serves this with a 5-minute
+        // max-age specifically so a re-upload becomes visible again on its
+        // own within a few minutes (see avatar-routes.ts) — every client
+        // doesn't need to invent its own busting scheme on top of that.
+        src={`${API_URL}/avatars/${encodeURIComponent(playerId)}`}
+        alt=""
+        className={cn('shrink-0 rounded-full object-cover', className)}
+        style={style}
+      />
     );
   }
 

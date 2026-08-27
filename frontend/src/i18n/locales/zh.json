@@ -644,7 +644,15 @@
     "signInRequired": "登录后即可管理您的个人信息。",
     "avatarTitle": "头像",
     "avatarUsePhoto": "使用我的账户照片",
-    "avatarUseInitial": "使用我的姓名首字母"
+    "avatarUseInitial": "使用我的姓名首字母",
+    "avatarUploadLabel": "上传照片",
+    "avatarUploadHint": "支持 JPEG、PNG 或 WebP 格式，最大 2 MB。",
+    "avatarPreviewAlt": "您即将设为头像的照片预览",
+    "avatarUploadConfirm": "设为头像",
+    "avatarUploading": "正在上传头像…",
+    "avatarUploaded": "头像已更新",
+    "avatarTooLargeClient": "该照片超过 2 MB，请选择更小的图片。",
+    "avatarWrongTypeClient": "请选择 JPEG、PNG 或 WebP 格式的图片。"
   },
   "avatars": {
     "a-spade": "黑桃",

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, Eye, EyeOff, Loader2, Mail, ShieldAlert } from 'lucide-react';
+import { Check, Eye, EyeOff, Loader2, Mail, ShieldAlert, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -11,6 +11,7 @@ import {
   useSelfProfile,
   useSettings,
   useUpdateSettings,
+  useUploadAvatar,
 } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
 import { ApiError } from '@/api/client';
@@ -20,6 +21,18 @@ import { cn } from '@/lib/cn';
 import { AVATARS, type AvatarId } from '@/lib/avatars';
 import type { Player } from '@/api/auth';
 import { haptic } from '@/lib/telegram';
+
+/**
+ * Formats the upload route actually accepts, by magic bytes — see
+ * avatar-processing.ts's `SIGNATURES`. Mirrored here only to build the file
+ * picker's `accept` filter and give instant feedback on an obviously wrong
+ * pick; see the class comment on `AvatarUploadSection` for why this can never
+ * be the real guard.
+ */
+const ACCEPTED_AVATAR_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+/** Must match AVATAR_MAX_UPLOAD_BYTES on the gateway (me-routes.ts). */
+const AVATAR_MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
 
 /** Must match MAX_DISPLAY_NAME_LENGTH on the gateway (credential-rules.ts). */
 const MAX_DISPLAY_NAME_LENGTH = 40;
@@ -123,7 +136,157 @@ function AvatarSection({ player }: { player: Player }) {
           <Avatar avatarId={null} photoUrl={player.photoUrl} name={player.displayName} size={56} />
         </AvatarTile>
       </div>
+
+      <AvatarUploadControls />
     </Section>
+  );
+}
+
+/**
+ * Upload-your-own-photo — an addition to the curated grid above, not a
+ * replacement. Picking a preset stays a single tap; this is for a player who
+ * wants their own picture instead.
+ *
+ * Flow: pick a file → local preview (courtesy checks run here, see below) →
+ * explicit "set as avatar" tap actually sends it → the settled settings
+ * (avatarId now the `UPLOADED_AVATAR` sentinel) replace the cache, and
+ * `Avatar.tsx`'s fallback chain picks it up everywhere, unprompted — Profile,
+ * Settings, and the "clear" tile above all re-render from that one query,
+ * so nothing here has to push the new avatar into more than one place.
+ *
+ * CLIENT-SIDE CHECKS ARE A COURTESY, NOT A GUARD. The size/type checks below
+ * exist only so a player who picks an obviously-wrong file finds out in a
+ * millisecond instead of after a round trip. They are not, and must never
+ * become, the security boundary: the gateway re-validates the real format by
+ * magic bytes regardless of what this file's `accept`/size checks allowed
+ * through (see avatar-processing.ts) — a hand-crafted request that skips this
+ * component entirely is refused there, not here. Do not remove the server
+ * error handling below on the theory that "the client already checks this."
+ */
+function AvatarUploadControls() {
+  const { t } = useTranslation();
+  const upload = useUploadAvatar();
+  const [pending, setPending] = useState<{ file: File; previewUrl: string } | null>(null);
+  const [clientError, setClientError] = useState<string | null>(null);
+
+  // Revoke the object URL on unmount even if a preview is still pending —
+  // the ref (rather than reading `pending` in the effect) keeps this a
+  // mount/unmount-only effect instead of one that reruns, and revokes, every
+  // time a new file is picked.
+  const pendingRef = useRef(pending);
+  pendingRef.current = pending;
+  useEffect(() => {
+    return () => {
+      if (pendingRef.current) URL.revokeObjectURL(pendingRef.current.previewUrl);
+    };
+  }, []);
+
+  const onFileSelected = (e: ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0];
+    // Reset the input so choosing the same file again still fires onChange.
+    e.target.value = '';
+    if (!file) return;
+
+    setClientError(null);
+
+    if (!ACCEPTED_AVATAR_TYPES.includes(file.type)) {
+      setClientError(t('personalInfo.avatarWrongTypeClient'));
+      return;
+    }
+    if (file.size > AVATAR_MAX_UPLOAD_BYTES) {
+      setClientError(t('personalInfo.avatarTooLargeClient'));
+      return;
+    }
+
+    if (pending) URL.revokeObjectURL(pending.previewUrl);
+    setPending({ file, previewUrl: URL.createObjectURL(file) });
+  };
+
+  const cancelPending = (): void => {
+    if (pending) URL.revokeObjectURL(pending.previewUrl);
+    setPending(null);
+    setClientError(null);
+  };
+
+  const confirmUpload = (): void => {
+    if (!pending || upload.isPending) return;
+    haptic('light');
+    const { file, previewUrl } = pending;
+    upload.mutate(
+      { file, contentType: file.type },
+      {
+        onSuccess: () => {
+          toast.success(t('personalInfo.avatarUploaded'));
+          URL.revokeObjectURL(previewUrl);
+          setPending(null);
+        },
+        onError: (e) => {
+          // The server's own message where it has one — too large (413),
+          // not a real image / wrong format (400), rate-limited (429) all
+          // arrive with a message written to be read as-is, same convention
+          // PasswordSection above follows for its own server errors. Only a
+          // transport failure (no ApiError at all) falls back to generic copy.
+          toast.error(e instanceof ApiError ? e.message : t('personalInfo.saveFailed'));
+        },
+      },
+    );
+  };
+
+  if (pending) {
+    return (
+      <div className="space-y-2 border-t border-border p-4">
+        <div className="flex items-center gap-3">
+          <img
+            src={pending.previewUrl}
+            alt={t('personalInfo.avatarPreviewAlt')}
+            className="size-14 shrink-0 rounded-full object-cover"
+          />
+          <div className="flex flex-1 flex-wrap gap-2">
+            <Button size="sm" disabled={upload.isPending} onClick={confirmUpload}>
+              {upload.isPending && <Loader2 size={16} className="animate-spin" />}
+              {t('personalInfo.avatarUploadConfirm')}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={upload.isPending}
+              onClick={cancelPending}
+            >
+              {t('common.cancel')}
+            </Button>
+          </div>
+        </div>
+        {/* Busy state announced for assistive tech, not conveyed by the spinner alone. */}
+        {upload.isPending && (
+          <p role="status" aria-live="polite" className="sr-only">
+            {t('personalInfo.avatarUploading')}
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 border-t border-border p-4">
+      <div className="flex items-center gap-3">
+        <label
+          htmlFor="avatar-file-input"
+          className="inline-flex h-9 cursor-pointer select-none items-center justify-center gap-2 rounded-(--radius-app) border border-border bg-surface-2 px-3.5 text-sm font-bold text-text"
+        >
+          <Upload size={16} />
+          {t('personalInfo.avatarUploadLabel')}
+        </label>
+        <input
+          id="avatar-file-input"
+          type="file"
+          accept={ACCEPTED_AVATAR_TYPES.join(',')}
+          onChange={onFileSelected}
+          className="sr-only"
+        />
+      </div>
+      <p className="text-xs leading-relaxed text-dim">{t('personalInfo.avatarUploadHint')}</p>
+      {clientError && <p className="text-xs leading-relaxed text-danger">{clientError}</p>}
+    </div>
   );
 }
 

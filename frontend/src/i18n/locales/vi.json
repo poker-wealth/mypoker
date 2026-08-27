@@ -644,7 +644,15 @@
     "signInRequired": "Đăng nhập để quản lý thông tin cá nhân của bạn.",
     "avatarTitle": "Ảnh đại diện",
     "avatarUsePhoto": "Dùng ảnh tài khoản của tôi",
-    "avatarUseInitial": "Dùng chữ cái đầu của tôi"
+    "avatarUseInitial": "Dùng chữ cái đầu của tôi",
+    "avatarUploadLabel": "Tải ảnh lên",
+    "avatarUploadHint": "Định dạng JPEG, PNG hoặc WebP, tối đa 2 MB.",
+    "avatarPreviewAlt": "Xem trước ảnh bạn sắp đặt làm ảnh đại diện",
+    "avatarUploadConfirm": "Đặt làm ảnh đại diện",
+    "avatarUploading": "Đang tải ảnh đại diện lên…",
+    "avatarUploaded": "Đã cập nhật ảnh đại diện",
+    "avatarTooLargeClient": "Ảnh này vượt quá 2 MB — hãy chọn ảnh nhỏ hơn.",
+    "avatarWrongTypeClient": "Hãy chọn ảnh định dạng JPEG, PNG hoặc WebP."
   },
   "avatars": {
     "a-spade": "Bích",

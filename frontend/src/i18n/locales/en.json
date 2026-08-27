@@ -644,7 +644,15 @@
     "signInRequired": "Sign in to manage your personal info.",
     "avatarTitle": "Avatar",
     "avatarUsePhoto": "Use my account photo",
-    "avatarUseInitial": "Use my initial"
+    "avatarUseInitial": "Use my initial",
+    "avatarUploadLabel": "Upload a photo",
+    "avatarUploadHint": "JPEG, PNG or WebP, up to 2 MB.",
+    "avatarPreviewAlt": "Preview of the photo you're about to set as your avatar",
+    "avatarUploadConfirm": "Set as avatar",
+    "avatarUploading": "Uploading avatar…",
+    "avatarUploaded": "Avatar updated",
+    "avatarTooLargeClient": "That photo is over 2 MB — choose a smaller one.",
+    "avatarWrongTypeClient": "Choose a JPEG, PNG or WebP image."
   },
   "avatars": {
     "a-spade": "Spade",

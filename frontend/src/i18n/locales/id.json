@@ -644,7 +644,15 @@
     "signInRequired": "Masuk untuk mengelola info pribadi Anda.",
     "avatarTitle": "Avatar",
     "avatarUsePhoto": "Gunakan foto akun saya",
-    "avatarUseInitial": "Gunakan inisial saya"
+    "avatarUseInitial": "Gunakan inisial saya",
+    "avatarUploadLabel": "Unggah foto",
+    "avatarUploadHint": "Format JPEG, PNG, atau WebP, maksimal 2 MB.",
+    "avatarPreviewAlt": "Pratinjau foto yang akan Anda jadikan avatar",
+    "avatarUploadConfirm": "Jadikan avatar",
+    "avatarUploading": "Mengunggah avatar…",
+    "avatarUploaded": "Avatar diperbarui",
+    "avatarTooLargeClient": "Foto ini lebih dari 2 MB — pilih foto yang lebih kecil.",
+    "avatarWrongTypeClient": "Pilih gambar berformat JPEG, PNG, atau WebP."
   },
   "avatars": {
     "a-spade": "Sekop",

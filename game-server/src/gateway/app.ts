@@ -9,6 +9,7 @@ import { buildLeagueRouter } from './league-routes';
 import { buildAgentRouter } from './agent-routes';
 import { buildAdminRouter } from './admin-routes';
 import { buildMeRouter } from './me-routes';
+import { buildAvatarRouter } from './avatar-routes';
 import { createRedEnvelopeRouter } from './red-envelope-routes';
 import { buildInternalRouter } from './internal-routes';
 import { currentRuleManifest, ruleVersionFor } from '../fairness/rule-version';
@@ -39,6 +40,9 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
 
   app.use('/auth', buildAuthRouter(config));
   app.use('/me', buildMeRouter(config));
+  // Avatar images. Public and unauthenticated (see avatar-routes.ts for why) —
+  // deliberately NOT under /me, which requireAuth guards wholesale.
+  app.use('/avatars', buildAvatarRouter(config));
   app.use('/leagues', buildLeagueRouter(config));
   app.use('/agent', buildAgentRouter(config));
   // Admin. Guarded to role 'ops' inside the router; deliberately NOT a product tab.
@@ -190,6 +194,20 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     if (err instanceof FilterError) {
       res.status(400).json({ error: err.message });
+      return;
+    }
+    // body-parser's size-limit rejection (express.json's global 64kb, and the
+    // avatar route's own scoped express.raw limit) throws an error with this
+    // shape. Without this branch it fell through to the generic 500 below —
+    // "internal error" for what is actually a well-formed, correctly-working
+    // rejection of an oversized request. A client cannot tell "the server
+    // broke" from "you sent too much" unless the status says which.
+    if (
+      err &&
+      typeof err === 'object' &&
+      ('type' in err ? (err as { type?: unknown }).type === 'entity.too.large' : false)
+    ) {
+      res.status(413).json({ error: 'request body is too large' });
       return;
     }
     const message = err instanceof Error ? err.message : 'internal error';

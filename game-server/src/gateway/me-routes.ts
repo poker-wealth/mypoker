@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from 'express';
+import express, { Router, type Request, type Response } from 'express';
 import type { GatewayConfig } from './config';
 import { requireAuth } from './auth';
 import {
@@ -11,6 +11,12 @@ import {
   daysElapsedThisMonth,
   type FindingReason,
 } from '../players/index';
+import {
+  processAvatarUpload,
+  AvatarRejected,
+} from '../uploads/avatar-processing';
+import { avatarUploadLimiter as defaultAvatarUploadLimiter } from '../auth/avatar-upload-store';
+import type { AvatarUploadLimiter } from '../auth/avatar-upload-store';
 
 /**
  * Player-scoped reads: stats and game history.
@@ -70,8 +76,21 @@ export async function forwardTo(
   }
 }
 
-export function buildMeRouter(config: GatewayConfig): Router {
+/** A file that big could never become a valid avatar — refused before it is even buffered. */
+const AVATAR_MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
+
+/**
+ * Injectable seams for testing the avatar-upload flow — same idea as
+ * `AuthDeps` in `./auth`. Defaults to the real rate limiter, so nothing about
+ * production wiring changes.
+ */
+export interface MeRouterDeps {
+  avatarUploadLimiter?: AvatarUploadLimiter;
+}
+
+export function buildMeRouter(config: GatewayConfig, deps: MeRouterDeps = {}): Router {
   const r = Router();
+  const uploadLimiter = deps.avatarUploadLimiter ?? defaultAvatarUploadLimiter;
   r.use(requireAuth(config));
 
   r.get('/stats', (req, res) => void forwardTo(config, req, res, '/me/stats'));
@@ -143,7 +162,128 @@ export function buildMeRouter(config: GatewayConfig): Router {
   r.get('/settings', (req, res) => void forwardTo(config, req, res, '/me/settings'));
   r.patch('/settings', (req, res) => void forwardTo(config, req, res, '/me/settings'));
 
+  // Avatar upload. `requireAuth` above already covers this route — an
+  // unauthenticated POST never reaches the handler. The body is read as raw
+  // bytes, capped well before the resize a real photo needs, scoped to this
+  // one route rather than raising the gateway's app-wide express.json()
+  // limit (see gateway/app.ts) — a bad actor's oversized body is rejected by
+  // Express itself before a single byte of it is handed to sharp.
+  r.post(
+    '/avatar',
+    express.raw({ type: () => true, limit: AVATAR_MAX_UPLOAD_BYTES }),
+    (req: Request, res: Response) => {
+      void handleAvatarUpload(config, uploadLimiter, req, res);
+    },
+  );
+
   return r;
+}
+
+/**
+ * The heavy-lifting behind `POST /me/avatar`.
+ *
+ * Order matters: rate limit first — the cheapest check, and the one that
+ * must run even for an otherwise-perfectly-valid upload — THEN validate and
+ * re-encode (the dangerous part, see `uploads/avatar-processing.ts`), THEN
+ * hand the SAFE, already-processed bytes to financial-core, the only service
+ * with a database a player record can live in. The limiter is only charged
+ * once the whole thing actually succeeded, so a rejected or failed attempt
+ * does not burn quota the player never got any use from.
+ */
+async function handleAvatarUpload(
+  config: GatewayConfig,
+  uploadLimiter: AvatarUploadLimiter,
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const playerId = req.player!.playerId;
+
+  const gate = await uploadLimiter.check(playerId);
+  if (!gate.ok) {
+    const seconds = Math.ceil(gate.retryAfterMs / 1000);
+    res.set('Retry-After', String(seconds));
+    res.status(429).json({
+      error:
+        gate.reason === 'cooldown'
+          ? `Please wait ${seconds}s before uploading another avatar.`
+          : 'Too many avatar uploads. Try again later.',
+      code: gate.reason,
+    });
+    return;
+  }
+
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+    res.status(400).json({ error: 'no image data received', code: 'empty_body' });
+    return;
+  }
+
+  let processed;
+  try {
+    processed = await processAvatarUpload(req.body);
+  } catch (err) {
+    if (err instanceof AvatarRejected) {
+      res.status(400).json({ error: err.message, code: err.code });
+      return;
+    }
+    console.error('[gateway] avatar processing failed:', err);
+    res.status(500).json({ error: 'internal error' });
+    return;
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+  try {
+    const upstream = await fetch(
+      `${config.financialCoreUrl}/api/v1/internal/avatars/${encodeURIComponent(playerId)}`,
+      {
+        method: 'PUT',
+        headers: {
+          'x-internal-secret': config.internalApiSecret,
+          'content-type': 'application/octet-stream',
+        },
+        body: processed.data,
+        signal: controller.signal,
+      },
+    );
+    if (!upstream.ok) {
+      console.error('[gateway] financial-core rejected avatar store:', upstream.status);
+      res.status(502).json({ error: 'financial service unavailable' });
+      return;
+    }
+  } catch (err) {
+    const aborted = err instanceof Error && err.name === 'AbortError';
+    console.error('[gateway] financial-core unreachable storing avatar:', err);
+    res.status(aborted ? 504 : 502).json({ error: 'financial service unavailable' });
+    return;
+  } finally {
+    clearTimeout(timer);
+  }
+
+  // Only counted against the limiter once financial-core actually accepted
+  // it — a rejected or failed attempt should not cost quota the player never
+  // got any use from.
+  await uploadLimiter.record(playerId);
+
+  // Read back the settled settings rather than assert a shape here:
+  // whatever financial-core actually persisted (the UPLOADED_AVATAR
+  // sentinel, written by saveUploadedAvatar) is what the client should
+  // render, and this way that sentinel string lives in exactly one place —
+  // financial-core/src/settings/player-settings.ts — rather than being
+  // duplicated into this package too.
+  const settings = await upstreamJson<{ avatarId: string | null }>(config, req, '/me/settings');
+  if (!settings.ok) {
+    // The image itself is safely stored; only the confirmation read failed.
+    // Say so, rather than a bare 502 that reads as "your upload failed" when
+    // it did not.
+    res.status(200).json({
+      avatarUrl: `/avatars/${encodeURIComponent(playerId)}`,
+      settings: null,
+      warning: 'avatar stored, but could not read back settings',
+    });
+    return;
+  }
+
+  res.json({ ...settings.body, avatarUrl: `/avatars/${encodeURIComponent(playerId)}` });
 }
 
 // ── upstream helpers for the shaping routes ──────────────────────────────────

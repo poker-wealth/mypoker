@@ -644,7 +644,15 @@
     "signInRequired": "個人情報を管理するにはログインしてください。",
     "avatarTitle": "アバター",
     "avatarUsePhoto": "アカウントの写真を使用",
-    "avatarUseInitial": "イニシャルを使用"
+    "avatarUseInitial": "イニシャルを使用",
+    "avatarUploadLabel": "写真をアップロード",
+    "avatarUploadHint": "JPEG、PNG、WebP形式に対応、最大2MBまで。",
+    "avatarPreviewAlt": "アバターに設定しようとしている写真のプレビュー",
+    "avatarUploadConfirm": "アバターに設定",
+    "avatarUploading": "アバターをアップロード中…",
+    "avatarUploaded": "アバターを更新しました",
+    "avatarTooLargeClient": "この写真は2MBを超えています。もっと小さい画像を選んでください。",
+    "avatarWrongTypeClient": "JPEG、PNG、WebP形式の画像を選んでください。"
   },
   "avatars": {
     "a-spade": "スペード",

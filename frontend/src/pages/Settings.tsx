@@ -16,7 +16,7 @@ import { useTheme } from '@/store/theme';
 import { SUPPORT_URL } from '@/config';
 import { LANGUAGES } from '@/i18n/languages';
 import { toast } from '@/store/toast';
-import type { PlayerSettings } from '@/api/settings';
+import type { SettingsPatch } from '@/api/settings';
 
 /**
  * Settings — account-scoped, so preferences follow the player to a new device.
@@ -42,7 +42,7 @@ export function Settings() {
 
   const currentLanguage = LANGUAGES.find((l) => l.code === i18n.resolvedLanguage)?.label ?? '';
 
-  const set = (patch: Partial<PlayerSettings>): void => {
+  const set = (patch: SettingsPatch): void => {
     update.mutate(patch);
   };
 
@@ -162,6 +162,7 @@ export function Settings() {
             leading={
               <Avatar
                 avatarId={settings.data?.avatarId}
+                playerId={player.playerId}
                 photoUrl={player.photoUrl}
                 name={player.displayName}
                 size={18}

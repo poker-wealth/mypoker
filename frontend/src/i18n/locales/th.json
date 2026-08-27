@@ -644,7 +644,15 @@
     "signInRequired": "เข้าสู่ระบบเพื่อจัดการข้อมูลส่วนตัวของคุณ",
     "avatarTitle": "อวตาร",
     "avatarUsePhoto": "ใช้รูปโปรไฟล์บัญชีของฉัน",
-    "avatarUseInitial": "ใช้อักษรย่อของฉัน"
+    "avatarUseInitial": "ใช้อักษรย่อของฉัน",
+    "avatarUploadLabel": "อัปโหลดรูปภาพ",
+    "avatarUploadHint": "รองรับ JPEG, PNG หรือ WebP ขนาดไม่เกิน 2 MB",
+    "avatarPreviewAlt": "ตัวอย่างรูปภาพที่คุณกำลังจะตั้งเป็นอวตาร",
+    "avatarUploadConfirm": "ตั้งเป็นอวตาร",
+    "avatarUploading": "กำลังอัปโหลดอวตาร…",
+    "avatarUploaded": "อัปเดตอวตารแล้ว",
+    "avatarTooLargeClient": "รูปนี้มีขนาดเกิน 2 MB โปรดเลือกรูปที่เล็กกว่านี้",
+    "avatarWrongTypeClient": "โปรดเลือกรูปภาพแบบ JPEG, PNG หรือ WebP"
   },
   "avatars": {
     "a-spade": "โพดำ",

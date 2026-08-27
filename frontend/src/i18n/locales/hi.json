@@ -644,7 +644,15 @@
     "signInRequired": "अपनी व्यक्तिगत जानकारी प्रबंधित करने के लिए साइन इन करें।",
     "avatarTitle": "अवतार",
     "avatarUsePhoto": "मेरी खाता फ़ोटो का उपयोग करें",
-    "avatarUseInitial": "मेरा आद्याक्षर उपयोग करें"
+    "avatarUseInitial": "मेरा आद्याक्षर उपयोग करें",
+    "avatarUploadLabel": "फ़ोटो अपलोड करें",
+    "avatarUploadHint": "JPEG, PNG या WebP, अधिकतम 2 MB तक।",
+    "avatarPreviewAlt": "जिस फ़ोटो को आप अपना अवतार बनाने वाले हैं उसका पूर्वावलोकन",
+    "avatarUploadConfirm": "अवतार के रूप में सेट करें",
+    "avatarUploading": "अवतार अपलोड हो रहा है…",
+    "avatarUploaded": "अवतार अपडेट हो गया",
+    "avatarTooLargeClient": "यह फ़ोटो 2 MB से बड़ी है — कोई छोटी फ़ोटो चुनें।",
+    "avatarWrongTypeClient": "JPEG, PNG या WebP छवि चुनें।"
   },
   "avatars": {
     "a-spade": "हुकुम",

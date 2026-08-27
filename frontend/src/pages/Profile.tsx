@@ -121,6 +121,7 @@ function Identity({ signedIn }: { signedIn: boolean }) {
       >
         <Avatar
           avatarId={signedIn ? settings.data?.avatarId : null}
+          playerId={signedIn ? player?.playerId : null}
           photoUrl={signedIn ? player?.photoUrl : null}
           // 'M' (brand initial), not the translated "Guest" word's initial —
           // matches Header.tsx's own untranslated 'MYPOKER' brand fallback.

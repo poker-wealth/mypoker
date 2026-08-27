@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from 'express';
+import express, { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { Money } from '../domain/money';
 import { LedgerType, LedgerDirection, PLATFORM_SCOPE } from '../domain/account-types';
@@ -60,6 +60,7 @@ import { getWalletTransactions, getWithdrawals } from '../wallet/wallet-views';
 import { isValidTronAddress } from '../wallet/tron-address';
 import { getPlayerStats, getPlayerHistory } from '../stats/player-stats';
 import { getSettings, updateSettings, AVATAR_IDS } from '../settings/player-settings';
+import { saveUploadedAvatar, getAvatarImage } from '../settings/avatar-store';
 import { getReputationFacts } from '../reputation/player-reputation';
 import {
   createLeague,
@@ -862,6 +863,58 @@ export function buildRouter(): Router {
     asyncHandler(async (req: Request, res: Response) => {
       const patch = settingsBody.parse(req.body);
       res.json(await updateSettings(req.dataScope!.playerId, patch));
+    }),
+  );
+
+  // ── Avatar images (internal) ─────────────────────────────────────────────
+  // The gateway is the only public entry point for an uploaded file. By the
+  // time either route below is called, the bytes have already been
+  // magic-byte-sniffed, pixel-bounded and re-encoded to a metadata-free JPEG
+  // (game-server/src/uploads/avatar-processing.ts) — these routes exist only
+  // because the gateway has no player-scoped database of its own to put the
+  // result in. `internalAuth`, never a player token: a player's own upload
+  // goes through the gateway's `/me/avatar`, which calls this with the
+  // service secret after processing, not with the caller's JWT.
+  r.put(
+    '/internal/avatars/:playerId',
+    internalAuth,
+    // Raw bytes, not base64-in-JSON: this is the exact re-encoded image, and
+    // base64 would burn roughly a third more bytes for no benefit to a
+    // service caller. Scoped to this one route rather than raising the
+    // app-wide express.json() limit above — and since the request's
+    // Content-Type here is never application/json, that global parser skips
+    // it entirely rather than needing a bigger budget.
+    express.raw({ type: () => true, limit: '512kb' }),
+    asyncHandler(async (req: Request, res: Response) => {
+      const playerId = String(req.params.playerId);
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        throw new ApiError(400, 'expected raw image bytes');
+      }
+      try {
+        await saveUploadedAvatar(playerId, req.body);
+      } catch (err) {
+        // MAX_STORED_AVATAR_BYTES and the empty-buffer guard both throw
+        // RangeError — a caller's problem (400), not this service's (500).
+        if (err instanceof RangeError) throw new ApiError(400, err.message);
+        throw err;
+      }
+      res.status(204).end();
+    }),
+  );
+
+  r.get(
+    '/internal/avatars/:playerId',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const image = await getAvatarImage(String(req.params.playerId));
+      if (!image) throw new ApiError(404, 'no uploaded avatar');
+      // Raw bytes out, mirroring the PUT above. The PUBLIC content-type,
+      // Content-Disposition, nosniff and cache headers are set by the
+      // gateway (game-server/src/gateway/avatar-routes.ts) — never derived
+      // from anything reported here, so a corrupted or tampered row can never
+      // make a browser sniff and execute something other than an image.
+      res.setHeader('X-Avatar-Updated-At', image.updatedAt.toISOString());
+      res.status(200).type('application/octet-stream').send(image.data);
     }),
   );
 
