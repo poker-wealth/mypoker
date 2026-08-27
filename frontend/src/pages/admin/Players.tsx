@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search, Users, Lock, ChevronRight } from 'lucide-react';
-import { Sheet } from '@/components/ui/Sheet';
+import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -176,9 +176,9 @@ export function AdminPlayers() {
         </p>
       )}
 
-      <Sheet open={selected !== null} onClose={() => setSelected(null)} title="User">
+      <Modal open={selected !== null} onClose={() => setSelected(null)} title="User">
         {selected && <PlayerDetail playerId={selected} />}
-      </Sheet>
+      </Modal>
     </div>
   );
 }
@@ -189,7 +189,7 @@ function PlayerDetail({ playerId }: { playerId: string }) {
 
   if (detail.isPending) {
     return (
-      <div className="space-y-3 py-2">
+      <div className="space-y-3">
         <Skeleton className="h-4 w-32" />
         <Skeleton className="h-8 w-40" />
         <Skeleton className="h-20 w-full" />
@@ -204,7 +204,7 @@ function PlayerDetail({ playerId }: { playerId: string }) {
   const d = detail.data;
 
   return (
-    <div className="space-y-4 py-1">
+    <div className="space-y-4">
       <div>
         <div className="text-sm font-bold">{d.identity?.displayName ?? d.playerId}</div>
         <div className="mt-0.5 break-all font-mono text-[0.62rem] text-dim">{d.playerId}</div>
