@@ -52,7 +52,6 @@ import { cn } from '@/lib/cn';
  *   you try to withdraw.
  */
 export function Profile() {
-  const navigate = useNavigate();
   const { t } = useTranslation();
   const { player, status, error, signIn, signOut } = useSession();
   const signedIn = status === 'authenticated' && player !== null;
@@ -60,7 +59,7 @@ export function Profile() {
 
   return (
     <div className="space-y-4 pb-2">
-      <Identity signedIn={signedIn} onSettings={() => navigate('/settings')} />
+      <Identity signedIn={signedIn} />
 
       {signedIn && <BalanceCard />}
 
@@ -101,7 +100,7 @@ export function Profile() {
 
 // ── Identity ─────────────────────────────────────────────────────────────────
 
-function Identity({ signedIn, onSettings }: { signedIn: boolean; onSettings: () => void }) {
+function Identity({ signedIn }: { signedIn: boolean }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const player = useSession((s) => s.player);
@@ -109,15 +108,8 @@ function Identity({ signedIn, onSettings }: { signedIn: boolean; onSettings: () 
 
   return (
     <section>
-      <div className="flex items-center justify-between px-1 pb-3">
+      <div className="px-1 pb-3">
         <span className="text-sm font-bold">{t('nav.account')}</span>
-        <button
-          onClick={onSettings}
-          className="rounded-lg p-1.5 text-dim active:bg-surface-2"
-          aria-label={t('account.settings')}
-        >
-          <SettingsIcon size={18} />
-        </button>
       </div>
 
       <button
