@@ -11,6 +11,7 @@ import { ConnectionBanner } from '@/components/ConnectionBanner';
 import { LanguageGate } from '@/components/LanguageGate';
 import { Onboarding } from '@/components/Onboarding';
 import { router } from '@/router';
+import { isAdminHost } from '@/lib/adminHost';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 // Imported for its side effect: initialises i18next before anything renders, so
 // the first paint is already in the right language.
@@ -19,8 +20,19 @@ import './index.css';
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'unset-google-client-id';
 
+// On the admin subdomain the app IS the admin panel. Rewrite a bare path to
+// /admin BEFORE the router reads the location, so admin.mypoker777.com lands on
+// the panel (or its login) with no flash of the player app in between.
+const onAdminHost = isAdminHost();
+if (onAdminHost && !window.location.pathname.startsWith('/admin')) {
+  window.history.replaceState(null, '', '/admin');
+}
+
 initTelegram();
-watchConnection();
+// The connection watcher drives the live-table socket + the "Reconnecting…"
+// banner — neither of which the admin panel has. Skipping it on the admin host
+// is what removes that stray banner there.
+if (!onAdminHost) watchConnection();
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
@@ -36,11 +48,12 @@ createRoot(document.getElementById('root')!).render(
     <QueryClientProvider client={queryClient}>
       {/* All three sit outside the router: a connection drop, an error toast or
           the first-launch language choice has to survive navigation, and none of
-          them belongs to any one screen. */}
-      <ConnectionBanner />
+          them belongs to any one screen. The connection banner, language gate and
+          onboarding are player-app concerns — the admin host shows none of them. */}
+      {!onAdminHost && <ConnectionBanner />}
       <Toaster />
-      <LanguageGate />
-      <Onboarding />
+      {!onAdminHost && <LanguageGate />}
+      {!onAdminHost && <Onboarding />}
       <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
         <RouterProvider router={router} />
       </GoogleOAuthProvider>

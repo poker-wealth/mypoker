@@ -17,6 +17,8 @@ import {
   fetchWithdrawalQueue,
   approveWithdrawal,
   rejectWithdrawal,
+  fetchAdmins,
+  createAdmin,
 } from './admin';
 import { fetchVip } from './vip';
 import {
@@ -687,6 +689,24 @@ export function useWithdrawalQueue() {
     staleTime: 5_000,
     refetchInterval: 15_000,
     retry: false,
+  });
+}
+
+/** The platform administrators. Rarely changes, so no polling. */
+export function useAdmins() {
+  return useQuery({
+    queryKey: ['admin', 'admins'],
+    queryFn: fetchAdmins,
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+export function useCreateAdmin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createAdmin,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['admin', 'admins'] }),
   });
 }
 

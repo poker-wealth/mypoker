@@ -214,3 +214,23 @@ export const approveWithdrawal = (id: string): Promise<WithdrawalApproval> =>
 
 export const rejectWithdrawal = (id: string, reason: string): Promise<{ state: string }> =>
   api.post<{ state: string }>(`/admin/withdrawals/${encodeURIComponent(id)}/reject`, { reason });
+
+// ── Admins ───────────────────────────────────────────────────────────────────
+
+/** A platform administrator, as the Admins screen lists them. */
+export interface AdminAccount {
+  playerId: string;
+  email?: string;
+  displayName?: string;
+  createdAt: string;
+}
+
+export const fetchAdmins = (): Promise<{ admins: AdminAccount[] }> =>
+  api.get<{ admins: AdminAccount[] }>('/admin/admins');
+
+export const createAdmin = (body: {
+  email: string;
+  password: string;
+  displayName?: string;
+}): Promise<{ admin: AdminAccount }> =>
+  api.post<{ admin: AdminAccount }>('/admin/admins', body);

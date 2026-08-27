@@ -20,6 +20,7 @@ import { AdminPlayers } from '@/pages/admin/Players';
 import { AdminAlerts } from '@/pages/admin/Alerts';
 import { AdminLeagues } from '@/pages/admin/Leagues';
 import { AdminWithdrawals } from '@/pages/admin/Withdrawals';
+import { AdminAdmins } from '@/pages/admin/Admins';
 // The styled admin dead-end (the "crash tab" fix) lives in route-fallbacks now; the withdrawals
 // stub that file also carries is unused here — the real review queue landed with league-funding.
 import { AdminRouteError } from '@/pages/admin/route-fallbacks';
@@ -66,6 +67,7 @@ export const router = createBrowserRouter([
       { path: 'players', element: <AdminPlayers /> },
       { path: 'leagues', element: <AdminLeagues /> },
       { path: 'alerts', element: <AdminAlerts /> },
+      { path: 'admins', element: <AdminAdmins /> },
     ],
   },
   { path: '/table/:id', element: <Table /> },
