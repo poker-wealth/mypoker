@@ -5,6 +5,7 @@ import { Mail, Lock, ChevronLeft, User, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { useSession } from '@/store/session';
 import { GoogleAuthButton } from '@/components/GoogleAuthButton';
+import { ApiError } from '@/api/client';
 
 export function Login() {
   const navigate = useNavigate();
@@ -39,9 +40,14 @@ export function Login() {
         await signUpWithEmail(identifier, password, displayName);
       }
       navigate('/');
-    } catch (err: any) {
-      const message = err?.response?.data?.message || err?.message || 'Authentication failed. Please check your credentials and try again.';
-      setError(message);
+    } catch (err) {
+      // fetch-based client → ApiError carries the server's message ("invalid email
+      // or password"); anything else falls back to a generic line.
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'Authentication failed. Please check your credentials and try again.',
+      );
     } finally {
       setIsSubmitting(false);
     }
