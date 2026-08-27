@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowDownLeft, ArrowUpRight, Info, Copy, Loader2 } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Info, Copy, ChevronRight, Loader2 } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Sheet';
@@ -16,6 +16,7 @@ import {
   useSetWithdrawalAddress,
 } from '@/api/hooks';
 import { ApiError } from '@/api/client';
+import type { WalletTxn } from '@/api/wallet';
 import { toast } from '@/lib/toast';
 
 /** DEPOSIT/WITHDRAW/BET/WIN_PAYOUT/RAKE/JACKPOT_PAYOUT → a short readable label. */
@@ -39,6 +40,11 @@ export function Wallet() {
   const [params] = useSearchParams();
   const [depositOpen, setDepositOpen] = useState(params.get('action') === 'deposit');
   const [withdrawOpen, setWithdrawOpen] = useState(params.get('action') === 'withdraw');
+  // Tap a row to open its full detail. `detailOpen` is kept separate from
+  // `detailTxn` so the sheet's slide-out animation still has data to render
+  // while it closes (clearing the txn immediately would blank it mid-exit).
+  const [detailTxn, setDetailTxn] = useState<WalletTxn | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   return (
     <div className="space-y-4">
@@ -116,15 +122,26 @@ export function Wallet() {
             txns.data.transactions.map((tx, i) => {
               const credit = tx.direction === 'CREDIT';
               return (
-                <div key={`${tx.at}-${i}`} className="flex items-center justify-between px-4 py-3">
+                <button
+                  key={`${tx.at}-${i}`}
+                  type="button"
+                  onClick={() => {
+                    setDetailTxn(tx);
+                    setDetailOpen(true);
+                  }}
+                  className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-surface-2 active:bg-surface-2"
+                >
                   <div>
                     <div className="text-sm font-semibold">{TXN_LABEL[tx.type] ?? tx.type}</div>
                     <div className="text-[0.66rem] text-dim">{new Date(tx.at).toLocaleString()}</div>
                   </div>
-                  <div className={`text-sm font-bold tabular-nums ${credit ? 'text-success' : 'text-text'}`}>
-                    {credit ? '+' : '−'}${tx.amount}
+                  <div className="flex items-center gap-1.5">
+                    <span className={`text-sm font-bold tabular-nums ${credit ? 'text-success' : 'text-text'}`}>
+                      {credit ? '+' : '−'}${tx.amount}
+                    </span>
+                    <ChevronRight size={16} className="shrink-0 text-dim" />
                   </div>
-                </div>
+                </button>
               );
             })
           )}
@@ -137,6 +154,7 @@ export function Wallet() {
         onClose={() => setWithdrawOpen(false)}
         available={balance.data?.available ?? '0'}
       />
+      <TxnDetailSheet open={detailOpen} txn={detailTxn} onClose={() => setDetailOpen(false)} />
     </div>
   );
 }
@@ -181,6 +199,98 @@ function DepositSheet({ open, onClose }: { open: boolean; onClose: () => void })
         )}
       </div>
     </Sheet>
+  );
+}
+
+// ── Transaction detail ───────────────────────────────────────────────────────
+
+/** Ledger types that settle a live-table hand — their businessId is the round id. */
+const GAME_TXN_TYPES = ['BET', 'WIN_PAYOUT', 'RAKE', 'JACKPOT_PAYOUT'];
+
+function TxnDetailSheet({
+  open,
+  txn,
+  onClose,
+}: {
+  open: boolean;
+  txn: WalletTxn | null;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Sheet open={open} onClose={onClose} title={t('wallet.txnDetail.title')}>
+      {/* Rendered only when a txn is selected; the sheet keeps its last txn while
+          it animates closed, so this stays populated through the exit. */}
+      {txn && <TxnDetailContent txn={txn} />}
+    </Sheet>
+  );
+}
+
+function TxnDetailContent({ txn }: { txn: WalletTxn }) {
+  const { t } = useTranslation();
+  const credit = txn.direction === 'CREDIT';
+  const onChain = txn.type === 'DEPOSIT' || txn.type === 'WITHDRAW';
+  // businessId is the on-chain tx hash for deposits/withdrawals and the round id
+  // for a hand's bet/win/rake/jackpot legs — label it for what it actually is.
+  const refLabel = onChain
+    ? t('wallet.txnDetail.txHash')
+    : GAME_TXN_TYPES.includes(txn.type)
+      ? t('wallet.txnDetail.roundId')
+      : t('wallet.txnDetail.reference');
+
+  const copyRef = (value: string): void => {
+    void navigator.clipboard
+      .writeText(value)
+      .then(() => toast.success(t('wallet.txnDetail.referenceCopied')))
+      .catch(() => toast.error(t('toasts.copyFailed')));
+  };
+
+  return (
+    <div className="space-y-4 p-4">
+      {/* Header — type + signed amount */}
+      <div className="flex flex-col items-center gap-2 py-1">
+        <div
+          className={`flex h-11 w-11 items-center justify-center rounded-full ${
+            credit ? 'bg-success/15 text-success' : 'bg-surface-2 text-text'
+          }`}
+        >
+          {credit ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
+        </div>
+        <div className="text-sm font-semibold text-dim">{TXN_LABEL[txn.type] ?? txn.type}</div>
+        <div className={`text-2xl font-black tabular-nums ${credit ? 'text-success' : 'text-text'}`}>
+          {credit ? '+' : '−'}${txn.amount}
+        </div>
+      </div>
+
+      {/* Facts the ledger states for certain */}
+      <div className="divide-y divide-border overflow-hidden rounded-(--radius-app) border border-border bg-surface">
+        <DetailRow label={t('wallet.txnDetail.status')} value={t('wallet.txnDetail.completed')} />
+        <DetailRow label={t('wallet.txnDetail.dateTime')} value={new Date(txn.at).toLocaleString()} />
+        {onChain && <DetailRow label={t('wallet.txnDetail.network')} value="TRON (TRC-20)" />}
+      </div>
+
+      {/* Reference — the on-chain tx hash or round id, in full and copyable */}
+      {txn.businessId && (
+        <div className="space-y-1.5">
+          <div className="text-xs font-semibold text-dim">{refLabel}</div>
+          <div className="rounded-(--radius-app) border border-border bg-surface p-3">
+            <div className="break-all font-mono text-xs text-text">{txn.businessId}</div>
+          </div>
+          <Button full variant="secondary" onClick={() => copyRef(txn.businessId!)}>
+            <Copy size={16} /> {t('wallet.txnDetail.copyReference')}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <span className="text-xs text-dim">{label}</span>
+      <span className="text-right text-sm font-medium tabular-nums">{value}</span>
+    </div>
   );
 }
 

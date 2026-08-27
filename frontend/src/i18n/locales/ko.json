@@ -228,7 +228,19 @@
     "saveAddress": "주소 저장",
     "changeAddress": "변경",
     "addressCooldownNote": "출금은 이 주소로만 전송됩니다. 변경하면 48시간의 대기 기간이 시작됩니다.",
-    "addressLocked": "이 주소로의 출금은 {{when}}에 열립니다"
+    "addressLocked": "이 주소로의 출금은 {{when}}에 열립니다",
+    "txnDetail": {
+      "title": "거래 상세",
+      "status": "상태",
+      "completed": "완료됨",
+      "dateTime": "날짜 및 시간",
+      "network": "네트워크",
+      "txHash": "트랜잭션 해시",
+      "roundId": "라운드 ID",
+      "reference": "참조 번호",
+      "copyReference": "복사",
+      "referenceCopied": "복사됨"
+    }
   },
   "table": {
     "fold": "폴드",

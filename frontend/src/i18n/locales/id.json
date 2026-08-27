@@ -228,7 +228,19 @@
     "saveAddress": "Simpan alamat",
     "changeAddress": "Ubah",
     "addressCooldownNote": "Penarikan hanya ke alamat ini. Mengubahnya memulai jeda 48 jam.",
-    "addressLocked": "Penarikan ke alamat ini dibuka {{when}}"
+    "addressLocked": "Penarikan ke alamat ini dibuka {{when}}",
+    "txnDetail": {
+      "title": "Detail transaksi",
+      "status": "Status",
+      "completed": "Selesai",
+      "dateTime": "Tanggal & waktu",
+      "network": "Jaringan",
+      "txHash": "Hash transaksi",
+      "roundId": "ID ronde",
+      "reference": "Referensi",
+      "copyReference": "Salin",
+      "referenceCopied": "Tersalin"
+    }
   },
   "table": {
     "fold": "Lipat",

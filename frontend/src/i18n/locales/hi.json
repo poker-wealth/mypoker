@@ -228,7 +228,19 @@
     "saveAddress": "पता सहेजें",
     "changeAddress": "बदलें",
     "addressCooldownNote": "निकासी केवल इसी पते पर जाएगी। इसे बदलने पर 48 घंटे की प्रतीक्षा शुरू होती है।",
-    "addressLocked": "इस पते पर निकासी {{when}} को खुलेगी"
+    "addressLocked": "इस पते पर निकासी {{when}} को खुलेगी",
+    "txnDetail": {
+      "title": "लेन-देन विवरण",
+      "status": "स्थिति",
+      "completed": "पूर्ण",
+      "dateTime": "दिनांक और समय",
+      "network": "नेटवर्क",
+      "txHash": "ट्रांज़ैक्शन हैश",
+      "roundId": "राउंड आईडी",
+      "reference": "संदर्भ",
+      "copyReference": "कॉपी करें",
+      "referenceCopied": "कॉपी हो गया"
+    }
   },
   "table": {
     "fold": "फ़ोल्ड",

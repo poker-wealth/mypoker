@@ -228,7 +228,19 @@
     "saveAddress": "アドレスを保存",
     "changeAddress": "変更",
     "addressCooldownNote": "出金はこのアドレスにのみ送られます。変更すると48時間の保留期間が始まります。",
-    "addressLocked": "このアドレスへの出金は {{when}} に開始されます"
+    "addressLocked": "このアドレスへの出金は {{when}} に開始されます",
+    "txnDetail": {
+      "title": "取引の詳細",
+      "status": "ステータス",
+      "completed": "完了",
+      "dateTime": "日時",
+      "network": "ネットワーク",
+      "txHash": "トランザクションハッシュ",
+      "roundId": "ラウンドID",
+      "reference": "参照番号",
+      "copyReference": "コピー",
+      "referenceCopied": "コピーしました"
+    }
   },
   "table": {
     "fold": "フォールド",

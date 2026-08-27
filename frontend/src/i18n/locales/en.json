@@ -228,7 +228,19 @@
     "saveAddress": "Save address",
     "changeAddress": "Change",
     "addressCooldownNote": "Withdrawals can only go to this address. Changing it starts a 48-hour hold before it can be used.",
-    "addressLocked": "Withdrawals to this address open {{when}}"
+    "addressLocked": "Withdrawals to this address open {{when}}",
+    "txnDetail": {
+      "title": "Transaction details",
+      "status": "Status",
+      "completed": "Completed",
+      "dateTime": "Date & time",
+      "network": "Network",
+      "txHash": "Transaction hash",
+      "roundId": "Round ID",
+      "reference": "Reference",
+      "copyReference": "Copy",
+      "referenceCopied": "Copied"
+    }
   },
   "table": {
     "fold": "Fold",

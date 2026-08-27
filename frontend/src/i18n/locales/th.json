@@ -228,7 +228,19 @@
     "saveAddress": "บันทึกที่อยู่",
     "changeAddress": "เปลี่ยน",
     "addressCooldownNote": "การถอนเงินจะส่งไปยังที่อยู่นี้เท่านั้น การเปลี่ยนแปลงจะเริ่มระยะรอ 48 ชั่วโมง",
-    "addressLocked": "การถอนไปยังที่อยู่นี้จะเปิด {{when}}"
+    "addressLocked": "การถอนไปยังที่อยู่นี้จะเปิด {{when}}",
+    "txnDetail": {
+      "title": "รายละเอียดธุรกรรม",
+      "status": "สถานะ",
+      "completed": "สำเร็จ",
+      "dateTime": "วันที่และเวลา",
+      "network": "เครือข่าย",
+      "txHash": "แฮชธุรกรรม",
+      "roundId": "รหัสรอบเกม",
+      "reference": "อ้างอิง",
+      "copyReference": "คัดลอก",
+      "referenceCopied": "คัดลอกแล้ว"
+    }
   },
   "table": {
     "fold": "หมอบ",
