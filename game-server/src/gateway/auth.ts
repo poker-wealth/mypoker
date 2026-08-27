@@ -635,9 +635,16 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
         return;
       }
 
-      // invalid_current_password -- the guard described above. 401, the same
-      // status a wrong password gets at /login.
-      res.status(401).json({
+      // invalid_current_password -- the guard described above. 400, NOT 401.
+      // The bearer token here is valid; only the second, self-supplied secret
+      // was wrong, which is a bad-input problem, not an authentication
+      // failure -- there is no unauthenticated caller to reject. A 401 is
+      // indistinguishable, client-side, from an expired session: the shared
+      // HTTP client in the web app treats any 401 as "log the user out", and
+      // did exactly that to a real tester who simply mistyped their current
+      // password on this form. 400 sits with this endpoint's other
+      // credential problems (`password_too_short`, `no_password`) instead.
+      res.status(400).json({
         error: 'Current password is incorrect.',
         code: 'invalid_current_password',
       });

@@ -525,7 +525,7 @@ describe('POST /auth/change-password', () => {
       .set('authorization', `Bearer ${tokenFor('player-1')}`)
       .send({ currentPassword: 'WrongPass', newPassword: 'NewPass456' });
 
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(400);
     expect(res.body.code).toBe('invalid_current_password');
 
     // The old password still works -- nothing about this attempt changed it.
@@ -537,6 +537,27 @@ describe('POST /auth/change-password', () => {
       .post('/auth/login')
       .send({ email: 'ada@example.com', password: 'OldPass123' });
     expect(login.status).toBe(200);
+  });
+
+  // Pins the actual bug a tester hit: a wrong current password must NOT come
+  // back as 401. The shared HTTP client in the web app treats any 401 as an
+  // expired session and signs the caller out globally -- so a 401 here would
+  // silently punish a mistyped current password with a full logout, on the
+  // one form whose entire job is protecting an already-signed-in account. If
+  // this test starts failing, someone has reintroduced 401 for this branch;
+  // do not "fix" it by changing the expectation back.
+  it('does not sign the caller out for a wrong current password (must not be 401)', async () => {
+    (userStore.changePassword as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      reason: 'invalid_current_password',
+    });
+
+    const res = await request(appWith())
+      .post('/auth/change-password')
+      .set('authorization', `Bearer ${tokenFor('player-1')}`)
+      .send({ currentPassword: 'WrongPass', newPassword: 'NewPass456' });
+
+    expect(res.status).not.toBe(401);
   });
 
   it('refuses clearly on a Google-linked account with no password to change', async () => {
