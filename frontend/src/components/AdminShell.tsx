@@ -41,7 +41,7 @@ const BASE = isAdminHost() ? '' : '/admin';
 const SECTIONS = [
   { to: BASE || '/', end: true, label: 'Overview', icon: LayoutGrid },
   { to: `${BASE}/withdrawals`, label: 'Withdrawals', icon: Banknote },
-  { to: `${BASE}/players`, label: 'Players', icon: Users },
+  { to: `${BASE}/users`, label: 'Users', icon: Users },
   { to: `${BASE}/leagues`, label: 'Leagues', icon: Shield },
   { to: `${BASE}/alerts`, label: 'Alerts', icon: TriangleAlert },
   { to: `${BASE}/admins`, label: 'Admins', icon: UserCog },

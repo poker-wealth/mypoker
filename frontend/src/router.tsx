@@ -31,7 +31,7 @@ import { isAdminHost } from '@/lib/adminHost';
 const adminChildren = [
   { index: true, element: <AdminOverview /> },
   { path: 'withdrawals', element: <AdminWithdrawals /> },
-  { path: 'players', element: <AdminPlayers /> },
+  { path: 'users', element: <AdminPlayers /> },
   { path: 'leagues', element: <AdminLeagues /> },
   { path: 'alerts', element: <AdminAlerts /> },
   { path: 'admins', element: <AdminAdmins /> },

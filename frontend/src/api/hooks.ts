@@ -19,6 +19,7 @@ import {
   rejectWithdrawal,
   fetchAdmins,
   createAdmin,
+  fetchUsers,
 } from './admin';
 import { fetchVip } from './vip';
 import {
@@ -596,6 +597,18 @@ export function usePlayerSearch(q: string) {
     queryFn: () => searchPlayers(q),
     enabled: q.trim().length >= 2,
     staleTime: 15_000,
+    retry: false,
+  });
+}
+
+/** The full Users list (all players). Enabled only when not actively searching. */
+export function useUsers(enabled = true) {
+  return useQuery({
+    queryKey: ['admin', 'users'],
+    queryFn: () => fetchUsers(),
+    enabled,
+    staleTime: 15_000,
+    refetchInterval: 30_000,
     retry: false,
   });
 }

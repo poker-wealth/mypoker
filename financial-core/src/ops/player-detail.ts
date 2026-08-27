@@ -1,5 +1,5 @@
 import { Money } from '../domain/money';
-import { AccountType } from '../domain/account-types';
+import { AccountType, PLATFORM_SCOPE } from '../domain/account-types';
 import { AccountModel } from '../wallet/account.model';
 import { getReputationFacts } from '../reputation/player-reputation';
 import { getVolumeFacts } from '../vip/volume-tracker';
@@ -87,6 +87,59 @@ export async function getAdminPlayerDetail(playerId: string): Promise<AdminPlaye
       cumulativeEffective: volume.cumulativeEffective,
       monthlyEffective: volume.monthlyEffective,
     },
+  };
+}
+
+export interface PlayerListRow {
+  playerId: string;
+  /** Spendable. */
+  available: string;
+  /** available + locked + clearing. */
+  balance: string;
+  /** When the player's account was created — first money movement. */
+  joinedAt: string;
+}
+
+/**
+ * Every player, newest first, for the admin Users list.
+ *
+ * A player IS a financial account (Telegram players have no gateway identity
+ * document, so listing the user store would miss them). One row per player: the
+ * PLATFORM wallet only — a league wallet is the same player under a different
+ * scope, and counting both would double a player into two rows. Read-only, like
+ * the rest of this file. Capped, with `truncated` set rather than silently
+ * dropping the tail, so an operator knows the list is partial.
+ */
+export async function listPlayers(
+  opts: { limit?: number } = {},
+): Promise<{ players: PlayerListRow[]; truncated: boolean }> {
+  const limit = Math.min(Math.max(Math.floor(opts.limit ?? 100), 1), 200);
+
+  const accounts = await AccountModel.find(
+    { accountType: AccountType.PLAYER, scope: PLATFORM_SCOPE },
+    { ownerId: 1, availableBalance: 1, lockedBalance: 1, clearingBalance: 1, createdAt: 1 },
+  )
+    .sort({ createdAt: -1 })
+    .limit(limit + 1)
+    .lean();
+
+  const truncated = accounts.length > limit;
+  const page = truncated ? accounts.slice(0, limit) : accounts;
+
+  return {
+    players: page.map((a) => {
+      const available = Money.fromDecimal128(a.availableBalance);
+      const total = available
+        .add(Money.fromDecimal128(a.lockedBalance))
+        .add(Money.fromDecimal128(a.clearingBalance));
+      return {
+        playerId: a.ownerId,
+        available: available.toString(),
+        balance: total.toString(),
+        joinedAt: a.createdAt.toISOString(),
+      };
+    }),
+    truncated,
   };
 }
 

@@ -100,6 +100,21 @@ export interface AdminPlayerDetail {
 export const searchPlayers = (q: string): Promise<PlayerSearchResult> =>
   api.get<PlayerSearchResult>(`/admin/players?q=${encodeURIComponent(q)}`);
 
+/** One row of the full Users list. `balance` is always a string (the player has an account). */
+export interface AdminUserRow {
+  playerId: string;
+  displayName: string | null;
+  email: string | null;
+  balance: string;
+  available: string;
+  joinedAt: string;
+}
+
+export const fetchUsers = (limit?: number): Promise<{ users: AdminUserRow[]; truncated: boolean }> =>
+  api.get<{ users: AdminUserRow[]; truncated: boolean }>(
+    `/admin/users${limit ? `?limit=${limit}` : ''}`,
+  );
+
 export const fetchPlayerDetail = (playerId: string): Promise<AdminPlayerDetail> =>
   api.get<AdminPlayerDetail>(`/admin/players/${encodeURIComponent(playerId)}`);
 

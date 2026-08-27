@@ -372,6 +372,43 @@ export function buildAdminRouter(config: GatewayConfig): Router {
   );
 
   /**
+   * Screen 3b — the full Users list.
+   *
+   * Players ARE financial accounts (Telegram players have no identity document,
+   * so the user store alone would miss them). financial-core returns every
+   * player + balance; this enriches each with the email/nickname it alone holds,
+   * in ONE lookup. Read-only — the row links to the same read-only detail.
+   */
+  r.get(
+    '/users',
+    handle(async (req, res) => {
+      const limit = typeof req.query.limit === 'string' ? `?limit=${encodeURIComponent(req.query.limit)}` : '';
+      const result = await internal<{ players: PlayerListShape[]; truncated: boolean }>(
+        `/internal/ops/players${limit}`,
+      );
+      if (!result.ok) {
+        res.status(result.status).json({ error: result.error });
+        return;
+      }
+      const identities = await userStore.byPlayerIds(result.body.players.map((p) => p.playerId));
+      res.json({
+        users: result.body.players.map((p) => {
+          const identity = identities.get(p.playerId);
+          return {
+            playerId: p.playerId,
+            displayName: identity?.displayName ?? null,
+            email: identity?.email ?? null,
+            balance: p.balance,
+            available: p.available,
+            joinedAt: p.joinedAt,
+          };
+        }),
+        truncated: result.body.truncated,
+      });
+    }),
+  );
+
+  /**
    * Admins — list and create platform administrators.
    *
    * Gated by requireAdmin like everything here, so only an existing ops account
@@ -432,6 +469,14 @@ interface QueuedWithdrawalShape {
   approvals: string[];
   cumulativeEffective: number;
   requestedAt: string;
+}
+
+/** One player row as financial-core returns it, before this layer adds identity. */
+interface PlayerListShape {
+  playerId: string;
+  available: string;
+  balance: string;
+  joinedAt: string;
 }
 
 /** What financial-core returns for one player, before this layer derives from it. */

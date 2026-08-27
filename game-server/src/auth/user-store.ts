@@ -150,6 +150,17 @@ export const userStore = {
   },
 
   /**
+   * Identities for many playerIds in ONE query — for enriching the admin Users
+   * list. Telegram players simply have no entry in the returned map (they have
+   * no identity document), which the caller renders as the playerId.
+   */
+  async byPlayerIds(playerIds: readonly string[]): Promise<Map<string, StoredIdentity>> {
+    if (playerIds.length === 0) return new Map();
+    const docs = await UserModel.find({ _id: { $in: [...playerIds] } }).lean();
+    return new Map(docs.map((d) => [d._id, toIdentity(d as UserDoc)]));
+  },
+
+  /**
    * Create a platform administrator (role: 'ops'). Email + password only — an
    * admin never signs in with Telegram or Google, so `ops` can only be minted
    * through the credential path this creates. Throws on a weak password or a
