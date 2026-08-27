@@ -641,6 +641,23 @@
     "passwordChanged": "Password changed",
     "noPasswordNotice": "This account has no password set, so there's nothing to change here.",
     "saveFailed": "Could not save. Try again.",
-    "signInRequired": "Sign in to manage your personal info."
+    "signInRequired": "Sign in to manage your personal info.",
+    "avatarTitle": "Avatar",
+    "avatarUsePhoto": "Use my account photo",
+    "avatarUseInitial": "Use my initial"
+  },
+  "avatars": {
+    "a-spade": "Spade",
+    "a-heart": "Heart",
+    "a-diamond": "Diamond",
+    "a-club": "Club",
+    "a-crown": "Crown",
+    "a-bull": "Bull",
+    "a-packet": "Red Packet",
+    "a-fan": "Fan",
+    "a-star": "Star",
+    "a-flame": "Flame",
+    "a-clover": "Clover",
+    "a-dragon": "Dragon"
   }
 }

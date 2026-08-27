@@ -1,3 +1,4 @@
+import type { AvatarId } from '@/lib/avatars';
 import { api } from './client';
 
 /**
@@ -15,6 +16,12 @@ export interface PlayerSettings {
   notifyResults: boolean;
   notifyDeposits: boolean;
   notifyPromos: boolean;
+  /**
+   * Chosen avatar, or null if the player has never picked one. Fallback order
+   * on the client when null: OAuth photoUrl, then the player's initial — see
+   * components/ui/Avatar.tsx.
+   */
+  avatarId: AvatarId | null;
 }
 
 export type SettingsPatch = Partial<PlayerSettings>;

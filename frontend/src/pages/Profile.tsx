@@ -18,10 +18,11 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { Avatar } from '@/components/ui/Avatar';
 import { LanguageSheet } from '@/components/LanguageSheet';
 import { GoogleAuthButton } from '@/components/GoogleAuthButton';
 import { useSession } from '@/store/session';
-import { useBalance, useVip, useUnreadCount } from '@/api/hooks';
+import { useBalance, useVip, useUnreadCount, useSettings } from '@/api/hooks';
 import { moneyFromDecimal } from '@/lib/money';
 import { isTelegram, haptic } from '@/lib/telegram';
 import { SUPPORT_URL } from '@/config';
@@ -105,6 +106,7 @@ function Identity({ signedIn }: { signedIn: boolean }) {
   const navigate = useNavigate();
   const player = useSession((s) => s.player);
   const vip = useVip();
+  const settings = useSettings();
 
   return (
     <section>
@@ -117,21 +119,14 @@ function Identity({ signedIn }: { signedIn: boolean }) {
         disabled={!signedIn}
         className="flex w-full items-center gap-3 text-left"
       >
-        {signedIn && player?.photoUrl ? (
-          <img
-            src={player.photoUrl}
-            alt=""
-            className="size-16 shrink-0 rounded-full object-cover"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <div
-            className="grid size-16 shrink-0 place-items-center rounded-full text-xl font-black text-white"
-            style={{ backgroundImage: 'var(--brand-gradient)' }}
-          >
-            {signedIn && player ? player.displayName.charAt(0).toUpperCase() : 'M'}
-          </div>
-        )}
+        <Avatar
+          avatarId={signedIn ? settings.data?.avatarId : null}
+          photoUrl={signedIn ? player?.photoUrl : null}
+          // 'M' (brand initial), not the translated "Guest" word's initial —
+          // matches Header.tsx's own untranslated 'MYPOKER' brand fallback.
+          name={signedIn && player ? player.displayName : 'M'}
+          size={64}
+        />
 
         <div className="min-w-0 flex-1">
           <div className="truncate text-base font-bold">

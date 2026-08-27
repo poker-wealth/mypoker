@@ -59,7 +59,7 @@ import { getDepositAddress } from '../wallet/deposit-address';
 import { getWalletTransactions, getWithdrawals } from '../wallet/wallet-views';
 import { isValidTronAddress } from '../wallet/tron-address';
 import { getPlayerStats, getPlayerHistory } from '../stats/player-stats';
-import { getSettings, updateSettings } from '../settings/player-settings';
+import { getSettings, updateSettings, AVATAR_IDS } from '../settings/player-settings';
 import { getReputationFacts } from '../reputation/player-reputation';
 import {
   createLeague,
@@ -853,6 +853,8 @@ export function buildRouter(): Router {
     notifyResults: z.boolean().optional(),
     notifyDeposits: z.boolean().optional(),
     notifyPromos: z.boolean().optional(),
+    // Curated set only — the server is the authority on what avatars exist.
+    avatarId: z.enum(AVATAR_IDS).nullable().optional(),
   });
   r.patch(
     '/me/settings',

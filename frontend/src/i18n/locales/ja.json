@@ -641,6 +641,23 @@
     "passwordChanged": "パスワードを変更しました",
     "noPasswordNotice": "このアカウントにはパスワードが設定されていないため、変更する項目がありません。",
     "saveFailed": "保存できませんでした。もう一度お試しください。",
-    "signInRequired": "個人情報を管理するにはログインしてください。"
+    "signInRequired": "個人情報を管理するにはログインしてください。",
+    "avatarTitle": "アバター",
+    "avatarUsePhoto": "アカウントの写真を使用",
+    "avatarUseInitial": "イニシャルを使用"
+  },
+  "avatars": {
+    "a-spade": "スペード",
+    "a-heart": "ハート",
+    "a-diamond": "ダイヤ",
+    "a-club": "クラブ",
+    "a-crown": "王冠",
+    "a-bull": "雄牛",
+    "a-packet": "ポチ袋",
+    "a-fan": "扇子",
+    "a-star": "星",
+    "a-flame": "炎",
+    "a-clover": "クローバー",
+    "a-dragon": "龍"
   }
 }

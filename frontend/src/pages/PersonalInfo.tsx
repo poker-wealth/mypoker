@@ -1,14 +1,25 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Eye, EyeOff, Loader2, Mail, ShieldAlert } from 'lucide-react';
+import { Check, Eye, EyeOff, Loader2, Mail, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { useChangeDisplayName, useChangePassword, useSelfProfile } from '@/api/hooks';
+import { Avatar } from '@/components/ui/Avatar';
+import {
+  useChangeDisplayName,
+  useChangePassword,
+  useSelfProfile,
+  useSettings,
+  useUpdateSettings,
+} from '@/api/hooks';
 import { errorKey } from '@/api/errors';
 import { ApiError } from '@/api/client';
 import { useSession } from '@/store/session';
 import { toast } from '@/store/toast';
+import { cn } from '@/lib/cn';
+import { AVATARS, type AvatarId } from '@/lib/avatars';
+import type { Player } from '@/api/auth';
+import { haptic } from '@/lib/telegram';
 
 /** Must match MAX_DISPLAY_NAME_LENGTH on the gateway (credential-rules.ts). */
 const MAX_DISPLAY_NAME_LENGTH = 40;
@@ -37,6 +48,7 @@ export function PersonalInfo() {
 
   return (
     <div className="space-y-4">
+      <AvatarSection player={player} />
       <DisplayNameSection displayName={player.displayName} />
       <EmailSection />
       <PasswordSection />
@@ -52,6 +64,105 @@ function Section({ title, children }: { title: string; children: React.ReactNode
         {children}
       </div>
     </section>
+  );
+}
+
+// ── Avatar ───────────────────────────────────────────────────────────────────
+
+/**
+ * Twelve curated avatars plus a "clear" tile that goes back to whatever
+ * Avatar.tsx's fallback chain would otherwise show — the account photo if
+ * there is one, the player's initial if not. The clear tile's own label says
+ * which, so nobody has to guess what "clear" resolves to.
+ *
+ * Reuses useUpdateSettings — the same optimistic mutation Settings.tsx uses
+ * for every other preference — rather than a second write path to the same
+ * endpoint.
+ *
+ * A group of mutually exclusive choices: each tile is a real <button> with
+ * its own accessible name (the avatar's name, translated) and aria-pressed
+ * reflects selection, so a screen reader hears "pressed" rather than relying
+ * on the ring/check that sighted users see. Colour alone never carries the
+ * selected state — the ring plus the check badge do.
+ */
+function AvatarSection({ player }: { player: Player }) {
+  const { t } = useTranslation();
+  const settings = useSettings();
+  const update = useUpdateSettings();
+  const current = settings.data?.avatarId ?? null;
+
+  const choose = (avatarId: AvatarId | null): void => {
+    if (avatarId === current || update.isPending) return;
+    haptic('light');
+    update.mutate({ avatarId });
+  };
+
+  const clearLabel = player.photoUrl
+    ? t('personalInfo.avatarUsePhoto')
+    : t('personalInfo.avatarUseInitial');
+
+  return (
+    <Section title={t('personalInfo.avatarTitle')}>
+      <div
+        role="group"
+        aria-label={t('personalInfo.avatarTitle')}
+        className="grid grid-cols-4 gap-3 p-4"
+      >
+        {AVATARS.map((a) => (
+          <AvatarTile
+            key={a.id}
+            selected={current === a.id}
+            label={t(`avatars.${a.id}`)}
+            onClick={() => choose(a.id)}
+          >
+            <Avatar avatarId={a.id} name="" size={56} />
+          </AvatarTile>
+        ))}
+
+        <AvatarTile selected={current === null} label={clearLabel} onClick={() => choose(null)}>
+          <Avatar avatarId={null} photoUrl={player.photoUrl} name={player.displayName} size={56} />
+        </AvatarTile>
+      </div>
+    </Section>
+  );
+}
+
+function AvatarTile({
+  selected,
+  label,
+  onClick,
+  children,
+}: {
+  selected: boolean;
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      aria-label={label}
+      onClick={onClick}
+      className="relative flex items-center justify-center"
+    >
+      <span
+        className={cn(
+          'rounded-full ring-2 ring-offset-2 ring-offset-surface transition-shadow',
+          selected ? 'ring-brand' : 'ring-transparent',
+        )}
+      >
+        {children}
+      </span>
+      {selected && (
+        <span
+          aria-hidden="true"
+          className="absolute -right-0.5 -top-0.5 grid size-5 place-items-center rounded-full bg-brand text-white ring-2 ring-offset-surface"
+        >
+          <Check size={12} strokeWidth={3} />
+        </span>
+      )}
+    </button>
   );
 }
 

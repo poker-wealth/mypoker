@@ -641,6 +641,23 @@
     "passwordChanged": "Kata sandi diubah",
     "noPasswordNotice": "Akun ini tidak memiliki kata sandi, jadi tidak ada yang bisa diubah di sini.",
     "saveFailed": "Tidak dapat menyimpan. Coba lagi.",
-    "signInRequired": "Masuk untuk mengelola info pribadi Anda."
+    "signInRequired": "Masuk untuk mengelola info pribadi Anda.",
+    "avatarTitle": "Avatar",
+    "avatarUsePhoto": "Gunakan foto akun saya",
+    "avatarUseInitial": "Gunakan inisial saya"
+  },
+  "avatars": {
+    "a-spade": "Sekop",
+    "a-heart": "Hati",
+    "a-diamond": "Wajik",
+    "a-club": "Keriting",
+    "a-crown": "Mahkota",
+    "a-bull": "Banteng",
+    "a-packet": "Angpau",
+    "a-fan": "Kipas",
+    "a-star": "Bintang",
+    "a-flame": "Api",
+    "a-clover": "Semanggi",
+    "a-dragon": "Naga"
   }
 }

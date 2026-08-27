@@ -641,6 +641,23 @@
     "passwordChanged": "Đã đổi mật khẩu",
     "noPasswordNotice": "Tài khoản này chưa đặt mật khẩu, nên không có gì để đổi ở đây.",
     "saveFailed": "Không thể lưu. Vui lòng thử lại.",
-    "signInRequired": "Đăng nhập để quản lý thông tin cá nhân của bạn."
+    "signInRequired": "Đăng nhập để quản lý thông tin cá nhân của bạn.",
+    "avatarTitle": "Ảnh đại diện",
+    "avatarUsePhoto": "Dùng ảnh tài khoản của tôi",
+    "avatarUseInitial": "Dùng chữ cái đầu của tôi"
+  },
+  "avatars": {
+    "a-spade": "Bích",
+    "a-heart": "Cơ",
+    "a-diamond": "Rô",
+    "a-club": "Chuồn",
+    "a-crown": "Vương miện",
+    "a-bull": "Bò tót",
+    "a-packet": "Bao lì xì",
+    "a-fan": "Quạt",
+    "a-star": "Ngôi sao",
+    "a-flame": "Ngọn lửa",
+    "a-clover": "Cỏ bốn lá",
+    "a-dragon": "Rồng"
   }
 }

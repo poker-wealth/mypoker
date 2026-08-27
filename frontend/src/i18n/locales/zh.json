@@ -641,6 +641,23 @@
     "passwordChanged": "密码已修改",
     "noPasswordNotice": "该账户未设置密码，因此这里没有可修改的内容。",
     "saveFailed": "保存失败，请重试。",
-    "signInRequired": "登录后即可管理您的个人信息。"
+    "signInRequired": "登录后即可管理您的个人信息。",
+    "avatarTitle": "头像",
+    "avatarUsePhoto": "使用我的账户照片",
+    "avatarUseInitial": "使用我的姓名首字母"
+  },
+  "avatars": {
+    "a-spade": "黑桃",
+    "a-heart": "红心",
+    "a-diamond": "方块",
+    "a-club": "梅花",
+    "a-crown": "皇冠",
+    "a-bull": "公牛",
+    "a-packet": "红包",
+    "a-fan": "扇子",
+    "a-star": "星星",
+    "a-flame": "火焰",
+    "a-clover": "四叶草",
+    "a-dragon": "龙"
   }
 }

@@ -14,6 +14,34 @@ import { Schema, model } from 'mongoose';
  * second-guess.
  */
 
+/**
+ * Curated avatar set. The server is the authority on what exists: a client
+ * must never be able to store an id we don't recognize, since it would
+ * eventually get interpolated into markup or an image URL. Each id pairs a
+ * two-stop brand gradient with a glyph, the same way the game catalogue tiles
+ * render.
+ */
+export const AVATAR_IDS = [
+  'a-spade',
+  'a-heart',
+  'a-diamond',
+  'a-club',
+  'a-crown',
+  'a-bull',
+  'a-packet',
+  'a-fan',
+  'a-star',
+  'a-flame',
+  'a-clover',
+  'a-dragon',
+] as const;
+
+export type AvatarId = (typeof AVATAR_IDS)[number];
+
+function isAvatarId(value: string): value is AvatarId {
+  return (AVATAR_IDS as readonly string[]).includes(value);
+}
+
 export interface PlayerSettings {
   /** BCP-47 code, or null to keep following the Telegram/browser language. */
   language: string | null;
@@ -23,6 +51,11 @@ export interface PlayerSettings {
   notifyResults: boolean;
   notifyDeposits: boolean;
   notifyPromos: boolean;
+  /**
+   * Chosen avatar, or null if the player has never picked one. Fallback order
+   * on the client when null: OAuth `photoUrl`, then the player's initial.
+   */
+  avatarId: AvatarId | null;
 }
 
 export const DEFAULT_SETTINGS: PlayerSettings = {
@@ -34,6 +67,7 @@ export const DEFAULT_SETTINGS: PlayerSettings = {
   // Off by default. Promotional pushes are the ones players resent receiving
   // without asking, and an opt-in costs one tap.
   notifyPromos: false,
+  avatarId: null,
 };
 
 /**
@@ -64,6 +98,7 @@ const settingsSchema = new Schema<SettingsDoc>(
     notifyResults: { type: Boolean, default: true },
     notifyDeposits: { type: Boolean, default: true },
     notifyPromos: { type: Boolean, default: false },
+    avatarId: { type: String, default: null },
   },
   { timestamps: true, collection: 'player_settings' },
 );
@@ -81,6 +116,7 @@ export async function getSettings(playerId: string): Promise<PlayerSettings> {
     notifyResults: doc.notifyResults,
     notifyDeposits: doc.notifyDeposits,
     notifyPromos: doc.notifyPromos,
+    avatarId: (doc.avatarId as AvatarId | null | undefined) ?? null,
   };
 }
 
@@ -95,6 +131,14 @@ export async function updateSettings(
   playerId: string,
   patch: SettingsPatch,
 ): Promise<PlayerSettings> {
+  // avatarId must be constrained to the curated set. An unvalidated string
+  // here is a stored-value injection risk the moment a client interpolates it
+  // into markup or an image URL, and it would also let a client store junk
+  // the UI cannot render. null (no chosen avatar) is always allowed.
+  if (patch.avatarId !== undefined && patch.avatarId !== null && !isAvatarId(patch.avatarId)) {
+    throw new RangeError(`unknown avatarId: ${patch.avatarId}`);
+  }
+
   // Strip undefined: { sound: undefined } would otherwise unset a real value.
   const update: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(patch)) {
@@ -116,5 +160,6 @@ export async function updateSettings(
     notifyResults: doc?.notifyResults ?? DEFAULT_SETTINGS.notifyResults,
     notifyDeposits: doc?.notifyDeposits ?? DEFAULT_SETTINGS.notifyDeposits,
     notifyPromos: doc?.notifyPromos ?? DEFAULT_SETTINGS.notifyPromos,
+    avatarId: (doc?.avatarId as AvatarId | null | undefined) ?? DEFAULT_SETTINGS.avatarId,
   };
 }

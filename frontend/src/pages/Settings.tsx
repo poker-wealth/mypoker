@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Volume2, Vibrate, Trophy, Wallet, Megaphone, Languages, ShieldCheck, LifeBuoy, Sun, Moon, User, LogOut } from 'lucide-react';
+import { Volume2, Vibrate, Trophy, Wallet, Megaphone, Languages, ShieldCheck, LifeBuoy, Sun, Moon, LogOut } from 'lucide-react';
 import { ListRow } from '@/components/ui/ListRow';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Switch } from '@/components/ui/Switch';
+import { Avatar } from '@/components/ui/Avatar';
 import { LanguageSheet } from '@/components/LanguageSheet';
 import { useSettings, useUpdateSettings } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
@@ -159,11 +160,12 @@ export function Settings() {
           <ListRow
             title={player.displayName}
             leading={
-              player.photoUrl ? (
-                <img src={player.photoUrl} alt="" className="size-[18px] rounded-full object-cover" referrerPolicy="no-referrer" />
-              ) : (
-                <User size={18} className="text-brand" />
-              )
+              <Avatar
+                avatarId={settings.data?.avatarId}
+                photoUrl={player.photoUrl}
+                name={player.displayName}
+                size={18}
+              />
             }
             value={player.username ? `@${player.username}` : `ID: ${player.playerId.slice(0, 14)}…`}
           />
