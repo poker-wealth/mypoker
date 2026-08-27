@@ -63,6 +63,8 @@ interface SessionState {
    * this just declines to store a non-admin result.
    */
   signInAsAdmin: (email: string, passwordPlain: string) => Promise<void>;
+  /** Admin-host Google sign-in — same ops-only rule as `signInAsAdmin`. */
+  signInWithGoogleAsAdmin: (accessToken: string) => Promise<void>;
   signOut: () => void;
 }
 
@@ -85,6 +87,29 @@ export const useSession = create<SessionState>((set, get) => {
       const message = e instanceof ApiError ? e.message : i18n.t('toasts.signInFailed');
       set({ status: 'error', error: message });
       toast.error(message);
+      throw e;
+    }
+  };
+
+  // Same as `settle`, but ONLY establishes a session for an `ops` account — a
+  // valid player credential is refused with no token stored, so the admin host
+  // never holds a player session. Shared by the email and Google admin flows.
+  const settleAdmin = async (login: () => Promise<LoginResponse>): Promise<void> => {
+    if (get().status === 'authenticating') return;
+    set({ status: 'authenticating', error: null });
+    try {
+      const { token, player } = await login();
+      if (player.role !== 'ops') {
+        set({ status: get().token ? 'authenticated' : 'anonymous', error: null });
+        throw new ApiError(403, 'This account is not an administrator.');
+      }
+      setAuthToken(token);
+      persist(token, player);
+      set({ token, player, status: 'authenticated', error: null });
+      toast.success(i18n.t('toasts.signedIn', { name: player.displayName }));
+    } catch (e) {
+      const message = e instanceof ApiError ? e.message : i18n.t('toasts.signInFailed');
+      set({ status: get().token ? 'authenticated' : 'anonymous', error: message });
       throw e;
     }
   };
@@ -136,26 +161,11 @@ export const useSession = create<SessionState>((set, get) => {
   },
 
   signInAsAdmin: async (email, passwordPlain) => {
-    if (get().status === 'authenticating') return;
-    set({ status: 'authenticating', error: null });
-    try {
-      const { token, player } = await loginWithEmail(email, passwordPlain);
-      if (player.role !== 'ops') {
-        // Valid credentials, but not an administrator — refuse rather than sign
-        // in as a player on the admin host. No token is stored.
-        set({ status: 'anonymous', error: null });
-        throw new ApiError(403, 'This account is not an administrator.');
-      }
-      setAuthToken(token);
-      persist(token, player);
-      set({ token, player, status: 'authenticated', error: null });
-      toast.success(i18n.t('toasts.signedIn', { name: player.displayName }));
-    } catch (e) {
-      const message = e instanceof ApiError ? e.message : i18n.t('toasts.signInFailed');
-      // Keep any pre-existing valid session; otherwise fall back to anonymous.
-      set({ status: get().token ? 'authenticated' : 'anonymous', error: message });
-      throw e;
-    }
+    await settleAdmin(() => loginWithEmail(email, passwordPlain));
+  },
+
+  signInWithGoogleAsAdmin: async (accessToken) => {
+    await settleAdmin(() => loginWithGoogle(accessToken));
   },
 
   signOut: () => {
