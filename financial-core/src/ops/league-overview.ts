@@ -2,7 +2,7 @@ import { Money } from '../domain/money';
 import { AccountType, LedgerType, LedgerDirection } from '../domain/account-types';
 import { AccountModel } from '../wallet/account.model';
 import { LedgerModel } from '../wallet/ledger.model';
-import { LeagueModel, MembershipModel } from '../league/league-store';
+import { LeagueModel, MembershipModel, getLeague, membersOf } from '../league/league-store';
 
 /**
  * Every league, with the figures an operator needs (SAMUEL.md task 3, screen 4;
@@ -90,4 +90,76 @@ export async function getLeagueOverview(): Promise<LeagueOverviewRow[]> {
     insurance: (insurance.get(l._id) ?? Money.ZERO).toString(),
     createdAt: l.createdAt.toISOString(),
   }));
+}
+
+export interface LeagueMemberRow {
+  playerId: string;
+  role: string;
+  joinedAt: string;
+}
+
+export interface LeagueDetail extends LeagueOverviewRow {
+  description: string | null;
+  settings: { rakeBps: number; tableHours: number; buyIn: number; spectatorsAllowed: boolean } | null;
+  pendingRakeChange: { rakeBps: number; effectiveAt: string } | null;
+  members: LeagueMemberRow[];
+}
+
+/**
+ * One league, with its roster and money — for the admin's drill-into-a-club view.
+ *
+ * The roster carries role and join date but NO per-member balance: what a member
+ * holds is theirs, and the league-store deliberately does not select it (wallet
+ * isolation is structural). Inventory/insurance/rake are THIS league's own, per
+ * §3.1 — never the platform's, never another club's.
+ */
+export async function getLeagueDetail(leagueId: string): Promise<LeagueDetail | null> {
+  const league = await getLeague(leagueId);
+  if (!league) return null;
+
+  const [members, accounts] = await Promise.all([
+    membersOf(leagueId),
+    AccountModel.find(
+      {
+        ownerId: leagueId,
+        accountType: { $in: [AccountType.LEAGUE_INVENTORY, AccountType.INSURANCE] },
+      },
+      { _id: 1, accountType: 1, availableBalance: 1 },
+    ).lean(),
+  ]);
+
+  let inventory = Money.ZERO;
+  let insurance = Money.ZERO;
+  const accountIds: string[] = [];
+  for (const a of accounts) {
+    accountIds.push(a._id);
+    const bal = Money.fromDecimal128(a.availableBalance);
+    if (a.accountType === AccountType.LEAGUE_INVENTORY) inventory = inventory.add(bal);
+    else insurance = insurance.add(bal);
+  }
+
+  const rakeRows = accountIds.length
+    ? await LedgerModel.find({
+        type: LedgerType.RAKE,
+        direction: LedgerDirection.CREDIT,
+        accountId: { $in: accountIds },
+      }).lean()
+    : [];
+  const rake = Money.sum(rakeRows.map((r) => Money.fromDecimal128(r.amount)));
+
+  return {
+    leagueId: league.leagueId,
+    name: league.name,
+    ownerId: league.ownerId,
+    memberCount: league.memberCount,
+    inviteOnly: league.inviteOnly,
+    inventory: inventory.toString(),
+    rake: rake.toString(),
+    insurance: insurance.toString(),
+    createdAt: league.createdAt,
+    description: league.description,
+    settings: league.settings,
+    pendingRakeChange: league.pendingRakeChange,
+    members,
+  };
 }

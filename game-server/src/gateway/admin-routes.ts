@@ -271,6 +271,38 @@ export function buildAdminRouter(config: GatewayConfig): Router {
   );
 
   /**
+   * One league in full — for the admin drill-into-a-club view. financial-core
+   * returns the roster + settings + money; this adds the email/nickname it alone
+   * holds, for the owner and every member, in one batched lookup.
+   */
+  r.get(
+    '/leagues/:id',
+    handle(async (req, res) => {
+      const result = await internal<LeagueDetailShape>(
+        `/internal/ops/leagues/${encodeURIComponent(String(req.params.id))}`,
+      );
+      if (!result.ok) {
+        res.status(result.status).json({ error: result.error });
+        return;
+      }
+      const league = result.body;
+      const identities = await userStore.byPlayerIds([
+        league.ownerId,
+        ...league.members.map((m) => m.playerId),
+      ]);
+      const named = (playerId: string): { displayName: string | null; email: string | null } => {
+        const id = identities.get(playerId);
+        return { displayName: id?.displayName ?? null, email: id?.email ?? null };
+      };
+      res.json({
+        ...league,
+        owner: { playerId: league.ownerId, ...named(league.ownerId) },
+        members: league.members.map((m) => ({ ...m, ...named(m.playerId) })),
+      });
+    }),
+  );
+
+  /**
    * League funding — the money actions.
    *
    * EVERY actor comes from the verified token, never the body. `requestedBy`,
@@ -477,6 +509,23 @@ interface PlayerListShape {
   available: string;
   balance: string;
   joinedAt: string;
+}
+
+/** One league in full, from financial-core, before this layer adds identities. */
+interface LeagueDetailShape {
+  leagueId: string;
+  name: string;
+  ownerId: string;
+  memberCount: number;
+  inviteOnly: boolean;
+  inventory: string;
+  rake: string;
+  insurance: string;
+  createdAt: string;
+  description: string | null;
+  settings: { rakeBps: number; tableHours: number; buyIn: number; spectatorsAllowed: boolean } | null;
+  pendingRakeChange: { rakeBps: number; effectiveAt: string } | null;
+  members: { playerId: string; role: string; joinedAt: string }[];
 }
 
 /** What financial-core returns for one player, before this layer derives from it. */

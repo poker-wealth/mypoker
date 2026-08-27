@@ -20,6 +20,7 @@ import {
   fetchAdmins,
   createAdmin,
   fetchUsers,
+  fetchLeagueDetail,
 } from './admin';
 import { fetchVip } from './vip';
 import {
@@ -654,6 +655,17 @@ export function useAdminLeagues() {
     queryKey: ['admin', 'leagues'],
     queryFn: fetchAdminLeagues,
     staleTime: 15_000,
+    retry: false,
+  });
+}
+
+/** One league in full — roster, settings, money — for the drill-in modal. */
+export function useLeagueDetail(leagueId: string | null) {
+  return useQuery({
+    queryKey: ['admin', 'league', leagueId],
+    queryFn: () => fetchLeagueDetail(leagueId!),
+    enabled: Boolean(leagueId),
+    staleTime: 10_000,
     retry: false,
   });
 }

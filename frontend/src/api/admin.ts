@@ -151,6 +151,35 @@ export interface LeagueOverviewRow {
 export const fetchAdminLeagues = (): Promise<{ leagues: LeagueOverviewRow[] }> =>
   api.get<{ leagues: LeagueOverviewRow[] }>('/admin/leagues');
 
+export interface LeagueMemberDetail {
+  playerId: string;
+  role: string;
+  joinedAt: string;
+  displayName: string | null;
+  email: string | null;
+}
+
+/** One league in full — for the admin drill-into-a-club view. */
+export interface LeagueDetail {
+  leagueId: string;
+  name: string;
+  ownerId: string;
+  memberCount: number;
+  inviteOnly: boolean;
+  inventory: string;
+  rake: string;
+  insurance: string;
+  createdAt: string;
+  description: string | null;
+  settings: { rakeBps: number; tableHours: number; buyIn: number; spectatorsAllowed: boolean } | null;
+  pendingRakeChange: { rakeBps: number; effectiveAt: string } | null;
+  owner: { playerId: string; displayName: string | null; email: string | null };
+  members: LeagueMemberDetail[];
+}
+
+export const fetchLeagueDetail = (leagueId: string): Promise<LeagueDetail> =>
+  api.get<LeagueDetail>(`/admin/leagues/${encodeURIComponent(leagueId)}`);
+
 export type LeagueFundingKind = 'TOPUP' | 'CASHOUT';
 export type LeagueFundingState = 'REQUESTED' | 'APPROVED' | 'EXECUTED' | 'REJECTED';
 

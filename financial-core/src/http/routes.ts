@@ -45,7 +45,7 @@ import { getOpsOverview } from '../ops/overview';
 import { getAdminPlayerDetail, getPlayerBalances, listPlayers } from '../ops/player-detail';
 import { getSecurityEvents, recordSettlementFailure } from '../ops/security-events';
 import { getWithdrawalQueue } from '../ops/withdrawal-queue';
-import { getLeagueOverview } from '../ops/league-overview';
+import { getLeagueOverview, getLeagueDetail } from '../ops/league-overview';
 import {
   requestTopUp,
   requestCashOut,
@@ -1348,6 +1348,20 @@ export function buildRouter(): Router {
     internalAuth,
     asyncHandler(async (_req: Request, res: Response) => {
       res.json({ leagues: await getLeagueOverview() });
+    }),
+  );
+
+  /** One league in full — roster, settings and its own money — for the admin drill-down. */
+  r.get(
+    '/internal/ops/leagues/:leagueId',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const league = await getLeagueDetail(String(req.params.leagueId));
+      if (!league) {
+        res.status(404).json({ error: 'no such league' });
+        return;
+      }
+      res.json(league);
     }),
   );
 
