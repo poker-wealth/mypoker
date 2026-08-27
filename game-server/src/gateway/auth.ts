@@ -27,6 +27,8 @@ export interface PlayerProfile {
   photoUrl: string | null;
   telegramId: number | null;
   vipTier: number;
+  /** 'ops' for a platform administrator; 'player' for everyone else. */
+  role: 'player' | 'ops';
 }
 
 declare global {
@@ -47,6 +49,9 @@ function profileFromTelegram(user: TelegramUser): PlayerProfile {
     photoUrl: user.photo_url ?? null,
     telegramId: user.id,
     vipTier: 0,
+    // Telegram sign-in never grants ops — admin authority comes only through the
+    // email/password path (a Telegram player can never become an administrator).
+    role: 'player',
   };
 }
 
@@ -114,9 +119,13 @@ export function buildAuthRouter(config: GatewayConfig): Router {
   const authClient = userStore;
   const googleClient = new OAuth2Client();
 
+  // The token's role is the profile's role — so an admin who signs in with
+  // email/password gets an `ops` token, and everyone else a `player` one. This
+  // is the ONLY place `ops` enters a token, and only via the credential login
+  // below (signup and Google always resolve to a player profile).
   const issue = (player: PlayerProfile): { token: string; player: PlayerProfile } => ({
     token: signToken(
-      { playerId: player.playerId, role: 'player' },
+      { playerId: player.playerId, role: player.role },
       config.jwtSecret,
       config.jwtTtlSeconds,
     ),
@@ -128,6 +137,7 @@ export function buildAuthRouter(config: GatewayConfig): Router {
     displayName?: string;
     email?: string;
     photoUrl?: string | null;
+    role?: 'ops';
   }): PlayerProfile => ({
     playerId: u.playerId,
     displayName: u.displayName || u.email?.split('@')[0] || 'Player',
@@ -135,6 +145,7 @@ export function buildAuthRouter(config: GatewayConfig): Router {
     photoUrl: u.photoUrl ?? null,
     telegramId: null,
     vipTier: 0,
+    role: u.role === 'ops' ? 'ops' : 'player',
   });
 
   r.post('/signup', (req: Request, res: Response) => {
@@ -323,6 +334,7 @@ export function buildAuthRouter(config: GatewayConfig): Router {
       photoUrl: null,
       telegramId: null,
       vipTier: 0,
+      role: 'player',
     };
     const token = signToken(
       { playerId: player.playerId, role: 'player' },
@@ -353,6 +365,9 @@ export function buildAuthRouter(config: GatewayConfig): Router {
         photoUrl: stored ? stored.photoUrl ?? null : null,
         telegramId: Number.isFinite(telegramId) ? telegramId : null,
         vipTier: 0,
+        // The role rides on the verified token; surfacing it lets the client
+        // decide whether to render the admin panel or the player app.
+        role: req.player!.role === 'ops' ? 'ops' : 'player',
       } satisfies PlayerProfile);
     } catch (err) {
       console.error('[auth] /me lookup failed:', err);

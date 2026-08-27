@@ -32,9 +32,21 @@ const STAKE_MULTIPLIERS = [1, 2, 5];
 export function NiuNiuFelt({
   snapshot,
   onCommand,
+  onSit,
 }: {
   snapshot: TableSnapshot;
   onCommand: (cmd: TableCommand) => void;
+  /**
+   * Taking a seat opens the buy-in sheet — it does NOT commit one.
+   *
+   * Every one of these felts used to send { kind: 'sit', buyIn: snapshot.minBuyIn } straight
+   * from the button, so a tap moved money at an amount the player was never shown and never
+   * chose. The poker felt has always gone through BuyInSheet; the other eight did not. An audit
+   * found all eight.
+   *
+   * Required, not optional: a felt that cannot open the sheet must not fall back to spending.
+   */
+  onSit: (seatIndex: number) => void;
 }) {
   const { width } = useWindowDimensions();
   const [betAmount, setBetAmount] = useState(100);
@@ -59,6 +71,10 @@ export function NiuNiuFelt({
 
   const stateOf = (index: number) => round?.seats.find((s) => s.index === index);
   const youBid = you ? stateOf(you.index)?.bid : undefined;
+  // The multiplier the SERVER recorded for this bet, not the one currently selected in the picker.
+  // After a bet is placed the picker can still move; showing its value would restate a committed
+  // bet with a number that no longer describes it.
+  const youMultiplier = you ? stateOf(you.index)?.betMultiplier : undefined;
 
   const secondsLeft = snapshot.actionDeadline
     ? Math.max(0, Math.ceil((snapshot.actionDeadline - now) / 1_000))
@@ -70,7 +86,7 @@ export function NiuNiuFelt({
 
   const sitDown = (): void => {
     const free = seats.find((s) => !s.playerId);
-    onCommand({ kind: 'sit', seat: free?.index ?? 0, buyIn: snapshot.minBuyIn });
+    onSit(free?.index ?? 0);
   };
   const bid = (n: number): void => onCommand({ kind: 'act', action: { type: `bid-${n}` } });
   const placeBet = (): void =>
@@ -187,10 +203,23 @@ export function NiuNiuFelt({
               onPress={placeBet}
               style={[styles.primary, (you?.bet ?? 0) > 0 && styles.primaryOff]}
             >
+              {/*
+                The stake is `betAmount`. It is NOT betAmount × multiplier.
+
+                niu-niu-room.ts sets `seat.bet = amount` and stores `seat.betMultiplier`
+                separately; the multiplier scales SETTLEMENT, not what leaves your stack when the
+                bet is placed. This button used to read `Stake ₮500 (₮100 × 5)` and then, once
+                placed, `Staked ₮100` — the same bet stated two different ways, overstating before
+                and understating after. An audit called it "misstating the stake in both
+                directions", which is exactly right.
+
+                So: the amount committed, and the multiplier named as what it is — a multiplier on
+                the outcome, not on the stake.
+              */}
               <Text style={styles.primaryText}>
                 {(you?.bet ?? 0) > 0
-                  ? `Staked ₮${you?.bet}`
-                  : `Stake ₮${betAmount * multiplier} (₮${betAmount} × ${multiplier})`}
+                  ? `Staked ₮${you?.bet}${youMultiplier ? ` · ${youMultiplier}× on the result` : ''}`
+                  : `Stake ₮${betAmount} · ${multiplier}× on the result`}
               </Text>
             </Pressable>
           </>

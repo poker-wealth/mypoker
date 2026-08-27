@@ -42,10 +42,10 @@ import {
 } from '../reinsurance/reinsurance-rules';
 import { getInsuranceReserve } from '../wallet/insurance-reserve';
 import { getOpsOverview } from '../ops/overview';
-import { getAdminPlayerDetail, getPlayerBalances } from '../ops/player-detail';
+import { getAdminPlayerDetail, getPlayerBalances, listPlayers } from '../ops/player-detail';
 import { getSecurityEvents, recordSettlementFailure } from '../ops/security-events';
 import { getWithdrawalQueue } from '../ops/withdrawal-queue';
-import { getLeagueOverview } from '../ops/league-overview';
+import { getLeagueOverview, getLeagueDetail } from '../ops/league-overview';
 import {
   requestTopUp,
   requestCashOut,
@@ -1288,6 +1288,21 @@ export function buildRouter(): Router {
   );
 
   /**
+   * Every player, newest first, for the admin Users list. Read-only; capped with
+   * a `truncated` flag rather than silently dropping the tail. The gateway
+   * enriches each row with the identity (email/nickname) it alone holds.
+   */
+  const playersListQuery = z.object({ limit: z.coerce.number().int().positive().max(200).optional() });
+  r.get(
+    '/internal/ops/players',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { limit } = playersListQuery.parse(req.query);
+      res.json(await listPlayers({ ...(limit !== undefined ? { limit } : {}) }));
+    }),
+  );
+
+  /**
    * One player's account detail, for the admin Players screen.
    *
    * GET only, and there is deliberately no sibling that writes. "No balance
@@ -1333,6 +1348,20 @@ export function buildRouter(): Router {
     internalAuth,
     asyncHandler(async (_req: Request, res: Response) => {
       res.json({ leagues: await getLeagueOverview() });
+    }),
+  );
+
+  /** One league in full — roster, settings and its own money — for the admin drill-down. */
+  r.get(
+    '/internal/ops/leagues/:leagueId',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const league = await getLeagueDetail(String(req.params.leagueId));
+      if (!league) {
+        res.status(404).json({ error: 'no such league' });
+        return;
+      }
+      res.json(league);
     }),
   );
 

@@ -43,15 +43,15 @@ export function BuyInSheet({
       <div className="space-y-5 px-4 pt-4">
         {shortfall ? (
           <div className="rounded-(--radius-app) border border-border bg-surface p-4 text-center text-sm text-dim">
-            You need at least <span className="font-bold text-text">₮{min.toLocaleString()}</span> to
-            sit at this table, and you have ₮{available.toLocaleString()}.
+            You need at least <span className="font-bold text-text">${min.toLocaleString()}</span> to
+            sit at this table, and you have ${available.toLocaleString()}.
           </div>
         ) : (
           <>
             <div className="text-center">
-              <div className="text-3xl font-black tabular-nums">₮{clamped.toLocaleString()}</div>
+              <div className="text-3xl font-black tabular-nums">${clamped.toLocaleString()}</div>
               <div className="mt-1 text-[0.7rem] text-dim">
-                {Math.floor(clamped / bigBlind)} big blinds · you have ₮{available.toLocaleString()}
+                {Math.floor(clamped / bigBlind)} big blinds · you have ${available.toLocaleString()}
               </div>
             </div>
 

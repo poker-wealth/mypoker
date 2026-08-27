@@ -8,6 +8,12 @@ export interface Player {
   photoUrl: string | null;
   telegramId: number | null;
   vipTier: number;
+  /**
+   * 'ops' for a platform administrator, 'player' for everyone else. Drives which
+   * app the client renders on the admin host. The server re-checks the token on
+   * every /admin call regardless — this only decides what to SHOW.
+   */
+  role: 'player' | 'ops';
 }
 
 export interface LoginResponse {

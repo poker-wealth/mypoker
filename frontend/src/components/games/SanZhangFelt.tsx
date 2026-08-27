@@ -37,7 +37,7 @@ export function SanZhangFelt({ snapshot, onCommand }: SanZhangFeltProps) {
           <div key={i} className="flex flex-col items-center rounded-xl border border-amber-700/40 bg-amber-900/30 p-3">
             <div className="text-sm font-bold text-amber-300">{seat.name || `Seat ${i + 1}`}</div>
             <div className="text-xs text-amber-300">{seat.isDealer ? '👑 BANKER' : 'PLAYER'}</div>
-            <div className="mt-2 text-xs font-semibold text-white">Stack: ₮{seat.stack}</div>
+            <div className="mt-2 text-xs font-semibold text-white">Stack: ${seat.stack}</div>
           </div>
         ))}
       </div>
@@ -53,11 +53,11 @@ export function SanZhangFelt({ snapshot, onCommand }: SanZhangFeltProps) {
                   betAmount === amt ? 'bg-amber-400 text-black' : 'bg-amber-900 text-amber-200'
                 }`}
               >
-                ₮{amt}
+                ${amt}
               </button>
             ))}
             <Button variant="primary" size="sm" onClick={() => onCommand?.({ kind: 'act', action: { type: 'bet', amount: betAmount } })}>
-              Place Bet (₮{betAmount})
+              Place Bet (${betAmount})
             </Button>
           </div>
         ) : isSeated ? (

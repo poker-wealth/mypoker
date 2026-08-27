@@ -16,7 +16,7 @@ const holdem: DemoScript = {
       caption: 'Blinds are posted and everyone is dealt two cards, face down to everyone but them.',
       snapshot: snap({
         tableId: 'texas',
-        name: "Hold'em · ₮0.10/0.20",
+        name: "Hold'em · $0.10/0.20",
         variant: "Texas Hold'em",
         street: 'PREFLOP',
         pot: 30,
@@ -33,7 +33,7 @@ const holdem: DemoScript = {
       caption: 'You call. The flop comes — and you have two hearts working.',
       snapshot: snap({
         tableId: 'texas',
-        name: "Hold'em · ₮0.10/0.20",
+        name: "Hold'em · $0.10/0.20",
         variant: "Texas Hold'em",
         street: 'FLOP',
         pot: 60,
@@ -50,7 +50,7 @@ const holdem: DemoScript = {
       caption: 'The river brings a fourth heart. Your flush is made.',
       snapshot: snap({
         tableId: 'texas',
-        name: "Hold'em · ₮0.10/0.20",
+        name: "Hold'em · $0.10/0.20",
         variant: "Texas Hold'em",
         street: 'RIVER',
         pot: 260,
@@ -69,12 +69,12 @@ const holdem: DemoScript = {
       holdMs: 5_000,
       snapshot: snap({
         tableId: 'texas',
-        name: "Hold'em · ₮0.10/0.20",
+        name: "Hold'em · $0.10/0.20",
         variant: "Texas Hold'em",
         phase: 'SHOWDOWN',
         street: 'SHOWDOWN',
         board: ['Qh', '7h', '2c', '9d', '4h'],
-        message: 'You win ₮247 with a Flush',
+        message: 'You win $247 with a Flush',
         seats: [
           seat({ index: 0, name: 'You', stack: 2127, cards: ['Ah', 'Kh'], isYou: true, isWinner: true }),
           seat({ index: 1, name: 'Bruno', stack: 1880, cards: ['Qs', 'Jd'], isDealer: true }),
@@ -106,7 +106,7 @@ const baccarat: DemoScript = {
       }),
     },
     {
-      caption: 'You back Player for ₮200. Mei backs Banker.',
+      caption: 'You back Player for $200. Mei backs Banker.',
       snapshot: snap({
         tableId: 'baccarat',
         name: 'Baccarat · Player Banked',
@@ -115,8 +115,8 @@ const baccarat: DemoScript = {
         pot: 400,
         seats: [
           seat({ index: 0, name: 'Bruno', stack: 4000, isDealer: true, lastAction: 'BANKER' }),
-          seat({ index: 1, name: 'You', stack: 2000, bet: 200, isYou: true, status: 'active', lastAction: 'PLAYER ₮200' }),
-          seat({ index: 2, name: 'Mei', stack: 1800, bet: 200, status: 'active', lastAction: 'BANKER ₮200' }),
+          seat({ index: 1, name: 'You', stack: 2000, bet: 200, isYou: true, status: 'active', lastAction: 'PLAYER $200' }),
+          seat({ index: 2, name: 'Mei', stack: 1800, bet: 200, status: 'active', lastAction: 'BANKER $200' }),
         ],
       }),
     },
@@ -133,14 +133,14 @@ const baccarat: DemoScript = {
         message: 'Outcome: PLAYER (P: 8 vs B: 6)',
         seats: [
           seat({ index: 0, name: 'Bruno', stack: 3800, isDealer: true }),
-          seat({ index: 1, name: 'You', stack: 2190, isYou: true, isWinner: true, lastAction: 'won ₮190' }),
-          seat({ index: 2, name: 'Mei', stack: 1600, lastAction: 'lost ₮200' }),
+          seat({ index: 1, name: 'You', stack: 2190, isYou: true, isWinner: true, lastAction: 'won $190' }),
+          seat({ index: 2, name: 'Mei', stack: 1600, lastAction: 'lost $200' }),
         ],
       }),
     },
     {
       caption:
-        'Bruno paid you as the banker and collected from Mei. The platform took ₮10 rake — it is never a party to the bet.',
+        'Bruno paid you as the banker and collected from Mei. The platform took $10 rake — it is never a party to the bet.',
       holdMs: 6_000,
       snapshot: snap({
         tableId: 'baccarat',
@@ -149,7 +149,7 @@ const baccarat: DemoScript = {
         phase: 'SHOWDOWN',
         maxSeats: 6,
         board: ['5h', '3s', '|', 'Kd', '6c'],
-        message: 'Σ losers ₮200 = Σ winners ₮190 + rake ₮10',
+        message: 'Σ losers $200 = Σ winners $190 + rake $10',
         seats: [
           seat({ index: 0, name: 'Bruno', stack: 3800, isDealer: true }),
           seat({ index: 1, name: 'You', stack: 2190, isYou: true, isWinner: true }),
@@ -181,7 +181,7 @@ const niuNiu: DemoScript = {
       }),
     },
     {
-      caption: 'You stake ₮150 against her.',
+      caption: 'You stake $150 against her.',
       snapshot: snap({
         tableId: 'niu-niu',
         name: 'Niu Niu · Player Banked',
@@ -204,7 +204,7 @@ const niuNiu: DemoScript = {
         variant: 'Niu Niu',
         phase: 'SHOWDOWN',
         maxSeats: 6,
-        message: 'You win ₮427 — Niu 9 (×3)',
+        message: 'You win $427 — Niu 9 (×3)',
         seats: [
           seat({ index: 0, name: 'Mei', stack: 4550, isDealer: true, cards: ['5c', '5d', '9s', 'Kh', 'Qd'] }),
           seat({ index: 1, name: 'You', stack: 2427, isYou: true, isWinner: true, cards: ['Th', 'Js', '4d', '2c', '3h'] }),
@@ -244,7 +244,7 @@ const sanZhang: DemoScript = {
         variant: 'San Zhang',
         phase: 'SHOWDOWN',
         maxSeats: 6,
-        message: 'You win ₮95 — Straight Flush',
+        message: 'You win $95 — Straight Flush',
         seats: [
           seat({ index: 0, name: 'Bruno', stack: 3900, isDealer: true, cards: ['9c', '9d', '4s'] }),
           seat({ index: 1, name: 'You', stack: 2095, isYou: true, isWinner: true, cards: ['7h', '8h', '9h'] }),
@@ -275,7 +275,7 @@ const redPacket: DemoScript = {
       }),
     },
     {
-      caption: 'You take square 7 for ₮100. Mei takes square 19.',
+      caption: 'You take square 7 for $100. Mei takes square 19.',
       snapshot: snap({
         tableId: 'red-packet',
         name: 'Red Packet Minesweeper',
@@ -325,9 +325,9 @@ const cowboy: DemoScript = {
         maxSeats: 6,
         pot: 500,
         seats: [
-          seat({ index: 0, name: 'You', stack: 2000, bet: 200, isYou: true, status: 'active', lastAction: 'COWBOY ₮200' }),
-          seat({ index: 1, name: 'Mei', stack: 1800, bet: 200, status: 'active', lastAction: 'BEAUTY ₮200' }),
-          seat({ index: 2, name: 'Bruno', stack: 2600, bet: 100, status: 'active', lastAction: 'COWBOY ₮100' }),
+          seat({ index: 0, name: 'You', stack: 2000, bet: 200, isYou: true, status: 'active', lastAction: 'COWBOY $200' }),
+          seat({ index: 1, name: 'Mei', stack: 1800, bet: 200, status: 'active', lastAction: 'BEAUTY $200' }),
+          seat({ index: 2, name: 'Bruno', stack: 2600, bet: 100, status: 'active', lastAction: 'COWBOY $100' }),
         ],
       }),
     },
@@ -458,9 +458,9 @@ const lottery: DemoScript = {
         maxSeats: 6,
         pot: 300,
         seats: [
-          seat({ index: 0, name: 'You', stack: 2000, bet: 100, isYou: true, status: 'active', lastAction: '#7 (₮100)' }),
-          seat({ index: 1, name: 'Mei', stack: 1500, bet: 100, status: 'active', lastAction: '#3 (₮100)' }),
-          seat({ index: 2, name: 'Bruno', stack: 2200, bet: 100, status: 'active', lastAction: '#7 (₮100)' }),
+          seat({ index: 0, name: 'You', stack: 2000, bet: 100, isYou: true, status: 'active', lastAction: '#7 ($100)' }),
+          seat({ index: 1, name: 'Mei', stack: 1500, bet: 100, status: 'active', lastAction: '#3 ($100)' }),
+          seat({ index: 2, name: 'Bruno', stack: 2200, bet: 100, status: 'active', lastAction: '#7 ($100)' }),
         ],
       }),
     },
@@ -492,7 +492,7 @@ const slots: DemoScript = {
     'A single-player spin. The outcome comes from an outside provider, signed — our side pays out only what the signature proves.',
   steps: [
     {
-      caption: 'You stake ₮100 on a spin.',
+      caption: 'You stake $100 on a spin.',
       snapshot: snap({
         tableId: 'slots',
         name: 'Classic Slots',
@@ -502,7 +502,7 @@ const slots: DemoScript = {
       }),
     },
     {
-      caption: 'The provider returns a signed result. Two cherries — ₮250 back.',
+      caption: 'The provider returns a signed result. Two cherries — $250 back.',
       holdMs: 6_000,
       snapshot: snap({
         tableId: 'slots',
@@ -510,7 +510,7 @@ const slots: DemoScript = {
         variant: 'Slots',
         phase: 'SHOWDOWN',
         maxSeats: 1,
-        message: 'Win ₮250',
+        message: 'Win $250',
         seats: [seat({ index: 0, name: 'You', stack: 2150, isYou: true, isWinner: true })],
       }),
     },

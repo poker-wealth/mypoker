@@ -1,6 +1,7 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import { LANGUAGES, DEFAULT_LANGUAGE } from './languages';
+import { LANGUAGES, DEFAULT_LANGUAGE, resolveLanguage } from './languages';
+import { telegramLanguageCode } from '../lib/telegram';
 import en from './locales/en.json';
 import zh from './locales/zh.json';
 import ja from './locales/ja.json';
@@ -17,18 +18,19 @@ import th from './locales/th.json';
  * they're a few KB, and a Mini App opening on a phone shouldn't wait on a second
  * network round-trip to render its first screen in the right language.
  *
- * MYPOKER is a Chinese-language product with translations, so **everyone opens
- * in 中文** — including a player whose Telegram is set to English or Japanese.
- * The only thing that changes it is the player picking a language themselves,
- * which is then remembered.
+ * The app opens in the player's OWN language, following the phone: someone whose
+ * Telegram is set to Thai lands on ไทย, a Korean phone on 한국어. An explicit
+ * in-app choice still wins and is remembered, so a player who picks a language
+ * keeps it regardless of what the phone says.
  *
  *   1. what the player explicitly picked (persisted)
- *   2. 中文
+ *   2. the phone's Telegram language   — resolveLanguage(telegramLanguageCode())
+ *   3. the browser / device language   — resolveLanguage(navigator.language)
+ *   4. 中文 as the final fallback
  *
- * Telegram and browser language are deliberately NOT consulted. That is the
- * client's decision, not an oversight — `resolveLanguage()` and
- * `telegramLanguageCode()` still exist and are what you would wire back in to
- * restore auto-detection.
+ * Owner directive (Aug 2026): "follow the phone's language" — reversing the
+ * earlier decision to force 中文 on everyone. 中文 stays the i18next fallback
+ * below, so a key missing from a locale still renders in Chinese rather than raw.
  *
  * Because a player can land on a screen they cannot read, the picker in My
  * Account labels every option in its own language, and sits at a fixed position
@@ -43,7 +45,12 @@ export function storedLanguage(): string | null {
 }
 
 function detectLanguage(): string {
-  return storedLanguage() ?? DEFAULT_LANGUAGE;
+  return (
+    storedLanguage() ??
+    resolveLanguage(telegramLanguageCode()) ??
+    resolveLanguage(navigator.language) ??
+    DEFAULT_LANGUAGE
+  );
 }
 
 /** Change language and remember the choice. */

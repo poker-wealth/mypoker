@@ -21,7 +21,7 @@ import type { BreakerStatus } from '@/api/admin';
  * judged.
  *
  * No placeholder figures, ever. A dash means the server has not answered — an
- * operator reading ₮0.00 when the truth is "unknown" is how a real shortfall
+ * operator reading $0.00 when the truth is "unknown" is how a real shortfall
  * gets missed.
  */
 export function AdminOverview() {
@@ -116,7 +116,7 @@ export function AdminOverview() {
           <Metric
             label="Awaiting 2nd sign-off"
             value={String(d.withdrawals.awaitingSecondApproval)}
-            hint="over ₮10,000"
+            hint="over $10,000"
           />
           <Metric label="In flight" value={String(d.withdrawals.inFlight)} hint="held, not yet sent" />
         </div>

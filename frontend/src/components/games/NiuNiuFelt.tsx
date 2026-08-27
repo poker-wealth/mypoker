@@ -214,8 +214,8 @@ export function NiuNiuFelt({ snapshot, onCommand }: NiuNiuFeltProps) {
             </div>
             <Button variant="primary" size="sm" onClick={placeBet} disabled={(you?.bet ?? 0) > 0}>
               {(you?.bet ?? 0) > 0
-                ? `Staked ₮${you?.bet}`
-                : `Stake ₮${betAmount * multiplier} (₮${betAmount} × ${multiplier})`}
+                ? `Staked $${you?.bet}`
+                : `Stake $${betAmount * multiplier} ($${betAmount} × ${multiplier})`}
             </Button>
           </>
         ) : (
@@ -276,13 +276,13 @@ function SeatSpot({ seat, slot, info, bankMultiplier, accent }: SeatSpotProps) {
           style={{ borderColor: seat.isDealer ? accent : 'rgba(255,255,255,0.15)' }}
         >
           <div className="truncate text-[0.7rem] font-bold">{seat.name}</div>
-          <div className="text-[0.65rem] text-white/70">₮{seat.stack}</div>
+          <div className="text-[0.65rem] text-white/70">${seat.stack}</div>
           {seat.isDealer && (
             <div className="text-[0.55rem] font-black tracking-wider" style={{ color: accent }}>
               👑 BANKER
             </div>
           )}
-          {seat.bet > 0 && <div className="text-[0.6rem] text-white/70">bet ₮{seat.bet}</div>}
+          {seat.bet > 0 && <div className="text-[0.6rem] text-white/70">bet ${seat.bet}</div>}
           {info?.net !== undefined && info.net !== 0 && (
             <div
               className={`text-[0.65rem] font-black ${info.net > 0 ? 'text-emerald-400' : 'text-rose-400'}`}

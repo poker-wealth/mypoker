@@ -30,6 +30,17 @@ export interface SideOption {
 export interface SideBetFeltProps {
   snapshot: TableSnapshot;
   onCommand: (cmd: TableCommand) => void;
+  /**
+   * Taking a seat opens the buy-in sheet — it does NOT commit one.
+   *
+   * Every one of these felts used to send { kind: 'sit', buyIn: snapshot.minBuyIn } straight
+   * from the button, so a tap moved money at an amount the player was never shown and never
+   * chose. The poker felt has always gone through BuyInSheet; the other eight did not. An audit
+   * found all eight.
+   *
+   * Required, not optional: a felt that cannot open the sheet must not fall back to spending.
+   */
+  onSit: (seatIndex: number) => void;
   title: string;
   sides: SideOption[];
   /** Cards or symbols revealed at showdown, if the game reveals any. */
@@ -45,6 +56,7 @@ const CHIPS = [50, 100, 500, 1_000];
 export function SideBetFelt({
   snapshot,
   onCommand,
+  onSit,
   title,
   sides,
   reveal,
@@ -71,10 +83,17 @@ export function SideBetFelt({
 
   const sitDown = (): void => {
     const free = snapshot.seats.find((s) => !s.playerId);
-    onCommand({ kind: 'sit', seat: free?.index ?? 0, buyIn: snapshot.minBuyIn });
+    onSit(free?.index ?? 0);
   };
   const back = (id: string): void => {
     setSide(id);
+    // One bet per round, guarded HERE rather than at each button.
+    //
+    // The primary control was the reported bug, but the side tiles above call this too: with ₮500
+    // already down on one side, tapping another sent a second bet at whatever chip was selected.
+    // Guarding the single place that issues the command covers every caller, including any added
+    // later — a guard per button is one forgotten button away from the same bug.
+    if (staked > 0) return;
     if (you && inHand && !youAreBanker) {
       onCommand({ kind: 'act', action: { type: id, amount: betAmount } });
     }
@@ -152,11 +171,25 @@ export function SideBetFelt({
                 </Pressable>
               ))}
             </View>
-            <Pressable onPress={() => back(side)} style={styles.primary}>
-              <Text style={styles.primaryText}>
-                {staked > 0 ? `Staked ₮${staked}` : `Stake ₮${betAmount}`}
-              </Text>
-            </Pressable>
+            {/*
+              Once staked, this stops being a button.
+
+              It used to read "Staked ₮500" — a STATUS — while remaining live, and tapping it sent
+              `amount: betAmount`, the chip currently selected. So a player who had ₮500 down could
+              tap what looked like a readout and silently commit a second, smaller bet. An audit
+              found it reducing ₮500 to ₮100.
+
+              A control whose label describes a completed action must not still perform one.
+            */}
+            {staked > 0 ? (
+              <View style={[styles.primary, styles.primaryOff]}>
+                <Text style={styles.primaryText}>Staked ₮{staked}</Text>
+              </View>
+            ) : (
+              <Pressable onPress={() => back(side)} style={styles.primary}>
+                <Text style={styles.primaryText}>Stake ₮{betAmount}</Text>
+              </Pressable>
+            )}
           </>
         ) : (
           <Text style={styles.hint}>{snapshot.message ?? 'Waiting for the next round'}</Text>
@@ -217,6 +250,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.card,
     backgroundColor: theme.brand,
   },
+  // A staked readout: same shape as the button it replaces, visibly inert.
+  primaryOff: { opacity: 0.55 },
   primaryText: { color: '#fff', fontWeight: '800', fontSize: 14 },
   hint: { color: theme.dim, fontSize: 12, textAlign: 'center' },
 });

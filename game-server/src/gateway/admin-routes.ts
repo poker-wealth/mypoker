@@ -257,6 +257,16 @@ export function buildAdminRouter(config: GatewayConfig): Router {
     })),
   );
 
+  // Take an APPROVED withdrawal on-chain — sign + broadcast from the hot wallet.
+  // No actor in the body: the approval already recorded who authorised it; this
+  // is the mechanical broadcast of a decision already made and audited. On a
+  // missing hot-wallet key financial-core answers 500 and the withdrawal stays
+  // APPROVED for a retry, which surfaces to the admin as a failed send.
+  r.post(
+    '/withdrawals/:id/send',
+    post('/internal/withdrawals/:id/sign-broadcast', () => ({})),
+  );
+
   /** Screen 4 — Leagues. */
   r.get(
     '/leagues',
@@ -267,6 +277,38 @@ export function buildAdminRouter(config: GatewayConfig): Router {
         return;
       }
       res.json(result.body);
+    }),
+  );
+
+  /**
+   * One league in full — for the admin drill-into-a-club view. financial-core
+   * returns the roster + settings + money; this adds the email/nickname it alone
+   * holds, for the owner and every member, in one batched lookup.
+   */
+  r.get(
+    '/leagues/:id',
+    handle(async (req, res) => {
+      const result = await internal<LeagueDetailShape>(
+        `/internal/ops/leagues/${encodeURIComponent(String(req.params.id))}`,
+      );
+      if (!result.ok) {
+        res.status(result.status).json({ error: result.error });
+        return;
+      }
+      const league = result.body;
+      const identities = await userStore.byPlayerIds([
+        league.ownerId,
+        ...league.members.map((m) => m.playerId),
+      ]);
+      const named = (playerId: string): { displayName: string | null; email: string | null } => {
+        const id = identities.get(playerId);
+        return { displayName: id?.displayName ?? null, email: id?.email ?? null };
+      };
+      res.json({
+        ...league,
+        owner: { playerId: league.ownerId, ...named(league.ownerId) },
+        members: league.members.map((m) => ({ ...m, ...named(m.playerId) })),
+      });
     }),
   );
 
@@ -371,6 +413,77 @@ export function buildAdminRouter(config: GatewayConfig): Router {
     }),
   );
 
+  /**
+   * Screen 3b — the full Users list.
+   *
+   * Players ARE financial accounts (Telegram players have no identity document,
+   * so the user store alone would miss them). financial-core returns every
+   * player + balance; this enriches each with the email/nickname it alone holds,
+   * in ONE lookup. Read-only — the row links to the same read-only detail.
+   */
+  r.get(
+    '/users',
+    handle(async (req, res) => {
+      const limit = typeof req.query.limit === 'string' ? `?limit=${encodeURIComponent(req.query.limit)}` : '';
+      const result = await internal<{ players: PlayerListShape[]; truncated: boolean }>(
+        `/internal/ops/players${limit}`,
+      );
+      if (!result.ok) {
+        res.status(result.status).json({ error: result.error });
+        return;
+      }
+      const identities = await userStore.byPlayerIds(result.body.players.map((p) => p.playerId));
+      res.json({
+        users: result.body.players.map((p) => {
+          const identity = identities.get(p.playerId);
+          return {
+            playerId: p.playerId,
+            displayName: identity?.displayName ?? null,
+            email: identity?.email ?? null,
+            balance: p.balance,
+            available: p.available,
+            joinedAt: p.joinedAt,
+          };
+        }),
+        truncated: result.body.truncated,
+      });
+    }),
+  );
+
+  /**
+   * Admins — list and create platform administrators.
+   *
+   * Gated by requireAdmin like everything here, so only an existing ops account
+   * can mint another (the default seed is the bootstrap; real admins are made
+   * here). Email + password only — an admin never signs in with Telegram or
+   * Google — and the new account carries role 'ops' from creation.
+   */
+  r.get(
+    '/admins',
+    handle(async (_req, res) => {
+      res.json({ admins: await userStore.listAdmins() });
+    }),
+  );
+
+  r.post(
+    '/admins',
+    handle(async (req, res) => {
+      const body = (req.body ?? {}) as Record<string, string>;
+      const email = (body.email ?? '').trim();
+      const password = body.password ?? '';
+      if (!email || !password) {
+        res.status(400).json({ error: 'email and password are required' });
+        return;
+      }
+      try {
+        const admin = await userStore.createAdmin(email, password, body.displayName);
+        res.json({ admin });
+      } catch (err) {
+        res.status(400).json({ error: err instanceof Error ? err.message : 'could not create admin' });
+      }
+    }),
+  );
+
   return r;
 }
 
@@ -398,6 +511,31 @@ interface QueuedWithdrawalShape {
   approvals: string[];
   cumulativeEffective: number;
   requestedAt: string;
+}
+
+/** One player row as financial-core returns it, before this layer adds identity. */
+interface PlayerListShape {
+  playerId: string;
+  available: string;
+  balance: string;
+  joinedAt: string;
+}
+
+/** One league in full, from financial-core, before this layer adds identities. */
+interface LeagueDetailShape {
+  leagueId: string;
+  name: string;
+  ownerId: string;
+  memberCount: number;
+  inviteOnly: boolean;
+  inventory: string;
+  rake: string;
+  insurance: string;
+  createdAt: string;
+  description: string | null;
+  settings: { rakeBps: number; tableHours: number; buyIn: number; spectatorsAllowed: boolean } | null;
+  pendingRakeChange: { rakeBps: number; effectiveAt: string } | null;
+  members: { playerId: string; role: string; joinedAt: string }[];
 }
 
 /** What financial-core returns for one player, before this layer derives from it. */

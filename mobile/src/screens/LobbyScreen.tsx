@@ -189,6 +189,7 @@ export function LobbyScreen() {
                   reusing it reproduces the web's rule exactly. */}
               <View style={styles.actionButton}>
                 <Button
+                  style={styles.actionFill}
                   variant="primary"
                   onPress={() => {
                     const target =
@@ -218,6 +219,7 @@ export function LobbyScreen() {
                */}
               <View style={styles.actionButton}>
                 <Button
+                  style={styles.actionFill}
                   variant="ghost"
                   onPress={() => {
                     setCreateHintVisible(true);
@@ -319,6 +321,8 @@ const styles = StyleSheet.create({
   listCard: { padding: 0, paddingHorizontal: space.md, gap: 0 },
   actionRow: { flexDirection: 'row', paddingHorizontal: space.md, gap: space.sm },
   actionButton: { flex: 1 },
+  // Fill the wrapper so both buttons share the tallest label's height.
+  actionFill: { flex: 1, width: '100%' },
   createHint: { color: theme.dim, fontSize: 12, paddingHorizontal: space.md, fontFamily: weight('400') },
   right: { alignItems: 'flex-end', gap: space.xs },
   jackpot: {

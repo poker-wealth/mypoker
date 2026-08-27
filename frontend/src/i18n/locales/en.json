@@ -228,7 +228,19 @@
     "saveAddress": "Save address",
     "changeAddress": "Change",
     "addressCooldownNote": "Withdrawals can only go to this address. Changing it starts a 48-hour hold before it can be used.",
-    "addressLocked": "Withdrawals to this address open {{when}}"
+    "addressLocked": "Withdrawals to this address open {{when}}",
+    "txnDetail": {
+      "title": "Transaction details",
+      "status": "Status",
+      "completed": "Completed",
+      "dateTime": "Date & time",
+      "network": "Network",
+      "txHash": "Transaction hash",
+      "roundId": "Round ID",
+      "reference": "Reference",
+      "copyReference": "Copy",
+      "referenceCopied": "Copied"
+    }
   },
   "table": {
     "fold": "Fold",
@@ -375,7 +387,7 @@
   "jackpot": {
     "totalPools": "Total in pools",
     "paysOut": "pays {{pct}}%",
-    "needsMore": "₮{{amount}} more before this tier can pay out",
+    "needsMore": "${{amount}} more before this tier can pay out",
     "windowOpen": "Grand window is open",
     "windowClosed": "Grand window closed",
     "opensIn": "Opens in {{time}}",
@@ -419,11 +431,11 @@
   "vip": {
     "signInToSee": "Sign in to see your VIP standing",
     "effectiveVolume": "Effective volume",
-    "remaining": "₮{{amount}} to {{tier}}",
+    "remaining": "${{amount}} to {{tier}}",
     "topTier": "Highest tier reached",
     "byGame": "Where it came from",
     "counted": "counted",
-    "roundsStaked": "{{rounds}} rounds · ₮{{staked}} staked",
+    "roundsStaked": "{{rounds}} rounds · ${{staked}} staked",
     "coefficientNote": "Games count differently toward VIP: Texas ×1.0, Niu Niu ×0.5, Baccarat ×0.3, others ×0.4. This keeps low-rake games from being a shortcut up the tiers.",
     "tiers": "Tiers",
     "title": {
@@ -447,17 +459,17 @@
     "signInToSee": "Sign in to see your notifications",
     "empty": "Nothing yet",
     "emptyBlurb": "Results, deposits and announcements will appear here.",
-    "handWon": "You won ₮{{amount}}",
-    "handLost": "Hand settled — ₮{{amount}}",
-    "deposit": "Deposit of ₮{{amount}} credited",
-    "withdrawal": "Withdrawal of ₮{{amount}} sent",
-    "jackpot": "Jackpot! You won ₮{{amount}}",
+    "handWon": "You won ${{amount}}",
+    "handLost": "Hand settled — ${{amount}}",
+    "deposit": "Deposit of ${{amount}} credited",
+    "withdrawal": "Withdrawal of ${{amount}} sent",
+    "jackpot": "Jackpot! You won ${{amount}}",
     "vipUp": "You reached {{tier}}",
     "addressChanged": "Your withdrawal address was changed",
     "promo": "{{text}}",
-    "depositCredited": "Deposit of ₮{{amount}} credited",
-    "withdrawalRequested": "Withdrawal of ₮{{amount}} requested",
-    "withdrawalSent": "Withdrawal of ₮{{amount}} sent"
+    "depositCredited": "Deposit of ${{amount}} credited",
+    "withdrawalRequested": "Withdrawal of ${{amount}} requested",
+    "withdrawalSent": "Withdrawal of ${{amount}} sent"
   },
   "agent": {
     "title": "Agent Center",
@@ -551,7 +563,7 @@
     "odds": "Odds",
     "payout": "Covers up to",
     "decline": "No thanks",
-    "accept": "Insure ₮{{premium}}",
+    "accept": "Insure ${{premium}}",
     "taken": "Insurance taken"
   },
   "context": {

@@ -91,3 +91,59 @@ export function withdrawalAddressCooldownMs(): number {
   const n = Number(process.env.WITHDRAWAL_ADDRESS_COOLDOWN_MS ?? 172_800_000);
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 172_800_000;
 }
+
+/**
+ * Sweep configuration — consolidating deposits from per-player addresses into one treasury.
+ *
+ * A deposit lands at the player's own address (derived from the PUBLIC xpub). To move it OUT, the
+ * sweep must SIGN from that address, which needs its private key — derived from the account-level
+ * extended PRIVATE key here. This is a hot secret, like the withdrawal key: on mainnet it belongs in
+ * KMS/HSM, not an env var. Empty ⇒ sweeping is OFF and deposits simply stay put.
+ *
+ *   TRON_ACCOUNT_XPRV        m/44'/195'/0' extended private key (SECRET; empty ⇒ sweep off)
+ *   TREASURY_SWEEP_ADDRESS   where swept USDT is collected (empty ⇒ sweep off)
+ *   SWEEP_GAS_WALLET_KEY     pays the TRX gas dripped into an address before its USDT can move
+ *                            (defaults to the hot wallet, which already holds TRX)
+ *   SWEEP_MIN_USDT           don't sweep dust below this (default 1 USDT)
+ *   SWEEP_GAS_SUN            TRX to drip per address, in SUN (default 30 TRX)
+ *   SWEEP_POLL_MS            scan interval (default 60s)
+ *   SWEEP_COOLDOWN_MS        per-address quiet time after an action, so an in-flight tx is not
+ *                            double-sent before it confirms (default 5 min)
+ */
+export function accountXprv(): string {
+  return (process.env.TRON_ACCOUNT_XPRV ?? '').trim();
+}
+
+export function treasurySweepAddress(): string {
+  return (process.env.TREASURY_SWEEP_ADDRESS ?? '').trim();
+}
+
+export function sweepGasWalletKey(): string {
+  return (process.env.SWEEP_GAS_WALLET_KEY ?? process.env.TRON_HOT_WALLET_KEY ?? '').trim();
+}
+
+/** Minimum USDT (decimal string) worth sweeping — below this the gas costs more than it collects. */
+export function sweepMinUsdt(): string {
+  const v = process.env.SWEEP_MIN_USDT?.trim();
+  return v && v.length > 0 ? v : '1';
+}
+
+export function sweepGasSun(): number {
+  const n = Number(process.env.SWEEP_GAS_SUN ?? 30_000_000);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 30_000_000;
+}
+
+export function sweepPollMs(): number {
+  const n = Number(process.env.SWEEP_POLL_MS ?? 60_000);
+  return Number.isFinite(n) && n >= 5000 ? Math.floor(n) : 60_000;
+}
+
+export function sweepCooldownMs(): number {
+  const n = Number(process.env.SWEEP_COOLDOWN_MS ?? 300_000);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 300_000;
+}
+
+/** Sweeping runs only when both the signing key and the destination are configured. */
+export function sweepEnabled(): boolean {
+  return accountXprv().length > 0 && treasurySweepAddress().length > 0;
+}

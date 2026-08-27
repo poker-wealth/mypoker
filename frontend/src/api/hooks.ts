@@ -17,6 +17,11 @@ import {
   fetchWithdrawalQueue,
   approveWithdrawal,
   rejectWithdrawal,
+  sendWithdrawal,
+  fetchAdmins,
+  createAdmin,
+  fetchUsers,
+  fetchLeagueDetail,
 } from './admin';
 import { fetchVip } from './vip';
 import {
@@ -598,6 +603,18 @@ export function usePlayerSearch(q: string) {
   });
 }
 
+/** The full Users list (all players). Enabled only when not actively searching. */
+export function useUsers(enabled = true) {
+  return useQuery({
+    queryKey: ['admin', 'users'],
+    queryFn: () => fetchUsers(),
+    enabled,
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    retry: false,
+  });
+}
+
 /** One player's detail, for the admin drawer. */
 export function usePlayerDetail(playerId: string | null) {
   return useQuery({
@@ -639,6 +656,17 @@ export function useAdminLeagues() {
     queryKey: ['admin', 'leagues'],
     queryFn: fetchAdminLeagues,
     staleTime: 15_000,
+    retry: false,
+  });
+}
+
+/** One league in full — roster, settings, money — for the drill-in modal. */
+export function useLeagueDetail(leagueId: string | null) {
+  return useQuery({
+    queryKey: ['admin', 'league', leagueId],
+    queryFn: () => fetchLeagueDetail(leagueId!),
+    enabled: Boolean(leagueId),
+    staleTime: 10_000,
     retry: false,
   });
 }
@@ -690,6 +718,24 @@ export function useWithdrawalQueue() {
   });
 }
 
+/** The platform administrators. Rarely changes, so no polling. */
+export function useAdmins() {
+  return useQuery({
+    queryKey: ['admin', 'admins'],
+    queryFn: fetchAdmins,
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+export function useCreateAdmin() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createAdmin,
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['admin', 'admins'] }),
+  });
+}
+
 export function useWithdrawalActions() {
   const queryClient = useQueryClient();
   // The queue and the overview both count pending withdrawals; approving one
@@ -705,5 +751,7 @@ export function useWithdrawalActions() {
       mutationFn: ({ id, reason }: { id: string; reason: string }) => rejectWithdrawal(id, reason),
       onSuccess: after,
     }),
+    // Sign + broadcast an APPROVED withdrawal on-chain.
+    send: useMutation({ mutationFn: sendWithdrawal, onSuccess: after }),
   };
 }

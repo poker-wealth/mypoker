@@ -228,7 +228,19 @@
     "saveAddress": "アドレスを保存",
     "changeAddress": "変更",
     "addressCooldownNote": "出金はこのアドレスにのみ送られます。変更すると48時間の保留期間が始まります。",
-    "addressLocked": "このアドレスへの出金は {{when}} に開始されます"
+    "addressLocked": "このアドレスへの出金は {{when}} に開始されます",
+    "txnDetail": {
+      "title": "取引の詳細",
+      "status": "ステータス",
+      "completed": "完了",
+      "dateTime": "日時",
+      "network": "ネットワーク",
+      "txHash": "トランザクションハッシュ",
+      "roundId": "ラウンドID",
+      "reference": "参照番号",
+      "copyReference": "コピー",
+      "referenceCopied": "コピーしました"
+    }
   },
   "table": {
     "fold": "フォールド",
@@ -375,7 +387,7 @@
   "jackpot": {
     "totalPools": "プール総額",
     "paysOut": "{{pct}}% 払い出し",
-    "needsMore": "この階層が払い出すまであと ₮{{amount}}",
+    "needsMore": "この階層が払い出すまであと ${{amount}}",
     "windowOpen": "グランド時間帯 開放中",
     "windowClosed": "グランド時間帯 終了",
     "opensIn": "{{time}} 後に開放",
@@ -419,11 +431,11 @@
   "vip": {
     "signInToSee": "ログインすると VIP ステータスが表示されます",
     "effectiveVolume": "有効ボリューム",
-    "remaining": "{{tier}} まで ₮{{amount}}",
+    "remaining": "{{tier}} まで ${{amount}}",
     "topTier": "最高ランク到達",
     "byGame": "内訳",
     "counted": "計上",
-    "roundsStaked": "{{rounds}} ラウンド · ₮{{staked}} 賭け",
+    "roundsStaked": "{{rounds}} ラウンド · ${{staked}} 賭け",
     "coefficientNote": "VIP への換算はゲームごとに異なります。テキサス ×1.0、牛牛 ×0.5、バカラ ×0.3、その他 ×0.4。低レーキのゲームが昇格の近道にならないようにするためです。",
     "tiers": "ランク",
     "title": {
@@ -447,17 +459,17 @@
     "signInToSee": "ログインすると通知が表示されます",
     "empty": "まだ通知はありません",
     "emptyBlurb": "ゲーム結果、入金、お知らせがここに表示されます。",
-    "handWon": "₮{{amount}} を獲得しました",
-    "handLost": "ハンド精算 — ₮{{amount}}",
-    "deposit": "₮{{amount}} の入金が反映されました",
-    "withdrawal": "₮{{amount}} の出金を送信しました",
-    "jackpot": "ジャックポット！₮{{amount}} を獲得",
+    "handWon": "${{amount}} を獲得しました",
+    "handLost": "ハンド精算 — ${{amount}}",
+    "deposit": "${{amount}} の入金が反映されました",
+    "withdrawal": "${{amount}} の出金を送信しました",
+    "jackpot": "ジャックポット！${{amount}} を獲得",
     "vipUp": "{{tier}} に到達しました",
     "addressChanged": "出金アドレスが変更されました",
     "promo": "{{text}}",
-    "depositCredited": "₮{{amount}} の入金が反映されました",
-    "withdrawalRequested": "₮{{amount}} の出金を受け付けました",
-    "withdrawalSent": "₮{{amount}} の出金を送信しました"
+    "depositCredited": "${{amount}} の入金が反映されました",
+    "withdrawalRequested": "${{amount}} の出金を受け付けました",
+    "withdrawalSent": "${{amount}} の出金を送信しました"
   },
   "agent": {
     "title": "エージェントセンター",
@@ -551,7 +563,7 @@
     "odds": "オッズ",
     "payout": "最大補償",
     "decline": "見送る",
-    "accept": "₮{{premium}} で加入",
+    "accept": "${{premium}} で加入",
     "taken": "保険に加入しました"
   },
   "context": {

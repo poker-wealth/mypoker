@@ -33,9 +33,21 @@ const CHIPS = [50, 100, 500, 1_000];
 export function BaccaratFelt({
   snapshot,
   onCommand,
+  onSit,
 }: {
   snapshot: TableSnapshot;
   onCommand: (cmd: TableCommand) => void;
+  /**
+   * Taking a seat opens the buy-in sheet — it does NOT commit one.
+   *
+   * Every one of these felts used to send { kind: 'sit', buyIn: snapshot.minBuyIn } straight
+   * from the button, so a tap moved money at an amount the player was never shown and never
+   * chose. The poker felt has always gone through BuyInSheet; the other eight did not. An audit
+   * found all eight.
+   *
+   * Required, not optional: a felt that cannot open the sheet must not fall back to spending.
+   */
+  onSit: (seatIndex: number) => void;
 }) {
   const [spot, setSpot] = useState<Spot>('player');
   const [betAmount, setBetAmount] = useState(100);
@@ -57,10 +69,13 @@ export function BaccaratFelt({
 
   const sitDown = (): void => {
     const free = snapshot.seats.find((s) => !s.playerId);
-    onCommand({ kind: 'sit', seat: free?.index ?? 0, buyIn: snapshot.minBuyIn });
+    onSit(free?.index ?? 0);
   };
   const back = (type: Spot): void => {
     setSpot(type);
+    // One bet per round — see SideBetFelt. The three spot tiles call this as well as the primary
+    // control, so with chips already down, switching spots placed a second bet.
+    if (staked > 0) return;
     if (you && inHand) onCommand({ kind: 'act', action: { type, amount: betAmount } });
   };
 
@@ -148,11 +163,21 @@ export function BaccaratFelt({
                 </Pressable>
               ))}
             </View>
-            <Pressable onPress={() => back(spot)} style={styles.primary}>
-              <Text style={styles.primaryText}>
-                {staked > 0 ? `Staked ₮${staked}` : `Back ${spot.toUpperCase()} for ₮${betAmount}`}
-              </Text>
-            </Pressable>
+            {/* Same fix as SideBetFelt: once staked this is a readout, not a control. Left live,
+                it read "Staked ₮500" while a tap sent the currently-selected chip — silently
+                placing a second, smaller bet on a player who thought they were looking at a
+                status. */}
+            {staked > 0 ? (
+              <View style={[styles.primary, styles.primaryOff]}>
+                <Text style={styles.primaryText}>Staked ₮{staked}</Text>
+              </View>
+            ) : (
+              <Pressable onPress={() => back(spot)} style={styles.primary}>
+                <Text style={styles.primaryText}>
+                  Back {spot.toUpperCase()} for ₮{betAmount}
+                </Text>
+              </Pressable>
+            )}
           </>
         ) : (
           <Text style={styles.hint}>{snapshot.message ?? 'Waiting for the next round'}</Text>
@@ -251,6 +276,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.card,
     backgroundColor: theme.brand,
   },
+  // A staked readout: same shape as the button it replaces, visibly inert.
+  primaryOff: { opacity: 0.55 },
   primaryText: { color: '#fff', fontWeight: '800', fontSize: 14 },
   hint: { color: theme.dim, fontSize: 12, textAlign: 'center' },
 });

@@ -71,7 +71,7 @@ export function SlotsFelt({ snapshot, onCommand }: SlotsFeltProps) {
                   wager === amt ? 'bg-amber-400 text-black' : 'bg-indigo-900 text-indigo-200'
                 }`}
               >
-                ₮{amt}
+                ${amt}
               </button>
             ))}
             <Button
@@ -79,7 +79,7 @@ export function SlotsFelt({ snapshot, onCommand }: SlotsFeltProps) {
               size="sm"
               onClick={() => onCommand?.({ kind: 'act', action: { type: 'spin', amount: wager } })}
             >
-              SPIN (₮{wager})
+              SPIN (${wager})
             </Button>
           </div>
         ) : (

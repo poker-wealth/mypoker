@@ -32,11 +32,12 @@ export const LANGUAGES: Language[] = [
 ];
 
 /**
- * The product's language.
+ * The fallback language.
  *
- * Every player opens in 中文 unless they have picked something else themselves —
- * Telegram's and the browser's language are not consulted. Also i18next's
- * fallback, so a key missing from any locale renders in Chinese.
+ * Players now open in their phone's language (see `detectLanguage()` in
+ * `i18n/index.ts`); 中文 is only the final fallback when neither an explicit
+ * pick nor the phone/browser expresses a language we ship. Also i18next's
+ * fallback, so a key missing from any locale renders in Chinese, not raw.
  */
 export const DEFAULT_LANGUAGE = 'zh';
 
@@ -48,9 +49,8 @@ export const DEFAULT_LANGUAGE = 'zh';
  * null rather than a default so callers can tell "no preference expressed" apart
  * from "explicitly wants English".
  *
- * NOT currently called: the client wants every player to open in 中文 regardless
- * of their Telegram language. Kept because it is the piece you wire back into
- * `detectLanguage()` to restore auto-detection, and it is covered by tests.
+ * Called by `detectLanguage()` to open the app in the phone's language — the
+ * player's Telegram tag first, the browser tag second.
  */
 export function resolveLanguage(tag: string | null | undefined): string | null {
   if (!tag) return null;

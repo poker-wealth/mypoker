@@ -77,6 +77,8 @@ export interface StoredIdentity {
   email?: string;
   displayName?: string;
   photoUrl?: string | null;
+  /** Present only for platform administrators; absent = a normal player. */
+  role?: 'ops';
 }
 
 const toIdentity = (u: UserDoc): StoredIdentity => {
@@ -86,6 +88,7 @@ const toIdentity = (u: UserDoc): StoredIdentity => {
     ...(email ? { email } : {}),
     ...(u.displayName ? { displayName: u.displayName } : {}),
     photoUrl: u.photoUrl ?? null,
+    ...(u.role ? { role: u.role } : {}),
   };
 };
 
@@ -145,4 +148,83 @@ export const userStore = {
     if (!doc) return null;
     return { ...toIdentity(doc as UserDoc), createdAt: doc.createdAt.toISOString() };
   },
+
+  /**
+   * Identities for many playerIds in ONE query — for enriching the admin Users
+   * list. Telegram players simply have no entry in the returned map (they have
+   * no identity document), which the caller renders as the playerId.
+   */
+  async byPlayerIds(playerIds: readonly string[]): Promise<Map<string, StoredIdentity>> {
+    if (playerIds.length === 0) return new Map();
+    const docs = await UserModel.find({ _id: { $in: [...playerIds] } }).lean();
+    return new Map(docs.map((d) => [d._id, toIdentity(d as UserDoc)]));
+  },
+
+  /**
+   * Create a platform administrator (role: 'ops'). Email + password only — an
+   * admin never signs in with Telegram or Google, so `ops` can only be minted
+   * through the credential path this creates. Throws on a weak password or a
+   * taken email rather than silently making a second, unreachable account.
+   */
+  async createAdmin(email: string, password: string, displayName?: string): Promise<StoredIdentity> {
+    const clean = email.trim().toLowerCase();
+    if (!clean.includes('@')) throw new Error('an admin needs an email address');
+    if (password.length < 8) throw new Error('admin password must be at least 8 characters');
+    if (await findByIdentifier(clean)) throw new Error('an account with this email already exists');
+    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+    const user = await UserModel.create({
+      email: clean,
+      passwordHash,
+      displayName: displayName?.trim() || (clean.split('@')[0] ?? clean),
+      role: 'ops',
+    });
+    return toIdentity(user.toObject());
+  },
+
+  /** Every administrator, newest first — for the admin panel's Admins screen. */
+  async listAdmins(): Promise<(StoredIdentity & { createdAt: string })[]> {
+    const docs = await UserModel.find({ role: 'ops' }).sort({ createdAt: -1 }).lean();
+    return docs.map((d) => ({ ...toIdentity(d as UserDoc), createdAt: d.createdAt.toISOString() }));
+  },
 };
+
+/**
+ * The built-in default administrator (owner's choice: a hardcoded default that
+ * works out of the box). Overridable by env so it can be secured without a code
+ * change — set `ADMIN_EMAIL` / `ADMIN_PASSWORD` on the gateway and they win.
+ *
+ * ⚠️ CHANGE THE PASSWORD after first login: create your real admin on the Admins
+ * screen, then this default is just a bootstrap. A known admin password on a
+ * live platform that controls withdrawals is exactly the credential to rotate.
+ */
+export const DEFAULT_ADMIN_EMAIL = (process.env.ADMIN_EMAIL?.trim() || 'admin@mypoker777.com').toLowerCase();
+export const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'MyPoker777!Admin';
+
+/**
+ * Seed the first administrator on boot. Idempotent and safe to call every start:
+ *   - an ops account already exists → do nothing.
+ *   - the default email exists as a normal user → promote it to ops.
+ *   - otherwise → create it with the default credentials.
+ * So the panel is never locked out, and re-deploying never spawns duplicates.
+ */
+export async function seedDefaultAdmin(): Promise<void> {
+  if (await UserModel.exists({ role: 'ops' })) return;
+
+  const existing = await UserModel.findOne({ email: DEFAULT_ADMIN_EMAIL });
+  if (existing) {
+    await UserModel.updateOne({ _id: existing._id }, { $set: { role: 'ops' } });
+    console.log(`[admin] promoted existing account ${DEFAULT_ADMIN_EMAIL} to ops`);
+    return;
+  }
+
+  const passwordHash = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, SALT_ROUNDS);
+  await UserModel.create({
+    email: DEFAULT_ADMIN_EMAIL,
+    passwordHash,
+    displayName: 'Administrator',
+    role: 'ops',
+  });
+  console.log(
+    `[admin] seeded default administrator ${DEFAULT_ADMIN_EMAIL} — CHANGE THE PASSWORD after first login`,
+  );
+}
