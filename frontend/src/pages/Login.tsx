@@ -17,10 +17,20 @@ export function Login() {
   const [displayName, setDisplayName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Basic email validation regex (requires @ and a valid domain)
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(identifier)) {
+      setError("Please enter a complete, valid email address (e.g., name@example.com).");
+      return;
+    }
+
     setIsSubmitting(true);
+    setError(null);
     
     try {
       if (view === 'login') {
@@ -29,6 +39,9 @@ export function Login() {
         await signUpWithEmail(identifier, password, displayName);
       }
       navigate('/');
+    } catch (err: any) {
+      const message = err?.response?.data?.message || err?.message || 'Authentication failed. Please check your credentials and try again.';
+      setError(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -127,6 +140,11 @@ export function Login() {
                 </div>
 
                 <form onSubmit={handleAuth} className="flex flex-col gap-3.5">
+                  {error && (
+                    <div className="rounded-xl border border-danger/50 bg-danger/10 p-3 text-sm text-danger">
+                      {error}
+                    </div>
+                  )}
                   
                   {view === 'signup' && (
                     <div className="space-y-1">
