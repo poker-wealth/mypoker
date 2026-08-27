@@ -28,7 +28,7 @@ export function AppShell() {
 
   // Outside Telegram (on the web), enforce web sign up / sign in gate before opening the app
   const isTelegram = Boolean(initData());
-  if (!isTelegram && !token && status !== 'authenticating' && status !== 'idle') {
+  if (!isTelegram && !token) {
     return <Login />;
   }
 
