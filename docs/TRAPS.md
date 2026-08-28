@@ -434,3 +434,48 @@ that a passing suite means it is load-bearing.
 **The pattern:** when you add a rule, enumerate the doors. Auth had two and only
 one was counted. Then make the type system carry the rule, because the next door
 will be added by someone who never read this.
+
+## 21. A check that only runs inside the process cannot see a browser's rule
+
+**The admin edit form failed with "cannot reach the server", and nothing was
+down.** The gateway advertised `Access-Control-Allow-Methods: GET, POST,
+OPTIONS`. The edit route is a `PATCH`. The browser reads that list *before*
+sending, refused, and `fetch` rejected with no response at all — which the
+client reports, correctly, as unreachable. The message was true and pointed at
+the network instead of at a header.
+
+All twenty-two route tests for that surface passed. Supertest calls the Express
+app directly and never performs a preflight, so the whole suite was blind to a
+rule only a browser enforces. Adding a verb to a router is therefore two
+changes, and the second one has no local consequence at all.
+
+The test that now covers it enumerates every verb the router actually mounts
+and asserts the preflight allows each — so a future `DELETE` fails in CI rather
+than in someone's browser.
+
+**A near-miss inside the fix:** the first version of that test asserted "more
+than 3 verbs are mounted" as a sanity floor. The app mounts exactly three, so
+the floor was a number nobody had checked, and it failed for the wrong reason.
+It now names the set.
+
+## 22. A cached identity is a claim that stops being true
+
+**An administrator renamed a player and the player's own app kept the old
+name.** The session player object is written to `localStorage` at sign-in and
+never rewritten; every screen reads it from there. `/auth/me` returned the new
+name the whole time — nothing was consulting it.
+
+A reload did not fix it, which is what makes this worse than a stale cache: a
+reload rehydrates the same object from storage. The old name would have
+survived until the player signed out and back in, and nothing on their screen
+would suggest that was the remedy.
+
+**The same bug in a worse costume:** `role` lives on that object too. Grant an
+account `ops` and its cached copy still says `player` — and `AdminShell` gates
+on exactly that copy, so the panel refuses its own newly-created administrator.
+Found by chasing the display name; the role case would have been reported as
+"the admin panel doesn't work for me" and diagnosed nowhere near here.
+
+The fix is one `refreshPlayer()` on boot for a restored session. The general
+shape: anything a SECOND party can change about you cannot be cached at first
+sight and trusted forever.

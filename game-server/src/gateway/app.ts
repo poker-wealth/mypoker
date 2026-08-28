@@ -230,7 +230,13 @@ function cors(allowed: string[]) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Vary', 'Origin');
       res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      // PATCH is here because the admin user-edit route uses it. It was missed
+      // when that route was added, and NOTHING in the test suite noticed:
+      // supertest talks to the app directly and never performs a preflight, so
+      // every route test passed while a browser refused to send the request at
+      // all. It surfaced as "cannot reach the server" — accurate, and pointing
+      // nowhere near the cause. Adding a verb to a route means adding it here.
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
       res.setHeader('Access-Control-Max-Age', '600');
     }
     if (req.method === 'OPTIONS') {

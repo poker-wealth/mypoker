@@ -9,6 +9,7 @@ import {
   signupWithEmail,
   confirmEmailCode,
   resendEmailCode,
+  fetchMe,
   type LoginResponse,
   type PendingConfirmation,
   type Player,
@@ -85,6 +86,14 @@ interface SessionState {
    * until the next full sign-in.
    */
   updatePlayer: (patch: Partial<Player>) => void;
+  /**
+   * Re-read the signed-in player from the server and merge it in.
+   *
+   * Called once on boot when a token exists. Without it the cached player is
+   * whatever sign-in returned, forever — so an admin renaming an account, or
+   * granting it `ops`, never reaches the device it happened to.
+   */
+  refreshPlayer: () => Promise<void>;
   /**
    * Admin-host sign-in. Like `signInWithEmail`, but ONLY establishes a session
    * for an `ops` account — a player who tries the admin login is refused and no
@@ -272,6 +281,35 @@ export const useSession = create<SessionState>((set, get) => {
     const next = { ...player, ...patch };
     persist(get().token, next);
     set({ player: next });
+  },
+
+  refreshPlayer: async () => {
+    // The cached player is written at sign-in and never again, so anything an
+    // ADMINISTRATOR changes about an account — a display name, a role — was
+    // invisible on that player's own device until they signed out and back in.
+    // Not until a reload: a reload rehydrates from localStorage and shows the
+    // same stale value. This is the only thing that reconciles the two.
+    //
+    // Role matters as much as the name: an account just granted `ops` carries
+    // `role: 'player'` in its cached object, and AdminShell reads that object,
+    // so the panel would refuse its own new administrator.
+    //
+    // Failure is deliberately silent. A dead network or an expired token are
+    // both already handled — the client's 401 handler drops the session — and
+    // a toast here would fire on every cold start with no connection, about
+    // something the player never asked for.
+    if (!get().token) return;
+    try {
+      const me = await fetchMe();
+      get().updatePlayer({
+        displayName: me.displayName,
+        photoUrl: me.photoUrl,
+        role: me.role,
+        vipTier: me.vipTier,
+      });
+    } catch {
+      // Keep the cached player. Stale is better than empty.
+    }
   },
 
   signInAsAdmin: async (email, passwordPlain) => {
