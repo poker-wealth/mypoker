@@ -479,3 +479,47 @@ Found by chasing the display name; the role case would have been reported as
 The fix is one `refreshPlayer()` on boot for a restored session. The general
 shape: anything a SECOND party can change about you cannot be cached at first
 sight and trusted forever.
+
+## 23. A guard on one rail is not a guard
+
+**Suspension revoked HTTP sessions and did nothing on the live table.** The gate
+was consulted in exactly one place — `requireAuth` — so a suspended player's
+REST calls started failing while they carried on playing at the felt with the
+token they already held, for up to the full 24-hour TTL. That is precisely the
+window the feature was built to close.
+
+Eighteen tests covered suspension and every one of them passed, because they
+mount a bare HTTP route and never open a socket. The socket handshake verifies
+a JWT signature and expiry and asks nothing else.
+
+This is #20 ("a rule enforced on one door is not enforced") a second time, at a
+larger scale: there the two doors were password and Google sign-in, here they
+are two entire transports. The lesson did not generalise on its own, which is
+the point worth writing down — enumerate the RAILS, not just the routes, and
+remember that a WebSocket authenticates once at connect while HTTP
+re-authenticates on every request.
+
+**Two more from the same review, both the shape of "the guarantee is stated in
+a comment and not implemented":**
+
+- Every admin write applied BEFORE its audit entry was written. The audit
+  store's own header says a failed log should fail the request "rather than
+  leave an unattributed edit" — but by the time the log ran, the change was
+  already committed. A failed audit insert gave a 500 on a change that had
+  happened, with no record. The comment described an intention; the ordering
+  contradicted it.
+- `requireAdmin` trusted the `ops` claim in the token, so demoting an
+  administrator did nothing until the token expired. Suspension had
+  per-request revocation and role did not — which meant the only way to cut off
+  a rogue admin was to suspend them, and (see above) that would not have
+  reached their socket either.
+
+**And a cache that only ever grew.** Both the suspension gate and the override
+store refreshed entries on expiry without ever removing one, so each held a
+slot per distinct player for the life of the process. Not exploitable; a leak
+that gets worse exactly as the platform succeeds.
+
+**The pattern across all four:** each was a control that looked complete from
+inside the file it lived in. What found them was asking, from outside, "what
+else reaches this state?" — a second transport, a failed second write, a
+second kind of privilege, an unbounded lifetime.

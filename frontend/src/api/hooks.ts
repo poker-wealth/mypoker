@@ -28,6 +28,7 @@ import {
   updateUser,
   setUserSuspension,
   setUserPassword,
+  setPlayerOverride,
   type AdminUserPatch,
 } from './admin';
 import { fetchVip } from './vip';
@@ -792,6 +793,11 @@ export function useAdminUserMutations(playerId: string | null) {
     password: useMutation({
       mutationFn: (v: { newPassword: string; reason?: string }) =>
         setUserPassword(playerId!, v.newPassword, v.reason),
+      onSuccess: after,
+    }),
+    override: useMutation({
+      mutationFn: (v: { reputationScore?: number | null; vipTier?: string | null; reason: string }) =>
+        setPlayerOverride(playerId!, v),
       onSuccess: after,
     }),
   };

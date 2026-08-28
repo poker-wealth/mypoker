@@ -95,18 +95,30 @@ export interface AdminPlayerDetail {
   vip: { tier: string; title: string };
   volume: { cumulativeEffective: number; monthlyEffective: number };
   identity: { displayName: string | null; email: string | null; createdAt: string | null } | null;
+  /** Present since reputation and VIP became overridable. */
+  override?: PlayerOverride;
 }
 
 export const searchPlayers = (q: string): Promise<PlayerSearchResult> =>
   api.get<PlayerSearchResult>(`/admin/players?q=${encodeURIComponent(q)}`);
 
-/** One row of the full Users list. `balance` is always a string (the player has an account). */
+/**
+ * One row of the full Users list, which is the UNION of two populations:
+ * financial-core's players (everyone money has touched, including Telegram
+ * players with no identity document) and the gateway's registrations (including
+ * accounts that have never deposited or played).
+ *
+ * `balance` is therefore NULLABLE — it was `string` when the list came from
+ * financial-core alone. Null means no financial account exists yet, which the
+ * table already renders as "no account" rather than as zero. Those are
+ * different facts and an admin acts differently on each.
+ */
 export interface AdminUserRow {
   playerId: string;
   displayName: string | null;
   email: string | null;
-  balance: string;
-  available: string;
+  balance: string | null;
+  available: string | null;
   joinedAt: string;
 }
 
@@ -136,7 +148,13 @@ export interface AdminUserRecord {
   displayName: string | null;
   photoUrl: string | null;
   emailVerified: boolean | null;
-  role: 'player' | 'league_admin' | 'ops';
+  /**
+   * The document stores `'ops'` or nothing; the server reports the absent case
+   * as `'player'`. `league_admin` exists in the token type but nothing grants or
+   * reads it, so it is deliberately not offered here — a role that confers
+   * nothing is a control an admin would reasonably expect to do something.
+   */
+  role: 'player' | 'ops';
   hasPassword: boolean;
   hasGoogle: boolean;
   suspendedAt: string | null;
@@ -152,7 +170,7 @@ export interface AdminUserPatch {
   email?: string | null;
   phone?: string | null;
   emailVerified?: boolean;
-  role?: 'player' | 'league_admin' | 'ops';
+  role?: 'player' | 'ops';
   reason?: string;
 }
 
@@ -185,6 +203,30 @@ export const setUserSuspension = (
     suspended,
     ...(reason ? { reason } : {}),
   });
+
+/**
+ * An administrator override of a DERIVED value.
+ *
+ * Both the override and the computed value are carried, because the form has to
+ * show what the player would have had as well as what was decided instead — an
+ * override that renders as an ordinary number is indistinguishable from an
+ * earned one, and nobody could tell a granted tier from a played-for tier.
+ */
+export interface PlayerOverride {
+  reputationScore: number | null;
+  vipTier: string | null;
+  computedScore: number;
+  computedTier: string;
+  setBy: string | null;
+  reason: string | null;
+  at: string | null;
+}
+
+export const setPlayerOverride = (
+  playerId: string,
+  patch: { reputationScore?: number | null; vipTier?: string | null; reason: string },
+): Promise<unknown> =>
+  api.post(`/admin/players/${encodeURIComponent(playerId)}/override`, patch);
 
 export const setUserPassword = (
   playerId: string,

@@ -13,7 +13,8 @@ import {
   useAdminUserAudit,
   useAdminUserMutations,
 } from '@/api/hooks';
-import { errorKey } from '@/api/errors';
+import { errorKey, adminErrorMessage } from '@/api/errors';
+import { useSession } from '@/store/session';
 import type { AdminUserPatch, AdminUserRecord } from '@/api/admin';
 
 /**
@@ -88,6 +89,11 @@ function EditorForm({ playerId, record }: { playerId: string; record: AdminUserR
   const [emailVerified, setEmailVerified] = useState(record.emailVerified === true);
   const [error, setError] = useState<string | null>(null);
 
+  // Whether this is the administrator's OWN account. The server refuses a
+  // self-suspension; knowing it here lets the form say so instead of offering
+  // a button whose only outcome is an error.
+  const isSelf = useSession((s) => s.player?.playerId) === playerId;
+
   const emailChanged = email.trim().toLowerCase() !== (record.email ?? '').toLowerCase();
   const dirty =
     displayName !== (record.displayName ?? '') ||
@@ -121,7 +127,7 @@ function EditorForm({ playerId, record }: { playerId: string; record: AdminUserR
     try {
       await m.update.mutateAsync(patch);
     } catch (err) {
-      setError(t(errorKey(err)));
+      setError(adminErrorMessage(err, t(errorKey(err))));
     }
   };
 
@@ -131,7 +137,14 @@ function EditorForm({ playerId, record }: { playerId: string; record: AdminUserR
     if (suspending) {
       const reason = await prompt({
         title: 'Suspend this account?',
-        body: 'They will be signed out of every session and cannot sign in again — by password or by Google — until reinstated. The reason is shown to them at sign-in.',
+        // Says what suspension ACTUALLY does. The previous wording — "they will
+        // be signed out of every session" — was false: nothing revokes an
+        // issued token, so a player already signed in keeps their session until
+        // it expires. An administrator suspending someone for cheating needs to
+        // know they may still be at a table right now, because that changes
+        // what they do next. docs/TRAPS.md #7, in the one place an admin reads
+        // before acting.
+        body: 'They cannot sign in again — by password or by Google — until reinstated, and the reason is shown to them. Note: this does NOT end a session they already have. If they are signed in now, they keep that session until it expires (up to 24 hours).',
         confirmLabel: 'Suspend',
         danger: true,
         withInput: { label: 'Reason', placeholder: 'Shown to the player', required: true },
@@ -140,7 +153,7 @@ function EditorForm({ playerId, record }: { playerId: string; record: AdminUserR
       try {
         await m.suspension.mutateAsync({ suspended: true, reason });
       } catch (err) {
-        setError(t(errorKey(err)));
+        setError(adminErrorMessage(err, t(errorKey(err))));
       }
       return;
     }
@@ -149,7 +162,7 @@ function EditorForm({ playerId, record }: { playerId: string; record: AdminUserR
     try {
       await m.suspension.mutateAsync({ suspended: false });
     } catch (err) {
-      setError(t(errorKey(err)));
+      setError(adminErrorMessage(err, t(errorKey(err))));
     }
   };
 
@@ -166,7 +179,7 @@ function EditorForm({ playerId, record }: { playerId: string; record: AdminUserR
     try {
       await m.password.mutateAsync({ newPassword: pw });
     } catch (err) {
-      setError(t(errorKey(err)));
+      setError(adminErrorMessage(err, t(errorKey(err))));
     }
   };
 
@@ -227,7 +240,13 @@ function EditorForm({ playerId, record }: { playerId: string; record: AdminUserR
 
       <Field label="Role">
         <div className="flex gap-1.5">
-          {(['player', 'league_admin', 'ops'] as const).map((rr) => (
+          {/*
+            Two options, not three. `league_admin` was offered here and the
+            server rejects it — nothing grants or reads that role yet, so the
+            button could only ever produce an error. A control that cannot
+            succeed does not belong on the form.
+          */}
+          {(['player', 'ops'] as const).map((rr) => (
             <button
               key={rr}
               onClick={() => setRole(rr)}
@@ -237,7 +256,7 @@ function EditorForm({ playerId, record }: { playerId: string; record: AdminUserR
                   : 'border-border text-dim active:bg-surface-2'
               }`}
             >
-              {rr === 'league_admin' ? 'League admin' : rr === 'ops' ? 'Admin' : 'Player'}
+              {rr === 'ops' ? 'Admin' : 'Player'}
             </button>
           ))}
         </div>
@@ -278,11 +297,24 @@ function EditorForm({ playerId, record }: { playerId: string; record: AdminUserR
         <Button
           variant={record.suspendedAt ? 'secondary' : 'danger'}
           onClick={() => void toggleSuspension()}
-          disabled={m.suspension.isPending}
+          disabled={m.suspension.isPending || isSelf}
         >
           {record.suspendedAt ? <RotateCcw size={13} /> : <Ban size={13} />}
           {record.suspendedAt ? 'Reinstate account' : 'Suspend account'}
         </Button>
+        {isSelf && (
+          /*
+            Said before the click, not after. The server refuses this — it would
+            lock the panel behind an account that can no longer sign in to
+            unlock it — but discovering that by pressing a red button and
+            reading an error is a worse way to learn it. A disabled control
+            needs a reason the reader can see.
+          */
+          <p className="text-[0.62rem] leading-relaxed text-dim">
+            You cannot suspend your own account — it would lock you out of this panel with no
+            way back in. Ask another administrator.
+          </p>
+        )}
       </div>
 
       <AuditTrail playerId={playerId} />

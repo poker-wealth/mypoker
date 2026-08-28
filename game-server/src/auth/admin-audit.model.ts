@@ -41,7 +41,9 @@ export type AdminAuditAction =
   | 'user.reinstate'
   | 'user.set_password'
   | 'user.clear_avatar'
-  | 'user.balance_adjust';
+  | 'user.balance_adjust'
+  /** A reputation score or VIP tier set by hand, against the computed value. */
+  | 'user.override';
 
 const adminAuditSchema = new Schema<AdminAuditDoc>(
   {

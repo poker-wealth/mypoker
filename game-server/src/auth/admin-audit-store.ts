@@ -1,4 +1,54 @@
+import mongoose, { type ClientSession } from 'mongoose';
 import { AdminAuditModel, type AdminAuditAction, type AdminAuditDoc } from './admin-audit.model';
+
+/**
+ * Run an admin write and its audit entry as ONE atomic unit.
+ *
+ * Every write route used to apply the change and then write the log. If the log
+ * insert failed the caller got a 500 on a change that had already happened,
+ * with no record of it — the exact state the model header calls impossible.
+ * Ordering alone cannot fix that: audit-first has the mirror flaw, a log
+ * claiming a change that never landed.
+ *
+ * Requires a replica set, as MongoDB transactions do. That is already this
+ * platform's standard — financial-core's `transfer()` has depended on one since
+ * it was written — so it is a deployment requirement the gateway now shares
+ * rather than a new one.
+ *
+ * Falls back to running the function WITHOUT a session when the deployment has
+ * no transaction support, rather than failing every admin write outright. The
+ * fallback is logged loudly, because it silently reintroduces the very gap this
+ * closes and nobody should discover that from a missing audit row months later.
+ */
+export async function withAuditTransaction<T>(fn: (session?: ClientSession) => Promise<T>): Promise<T> {
+  let session: ClientSession;
+  try {
+    session = await mongoose.startSession();
+  } catch {
+    console.warn('[admin-audit] no session support — write and audit are NOT atomic');
+    return fn(undefined);
+  }
+
+  try {
+    let result: T;
+    await session.withTransaction(async () => {
+      result = await fn(session);
+    });
+    return result!;
+  } catch (err) {
+    // A deployment without transactions rejects at commit with a specific
+    // error. Anything else is a real failure and must propagate — swallowing it
+    // would turn a rolled-back write into an apparent success.
+    const message = err instanceof Error ? err.message : String(err);
+    if (/Transaction numbers are only allowed|replica set|not supported/i.test(message)) {
+      console.warn(`[admin-audit] transactions unavailable (${message}) — falling back, NOT atomic`);
+      return fn(undefined);
+    }
+    throw err;
+  } finally {
+    await session.endSession();
+  }
+}
 
 /**
  * Reading and writing the admin audit log.
@@ -81,22 +131,32 @@ export const adminAudit = {
    * is the exact state this log exists to make impossible. If the log cannot be
    * written the request should fail — better a retry than an unattributed edit.
    */
-  async record(input: {
-    actorPlayerId: string;
-    subjectPlayerId: string;
-    action: AdminAuditAction;
-    before?: Record<string, unknown>;
-    after?: Record<string, unknown>;
-    reason?: string;
-  }): Promise<void> {
-    await AdminAuditModel.create({
-      actorPlayerId: input.actorPlayerId,
-      subjectPlayerId: input.subjectPlayerId,
-      action: input.action,
-      ...(input.before ? { before: input.before } : {}),
-      ...(input.after ? { after: input.after } : {}),
-      ...(input.reason ? { reason: input.reason } : {}),
-    });
+  async record(
+    input: {
+      actorPlayerId: string;
+      subjectPlayerId: string;
+      action: AdminAuditAction;
+      before?: Record<string, unknown>;
+      after?: Record<string, unknown>;
+      reason?: string;
+    },
+    session?: ClientSession,
+  ): Promise<void> {
+    await AdminAuditModel.create(
+      [
+        {
+          actorPlayerId: input.actorPlayerId,
+          subjectPlayerId: input.subjectPlayerId,
+          action: input.action,
+          ...(input.before ? { before: input.before } : {}),
+          ...(input.after ? { after: input.after } : {}),
+          ...(input.reason ? { reason: input.reason } : {}),
+        },
+      ],
+      // The array form is required to pass a session — `create(doc, {session})`
+      // silently treats the options object as a second DOCUMENT.
+      session ? { session, ordered: true } : { ordered: true },
+    );
   },
 
   /** Newest first — an audit trail is read from the most recent action back. */

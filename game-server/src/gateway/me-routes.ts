@@ -15,6 +15,7 @@ import {
   processAvatarUpload,
   AvatarRejected,
 } from '../uploads/avatar-processing';
+import { overrideStore } from '../players/override-store';
 import { avatarUploadLimiter as defaultAvatarUploadLimiter } from '../auth/avatar-upload-store';
 import type { AvatarUploadLimiter } from '../auth/avatar-upload-store';
 
@@ -126,13 +127,25 @@ export function buildMeRouter(config: GatewayConfig, deps: MeRouterDeps = {}): R
       if (!facts.ok) return sendUpstreamError(res, facts);
 
       const { roundsPlayed, findings } = facts.body;
-      const score = scoreFor(roundsPlayed, findings);
+      const computed = scoreFor(roundsPlayed, findings);
+
+      // An administrator override replaces the SCORE, never the facts under it.
+      // roundsPlayed and the findings below are still what actually happened —
+      // so a player granted a score of 90 still sees the rounds they have
+      // really played, and the two do not have to agree. They are different
+      // claims: one is a history, the other is a decision someone made.
+      const override = await overrideStore.get(req.player!.playerId);
+      const score = override?.reputationScore ?? computed;
+
       res.json({
         score,
         band: tierOf(score),
         roundsPlayed,
         roundsToAdvance: Math.max(0, NORMAL_ROUNDS_TO_GOOD - roundsPlayed),
         deducted: findings.reduce((sum, f) => sum + DEDUCTION[f], 0),
+        // Reported rather than hidden. A score that does not follow from the
+        // rounds beside it is confusing unless the screen can say why.
+        ...(override?.reputationScore != null ? { overridden: true, computedScore: computed } : {}),
       });
     })();
   });
@@ -152,7 +165,20 @@ export function buildMeRouter(config: GatewayConfig, deps: MeRouterDeps = {}): R
           })
         : null;
 
-      res.json({ ...progress, ...facts.body, estimatedDaysToNextTier });
+      // An override replaces the TIER. Volume, progress and the estimate stay
+      // as computed — they describe real settled play, and rewriting them would
+      // put a number on the screen that the ledger cannot account for.
+      const override = await overrideStore.get(req.player!.playerId);
+      const overridden = override?.vipTier != null;
+
+      res.json({
+        ...progress,
+        ...facts.body,
+        estimatedDaysToNextTier,
+        ...(overridden
+          ? { tier: override!.vipTier, overridden: true, computedTier: progress.tier }
+          : {}),
+      });
     })();
   });
   r.get('/leagues', (req, res) => void forwardTo(config, req, res, '/me/leagues'));

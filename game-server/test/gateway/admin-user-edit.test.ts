@@ -29,6 +29,10 @@ jest.mock('../../src/auth/admin-audit-store', () => {
     // The real diff — an audit assertion against a mocked differ proves nothing.
     changedFields: actual.changedFields,
     adminAudit: { record: jest.fn(), forSubject: jest.fn() },
+    // A passthrough: the real one opens a Mongo session and nothing here
+    // connects to a database. Atomicity is asserted in
+    // admin-audit-transaction.test.ts; these tests are about route decisions.
+    withAuditTransaction: (fn: (s?: unknown) => Promise<unknown>) => fn(undefined),
   };
 });
 

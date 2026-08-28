@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { UserEditor } from './UserEditor';
+import { OverrideEditor } from './OverrideEditor';
 import { usePlayerSearch, usePlayerDetail, useUsers } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
 import { moneyFromDecimal, money } from '@/lib/money';
@@ -261,6 +262,8 @@ function PlayerDetail({ playerId }: { playerId: string }) {
           </div>
         </div>
       </div>
+
+      {d.override && <OverrideEditor playerId={playerId} override={d.override} />}
 
       {d.reputation.findings.length > 0 && (
         <div>

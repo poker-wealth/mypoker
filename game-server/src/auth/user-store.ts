@@ -1,4 +1,5 @@
 import * as bcrypt from 'bcrypt';
+import type { ClientSession } from 'mongoose';
 import { UserModel, type UserDoc } from './user.model';
 import { isSignInAllowed } from './sign-in-rules';
 
@@ -484,11 +485,15 @@ export const userStore = {
   async adminUpdate(
     playerId: string,
     patch: AdminUserPatch,
+    /** Runs inside the caller's transaction, so the audit entry cannot be lost. */
+    session?: ClientSession,
   ): Promise<
     | { ok: true; before: AdminUserRecord; after: AdminUserRecord }
     | { ok: false; reason: 'no_account' | 'email_taken' | 'phone_taken' }
   > {
-    const before = await UserModel.findById(playerId).lean();
+    // Every query below carries the session, or that write lands outside the
+    // transaction it is meant to be atomic with.
+    const before = await UserModel.findById(playerId).session(session ?? null).lean();
     if (!before) return { ok: false, reason: 'no_account' };
 
     const set: Record<string, unknown> = {};
@@ -506,6 +511,7 @@ export const userStore = {
         // of a 500. The unique index is still the real guarantee under a race.
         const clash = await UserModel.findOne({ email, _id: { $ne: playerId } })
           .select('_id')
+          .session(session ?? null)
           .lean();
         if (clash) return { ok: false, reason: 'email_taken' };
         set.email = email;
@@ -519,6 +525,7 @@ export const userStore = {
         const phone = patch.phone.trim();
         const clash = await UserModel.findOne({ phone, _id: { $ne: playerId } })
           .select('_id')
+          .session(session ?? null)
           .lean();
         if (clash) return { ok: false, reason: 'phone_taken' };
         set.phone = phone;
@@ -553,6 +560,7 @@ export const userStore = {
         ? before
         : ((await UserModel.findOneAndUpdate({ _id: playerId }, update, {
             new: true,
+            ...(session ? { session } : {}),
           }).lean()) ?? before);
 
     return {
@@ -574,8 +582,10 @@ export const userStore = {
     suspended: boolean,
     actorPlayerId: string,
     reason?: string,
+    /** Runs inside the caller's transaction, so the audit entry cannot be lost. */
+    session?: ClientSession,
   ): Promise<{ before: AdminUserRecord; after: AdminUserRecord } | null> {
-    const before = await UserModel.findById(playerId).lean();
+    const before = await UserModel.findById(playerId).session(session ?? null).lean();
     if (!before) return null;
 
     const update = suspended
@@ -588,7 +598,10 @@ export const userStore = {
         }
       : { $unset: { suspendedAt: '', suspendedBy: '', suspendedReason: '' } };
 
-    const after = await UserModel.findOneAndUpdate({ _id: playerId }, update, { new: true }).lean();
+    const after = await UserModel.findOneAndUpdate({ _id: playerId }, update, {
+      new: true,
+      ...(session ? { session } : {}),
+    }).lean();
     return {
       before: toAdminRecord(before as UserDoc),
       after: toAdminRecord((after ?? before) as UserDoc),
@@ -609,13 +622,19 @@ export const userStore = {
   async adminSetPassword(
     playerId: string,
     newPassword: string,
+    /** Runs inside the caller's transaction, so the audit entry cannot be lost. */
+    session?: ClientSession,
   ): Promise<{ ok: true } | { ok: false; reason: 'no_account' | 'no_identifier' }> {
-    const user = await UserModel.findById(playerId).lean();
+    const user = await UserModel.findById(playerId).session(session ?? null).lean();
     if (!user) return { ok: false, reason: 'no_account' };
     if (!user.email && !user.phone) return { ok: false, reason: 'no_identifier' };
 
     const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    await UserModel.updateOne({ _id: playerId }, { $set: { passwordHash } });
+    await UserModel.updateOne(
+      { _id: playerId },
+      { $set: { passwordHash } },
+      session ? { session } : {},
+    );
     return { ok: true };
   },
 
@@ -649,6 +668,51 @@ export const userStore = {
     if (playerIds.length === 0) return new Map();
     const docs = await UserModel.find({ _id: { $in: [...playerIds] } }).lean();
     return new Map(docs.map((d) => [d._id, toIdentity(d as UserDoc)]));
+  },
+
+  /**
+   * Just the suspension state and current role, for the per-request gate.
+   *
+   * Its own method, selecting two fields, because it runs on the hot path —
+   * the gate consults it for every authenticated request that misses its
+   * cache, and pulling a whole user document (hash included) to read a date
+   * and a role would be both wasteful and a credential loaded for no reason.
+   * `role` rides along with `suspendedAt` rather than getting its own method
+   * because `SuspensionGate` answers both questions from one cached entry —
+   * see that file — so one query should fill both rather than two.
+   *
+   * `null` for a player with no identity document — every Telegram player —
+   * which the gate reads as "not suspendable" AND "not ops": there is no
+   * document for either fact to live on.
+   */
+  async suspensionOf(
+    playerId: string,
+  ): Promise<{ suspendedAt: Date | null; role: 'player' | 'ops' } | null> {
+    const doc = await UserModel.findById(playerId).select('suspendedAt role').lean();
+    if (!doc) return null;
+    return { suspendedAt: doc.suspendedAt ?? null, role: doc.role ?? 'player' };
+  },
+
+  /**
+   * Registered identities, newest first — the other half of the admin Users list.
+   *
+   * The list was built from financial-core's players alone, which is every
+   * account money has touched. A web sign-up that has never deposited or played
+   * has no financial account yet, so it did not appear at all: someone could
+   * register, fail to get in, contact support, and be told no such account
+   * exists. New sign-ups are exactly who support is asked about first.
+   *
+   * `createdAt` comes back so the merged list can be ordered against
+   * financial-core's `joinedAt` on one comparable field.
+   */
+  async listIdentities(
+    limit: number,
+  ): Promise<(StoredIdentity & { createdAt: string })[]> {
+    const docs = await UserModel.find({}).sort({ createdAt: -1 }).limit(limit).lean();
+    return docs.map((d) => ({
+      ...toIdentity(d as UserDoc),
+      createdAt: d.createdAt.toISOString(),
+    }));
   },
 
   /**

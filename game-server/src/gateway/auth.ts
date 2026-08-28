@@ -4,6 +4,7 @@ import { OAuth2Client } from 'google-auth-library';
 import type { GatewayConfig } from './config';
 import { userStore } from '../auth/user-store';
 import { otpStore, type OtpStore } from '../auth/otp-store';
+import { defaultSuspensionGate, type SuspensionGate } from '../auth/suspension-gate';
 import { OTP_TTL_MS } from '../auth/otp-rules';
 import {
   validateSignupCredentials,
@@ -91,8 +92,22 @@ function profileFromTelegram(user: TelegramUser): PlayerProfile {
   };
 }
 
-/** Rejects any request without a valid, unexpired player token. */
-export function requireAuth(config: GatewayConfig) {
+/**
+ * Rejects any request without a valid, unexpired player token — and any request
+ * from an account that has since been SUSPENDED.
+ *
+ * The suspension check is what makes a ban take effect on a session that
+ * already exists. Without it, suspension only closed the door to signing in
+ * again: a player already holding a token kept playing until it expired, up to
+ * twenty-four hours, which is precisely the window that matters for the reason
+ * suspensions get issued. See `auth/suspension-gate.ts` for why it is cached
+ * and why it fails open.
+ *
+ * 401 with a `code`, not 403: the client's 401 handler already drops the
+ * session and returns the player to sign-in, which is exactly the right
+ * outcome, and the code lets the screen say why rather than "Signed out".
+ */
+export function requireAuth(config: GatewayConfig, gate: SuspensionGate = defaultSuspensionGate) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const header = req.headers.authorization;
     if (!header?.startsWith('Bearer ')) {
@@ -102,7 +117,24 @@ export function requireAuth(config: GatewayConfig) {
     try {
       const claims = verifyToken(header.slice('Bearer '.length), config.jwtSecret);
       req.player = { playerId: claims.playerId, role: claims.role ?? 'player' };
-      next();
+      gate
+        .isSuspended(claims.playerId)
+        .then((suspended) => {
+          if (suspended) {
+            res.status(401).json({
+              error: 'This account is suspended. Contact support.',
+              code: 'account_suspended',
+            });
+            return;
+          }
+          next();
+        })
+        .catch(() => {
+          // The gate already swallows lookup failures; this is the belt to that
+          // brace. An unexpected throw here must not 500 every request.
+          next();
+        });
+      return;
     } catch (e) {
       const reason = e instanceof TokenError ? e.message : 'invalid token';
       res.status(401).json({ error: reason });
@@ -122,11 +154,11 @@ export function requireAuth(config: GatewayConfig) {
  * middleware put there, so on its own it would authorise an unauthenticated
  * request whose `req.player` is undefined. Ordering is the whole guard.
  *
- * 404, not 403, on the role check. A 403 confirms the admin API exists and
- * that this account simply lacks the rank — which tells someone probing with a
- * stolen player token exactly what to go after next. A missing token still
- * gets 401 from `requireAuth`, because that is a statement about the request
- * rather than about what lies behind it.
+ * 404, not 403, on the role check — BOTH role checks below. A 403 confirms
+ * the admin API exists and that this account simply lacks the rank — which
+ * tells someone probing with a stolen player token exactly what to go after
+ * next. A missing token still gets 401 from `requireAuth`, because that is a
+ * statement about the request rather than about what lies behind it.
  *
  * `league_admin` is deliberately NOT accepted. The spec gives league
  * administrators their OWN panel, scoped to their alliance — "league overview
@@ -134,14 +166,43 @@ export function requireAuth(config: GatewayConfig) {
  * league admin (for their own league players only)" (12-week plan, W10). The
  * platform's withdrawal queue, player list and treasury are a different scope,
  * and that panel is a separate build, not this one with a wider role check.
+ *
+ * A SECOND check runs after the token's own claim: `gate.isOps` confirms the
+ * claim against the STORED role. Without it, demoting an administrator
+ * (`PATCH /admin/players/:id`) writes the database and does nothing to a
+ * session that already has a token — they keep full admin access until it
+ * expires, up to `jwtTtlSeconds` (a day by default). This is exactly the gap
+ * `SuspensionGate` closed for suspension, reusing the same cache/TTL/prime
+ * machinery — see `auth/suspension-gate.ts`. A demoted account gets the
+ * identical 404 a non-ops caller always got, never a 403: it must not be
+ * distinguishable from "never was an admin" to whatever is holding that
+ * token.
  */
-export function requireAdmin() {
+export function requireAdmin(gate: SuspensionGate = defaultSuspensionGate) {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (req.player?.role !== 'ops') {
       res.status(404).json({ error: 'not found' });
       return;
     }
-    next();
+    // The token claimed ops when it was signed; confirm that against the
+    // account's CURRENT role. `true` is the fallback if the lookup fails or
+    // times out — see `SuspensionGate.isOps` for why that is not `false` and
+    // not a hardcoded pass: it is "trust the claim already verified above",
+    // which is what this check did with no verification at all before today.
+    gate
+      .isOps(req.player.playerId, true)
+      .then((stillOps) => {
+        if (!stillOps) {
+          res.status(404).json({ error: 'not found' });
+          return;
+        }
+        next();
+      })
+      .catch(() => {
+        // `isOps` already swallows lookup failures internally; this is the
+        // belt to that brace, same as `requireAuth`'s identical catch above.
+        next();
+      });
   };
 }
 
