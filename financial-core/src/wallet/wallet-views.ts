@@ -3,6 +3,7 @@ import { LedgerModel } from './ledger.model';
 import { WithdrawalModel } from '../withdrawal/withdrawal.model';
 // The enum, not string literals: 'BROADCAST' silently matched nothing.
 import { WithdrawalState } from '../domain/withdrawal-types';
+import { PendingDepositModel } from '../deposit/pending-deposit.model';
 
 /**
  * Read-only wallet views for the player's own screen.
@@ -61,9 +62,15 @@ export async function getWalletTransactions(
 ): Promise<{ transactions: WalletTxn[] }> {
   const limit = Math.min(opts.limit ?? 50, 200);
 
-  const [rows, inFlight] = await Promise.all([
+  const [rows, inFlight, incoming] = await Promise.all([
     LedgerModel.find({ accountId }).sort({ createdAt: -1 }).limit(limit).lean(),
     WithdrawalModel.find({ playerAccountId: accountId, state: { $in: IN_FLIGHT } })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean(),
+    // Unconfirmed deposits — sightings, not ledger entries. See
+    // deposit/pending-deposit.model.ts for why they are kept apart.
+    PendingDepositModel.find({ playerAccountId: accountId })
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean(),
@@ -89,9 +96,20 @@ export async function getWalletTransactions(
     state: w.state,
   }));
 
-  // Merged then trimmed, so the newest `limit` across BOTH sources wins rather
+  const arriving: WalletTxn[] = incoming.map((p) => ({
+    at: p.createdAt.toISOString(),
+    type: 'DEPOSIT',
+    direction: 'CREDIT',
+    amount: Money.fromDecimal128(p.amount).toString(),
+    businessId: p._id,
+    // The client MUST render this as not-yet-arrived. The amount is real but it
+    // is not in any balance, and will not be until the chain confirms it.
+    state: 'PENDING',
+  }));
+
+  // Merged then trimmed, so the newest `limit` across ALL sources wins rather
   // than the newest limit of each.
-  const transactions = [...settled, ...pending]
+  const transactions = [...settled, ...pending, ...arriving]
     .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
     .slice(0, limit);
 

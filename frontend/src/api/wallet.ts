@@ -36,10 +36,14 @@ export interface WalletTxn {
   amount: string;
   businessId: string | null;
   /**
-   * Lifecycle state, sent ONLY for a withdrawal that has not settled yet — it
-   * has no ledger entry until it confirms. Absent means the row is settled.
+   * Lifecycle state, sent ONLY for rows that have NOT settled — an in-flight
+   * withdrawal, or a deposit seen on chain but not yet confirmed (`PENDING`).
+   * Absent means the row is a settled ledger entry.
+   *
+   * A row carrying a state is NOT in any balance. Rendering one as though it
+   * were would tell a player they have money they cannot spend.
    */
-  state?: WithdrawalState;
+  state?: WithdrawalState | 'PENDING';
 }
 
 /**

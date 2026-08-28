@@ -33,7 +33,9 @@ import { toast } from '@/lib/toast';
  */
 type StateTone = 'neutral' | 'accent' | 'success' | 'warn';
 
-const WITHDRAWAL_STATE: Record<WithdrawalState, { key: string; tone: StateTone }> = {
+const WITHDRAWAL_STATE: Record<WithdrawalState | 'PENDING', { key: string; tone: StateTone }> = {
+  // A deposit the chain has seen but not confirmed. Not in any balance yet.
+  PENDING: { key: 'wallet.withdrawalState.pending', tone: 'neutral' },
   REQUESTED: { key: 'wallet.withdrawalState.pending', tone: 'neutral' },
   APPROVED: { key: 'wallet.withdrawalState.approved', tone: 'accent' },
   BROADCASTING: { key: 'wallet.withdrawalState.sent', tone: 'accent' },
@@ -52,7 +54,7 @@ const WITHDRAWAL_STATE: Record<WithdrawalState, { key: string; tone: StateTone }
  * white screen on the money page.
  */
 function stateBadge(state: string): { key: string; tone: StateTone } | null {
-  return WITHDRAWAL_STATE[state as WithdrawalState] ?? null;
+  return WITHDRAWAL_STATE[state as WithdrawalState | 'PENDING'] ?? null;
 }
 
 /** DEPOSIT/WITHDRAW/BET/WIN_PAYOUT/RAKE/JACKPOT_PAYOUT → a short readable label. */
@@ -204,7 +206,14 @@ export function Wallet() {
                     <div className="text-[0.66rem] text-dim">{new Date(tx.at).toLocaleString()}</div>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className={`text-sm font-bold tabular-nums ${credit ? 'text-success' : 'text-text'}`}>
+                    {/* An unsettled row is dimmed and never green: green reads
+                        as "this is yours now", and a pending deposit is not in
+                        any balance until the chain confirms it. */}
+                    <span
+                      className={`text-sm font-bold tabular-nums ${
+                        tx.state ? 'text-dim' : credit ? 'text-success' : 'text-text'
+                      }`}
+                    >
                       {credit ? '+' : '−'}${tx.amount}
                     </span>
                     <ChevronRight size={16} className="shrink-0 text-dim" />
