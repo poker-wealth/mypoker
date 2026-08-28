@@ -6,7 +6,7 @@ import { motion } from 'motion/react';
 import { Segmented } from '@/components/ui/Segmented';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { GameTile } from '@/components/GameTile';
-import { TableEntrySheet } from '@/components/TableEntrySheet';
+import { TableEntryModal } from '@/components/TableEntryModal';
 import { visibleGames, type GameCategory, type GameDef } from '@/lib/games';
 import { useLobbyGames } from '@/api/hooks';
 import { formatMicros } from '@/api/lobby';
@@ -20,7 +20,7 @@ export function Games() {
   const { t } = useTranslation();
   const [cat, setCat] = useState<Filter>('all');
   const [q, setQ] = useState('');
-  // Hold'em taps open the join-or-create sheet instead of going straight to
+  // Hold'em taps open the join-or-create modal instead of going straight to
   // felt (owner-approved). Other games still navigate directly.
   const [entryOpen, setEntryOpen] = useState(false);
 
@@ -197,7 +197,7 @@ export function Games() {
         </div>
       </section>
 
-      <TableEntrySheet open={entryOpen} onClose={() => setEntryOpen(false)} />
+      <TableEntryModal open={entryOpen} onClose={() => setEntryOpen(false)} />
     </div>
   );
 }
