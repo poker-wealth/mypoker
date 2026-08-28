@@ -212,7 +212,10 @@ function cors(allowed: string[]) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Vary', 'Origin');
       res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+      // PATCH is used by settings updates (e.g. the table sound toggle). Without it
+      // the browser's preflight refuses the PATCH, the fetch rejects, and the
+      // reachability handler flips to "Reconnecting" on every settings change.
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
       res.setHeader('Access-Control-Max-Age', '600');
     }
     if (req.method === 'OPTIONS') {
