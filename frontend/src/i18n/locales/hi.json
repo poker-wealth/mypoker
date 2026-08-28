@@ -247,7 +247,7 @@
       "approved": "स्वीकृत",
       "sent": "भेजा गया",
       "completed": "पूर्ण",
-      "rejected": "अस्वीकृत"
+      "returned": "वापस किया गया"
     }
   },
   "table": {
@@ -477,7 +477,10 @@
     "promo": "{{text}}",
     "depositCredited": "${{amount}} की जमा राशि जोड़ी गई",
     "withdrawalRequested": "${{amount}} की निकासी का अनुरोध किया गया",
-    "withdrawalSent": "${{amount}} की निकासी भेजी गई"
+    "withdrawalSent": "${{amount}} की निकासी भेजी गई",
+    "depositRejected": "${{amount}} की जमा राशि जोड़ी नहीं गई",
+    "withdrawalConfirmed": "${{amount}} की निकासी पूर्ण हुई",
+    "withdrawalReturned": "${{amount}} की निकासी वापस की गई"
   },
   "agent": {
     "title": "एजेंट सेंटर",

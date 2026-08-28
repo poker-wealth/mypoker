@@ -1,6 +1,8 @@
 import { Money } from '../domain/money';
 import { LedgerModel } from './ledger.model';
 import { WithdrawalModel } from '../withdrawal/withdrawal.model';
+// The enum, not string literals: 'BROADCAST' silently matched nothing.
+import { WithdrawalState } from '../domain/withdrawal-types';
 
 /**
  * Read-only wallet views for the player's own screen.
@@ -32,7 +34,11 @@ export interface WalletTxn {
  * excluded because no money ever moved: it belongs in the withdrawals list,
  * not in a record of what happened to the balance.
  */
-const IN_FLIGHT = ['REQUESTED', 'APPROVED', 'BROADCAST'];
+const IN_FLIGHT = [
+  WithdrawalState.REQUESTED,
+  WithdrawalState.APPROVED,
+  WithdrawalState.BROADCASTING,
+];
 
 /**
  * The player's money movements, newest first. Scoped to their own account only.

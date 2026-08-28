@@ -92,3 +92,31 @@ export function nonOfficialContract(input: { txHash: string }): string {
     'Contact support with this transaction id.',
   ].join('\n');
 }
+
+/** Money out, step three — on-chain final. */
+export function withdrawalConfirmed(input: { amount: string; txHash: string }): string {
+  return [
+    `<b>${amount(input.amount)} arrived</b>`,
+    '',
+    'Your withdrawal is confirmed on the network.',
+    '',
+    `<code>${esc(input.txHash)}</code>`,
+  ].join('\n');
+}
+
+/**
+ * The withdrawal did not happen and the money is back.
+ *
+ * Covers an operator refusing it and a broadcast that failed alike: the
+ * player's position is the same either way, and naming a cause we cannot always
+ * know would be worse than stating the outcome we always can.
+ */
+export function withdrawalReturned(input: { amount: string }): string {
+  return [
+    `<b>${amount(input.amount)} returned</b>`,
+    '',
+    'This withdrawal did not go through. The amount is back in your balance.',
+    '',
+    'Contact support if you were expecting it to complete.',
+  ].join('\n');
+}

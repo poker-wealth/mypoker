@@ -247,7 +247,7 @@
       "approved": "已批准",
       "sent": "已发出",
       "completed": "已完成",
-      "rejected": "已拒绝"
+      "returned": "已退回"
     }
   },
   "table": {
@@ -477,7 +477,10 @@
     "promo": "{{text}}",
     "depositCredited": "充值 ${{amount}} 已到账",
     "withdrawalRequested": "已提交 ${{amount}} 提现申请",
-    "withdrawalSent": "提现 ${{amount}} 已发出"
+    "withdrawalSent": "提现 ${{amount}} 已发出",
+    "depositRejected": "充值 ${{amount}} 未到账",
+    "withdrawalConfirmed": "提现 ${{amount}} 已完成",
+    "withdrawalReturned": "提现 ${{amount}} 已退回"
   },
   "agent": {
     "title": "代理中心",

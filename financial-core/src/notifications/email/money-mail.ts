@@ -1,6 +1,13 @@
 import { notify, GOVERNED_BY } from '../notification-store';
 import { sendEmail } from './send-email';
-import { depositReceived, withdrawalRequested, withdrawalSent } from './templates';
+import {
+  depositReceived,
+  depositRejected,
+  withdrawalRequested,
+  withdrawalSent,
+  withdrawalConfirmed,
+  withdrawalReturned,
+} from './templates';
 import { sendTelegram } from '../telegram/send-telegram';
 import * as tg from '../telegram/messages';
 import { getSettings } from '../../settings/player-settings';
@@ -256,5 +263,105 @@ export async function announceWithdrawalSent(input: {
     });
   } catch (err) {
     console.error(`[money-mail] sent announce failed for ${input.withdrawalId}:`, err);
+  }
+}
+
+/**
+ * Money in that will NOT be credited — the wrong-contract case (spec §3.7).
+ *
+ * SYSTEM, not DEPOSIT, and therefore unsuppressible. Someone has sent real
+ * funds the platform cannot accept; a player who muted deposit receipts still
+ * needs to know their money did not arrive and that support needs the tx id.
+ *
+ * It used to call sendTelegram directly, which meant an email or Google sign-up
+ * — who has no Telegram to reach — was told nothing at all. The spec says the
+ * player is notified; that was only true for half of them.
+ */
+export async function announceDepositRejected(input: {
+  playerId: string;
+  amount: string;
+  txHash: string;
+  network: string;
+  at?: Date;
+}): Promise<void> {
+  try {
+    const at = input.at ?? new Date();
+    await announce({
+      playerId: input.playerId,
+      eventId: `deposit:${input.txHash}:rejected`,
+      kind: 'SYSTEM',
+      titleKey: 'notifications.depositRejected',
+      params: { amount: input.amount },
+      template: (locale) =>
+        depositRejected({
+          amount: input.amount,
+          txHash: input.txHash,
+          network: input.network,
+          at,
+          locale,
+        }),
+      telegram: tg.nonOfficialContract({ txHash: input.txHash }),
+    });
+  } catch (err) {
+    console.error(`[money-mail] rejected-deposit announce failed for ${input.txHash}:`, err);
+  }
+}
+
+/** Money out, step three — it is on-chain final. The message that ends the story. */
+export async function announceWithdrawalConfirmed(input: {
+  playerId: string;
+  withdrawalId: string;
+  amount: string;
+  address: string;
+  txHash: string;
+  network: string;
+  at?: Date;
+}): Promise<void> {
+  try {
+    const at = input.at ?? new Date();
+    await announce({
+      playerId: input.playerId,
+      eventId: `withdrawal:${input.withdrawalId}:confirmed`,
+      kind: 'SYSTEM',
+      titleKey: 'notifications.withdrawalConfirmed',
+      params: { amount: input.amount },
+      template: (locale) =>
+        withdrawalConfirmed({
+          amount: input.amount,
+          address: input.address,
+          txHash: input.txHash,
+          network: input.network,
+          at,
+          locale,
+        }),
+      telegram: tg.withdrawalConfirmed({ amount: input.amount, txHash: input.txHash }),
+    });
+  } catch (err) {
+    console.error(`[money-mail] confirm announce failed for ${input.withdrawalId}:`, err);
+  }
+}
+
+/** Money out that came back — an operator refusal or a failed broadcast alike. */
+export async function announceWithdrawalReturned(input: {
+  playerId: string;
+  withdrawalId: string;
+  amount: string;
+  address: string;
+  at?: Date;
+}): Promise<void> {
+  try {
+    const at = input.at ?? new Date();
+    await announce({
+      playerId: input.playerId,
+      eventId: `withdrawal:${input.withdrawalId}:returned`,
+      kind: 'SYSTEM',
+      titleKey: 'notifications.withdrawalReturned',
+      params: { amount: input.amount },
+      template: (locale) =>
+        withdrawalReturned({ amount: input.amount, address: input.address, at, locale }),
+      telegram: tg.withdrawalReturned({ amount: input.amount }),
+    });
+  } catch (err) {
+    console.error(`[money-mail] return announce failed for ${input.withdrawalId}:`, err);
   }
 }

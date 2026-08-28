@@ -247,7 +247,7 @@
       "approved": "Approved",
       "sent": "Sent",
       "completed": "Completed",
-      "rejected": "Rejected"
+      "returned": "Returned"
     }
   },
   "table": {
@@ -477,7 +477,10 @@
     "promo": "{{text}}",
     "depositCredited": "Deposit of ${{amount}} credited",
     "withdrawalRequested": "Withdrawal of ${{amount}} requested",
-    "withdrawalSent": "Withdrawal of ${{amount}} sent"
+    "withdrawalSent": "Withdrawal of ${{amount}} sent",
+    "depositRejected": "Deposit of ${{amount}} was not credited",
+    "withdrawalConfirmed": "Withdrawal of ${{amount}} completed",
+    "withdrawalReturned": "Withdrawal of ${{amount}} returned"
   },
   "agent": {
     "title": "Agent Center",

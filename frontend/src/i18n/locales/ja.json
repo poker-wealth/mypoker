@@ -247,7 +247,7 @@
       "approved": "承認済み",
       "sent": "送信済み",
       "completed": "完了",
-      "rejected": "却下"
+      "returned": "返金済み"
     }
   },
   "table": {
@@ -477,7 +477,10 @@
     "promo": "{{text}}",
     "depositCredited": "${{amount}} の入金が反映されました",
     "withdrawalRequested": "${{amount}} の出金を受け付けました",
-    "withdrawalSent": "${{amount}} の出金を送信しました"
+    "withdrawalSent": "${{amount}} の出金を送信しました",
+    "depositRejected": "${{amount}} の入金は反映されませんでした",
+    "withdrawalConfirmed": "${{amount}} の出金が完了しました",
+    "withdrawalReturned": "${{amount}} の出金が返金されました"
   },
   "agent": {
     "title": "エージェントセンター",

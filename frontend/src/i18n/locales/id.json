@@ -247,7 +247,7 @@
       "approved": "Disetujui",
       "sent": "Dikirim",
       "completed": "Selesai",
-      "rejected": "Ditolak"
+      "returned": "Dikembalikan"
     }
   },
   "table": {
@@ -477,7 +477,10 @@
     "promo": "{{text}}",
     "depositCredited": "Setoran ${{amount}} telah masuk",
     "withdrawalRequested": "Penarikan ${{amount}} telah diminta",
-    "withdrawalSent": "Penarikan ${{amount}} telah dikirim"
+    "withdrawalSent": "Penarikan ${{amount}} telah dikirim",
+    "depositRejected": "Setoran ${{amount}} tidak masuk",
+    "withdrawalConfirmed": "Penarikan ${{amount}} selesai",
+    "withdrawalReturned": "Penarikan ${{amount}} dikembalikan"
   },
   "agent": {
     "title": "Pusat Agen",

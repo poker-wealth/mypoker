@@ -42,12 +42,24 @@ export interface WalletTxn {
   state?: WithdrawalState;
 }
 
+/**
+ * Mirrors financial-core's WithdrawalState enum EXACTLY.
+ *
+ * It previously said `BROADCAST` and `REJECTED`; the service emits
+ * `BROADCASTING` and `ROLLED_BACK`. Nothing caught it because the only consumer
+ * rendered the string raw, so the wrong names merely displayed oddly — until
+ * something tried to look a state up in a map and got undefined.
+ *
+ * ROLLED_BACK is not only an ops refusal: a failed broadcast rolls back too. It
+ * means "the hold was released and the money is back in your balance", which is
+ * why the label for it is neutral rather than an accusation.
+ */
 export type WithdrawalState =
   | 'REQUESTED'
   | 'APPROVED'
-  | 'BROADCAST'
+  | 'BROADCASTING'
   | 'CONFIRMED'
-  | 'REJECTED';
+  | 'ROLLED_BACK';
 
 export interface Withdrawal {
   id: string;

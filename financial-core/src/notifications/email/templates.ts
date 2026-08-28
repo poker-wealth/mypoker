@@ -264,3 +264,109 @@ export function withdrawalSent(input: {
     text: plain(body),
   };
 }
+
+/**
+ * Money that arrived but will never be credited (spec §3.7: wrong contract).
+ *
+ * NOT a receipt — the one message here that is bad news. Someone sent real
+ * funds to a contract the platform does not accept, and the transaction id is
+ * what support needs to help them, so it is the most prominent row.
+ */
+export function depositRejected(input: {
+  amount: string;
+  txHash: string;
+  network: string;
+  at: Date;
+  locale?: Locale;
+}): EmailTemplate {
+  const m = MESSAGES[input.locale ?? DEFAULT_LOCALE];
+  const amount = formatAmount(input.amount);
+  const body = {
+    heading: m.depositRejected.heading,
+    amount: fill(m.depositRejected.amountLine, { amount }),
+    amountNote: m.depositRejected.note,
+    rows: [
+      { label: m.labels.amount, value: amount },
+      { label: m.labels.network, value: input.network },
+      { label: m.labels.transaction, value: input.txHash, wrap: true },
+      { label: m.labels.dateTime, value: input.at.toUTCString() },
+      { label: m.labels.status, value: m.status.notCredited },
+    ],
+    supportUrl: SUPPORT,
+    footer: m.footer,
+  };
+  return {
+    subject: fill(m.depositRejected.subject, { amount }),
+    html: layout(body),
+    text: plain(body),
+  };
+}
+
+/** Money out, step three — it is on-chain final. The end of the story. */
+export function withdrawalConfirmed(input: {
+  amount: string;
+  address: string;
+  txHash: string;
+  network: string;
+  at: Date;
+  locale?: Locale;
+}): EmailTemplate {
+  const m = MESSAGES[input.locale ?? DEFAULT_LOCALE];
+  const amount = formatAmount(input.amount);
+  const body = {
+    heading: m.withdrawalConfirmed.heading,
+    amount: fill(m.withdrawalConfirmed.amountLine, { amount }),
+    amountNote: m.withdrawalConfirmed.note,
+    rows: [
+      { label: m.labels.amount, value: amount },
+      { label: m.labels.toAddress, value: input.address, wrap: true },
+      { label: m.labels.network, value: input.network },
+      { label: m.labels.transaction, value: input.txHash, wrap: true },
+      { label: m.labels.sent, value: input.at.toUTCString() },
+      { label: m.labels.status, value: m.status.completed },
+    ],
+    supportUrl: SUPPORT,
+    footer: m.footer,
+  };
+  return {
+    subject: fill(m.withdrawalConfirmed.subject, { amount }),
+    html: layout(body),
+    text: plain(body),
+  };
+}
+
+/**
+ * A withdrawal that did not happen, and the money is back.
+ *
+ * Covers BOTH an operator refusing it and a broadcast that failed, because the
+ * player's position is identical either way: the payout did not occur and the
+ * balance is whole again. Stating a cause we cannot always know would be worse
+ * than stating the outcome we always do.
+ */
+export function withdrawalReturned(input: {
+  amount: string;
+  address: string;
+  at: Date;
+  locale?: Locale;
+}): EmailTemplate {
+  const m = MESSAGES[input.locale ?? DEFAULT_LOCALE];
+  const amount = formatAmount(input.amount);
+  const body = {
+    heading: m.withdrawalReturned.heading,
+    amount: fill(m.withdrawalReturned.amountLine, { amount }),
+    amountNote: m.withdrawalReturned.note,
+    rows: [
+      { label: m.labels.amount, value: amount },
+      { label: m.labels.toAddress, value: input.address, wrap: true },
+      { label: m.labels.dateTime, value: input.at.toUTCString() },
+      { label: m.labels.status, value: m.status.returned },
+    ],
+    supportUrl: SUPPORT,
+    footer: m.footer,
+  };
+  return {
+    subject: fill(m.withdrawalReturned.subject, { amount }),
+    html: layout(body),
+    text: plain(body),
+  };
+}

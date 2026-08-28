@@ -247,7 +247,7 @@
       "approved": "อนุมัติแล้ว",
       "sent": "ส่งแล้ว",
       "completed": "สำเร็จ",
-      "rejected": "ถูกปฏิเสธ"
+      "returned": "คืนเงินแล้ว"
     }
   },
   "table": {
@@ -477,7 +477,10 @@
     "promo": "{{text}}",
     "depositCredited": "เติมเงิน ${{amount}} เข้าบัญชีแล้ว",
     "withdrawalRequested": "ส่งคำขอถอน ${{amount}} แล้ว",
-    "withdrawalSent": "ส่งการถอน ${{amount}} แล้ว"
+    "withdrawalSent": "ส่งการถอน ${{amount}} แล้ว",
+    "depositRejected": "ไม่ได้เติมเงิน ${{amount}} เข้าบัญชี",
+    "withdrawalConfirmed": "ถอนเงิน ${{amount}} สำเร็จ",
+    "withdrawalReturned": "คืนเงินการถอน ${{amount}} แล้ว"
   },
   "agent": {
     "title": "ศูนย์ตัวแทน",

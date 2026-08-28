@@ -15,9 +15,7 @@ import { alertOps } from '../lib/alert';
 import { SecurityLogModel } from '../security/security-log.model';
 import { isOfficialContract, isConfirmed } from './trc20';
 import { networkLabel } from '../config/chain';
-import { announceDeposit } from '../notifications/email/money-mail';
-import { sendTelegram } from '../notifications/telegram/send-telegram';
-import { nonOfficialContract } from '../notifications/telegram/messages';
+import { announceDeposit, announceDepositRejected } from '../notifications/email/money-mail';
 
 /**
  * Deposit crediting (FairPlay §3.7). A confirmed on-chain USDT deposit is recorded as the
@@ -178,11 +176,16 @@ export async function processConfirmedDeposit(
     try {
       const account = await AccountModel.findById(event.playerAccountId).lean();
       if (account) {
-        await sendTelegram(
-          account.ownerId,
-          nonOfficialContract({ txHash: event.txHash }),
-          `deposit:${event.txHash}:rejected`,
-        );
+        // Through announce(), NOT sendTelegram directly. This used to reach only
+        // Telegram players, so an email or Google sign-up who sent to the wrong
+        // contract was told nothing — the spec says the player is notified, and
+        // that was true for half of them.
+        await announceDepositRejected({
+          playerId: account.ownerId,
+          amount: event.amount.toString(),
+          txHash: event.txHash,
+          network: networkLabel(),
+        });
       }
     } catch (err) {
       console.error(`[deposit] could not notify ${event.txHash} rejection:`, err);

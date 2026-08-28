@@ -247,7 +247,7 @@
       "approved": "Đã duyệt",
       "sent": "Đã gửi",
       "completed": "Hoàn tất",
-      "rejected": "Bị từ chối"
+      "returned": "Đã hoàn lại"
     }
   },
   "table": {
@@ -477,7 +477,10 @@
     "promo": "{{text}}",
     "depositCredited": "Đã ghi có khoản nạp ${{amount}}",
     "withdrawalRequested": "Đã yêu cầu rút ${{amount}}",
-    "withdrawalSent": "Đã gửi khoản rút ${{amount}}"
+    "withdrawalSent": "Đã gửi khoản rút ${{amount}}",
+    "depositRejected": "Khoản nạp ${{amount}} không được ghi có",
+    "withdrawalConfirmed": "Rút ${{amount}} đã hoàn tất",
+    "withdrawalReturned": "Khoản rút ${{amount}} đã hoàn lại"
   },
   "agent": {
     "title": "Trung tâm Đại lý",

@@ -247,7 +247,7 @@
       "approved": "승인됨",
       "sent": "전송됨",
       "completed": "완료됨",
-      "rejected": "거부됨"
+      "returned": "반환됨"
     }
   },
   "table": {
@@ -477,7 +477,10 @@
     "promo": "{{text}}",
     "depositCredited": "${{amount}} 입금이 반영되었습니다",
     "withdrawalRequested": "${{amount}} 출금이 요청되었습니다",
-    "withdrawalSent": "${{amount}} 출금이 전송되었습니다"
+    "withdrawalSent": "${{amount}} 출금이 전송되었습니다",
+    "depositRejected": "${{amount}} 입금이 반영되지 않았습니다",
+    "withdrawalConfirmed": "${{amount}} 출금이 완료되었습니다",
+    "withdrawalReturned": "${{amount}} 출금이 반환되었습니다"
   },
   "agent": {
     "title": "에이전트 센터",

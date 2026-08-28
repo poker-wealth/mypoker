@@ -31,16 +31,29 @@ import { toast } from '@/lib/toast';
  *
  * `warn` is the danger tone — Badge has no `danger`; see the frontend notes.
  */
-const WITHDRAWAL_STATE: Record<
-  WithdrawalState,
-  { key: string; tone: 'neutral' | 'accent' | 'success' | 'warn' }
-> = {
+type StateTone = 'neutral' | 'accent' | 'success' | 'warn';
+
+const WITHDRAWAL_STATE: Record<WithdrawalState, { key: string; tone: StateTone }> = {
   REQUESTED: { key: 'wallet.withdrawalState.pending', tone: 'neutral' },
   APPROVED: { key: 'wallet.withdrawalState.approved', tone: 'accent' },
-  BROADCAST: { key: 'wallet.withdrawalState.sent', tone: 'accent' },
+  BROADCASTING: { key: 'wallet.withdrawalState.sent', tone: 'accent' },
   CONFIRMED: { key: 'wallet.withdrawalState.completed', tone: 'success' },
-  REJECTED: { key: 'wallet.withdrawalState.rejected', tone: 'warn' },
+  // Covers an ops refusal AND a failed broadcast. Neutral wording on purpose:
+  // in both cases the money is simply back in the player's balance.
+  ROLLED_BACK: { key: 'wallet.withdrawalState.returned', tone: 'warn' },
 };
+
+/**
+ * Never throws on a state this build has not heard of.
+ *
+ * The type used to disagree with the service's enum, and a bare map lookup on
+ * an unknown state returns undefined — which took the whole wallet down on
+ * `.tone`. A new state added server-side must degrade to a plain label, not a
+ * white screen on the money page.
+ */
+function stateBadge(state: string): { key: string; tone: StateTone } | null {
+  return WITHDRAWAL_STATE[state as WithdrawalState] ?? null;
+}
 
 /** DEPOSIT/WITHDRAW/BET/WIN_PAYOUT/RAKE/JACKPOT_PAYOUT → a short readable label. */
 const TXN_LABEL: Record<string, string> = {
@@ -183,11 +196,10 @@ export function Wallet() {
                       <span className="text-sm font-semibold">{TXN_LABEL[tx.type] ?? tx.type}</span>
                       {/* Only in-flight rows carry a state; a settled entry
                           needs no qualifier and gets no badge. */}
-                      {tx.state && (
-                        <Badge tone={WITHDRAWAL_STATE[tx.state].tone}>
-                          {t(WITHDRAWAL_STATE[tx.state].key)}
-                        </Badge>
-                      )}
+                      {(() => {
+                        const badge = tx.state ? stateBadge(tx.state) : null;
+                        return badge ? <Badge tone={badge.tone}>{t(badge.key)}</Badge> : null;
+                      })()}
                     </div>
                     <div className="text-[0.66rem] text-dim">{new Date(tx.at).toLocaleString()}</div>
                   </div>
@@ -359,9 +371,12 @@ function TxnDetailContent({ txn }: { txn: WalletTxn }) {
             their money had gone when it had not left the platform. */}
         <DetailRow
           label={t('wallet.txnDetail.status')}
-          value={
-            txn.state ? t(WITHDRAWAL_STATE[txn.state].key) : t('wallet.txnDetail.completed')
-          }
+          value={(() => {
+            const badge = txn.state ? stateBadge(txn.state) : null;
+            // Unknown state → the raw value, which is honest, rather than
+            // "Completed", which would be a claim about someone's money.
+            return badge ? t(badge.key) : (txn.state ?? t('wallet.txnDetail.completed'));
+          })()}
         />
         <DetailRow label={t('wallet.txnDetail.dateTime')} value={new Date(txn.at).toLocaleString()} />
         {onChain && <DetailRow label={t('wallet.txnDetail.network')} value="TRON (TRC-20)" />}
@@ -556,9 +571,17 @@ function WithdrawSheet({
                     <div className="text-sm font-bold tabular-nums">${w.amount}</div>
                     <div className="text-[0.62rem] text-dim">{new Date(w.at).toLocaleString()}</div>
                   </div>
-                  <Badge tone={WITHDRAWAL_STATE[w.state].tone}>
-                    {t(WITHDRAWAL_STATE[w.state].key)}
-                  </Badge>
+                  {(() => {
+                    const badge = stateBadge(w.state);
+                    // Unknown state falls back to the raw value in a neutral
+                    // badge — odd-looking, but not a blank space where a
+                    // withdrawal's status should be.
+                    return badge ? (
+                      <Badge tone={badge.tone}>{t(badge.key)}</Badge>
+                    ) : (
+                      <Badge tone="neutral">{w.state}</Badge>
+                    );
+                  })()}
                 </div>
               ))}
             </div>
