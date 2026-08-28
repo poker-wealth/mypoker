@@ -70,7 +70,7 @@ export const MAX_HAND_MULTIPLIER = 6;
  * enough for the worst case a full table can present — every other seat staking the minimum, all
  * of them turning over Five Small.
  *
- * At six seats and a ₮100 stake that is ₮3,000, not the ₮1,000 the table opened with — which is
+ * At six seats and a $100 stake that is $3,000, not the $1,000 the table opened with — which is
  * why a second bettor used to be refused outright and the table looked broken.
  */
 export function bankerMinimumFor(seats: number, minStake: number): number {
@@ -375,7 +375,7 @@ export class NiuNiuRoom extends BaseLiveRoom<NiuNiuRoomConfig, RoomSeat> {
 
         let lastAction: string | undefined;
         if (s.isBanker) lastAction = 'BANKER';
-        else if (s.bet > 0) lastAction = `BET ₮${s.bet}`;
+        else if (s.bet > 0) lastAction = `BET $${s.bet}`;
 
         return {
           index: s.index,

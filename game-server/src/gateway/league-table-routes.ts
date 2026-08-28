@@ -33,7 +33,7 @@ import { LeagueRuleError, type LeagueSettingsState, type PlatformLeaguePolicy } 
  * `PlatformLeaguePolicy` comes from env, with the defaults below. The doc says a
  * league sets its rake "within platform min~max" and deliberately does not name
  * the numbers — they are platform policy, so they belong in config where policy
- * can change without a code change. Note the platform lobby's own 5% / ₮6-cap
+ * can change without a code change. Note the platform lobby's own 5% / $6-cap
  * rake is a DIFFERENT thing: league rake is a percentage inside a band, and the
  * doc gives league rake no cap at all.
  */

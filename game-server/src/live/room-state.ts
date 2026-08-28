@@ -41,7 +41,7 @@ export interface SeatSnapshot {
    * down at showdown), `null` for a face-down card, empty when they aren't in the hand.
    */
   cards: (string | null)[];
-  /** Their last action this street ("Call", "Raise ₮120"…), for the seat bubble. */
+  /** Their last action this street ("Call", "Raise $120"…), for the seat bubble. */
   lastAction?: string;
 }
 

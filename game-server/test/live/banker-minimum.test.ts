@@ -6,7 +6,7 @@ import { defaultTables } from '../../src/live/server';
  *
  * Niu Niu's exposure guard refuses a bet the banker cannot pay — that is the iron rule, because the
  * alternative is the platform quietly making up the shortfall. The guard was right; the TABLE was
- * wrong. Its minimum buy-in was ₮1,000 while a full table's worst case is ₮3,000, so a second
+ * wrong. Its minimum buy-in was $1,000 while a full table's worst case is $3,000, so a second
  * bettor was refused outright with "aggregate bets exceed banker stack capacity" and the game
  * looked broken to anyone who tried to play it.
  *
@@ -16,7 +16,7 @@ import { defaultTables } from '../../src/live/server';
  */
 describe('the Niu Niu banker minimum', () => {
   it('covers every other seat at the worst hand on the ladder', () => {
-    // Six seats, ₮100 minimum stake: five opponents × 100 × 6.
+    // Six seats, $100 minimum stake: five opponents × 100 × 6.
     expect(bankerMinimumFor(6, 100)).toBe(3_000);
   });
 

@@ -273,7 +273,7 @@ export class RedPacketRoom extends BaseLiveRoom<RedPacketRoomConfig, RoomSeat> {
 
         let lastAction: string | undefined;
         if (s.isBanker) lastAction = 'BANKER';
-        else if (s.bet > 0) lastAction = `CELL ${s.cell} (₮${s.bet})`;
+        else if (s.bet > 0) lastAction = `CELL ${s.cell} ($${s.bet})`;
 
         return {
           index: s.index,
