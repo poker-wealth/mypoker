@@ -628,5 +628,24 @@
     "errNoAccount": "Không tìm thấy tài khoản với email hoặc số điện thoại đó",
     "errWrongPassword": "Mật khẩu không đúng",
     "errUseGoogle": "Tài khoản này được tạo bằng Google — hãy dùng \"Tiếp tục với Google\""
+  },
+  "tableEntry": {
+    "title": "Poker Texas Hold'em",
+    "joinExisting": "Tham gia bàn",
+    "joinBlurb": "Ngồi vào bàn công khai đang mở.",
+    "createNew": "Tạo bàn",
+    "createBlurb": "Mở bàn của riêng bạn và mời bạn bè.",
+    "who": "Ai có thể tham gia?",
+    "public": "Công khai",
+    "publicBlurb": "Hiển thị trong sảnh — ai cũng có thể tham gia.",
+    "private": "Riêng tư",
+    "privateBlurb": "Chỉ theo lời mời — chỉ tham gia được qua liên kết bạn chia sẻ.",
+    "createCta": "Tạo bàn",
+    "ready": "Bàn của bạn đã sẵn sàng",
+    "shareBlurb": "Gửi liên kết này để mời bạn bè vào đúng bàn này.",
+    "copy": "Sao chép liên kết mời",
+    "copied": "Đã sao chép liên kết",
+    "enter": "Vào bàn",
+    "error": "Không thể tạo bàn. Vui lòng thử lại."
   }
 }

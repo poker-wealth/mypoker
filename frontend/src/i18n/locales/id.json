@@ -628,5 +628,24 @@
     "errNoAccount": "Tidak ada akun dengan email atau nomor telepon tersebut",
     "errWrongPassword": "Kata sandi salah",
     "errUseGoogle": "Akun ini dibuat dengan Google — gunakan \"Lanjutkan dengan Google\""
+  },
+  "tableEntry": {
+    "title": "Texas Hold'em",
+    "joinExisting": "Gabung meja",
+    "joinBlurb": "Duduk di meja publik yang terbuka.",
+    "createNew": "Buat meja",
+    "createBlurb": "Buka meja sendiri dan undang teman.",
+    "who": "Siapa yang bisa gabung?",
+    "public": "Publik",
+    "publicBlurb": "Tampil di lobi — siapa saja bisa gabung.",
+    "private": "Pribadi",
+    "privateBlurb": "Hanya undangan — hanya bisa gabung lewat tautan yang kamu bagikan.",
+    "createCta": "Buat meja",
+    "ready": "Meja kamu sudah siap",
+    "shareBlurb": "Kirim tautan ini untuk mengundang teman ke meja ini.",
+    "copy": "Salin tautan undangan",
+    "copied": "Tautan disalin",
+    "enter": "Masuk meja",
+    "error": "Tidak bisa membuat meja. Silakan coba lagi."
   }
 }

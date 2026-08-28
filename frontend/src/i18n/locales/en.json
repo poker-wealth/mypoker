@@ -628,5 +628,24 @@
     "errNoAccount": "No account found with that email or phone number",
     "errWrongPassword": "Incorrect password",
     "errUseGoogle": "This account was created with Google — use “Continue with Google”"
+  },
+  "tableEntry": {
+    "title": "Texas Hold'em",
+    "joinExisting": "Join a table",
+    "joinBlurb": "Take a seat at the open table.",
+    "createNew": "Create a table",
+    "createBlurb": "Open your own and invite friends.",
+    "who": "Who can join?",
+    "public": "Public",
+    "publicBlurb": "Listed in the lobby — anyone can join.",
+    "private": "Private",
+    "privateBlurb": "Invite-only — reachable only by the link you share.",
+    "createCta": "Create table",
+    "ready": "Your table is ready",
+    "shareBlurb": "Send this link to invite a friend to this exact table.",
+    "copy": "Copy invite link",
+    "copied": "Link copied",
+    "enter": "Enter table",
+    "error": "Couldn't open the table. Please try again."
   }
 }

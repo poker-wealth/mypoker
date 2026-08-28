@@ -6,6 +6,7 @@ import { motion } from 'motion/react';
 import { Segmented } from '@/components/ui/Segmented';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { GameTile } from '@/components/GameTile';
+import { TableEntrySheet } from '@/components/TableEntrySheet';
 import { visibleGames, type GameCategory, type GameDef } from '@/lib/games';
 import { useLobbyGames } from '@/api/hooks';
 import { formatMicros } from '@/api/lobby';
@@ -19,6 +20,9 @@ export function Games() {
   const { t } = useTranslation();
   const [cat, setCat] = useState<Filter>('all');
   const [q, setQ] = useState('');
+  // Hold'em taps open the join-or-create sheet instead of going straight to
+  // felt (owner-approved). Other games still navigate directly.
+  const [entryOpen, setEntryOpen] = useState(false);
 
   const lobby = useLobbyGames();
   // Null, not '$ 0.00', while the lobby is still answering — a zero jackpot is
@@ -125,7 +129,9 @@ export function Games() {
                   game={g}
                   tables={live.get(g.id)?.tables}
                   jackpot={live.get(g.id)?.jackpot}
-                  onClick={() => navigate(`/table/${g.id}`)}
+                  onClick={() =>
+                    g.id === 'texas' ? setEntryOpen(true) : navigate(`/table/${g.id}`)
+                  }
                 />
               ))}
             </div>
@@ -190,6 +196,8 @@ export function Games() {
           ))}
         </div>
       </section>
+
+      <TableEntrySheet open={entryOpen} onClose={() => setEntryOpen(false)} />
     </div>
   );
 }
