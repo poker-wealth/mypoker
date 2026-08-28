@@ -240,6 +240,14 @@
       "reference": "参照番号",
       "copyReference": "コピー",
       "referenceCopied": "コピーしました"
+    },
+    "txnNotFound": "その取引は最近の履歴に残っていません。",
+    "withdrawalState": {
+      "pending": "保留中",
+      "approved": "承認済み",
+      "sent": "送信済み",
+      "completed": "完了",
+      "returned": "返金済み"
     }
   },
   "table": {
@@ -469,7 +477,10 @@
     "promo": "{{text}}",
     "depositCredited": "${{amount}} の入金が反映されました",
     "withdrawalRequested": "${{amount}} の出金を受け付けました",
-    "withdrawalSent": "${{amount}} の出金を送信しました"
+    "withdrawalSent": "${{amount}} の出金を送信しました",
+    "depositRejected": "${{amount}} の入金は反映されませんでした",
+    "withdrawalConfirmed": "${{amount}} の出金が完了しました",
+    "withdrawalReturned": "${{amount}} の出金が返金されました"
   },
   "agent": {
     "title": "エージェントセンター",
@@ -613,6 +624,9 @@
     "passwordTooShort": "パスワードは8文字以上で入力してください",
     "signedOut": "ログアウトしました",
     "continueWithGoogle": "Google で続ける",
-    "or": "または"
+    "or": "または",
+    "errNoAccount": "そのメールアドレスまたは電話番号のアカウントが見つかりません",
+    "errWrongPassword": "パスワードが正しくありません",
+    "errUseGoogle": "このアカウントは Google で作成されています。「Google で続行」をご利用ください"
   }
 }

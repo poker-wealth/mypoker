@@ -240,6 +240,14 @@
       "reference": "参考编号",
       "copyReference": "复制",
       "referenceCopied": "已复制"
+    },
+    "txnNotFound": "该交易已不在您的近期记录中。",
+    "withdrawalState": {
+      "pending": "待处理",
+      "approved": "已批准",
+      "sent": "已发出",
+      "completed": "已完成",
+      "returned": "已退回"
     }
   },
   "table": {
@@ -469,7 +477,10 @@
     "promo": "{{text}}",
     "depositCredited": "充值 ${{amount}} 已到账",
     "withdrawalRequested": "已提交 ${{amount}} 提现申请",
-    "withdrawalSent": "提现 ${{amount}} 已发出"
+    "withdrawalSent": "提现 ${{amount}} 已发出",
+    "depositRejected": "充值 ${{amount}} 未到账",
+    "withdrawalConfirmed": "提现 ${{amount}} 已完成",
+    "withdrawalReturned": "提现 ${{amount}} 已退回"
   },
   "agent": {
     "title": "代理中心",
@@ -613,6 +624,9 @@
     "passwordTooShort": "密码至少需要 8 个字符",
     "signedOut": "您已退出登录",
     "continueWithGoogle": "使用 Google 继续",
-    "or": "或"
+    "or": "或",
+    "errNoAccount": "未找到使用该邮箱或手机号的账户",
+    "errWrongPassword": "密码错误",
+    "errUseGoogle": "该账户是通过 Google 创建的，请使用“使用 Google 继续”"
   }
 }

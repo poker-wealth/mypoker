@@ -147,14 +147,14 @@ describe('message bodies', () => {
 
   it('truncates rather than rounds the amount', () => {
     // A receipt must not claim a cent the ledger did not move.
-    expect(amount('20.999999')).toBe('₮20.99');
-    expect(amount('20')).toBe('₮20.00');
-    expect(amount('0.5')).toBe('₮0.50');
+    expect(amount('20.999999')).toBe('$20.99');
+    expect(amount('20')).toBe('$20.00');
+    expect(amount('0.5')).toBe('$0.50');
   });
 
   it('states the amount and that the funds are usable', () => {
     const body = depositReceived({ amount: '500.000000', txHash: 'abc' });
-    expect(body).toContain('₮500.00 received');
+    expect(body).toContain('$500.00 received');
     expect(body).toContain('abc');
   });
 

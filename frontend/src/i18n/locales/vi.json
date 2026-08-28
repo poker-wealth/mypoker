@@ -240,6 +240,14 @@
       "reference": "Tham chiếu",
       "copyReference": "Sao chép",
       "referenceCopied": "Đã sao chép"
+    },
+    "txnNotFound": "Giao dịch đó không còn trong hoạt động gần đây của bạn.",
+    "withdrawalState": {
+      "pending": "Đang chờ",
+      "approved": "Đã duyệt",
+      "sent": "Đã gửi",
+      "completed": "Hoàn tất",
+      "returned": "Đã hoàn lại"
     }
   },
   "table": {
@@ -469,7 +477,10 @@
     "promo": "{{text}}",
     "depositCredited": "Đã ghi có khoản nạp ${{amount}}",
     "withdrawalRequested": "Đã yêu cầu rút ${{amount}}",
-    "withdrawalSent": "Đã gửi khoản rút ${{amount}}"
+    "withdrawalSent": "Đã gửi khoản rút ${{amount}}",
+    "depositRejected": "Khoản nạp ${{amount}} không được ghi có",
+    "withdrawalConfirmed": "Rút ${{amount}} đã hoàn tất",
+    "withdrawalReturned": "Khoản rút ${{amount}} đã hoàn lại"
   },
   "agent": {
     "title": "Trung tâm Đại lý",
@@ -613,6 +624,9 @@
     "passwordTooShort": "Mật khẩu phải có ít nhất 8 ký tự",
     "signedOut": "Bạn đã đăng xuất",
     "continueWithGoogle": "Tiếp tục với Google",
-    "or": "hoặc"
+    "or": "hoặc",
+    "errNoAccount": "Không tìm thấy tài khoản với email hoặc số điện thoại đó",
+    "errWrongPassword": "Mật khẩu không đúng",
+    "errUseGoogle": "Tài khoản này được tạo bằng Google — hãy dùng \"Tiếp tục với Google\""
   }
 }

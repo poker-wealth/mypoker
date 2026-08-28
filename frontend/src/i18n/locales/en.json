@@ -240,6 +240,14 @@
       "reference": "Reference",
       "copyReference": "Copy",
       "referenceCopied": "Copied"
+    },
+    "txnNotFound": "That transaction is no longer in your recent activity.",
+    "withdrawalState": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "sent": "Sent",
+      "completed": "Completed",
+      "returned": "Returned"
     }
   },
   "table": {
@@ -469,7 +477,10 @@
     "promo": "{{text}}",
     "depositCredited": "Deposit of ${{amount}} credited",
     "withdrawalRequested": "Withdrawal of ${{amount}} requested",
-    "withdrawalSent": "Withdrawal of ${{amount}} sent"
+    "withdrawalSent": "Withdrawal of ${{amount}} sent",
+    "depositRejected": "Deposit of ${{amount}} was not credited",
+    "withdrawalConfirmed": "Withdrawal of ${{amount}} completed",
+    "withdrawalReturned": "Withdrawal of ${{amount}} returned"
   },
   "agent": {
     "title": "Agent Center",
@@ -613,6 +624,9 @@
     "passwordTooShort": "Password must be at least 8 characters",
     "signedOut": "You are signed out",
     "continueWithGoogle": "Continue with Google",
-    "or": "or"
+    "or": "or",
+    "errNoAccount": "No account found with that email or phone number",
+    "errWrongPassword": "Incorrect password",
+    "errUseGoogle": "This account was created with Google — use “Continue with Google”"
   }
 }

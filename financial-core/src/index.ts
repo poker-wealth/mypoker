@@ -4,8 +4,7 @@ import { loadConfig } from './config/env';
 import { connectDb, disconnectDb } from './db/connection';
 import { createApp } from './http/app';
 import { installTelegramAlertsFromEnv } from './lib/telegram-alert';
-import { setRecipientResolver } from './notifications/email/money-mail';
-import { gatewayRecipientResolver } from './notifications/email/gateway-recipient';
+import { installGatewayRecipientFromEnv } from './notifications/email/gateway-recipient';
 
 /**
  * FairPlay Financial Core — production entrypoint.
@@ -35,14 +34,10 @@ export async function startServer(): Promise<RunningServer> {
   // the money paths never have to know where an address comes from — they just
   // ask, and get null when there is none (every Telegram player, and any
   // deployment with no GATEWAY_URL configured).
-  if (process.env.GATEWAY_URL) {
-    setRecipientResolver(
-      gatewayRecipientResolver({
-        gatewayUrl: process.env.GATEWAY_URL,
-        internalSecret: config.INTERNAL_API_SECRET,
-      }),
-    );
-  }
+  const mailLive = installGatewayRecipientFromEnv(config.INTERNAL_API_SECRET);
+  console.log(
+    `[recipients] email lookup: ${mailLive ? 'gateway' : 'none (GATEWAY_URL unset — no deposit emails)'}`,
+  );
 
   const app = createApp();
   const server = await new Promise<Server>((resolve) => {

@@ -5,6 +5,7 @@ import { runWithdrawalWatcher } from '../withdrawal/withdrawal-watcher';
 import { runSweeper } from './sweep';
 import { tronGridSweepChain } from './sweep-chain';
 import { hotWalletKey } from '../config/chain';
+import { installGatewayRecipientFromEnv } from '../notifications/email/gateway-recipient';
 import {
   tronApiUrl,
   usdtContract,
@@ -32,6 +33,12 @@ async function main(): Promise<void> {
   console.log(`  RPC      ${tronApiUrl()}`);
   console.log(`  token    ${usdtContract()}`);
   console.log(`  confirms ${requiredConfirmations()}   poll ${depositPollMs()}ms`);
+
+  // The dyno that credits deposits is the dyno that must be able to email the
+  // receipt. This was wired only in src/index.ts (the web dyno), so on the
+  // deployed path every real deposit credited silently and mailed nobody.
+  const mailLive = installGatewayRecipientFromEnv(cfg.INTERNAL_API_SECRET);
+  console.log(`  email    ${mailLive ? 'gateway lookup on' : 'OFF (GATEWAY_URL unset)'}`);
 
   const deposits = runWatcher();
   // Same dyno also finalizes broadcast withdrawals (→ CONFIRMED) once they're on-chain-final.

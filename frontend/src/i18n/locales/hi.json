@@ -240,6 +240,14 @@
       "reference": "संदर्भ",
       "copyReference": "कॉपी करें",
       "referenceCopied": "कॉपी हो गया"
+    },
+    "txnNotFound": "वह ट्रांज़ैक्शन अब आपकी हाल की गतिविधि में नहीं है।",
+    "withdrawalState": {
+      "pending": "लंबित",
+      "approved": "स्वीकृत",
+      "sent": "भेजा गया",
+      "completed": "पूर्ण",
+      "returned": "वापस किया गया"
     }
   },
   "table": {
@@ -469,7 +477,10 @@
     "promo": "{{text}}",
     "depositCredited": "${{amount}} की जमा राशि जोड़ी गई",
     "withdrawalRequested": "${{amount}} की निकासी का अनुरोध किया गया",
-    "withdrawalSent": "${{amount}} की निकासी भेजी गई"
+    "withdrawalSent": "${{amount}} की निकासी भेजी गई",
+    "depositRejected": "${{amount}} की जमा राशि जोड़ी नहीं गई",
+    "withdrawalConfirmed": "${{amount}} की निकासी पूर्ण हुई",
+    "withdrawalReturned": "${{amount}} की निकासी वापस की गई"
   },
   "agent": {
     "title": "एजेंट सेंटर",
@@ -613,6 +624,9 @@
     "passwordTooShort": "पासवर्ड कम से कम 8 अक्षरों का होना चाहिए",
     "signedOut": "आप साइन आउट हो गए हैं",
     "continueWithGoogle": "Google से जारी रखें",
-    "or": "या"
+    "or": "या",
+    "errNoAccount": "उस ईमेल या फ़ोन नंबर से कोई खाता नहीं मिला",
+    "errWrongPassword": "गलत पासवर्ड",
+    "errUseGoogle": "यह खाता Google से बनाया गया था — \"Google के साथ जारी रखें\" का उपयोग करें"
   }
 }
