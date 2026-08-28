@@ -35,6 +35,11 @@ export interface WalletTxn {
   direction: 'DEBIT' | 'CREDIT';
   amount: string;
   businessId: string | null;
+  /**
+   * Lifecycle state, sent ONLY for a withdrawal that has not settled yet — it
+   * has no ledger entry until it confirms. Absent means the row is settled.
+   */
+  state?: WithdrawalState;
 }
 
 export type WithdrawalState =

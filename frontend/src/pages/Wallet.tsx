@@ -56,8 +56,6 @@ export function Wallet() {
   const { t } = useTranslation();
   const balance = useBalance();
   const txns = useTransactions();
-  // Also read by WithdrawSheet; react-query dedupes, so this is one request.
-  const withdrawals = useWithdrawals();
   // Deep link from the Me tab's DEPOSIT / WITHDRAW buttons, so those land on
   // the sheet they name rather than on the wallet's front page. Read once as
   // the initial state: re-reading would reopen the sheet every time the player
@@ -78,11 +76,6 @@ export function Wallet() {
   // Fires ONCE (the ref), so closing the sheet does not immediately reopen it
   // while the query string is still in the URL — the same reason `action=` is
   // read as initial state above rather than watched.
-  const detailWithdrawalState =
-    detailTxn?.type === 'WITHDRAW' && detailTxn.businessId
-      ? withdrawals.data?.withdrawals.find((w) => w.id === detailTxn.businessId)?.state
-      : undefined;
-
   const wantedTxn = params.get('txn');
   const deepLinkHandled = useRef(false);
   useEffect(() => {
@@ -186,7 +179,16 @@ export function Wallet() {
                   className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-surface-2 active:bg-surface-2"
                 >
                   <div>
-                    <div className="text-sm font-semibold">{TXN_LABEL[tx.type] ?? tx.type}</div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-semibold">{TXN_LABEL[tx.type] ?? tx.type}</span>
+                      {/* Only in-flight rows carry a state; a settled entry
+                          needs no qualifier and gets no badge. */}
+                      {tx.state && (
+                        <Badge tone={WITHDRAWAL_STATE[tx.state].tone}>
+                          {t(WITHDRAWAL_STATE[tx.state].key)}
+                        </Badge>
+                      )}
+                    </div>
                     <div className="text-[0.66rem] text-dim">{new Date(tx.at).toLocaleString()}</div>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -208,16 +210,7 @@ export function Wallet() {
         onClose={() => setWithdrawOpen(false)}
         available={balance.data?.available ?? '0'}
       />
-      <TxnDetailSheet
-        open={detailOpen}
-        txn={detailTxn}
-        // A withdrawal's ledger leg is written when it is REQUESTED, so the row
-        // exists long before the money leaves. Its real state comes from the
-        // withdrawal record; without it the detail claimed "Completed" for a
-        // payout still sitting in the admin queue.
-        {...(detailWithdrawalState ? { withdrawalState: detailWithdrawalState } : {})}
-        onClose={() => setDetailOpen(false)}
-      />
+      <TxnDetailSheet open={detailOpen} txn={detailTxn} onClose={() => setDetailOpen(false)} />
     </div>
   );
 }
@@ -306,12 +299,10 @@ const GAME_TXN_TYPES = ['BET', 'WIN_PAYOUT', 'RAKE', 'JACKPOT_PAYOUT'];
 function TxnDetailSheet({
   open,
   txn,
-  withdrawalState,
   onClose,
 }: {
   open: boolean;
   txn: WalletTxn | null;
-  withdrawalState?: WithdrawalState;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -319,23 +310,12 @@ function TxnDetailSheet({
     <Sheet open={open} onClose={onClose} title={t('wallet.txnDetail.title')}>
       {/* Rendered only when a txn is selected; the sheet keeps its last txn while
           it animates closed, so this stays populated through the exit. */}
-      {txn && (
-        <TxnDetailContent
-          txn={txn}
-          {...(withdrawalState ? { withdrawalState } : {})}
-        />
-      )}
+      {txn && <TxnDetailContent txn={txn} />}
     </Sheet>
   );
 }
 
-function TxnDetailContent({
-  txn,
-  withdrawalState,
-}: {
-  txn: WalletTxn;
-  withdrawalState?: WithdrawalState;
-}) {
+function TxnDetailContent({ txn }: { txn: WalletTxn }) {
   const { t } = useTranslation();
   const credit = txn.direction === 'CREDIT';
   const onChain = txn.type === 'DEPOSIT' || txn.type === 'WITHDRAW';
@@ -380,9 +360,7 @@ function TxnDetailContent({
         <DetailRow
           label={t('wallet.txnDetail.status')}
           value={
-            withdrawalState
-              ? t(WITHDRAWAL_STATE[withdrawalState].key)
-              : t('wallet.txnDetail.completed')
+            txn.state ? t(WITHDRAWAL_STATE[txn.state].key) : t('wallet.txnDetail.completed')
           }
         />
         <DetailRow label={t('wallet.txnDetail.dateTime')} value={new Date(txn.at).toLocaleString()} />
