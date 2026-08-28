@@ -15,6 +15,8 @@ import { currentRuleManifest, ruleVersionFor } from '../fairness/rule-version';
 import { ruleCommitment } from '../fairness/rule-commitment';
 import { mountLiveTables } from '../live/mount';
 import { buildLeagueTableRouter } from './league-table-routes';
+import { buildPlayerTableRouter } from './player-table-routes';
+import { runtimePublicTables } from '../live/runtime-tables';
 import { defaultTables } from '../live/server';
 import type { LobbyService } from '../lobby';
 
@@ -168,7 +170,13 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
      */
     if (lobby) {
       const resync = (): void =>
-        syncLobbyWithLiveTables(lobby, mounted.hub.tables(), liveTables);
+        // Include public player-created tables so the resync lists and keeps them
+        // (it removes any lobby row not in this identity list). Private ones are
+        // deliberately absent — hub-only, reachable by link.
+        syncLobbyWithLiveTables(lobby, mounted.hub.tables(), [
+          ...liveTables,
+          ...runtimePublicTables(),
+        ]);
       resync();
       setInterval(resync, 5_000).unref();
     }
@@ -179,6 +187,9 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
     // open a table would 500 rather than refuse.
     if (lobby) {
       app.use('/leagues', buildLeagueTableRouter(config, { hub: mounted.hub, lobby }));
+      // Any player can open a public/private table (owner-approved). Same deps —
+      // it needs the hub to open the room and the lobby to list a public one.
+      app.use('/tables', buildPlayerTableRouter(config, { hub: mounted.hub, lobby }));
     }
   }
 
