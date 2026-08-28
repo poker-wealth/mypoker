@@ -241,7 +241,14 @@
       "copyReference": "कॉपी करें",
       "referenceCopied": "कॉपी हो गया"
     },
-    "txnNotFound": "वह ट्रांज़ैक्शन अब आपकी हाल की गतिविधि में नहीं है।"
+    "txnNotFound": "वह ट्रांज़ैक्शन अब आपकी हाल की गतिविधि में नहीं है।",
+    "withdrawalState": {
+      "pending": "लंबित",
+      "approved": "स्वीकृत",
+      "sent": "भेजा गया",
+      "completed": "पूर्ण",
+      "rejected": "अस्वीकृत"
+    }
   },
   "table": {
     "fold": "फ़ोल्ड",

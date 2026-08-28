@@ -241,7 +241,14 @@
       "copyReference": "คัดลอก",
       "referenceCopied": "คัดลอกแล้ว"
     },
-    "txnNotFound": "ไม่พบธุรกรรมนี้ในรายการล่าสุดของคุณแล้ว"
+    "txnNotFound": "ไม่พบธุรกรรมนี้ในรายการล่าสุดของคุณแล้ว",
+    "withdrawalState": {
+      "pending": "รอดำเนินการ",
+      "approved": "อนุมัติแล้ว",
+      "sent": "ส่งแล้ว",
+      "completed": "สำเร็จ",
+      "rejected": "ถูกปฏิเสธ"
+    }
   },
   "table": {
     "fold": "หมอบ",

@@ -241,7 +241,14 @@
       "copyReference": "Salin",
       "referenceCopied": "Tersalin"
     },
-    "txnNotFound": "Transaksi itu sudah tidak ada di aktivitas terbaru Anda."
+    "txnNotFound": "Transaksi itu sudah tidak ada di aktivitas terbaru Anda.",
+    "withdrawalState": {
+      "pending": "Menunggu",
+      "approved": "Disetujui",
+      "sent": "Dikirim",
+      "completed": "Selesai",
+      "rejected": "Ditolak"
+    }
   },
   "table": {
     "fold": "Lipat",

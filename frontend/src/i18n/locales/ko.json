@@ -241,7 +241,14 @@
       "copyReference": "복사",
       "referenceCopied": "복사됨"
     },
-    "txnNotFound": "해당 거래는 최근 내역에 남아 있지 않습니다."
+    "txnNotFound": "해당 거래는 최근 내역에 남아 있지 않습니다.",
+    "withdrawalState": {
+      "pending": "대기 중",
+      "approved": "승인됨",
+      "sent": "전송됨",
+      "completed": "완료됨",
+      "rejected": "거부됨"
+    }
   },
   "table": {
     "fold": "폴드",

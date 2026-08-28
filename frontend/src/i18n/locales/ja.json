@@ -241,7 +241,14 @@
       "copyReference": "コピー",
       "referenceCopied": "コピーしました"
     },
-    "txnNotFound": "その取引は最近の履歴に残っていません。"
+    "txnNotFound": "その取引は最近の履歴に残っていません。",
+    "withdrawalState": {
+      "pending": "保留中",
+      "approved": "承認済み",
+      "sent": "送信済み",
+      "completed": "完了",
+      "rejected": "却下"
+    }
   },
   "table": {
     "fold": "フォールド",

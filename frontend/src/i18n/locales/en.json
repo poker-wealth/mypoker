@@ -241,7 +241,14 @@
       "copyReference": "Copy",
       "referenceCopied": "Copied"
     },
-    "txnNotFound": "That transaction is no longer in your recent activity."
+    "txnNotFound": "That transaction is no longer in your recent activity.",
+    "withdrawalState": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "sent": "Sent",
+      "completed": "Completed",
+      "rejected": "Rejected"
+    }
   },
   "table": {
     "fold": "Fold",

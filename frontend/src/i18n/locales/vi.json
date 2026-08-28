@@ -241,7 +241,14 @@
       "copyReference": "Sao chép",
       "referenceCopied": "Đã sao chép"
     },
-    "txnNotFound": "Giao dịch đó không còn trong hoạt động gần đây của bạn."
+    "txnNotFound": "Giao dịch đó không còn trong hoạt động gần đây của bạn.",
+    "withdrawalState": {
+      "pending": "Đang chờ",
+      "approved": "Đã duyệt",
+      "sent": "Đã gửi",
+      "completed": "Hoàn tất",
+      "rejected": "Bị từ chối"
+    }
   },
   "table": {
     "fold": "Bỏ bài",

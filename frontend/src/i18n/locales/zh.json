@@ -241,7 +241,14 @@
       "copyReference": "复制",
       "referenceCopied": "已复制"
     },
-    "txnNotFound": "该交易已不在您的近期记录中。"
+    "txnNotFound": "该交易已不在您的近期记录中。",
+    "withdrawalState": {
+      "pending": "待处理",
+      "approved": "已批准",
+      "sent": "已发出",
+      "completed": "已完成",
+      "rejected": "已拒绝"
+    }
   },
   "table": {
     "fold": "弃牌",
