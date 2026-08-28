@@ -1463,5 +1463,5 @@ export class PokerRoom implements LiveRoom {
 }
 
 function chips(amount: number): string {
-  return `₮${amount.toLocaleString('en-US')}`;
+  return `$${amount.toLocaleString('en-US')}`;
 }

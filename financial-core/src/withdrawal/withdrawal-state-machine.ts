@@ -22,6 +22,8 @@ import { networkLabel } from '../config/chain';
 import {
   announceWithdrawalRequested,
   announceWithdrawalSent,
+  announceWithdrawalConfirmed,
+  announceWithdrawalReturned,
 } from '../notifications/email/money-mail';
 
 /**
@@ -246,6 +248,24 @@ export async function confirmWithdrawal(withdrawalId: string): Promise<void> {
       throw new InvalidWithdrawalTransitionError(w.state, WithdrawalState.CONFIRMED);
     }
   });
+
+  // The end of the story. The BROADCAST message told the player "arrival
+  // depends on confirmations" and nothing ever followed it, so they had to go
+  // and check their own wallet to learn whether they had been paid.
+  //
+  // After the transaction, like every other announce here: a mail server having
+  // a bad afternoon must not undo a withdrawal that is already on-chain final.
+  const account = await AccountModel.findById(w.playerAccountId).lean();
+  if (account) {
+    await announceWithdrawalConfirmed({
+      playerId: account.ownerId,
+      withdrawalId,
+      amount: Money.fromDecimal128(w.amount).toString(),
+      address: w.address,
+      txHash: w.txHash ?? '',
+      network: networkLabel(),
+    });
+  }
 }
 
 /**
@@ -278,4 +298,22 @@ export async function rollbackWithdrawal(withdrawalId: string, reason: string): 
       throw new InvalidWithdrawalTransitionError(w.state, WithdrawalState.ROLLED_BACK);
     }
   });
+
+  // The player asked for their money, was told "you will get another email when
+  // it is sent" — and then, if it was refused or the send failed, was told
+  // nothing at all, ever. They were left waiting on an email that would never
+  // come, for money that was quietly already back in their balance.
+  //
+  // `reason` is deliberately NOT sent to the player: it carries the refusing
+  // administrator's id and internal failure text. What they need is the
+  // outcome, which is the same either way.
+  const account = await AccountModel.findById(w.playerAccountId).lean();
+  if (account) {
+    await announceWithdrawalReturned({
+      playerId: account.ownerId,
+      withdrawalId,
+      amount: Money.fromDecimal128(w.amount).toString(),
+      address: w.address,
+    });
+  }
 }

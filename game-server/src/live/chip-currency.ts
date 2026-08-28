@@ -4,7 +4,7 @@
  * The engine deals in integer "chips"; the Financial Core deals in USDT decimal strings. The v5.9
  * spec fixes the accounting unit at cents ("BIGINT, unit: cents"), so one chip is one cent:
  *
- *     1 chip = ₮0.01
+ *     1 chip = $0.01
  *
  * All arithmetic is exact (BigInt / string), never float — iron rule: no floating point on money.
  * This is the ONLY place the two units meet; the room, the games and the ledger each stay in their

@@ -40,6 +40,8 @@ export interface PlayerProfile {
   photoUrl: string | null;
   telegramId: number | null;
   vipTier: number;
+  /** 'ops' for a platform administrator; 'player' for everyone else. */
+  role: 'player' | 'ops';
 }
 
 /**
@@ -83,6 +85,9 @@ function profileFromTelegram(user: TelegramUser): PlayerProfile {
     photoUrl: user.photo_url ?? null,
     telegramId: user.id,
     vipTier: 0,
+    // Telegram sign-in never grants ops — admin authority comes only through the
+    // email/password path (a Telegram player can never become an administrator).
+    role: 'player',
   };
 }
 
@@ -187,23 +192,16 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
   const authClient: AuthUserStore = deps.users ?? userStore;
   const googleClient = new OAuth2Client();
 
-  /**
-   * Mint a session.
-   *
-   * THE ROLE COMES FROM THE STORED IDENTITY, and this is the only place an `ops`
-   * token is created anywhere in the platform. Before this, every sign-in path
-   * hardcoded `role: 'player'`, so `requireAdmin` — which demands `ops` — could
-   * never pass for anyone: the admin API was unreachable by every human alive.
-   *
-   * `role` is read off the document the store returned, never off the request.
-   * A client that could name its own role would grant itself the admin panel.
-   * Absent means player, matching `UserDoc.role`'s absent-means-player rule.
-   */
-  const issue = (
-    player: PlayerProfile,
-    role: 'player' | 'league_admin' | 'ops' = 'player',
-  ): { token: string; player: PlayerProfile } => ({
-    token: signToken({ playerId: player.playerId, role }, config.jwtSecret, config.jwtTtlSeconds),
+  // The token's role is the profile's role — so an admin who signs in with
+  // email/password gets an `ops` token, and everyone else a `player` one. This
+  // is the ONLY place `ops` enters a token, and only via the credential login
+  // below (signup and Google always resolve to a player profile).
+  const issue = (player: PlayerProfile): { token: string; player: PlayerProfile } => ({
+    token: signToken(
+      { playerId: player.playerId, role: player.role },
+      config.jwtSecret,
+      config.jwtTtlSeconds,
+    ),
     player,
   });
 
@@ -212,6 +210,7 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
     displayName?: string;
     email?: string;
     photoUrl?: string | null;
+    role?: 'ops';
   }): PlayerProfile => ({
     playerId: u.playerId,
     displayName: u.displayName || u.email?.split('@')[0] || 'Player',
@@ -219,6 +218,7 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
     photoUrl: u.photoUrl ?? null,
     telegramId: null,
     vipTier: 0,
+    role: u.role === 'ops' ? 'ops' : 'player',
   });
 
   // -- Email confirmation ---------------------------------------------------
@@ -439,7 +439,7 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
         return;
       }
 
-      res.json(issue(asProfile(identity), identity.role));
+      res.json(issue(asProfile(identity)));
     })().catch((err: unknown) => {
       console.error('[auth] verify-otp failed:', err);
       res.status(500).json({ error: 'internal error' });
@@ -498,7 +498,7 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
       const check = await authClient.verifyPassword(identifier, password);
 
       if (check.ok) {
-        res.json(issue(asProfile(check.identity), check.identity.role));
+        res.json(issue(asProfile(check.identity)));
         return;
       }
 
@@ -906,7 +906,7 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
         });
         return;
       }
-      res.json(issue(asProfile(u.identity), u.identity.role));
+      res.json(issue(asProfile(u.identity)));
     } catch (err) {
       console.error('[auth] Google authentication error:', err);
       res.status(401).json({ error: err instanceof Error ? err.message : 'Google authentication failed' });
@@ -968,6 +968,7 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
       photoUrl: null,
       telegramId: null,
       vipTier: 0,
+      role: 'player',
     };
     const token = signToken(
       { playerId: player.playerId, role: 'player' },
@@ -1006,8 +1007,14 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
         photoUrl: stored ? stored.photoUrl ?? null : null,
         telegramId: Number.isFinite(telegramId) ? telegramId : null,
         vipTier: 0,
+        // The role rides on the verified token; surfacing it lets the client
+        // decide whether to render the admin panel or the player app.
+        role: req.player!.role === 'ops' ? 'ops' : 'player',
         email,
         hasPassword: stored?.hasPassword ?? false,
+        // `SelfProfile`, not `PlayerProfile`: this is the one endpoint that tells
+        // a player about their own account, so it carries the two extra fields
+        // Personal Info needs. It still satisfies the narrower shape.
       } satisfies SelfProfile);
     } catch (err) {
       console.error('[auth] /me lookup failed:', err);

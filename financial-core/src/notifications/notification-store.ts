@@ -20,8 +20,15 @@ import { getSettings } from '../settings/player-settings';
 
 export type NotificationKind = 'RESULT' | 'DEPOSIT' | 'PROMO' | 'JACKPOT' | 'SYSTEM';
 
-/** Which Settings toggle governs each kind. SYSTEM is never suppressible. */
-const GOVERNED_BY: Record<NotificationKind, 'notifyResults' | 'notifyDeposits' | 'notifyPromos' | null> = {
+/**
+ * Which Settings toggle governs each kind. SYSTEM is never suppressible.
+ *
+ * Exported because the toggle governs the CHANNELS too, not just this table:
+ * money-mail's announce() reads it before sending on Telegram or by email. One
+ * table, consulted twice — a second literal `notifyDeposits` sitting next to a
+ * send call is the copy that eventually disagrees with this one.
+ */
+export const GOVERNED_BY: Record<NotificationKind, 'notifyResults' | 'notifyDeposits' | 'notifyPromos' | null> = {
   RESULT: 'notifyResults',
   DEPOSIT: 'notifyDeposits',
   PROMO: 'notifyPromos',

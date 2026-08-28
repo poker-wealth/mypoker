@@ -241,7 +241,7 @@ export class SanZhangRoom extends BaseLiveRoom<SanZhangRoomConfig, RoomSeat> {
 
         let lastAction: string | undefined;
         if (s.isBanker) lastAction = 'BANKER';
-        else if (s.bet > 0) lastAction = `BET ₮${s.bet}`;
+        else if (s.bet > 0) lastAction = `BET $${s.bet}`;
 
         return {
           index: s.index,

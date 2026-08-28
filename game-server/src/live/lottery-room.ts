@@ -229,7 +229,7 @@ export class LotteryRoom extends BaseLiveRoom<LotteryRoomConfig, RoomSeat> {
         }
 
         let lastAction: string | undefined;
-        if (s.bet > 0 && s.number !== undefined) lastAction = `#${s.number} (₮${s.bet})`;
+        if (s.bet > 0 && s.number !== undefined) lastAction = `#${s.number} ($${s.bet})`;
 
         return {
           index: s.index,

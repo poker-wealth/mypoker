@@ -249,7 +249,7 @@ export class CowboyBeautyRoom extends BaseLiveRoom<CowboyBeautyRoomConfig, RoomS
         }
 
         let lastAction: string | undefined;
-        if (s.bet > 0 && s.side) lastAction = `${s.side} ₮${s.bet}`;
+        if (s.bet > 0 && s.side) lastAction = `${s.side} $${s.bet}`;
 
         return {
           index: s.index,

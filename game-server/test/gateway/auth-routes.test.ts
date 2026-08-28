@@ -77,6 +77,9 @@ describe('POST /auth/telegram', () => {
       photoUrl: 'https://x/a.jpg',
       telegramId: 4242,
       vipTier: 0,
+      // Telegram sign-in is never an administrator — the profile now carries the
+      // role explicitly, and for a Mini App launch it is always 'player'.
+      role: 'player',
     });
     expect(typeof res.body.token).toBe('string');
   });
@@ -247,6 +250,12 @@ describe('GET /auth/me', () => {
     const serialized = JSON.stringify(res.body);
     expect(serialized).not.toContain(secretHash);
     expect(serialized).not.toContain('passwordHash');
+    // An EXHAUSTIVE match, deliberately. The two `not.toContain` checks above
+    // catch the hash by name and by value; this catches anything else the
+    // response starts carrying — which is how a field nobody meant to expose
+    // gets noticed. `role` is listed because /me genuinely returns it now (the
+    // client decides between the admin panel and the player app from it), not
+    // because the assertion was loosened to make a failure go away.
     expect(res.body).toEqual({
       playerId: 'player-abc123',
       displayName: 'Real Name',
@@ -254,6 +263,7 @@ describe('GET /auth/me', () => {
       photoUrl: null,
       telegramId: null,
       vipTier: 0,
+      role: 'player',
       email: 'ada@example.com',
       hasPassword: true,
     });

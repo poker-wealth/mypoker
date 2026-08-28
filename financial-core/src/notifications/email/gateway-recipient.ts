@@ -1,4 +1,4 @@
-import type { RecipientResolver } from './money-mail';
+import { setRecipientResolver, type RecipientResolver } from './money-mail';
 
 /**
  * Resolve a player's email address by asking the gateway.
@@ -50,4 +50,26 @@ export function gatewayRecipientResolver(opts: {
       clearTimeout(timer);
     }
   };
+}
+
+/**
+ * Install the gateway lookup from the environment. Returns whether it was.
+ *
+ * EVERY PROCESS THAT CREDITS MONEY MUST CALL THIS. It exists because the wiring
+ * used to live inline in src/index.ts, which meant the API had it and the
+ * deposit watcher did not — and the watcher is the only thing that credits a
+ * real on-chain deposit. Without a resolver installed, `resolveRecipient`
+ * returns null, sendEmail reports 'no_recipient', and that is indistinguishable
+ * from a Telegram player who legitimately has no mailbox: no error, no log, no
+ * row in email_sends. Every real deposit went uncredited by email and nothing
+ * anywhere said so.
+ *
+ * The caller logs the result. A money process that cannot email should say so
+ * at startup rather than be discovered by a player who never got a receipt.
+ */
+export function installGatewayRecipientFromEnv(internalSecret: string): boolean {
+  const gatewayUrl = process.env.GATEWAY_URL;
+  if (!gatewayUrl) return false;
+  setRecipientResolver(gatewayRecipientResolver({ gatewayUrl, internalSecret }));
+  return true;
 }

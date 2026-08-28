@@ -24,10 +24,21 @@ export function esc(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-/** ₮ and two decimals, truncated — never rounded up past what the ledger moved. */
+/**
+ * `$` and two decimals, truncated — never rounded up past what the ledger moved.
+ *
+ * `$` because that is the mark the app uses everywhere: all eight locale files
+ * write `${{amount}}`, and the frontend's `SYMBOL` is `$`. This said `₮` until
+ * now, so one deposit told the player `₮30.00` on Telegram and `$30.00` on the
+ * screen they opened next.
+ *
+ * NOTE: these bodies are still English-only, unlike the emails next door, which
+ * render from a per-locale catalog. Localising them is the same exercise and
+ * has not been done yet.
+ */
 export function amount(decimal: string): string {
   const [whole = '0', frac = ''] = decimal.split('.');
-  return `₮${whole}.${(frac + '00').slice(0, 2)}`;
+  return `$${whole}.${(frac + '00').slice(0, 2)}`;
 }
 
 export function depositReceived(input: { amount: string; txHash?: string | undefined }): string {
@@ -79,5 +90,33 @@ export function nonOfficialContract(input: { txHash: string }): string {
     `<code>${esc(input.txHash)}</code>`,
     '',
     'Contact support with this transaction id.',
+  ].join('\n');
+}
+
+/** Money out, step three — on-chain final. */
+export function withdrawalConfirmed(input: { amount: string; txHash: string }): string {
+  return [
+    `<b>${amount(input.amount)} arrived</b>`,
+    '',
+    'Your withdrawal is confirmed on the network.',
+    '',
+    `<code>${esc(input.txHash)}</code>`,
+  ].join('\n');
+}
+
+/**
+ * The withdrawal did not happen and the money is back.
+ *
+ * Covers an operator refusing it and a broadcast that failed alike: the
+ * player's position is the same either way, and naming a cause we cannot always
+ * know would be worse than stating the outcome we always can.
+ */
+export function withdrawalReturned(input: { amount: string }): string {
+  return [
+    `<b>${amount(input.amount)} returned</b>`,
+    '',
+    'This withdrawal did not go through. The amount is back in your balance.',
+    '',
+    'Contact support if you were expecting it to complete.',
   ].join('\n');
 }

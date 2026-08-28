@@ -228,7 +228,27 @@
     "saveAddress": "บันทึกที่อยู่",
     "changeAddress": "เปลี่ยน",
     "addressCooldownNote": "การถอนเงินจะส่งไปยังที่อยู่นี้เท่านั้น การเปลี่ยนแปลงจะเริ่มระยะรอ 48 ชั่วโมง",
-    "addressLocked": "การถอนไปยังที่อยู่นี้จะเปิด {{when}}"
+    "addressLocked": "การถอนไปยังที่อยู่นี้จะเปิด {{when}}",
+    "txnDetail": {
+      "title": "รายละเอียดธุรกรรม",
+      "status": "สถานะ",
+      "completed": "สำเร็จ",
+      "dateTime": "วันที่และเวลา",
+      "network": "เครือข่าย",
+      "txHash": "แฮชธุรกรรม",
+      "roundId": "รหัสรอบเกม",
+      "reference": "อ้างอิง",
+      "copyReference": "คัดลอก",
+      "referenceCopied": "คัดลอกแล้ว"
+    },
+    "txnNotFound": "ไม่พบธุรกรรมนี้ในรายการล่าสุดของคุณแล้ว",
+    "withdrawalState": {
+      "pending": "รอดำเนินการ",
+      "approved": "อนุมัติแล้ว",
+      "sent": "ส่งแล้ว",
+      "completed": "สำเร็จ",
+      "returned": "คืนเงินแล้ว"
+    }
   },
   "table": {
     "fold": "หมอบ",
@@ -460,7 +480,10 @@
     "promo": "{{text}}",
     "depositCredited": "เติมเงิน ${{amount}} เข้าบัญชีแล้ว",
     "withdrawalRequested": "ส่งคำขอถอน ${{amount}} แล้ว",
-    "withdrawalSent": "ส่งการถอน ${{amount}} แล้ว"
+    "withdrawalSent": "ส่งการถอน ${{amount}} แล้ว",
+    "depositRejected": "ไม่ได้เติมเงิน ${{amount}} เข้าบัญชี",
+    "withdrawalConfirmed": "ถอนเงิน ${{amount}} สำเร็จ",
+    "withdrawalReturned": "คืนเงินการถอน ${{amount}} แล้ว"
   },
   "agent": {
     "title": "ศูนย์ตัวแทน",
@@ -628,7 +651,10 @@
     "resetPasswordSubmit": "รีเซ็ตรหัสผ่าน",
     "resetting": "กำลังรีเซ็ต…",
     "resetPasswordSuccess": "รีเซ็ตรหัสผ่านแล้ว เข้าสู่ระบบด้วยรหัสผ่านใหม่ของคุณ",
-    "resetPasswordFailed": "ไม่สามารถรีเซ็ตรหัสผ่านได้ ลองอีกครั้ง"
+    "resetPasswordFailed": "ไม่สามารถรีเซ็ตรหัสผ่านได้ ลองอีกครั้ง",
+    "errNoAccount": "ไม่พบบัญชีที่ใช้อีเมลหรือหมายเลขโทรศัพท์นี้",
+    "errWrongPassword": "รหัสผ่านไม่ถูกต้อง",
+    "errUseGoogle": "บัญชีนี้สร้างด้วย Google โปรดใช้ \"ดำเนินการต่อด้วย Google\""
   },
   "personalInfo": {
     "saveDisplayName": "บันทึกชื่อ",

@@ -2,6 +2,7 @@ import { loadConfig } from '../src/config/env';
 import { connectDb, disconnectDb } from '../src/db/connection';
 import { runWatcher } from '../src/deposit/deposit-watcher';
 import { tronApiUrl, usdtContract, requiredConfirmations, depositPollMs } from '../src/config/chain';
+import { installGatewayRecipientFromEnv } from '../src/notifications/email/gateway-recipient';
 
 /**
  * Deposit watcher process. Connects to the same database as the Financial Core
@@ -17,6 +18,11 @@ async function main(): Promise<void> {
   console.log(`  RPC      ${tronApiUrl()}`);
   console.log(`  token    ${usdtContract()}`);
   console.log(`  confirms ${requiredConfirmations()}   poll ${depositPollMs()}ms`);
+
+  // This process credits real deposits, so it is the one that has to be able to
+  // email a receipt. Without this the send degrades to 'no_recipient' silently.
+  const mailLive = installGatewayRecipientFromEnv(cfg.INTERNAL_API_SECRET);
+  console.log(`  email    ${mailLive ? 'gateway lookup on' : 'OFF (GATEWAY_URL unset)'}`);
 
   const watcher = runWatcher();
 

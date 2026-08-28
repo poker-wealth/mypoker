@@ -7,6 +7,9 @@ import { creditDeposit } from '../../src/deposit/deposit-credit';
 import { requestWithdrawal } from '../../src/withdrawal/withdrawal-state-machine';
 import { setRecipientResolver } from '../../src/notifications/email/money-mail';
 import { EmailSendModel } from '../../src/notifications/email/send-email';
+import * as email from '../../src/notifications/email/send-email';
+import * as telegram from '../../src/notifications/telegram/send-telegram';
+import * as settings from '../../src/settings/player-settings';
 import { startTestDb, stopTestDb, clearCollections, ensureIndexes } from '../db-helper';
 
 /**
@@ -17,6 +20,20 @@ import { startTestDb, stopTestDb, clearCollections, ensureIndexes } from '../db-
  * roll back the movement they are reporting. A player's deposit must land even
  * if the mail server is on fire and the address lookup throws.
  */
+
+/**
+ * Pass-through spies, not stubs: the channels behave exactly as they would
+ * untouched, and these only record that they were reached at all. Whether a
+ * message is SUPPRESSED cannot be read off the database — sendEmail with no
+ * recipient and sendTelegram for a web account both write nothing and return a
+ * normal outcome, so "no row" is indistinguishable from "never called". The
+ * call itself is the only observable that separates them.
+ *
+ * `clearMocks` in jest.config.js resets the recorded calls before each test.
+ */
+const sendTelegramSpy = jest.spyOn(telegram, 'sendTelegram');
+const sendEmailSpy = jest.spyOn(email, 'sendEmail');
+const getSettingsSpy = jest.spyOn(settings, 'getSettings');
 
 beforeAll(async () => {
   await startTestDb();
@@ -29,6 +46,10 @@ afterEach(async () => {
   setRecipientResolver(() => Promise.resolve(null));
 });
 
+/**
+ * A player with no settings row, which is the ordinary case — most accounts
+ * never open Settings, and the defaults are what they are notified under.
+ */
 async function player(ownerId: string, balance = '0'): Promise<string> {
   const acc = await AccountModel.create({
     accountType: AccountType.PLAYER,
@@ -104,6 +125,59 @@ describe('deposits announce after the credit', () => {
     });
     expect(again.credited).toBe(false);
     expect(await NotificationModel.countDocuments({})).toBe(0);
+  });
+
+  it('reaches both channels for a player who has not muted deposits', async () => {
+    const accountId = await player('p-dep5');
+    await creditDeposit({
+      playerAccountId: accountId,
+      amount: Money.fromDecimalString('20'),
+      txHash: 'tx-dep-5',
+    });
+
+    // The control for the suppression test below. Without it, "was not called"
+    // would go green against code that never called these in the first place.
+    expect(sendTelegramSpy).toHaveBeenCalledWith('p-dep5', expect.any(String), 'deposit:tx-dep-5');
+    expect(sendEmailSpy).toHaveBeenCalledWith(null, expect.anything(), 'deposit:tx-dep-5');
+  });
+
+  it('reaches no channel at all for a player who muted deposits', async () => {
+    const accountId = await player('p-dep6');
+    await settings.updateSettings('p-dep6', { notifyDeposits: false });
+
+    const result = await creditDeposit({
+      playerAccountId: accountId,
+      amount: Money.fromDecimalString('20'),
+      txHash: 'tx-dep-6',
+    });
+
+    // The money still moves. A muted receipt is not a declined deposit.
+    expect(result.credited).toBe(true);
+    const acc = await AccountModel.findById(accountId).lean();
+    expect(Money.fromDecimal128(acc!.availableBalance).toString()).toBe('20.000000');
+
+    // Telegram and email are the assertions that carry this test. notify()
+    // has always suppressed the in-app row on its own, so checking only the
+    // notifications collection would pass with no gate on the channels at all.
+    expect(sendTelegramSpy).not.toHaveBeenCalled();
+    expect(sendEmailSpy).not.toHaveBeenCalled();
+    expect(await NotificationModel.countDocuments({ _id: 'deposit:tx-dep-6' })).toBe(0);
+  });
+
+  it('announces anyway when the preference cannot be read', async () => {
+    // Fails open: a settings lookup that throws must not be read as consent to
+    // say nothing about money that arrived.
+    getSettingsSpy.mockRejectedValueOnce(new Error('settings unreachable'));
+    const accountId = await player('p-dep7');
+
+    await creditDeposit({
+      playerAccountId: accountId,
+      amount: Money.fromDecimalString('20'),
+      txHash: 'tx-dep-7',
+    });
+
+    expect(sendTelegramSpy).toHaveBeenCalledWith('p-dep7', expect.any(String), 'deposit:tx-dep-7');
+    expect(sendEmailSpy).toHaveBeenCalledWith(null, expect.anything(), 'deposit:tx-dep-7');
   });
 });
 

@@ -228,7 +228,27 @@
     "saveAddress": "Save address",
     "changeAddress": "Change",
     "addressCooldownNote": "Withdrawals can only go to this address. Changing it starts a 48-hour hold before it can be used.",
-    "addressLocked": "Withdrawals to this address open {{when}}"
+    "addressLocked": "Withdrawals to this address open {{when}}",
+    "txnDetail": {
+      "title": "Transaction details",
+      "status": "Status",
+      "completed": "Completed",
+      "dateTime": "Date & time",
+      "network": "Network",
+      "txHash": "Transaction hash",
+      "roundId": "Round ID",
+      "reference": "Reference",
+      "copyReference": "Copy",
+      "referenceCopied": "Copied"
+    },
+    "txnNotFound": "That transaction is no longer in your recent activity.",
+    "withdrawalState": {
+      "pending": "Pending",
+      "approved": "Approved",
+      "sent": "Sent",
+      "completed": "Completed",
+      "returned": "Returned"
+    }
   },
   "table": {
     "fold": "Fold",
@@ -460,7 +480,10 @@
     "promo": "{{text}}",
     "depositCredited": "Deposit of ${{amount}} credited",
     "withdrawalRequested": "Withdrawal of ${{amount}} requested",
-    "withdrawalSent": "Withdrawal of ${{amount}} sent"
+    "withdrawalSent": "Withdrawal of ${{amount}} sent",
+    "depositRejected": "Deposit of ${{amount}} was not credited",
+    "withdrawalConfirmed": "Withdrawal of ${{amount}} completed",
+    "withdrawalReturned": "Withdrawal of ${{amount}} returned"
   },
   "agent": {
     "title": "Agent Center",
@@ -628,7 +651,10 @@
     "resetPasswordSubmit": "Reset password",
     "resetting": "Resetting…",
     "resetPasswordSuccess": "Password reset. Sign in with your new password.",
-    "resetPasswordFailed": "Could not reset your password. Try again."
+    "resetPasswordFailed": "Could not reset your password. Try again.",
+    "errNoAccount": "No account found with that email or phone number",
+    "errWrongPassword": "Incorrect password",
+    "errUseGoogle": "This account was created with Google — use “Continue with Google”"
   },
   "personalInfo": {
     "saveDisplayName": "Save name",

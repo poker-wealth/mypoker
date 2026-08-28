@@ -228,7 +228,27 @@
     "saveAddress": "पता सहेजें",
     "changeAddress": "बदलें",
     "addressCooldownNote": "निकासी केवल इसी पते पर जाएगी। इसे बदलने पर 48 घंटे की प्रतीक्षा शुरू होती है।",
-    "addressLocked": "इस पते पर निकासी {{when}} को खुलेगी"
+    "addressLocked": "इस पते पर निकासी {{when}} को खुलेगी",
+    "txnDetail": {
+      "title": "लेन-देन विवरण",
+      "status": "स्थिति",
+      "completed": "पूर्ण",
+      "dateTime": "दिनांक और समय",
+      "network": "नेटवर्क",
+      "txHash": "ट्रांज़ैक्शन हैश",
+      "roundId": "राउंड आईडी",
+      "reference": "संदर्भ",
+      "copyReference": "कॉपी करें",
+      "referenceCopied": "कॉपी हो गया"
+    },
+    "txnNotFound": "वह ट्रांज़ैक्शन अब आपकी हाल की गतिविधि में नहीं है।",
+    "withdrawalState": {
+      "pending": "लंबित",
+      "approved": "स्वीकृत",
+      "sent": "भेजा गया",
+      "completed": "पूर्ण",
+      "returned": "वापस किया गया"
+    }
   },
   "table": {
     "fold": "फ़ोल्ड",
@@ -460,7 +480,10 @@
     "promo": "{{text}}",
     "depositCredited": "${{amount}} की जमा राशि जोड़ी गई",
     "withdrawalRequested": "${{amount}} की निकासी का अनुरोध किया गया",
-    "withdrawalSent": "${{amount}} की निकासी भेजी गई"
+    "withdrawalSent": "${{amount}} की निकासी भेजी गई",
+    "depositRejected": "${{amount}} की जमा राशि जोड़ी नहीं गई",
+    "withdrawalConfirmed": "${{amount}} की निकासी पूर्ण हुई",
+    "withdrawalReturned": "${{amount}} की निकासी वापस की गई"
   },
   "agent": {
     "title": "एजेंट सेंटर",
@@ -628,7 +651,10 @@
     "resetPasswordSubmit": "पासवर्ड रीसेट करें",
     "resetting": "रीसेट हो रहा है…",
     "resetPasswordSuccess": "पासवर्ड रीसेट हो गया। अपने नए पासवर्ड से साइन इन करें।",
-    "resetPasswordFailed": "आपका पासवर्ड रीसेट नहीं हो सका। फिर से कोशिश करें।"
+    "resetPasswordFailed": "आपका पासवर्ड रीसेट नहीं हो सका। फिर से कोशिश करें।",
+    "errNoAccount": "उस ईमेल या फ़ोन नंबर से कोई खाता नहीं मिला",
+    "errWrongPassword": "गलत पासवर्ड",
+    "errUseGoogle": "यह खाता Google से बनाया गया था — \"Google के साथ जारी रखें\" का उपयोग करें"
   },
   "personalInfo": {
     "saveDisplayName": "नाम सहेजें",

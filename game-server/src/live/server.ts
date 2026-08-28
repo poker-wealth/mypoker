@@ -28,7 +28,7 @@ export interface TableServerConfig {
    *  `financialCore` is absent. */
   chipsFile?: string;
   /**
-   * When set, tables settle real money through the Financial Core ledger (1 chip = ₮0.01) instead
+   * When set, tables settle real money through the Financial Core ledger (1 chip = $0.01) instead
    * of the local play-chip bank. Absent → the DevPlayers/ChipBank play-money path, for local dev.
    */
   financialCore?: { baseUrl: string; internalSecret: string };
@@ -53,17 +53,17 @@ export interface TableServer {
 /**
  * The tables a fresh deployment opens — one per catalogued game.
  *
- * Stakes are in chips; 1 chip = ₮0.01 (v5.9 spec: amounts are integer cents). So the ₮0.10/0.20
- * table below has 10/20-chip blinds and a 2,000-chip (₮20) buy-in.
+ * Stakes are in chips; 1 chip = $0.01 (v5.9 spec: amounts are integer cents). So the $0.10/0.20
+ * table below has 10/20-chip blinds and a 2,000-chip ($20) buy-in.
  */
 export function defaultTables(): LiveTableConfig[] {
   return [
-    { ...DEFAULT_ROOM, id: 'texas', game: 'texas', name: "Hold'em · ₮0.10/0.20" },
+    { ...DEFAULT_ROOM, id: 'texas', game: 'texas', name: "Hold'em · $0.10/0.20" },
     {
       ...DEFAULT_ROOM,
       id: 'texas-high',
       game: 'texas',
-      name: "Hold'em · ₮0.50/1",
+      name: "Hold'em · $0.50/1",
       smallBlind: 50,
       bigBlind: 100,
       minBuyIn: 2_000,
@@ -73,12 +73,12 @@ export function defaultTables(): LiveTableConfig[] {
 
     // Poker variants — same PokerRoom, same real-money rail; a variant only changes the deck,
     // hole-card count and scoring (see games/texas/variants.ts).
-    { ...DEFAULT_ROOM, id: 'short-deck', game: 'short-deck', variantId: 'short-deck', name: 'Short Deck · ₮0.10/0.20' },
-    { ...DEFAULT_ROOM, id: 'omaha', game: 'omaha', variantId: 'omaha', name: 'Omaha · ₮0.10/0.20' },
+    { ...DEFAULT_ROOM, id: 'short-deck', game: 'short-deck', variantId: 'short-deck', name: 'Short Deck · $0.10/0.20' },
+    { ...DEFAULT_ROOM, id: 'omaha', game: 'omaha', variantId: 'omaha', name: 'Omaha · $0.10/0.20' },
     { id: 'baccarat', name: 'Baccarat · Player Banked', game: 'baccarat', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 8, rakeBps: 500, tiePayout: 8 },
     // The buy-in is DERIVED from the exposure rule, not picked: whoever holds the bank must be able
     // to cover every other seat staking the minimum and all of them turning over Five Small (6x).
-    // At ₮1,000 the guard refused the second bettor and the table looked broken.
+    // At $1,000 the guard refused the second bettor and the table looked broken.
     { id: 'niu-niu', name: 'Niu Niu · Player Banked', game: 'niu-niu', minBuyIn: bankerMinimumFor(6, 100), maxBuyIn: 50_000, maxSeats: 6, rakeBps: 500 },
     { id: 'san-zhang', name: 'San Zhang · Player Banked', game: 'san-zhang', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 6, rakeBps: 500 },
     { id: 'red-packet', name: 'Red Packet Minesweeper', game: 'red-packet', size: 25, mineCount: 5, minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 8, rakeBps: 500 },
@@ -180,7 +180,7 @@ export function startFromEnv(): TableServer {
     console.log(`  Open tables   ${defaultTables().map((t) => t.id).join(', ')}`);
     console.log(
       financialCore
-        ? `  Money         REAL — settling through the Financial Core at ${fcUrl} (1 chip = ₮0.01)`
+        ? `  Money         REAL — settling through the Financial Core at ${fcUrl} (1 chip = $0.01)`
         : `  Money         PLAY CHIPS — set FINANCIAL_CORE_URL + INTERNAL_API_SECRET for real money`,
     );
     console.log(`  Player ids come from the session token (JWT_SECRET must match the issuer)\n`);

@@ -228,7 +228,27 @@
     "saveAddress": "Lưu địa chỉ",
     "changeAddress": "Thay đổi",
     "addressCooldownNote": "Rút tiền chỉ đến địa chỉ này. Thay đổi sẽ bắt đầu thời gian chờ 48 giờ.",
-    "addressLocked": "Rút tiền đến địa chỉ này mở vào {{when}}"
+    "addressLocked": "Rút tiền đến địa chỉ này mở vào {{when}}",
+    "txnDetail": {
+      "title": "Chi tiết giao dịch",
+      "status": "Trạng thái",
+      "completed": "Hoàn tất",
+      "dateTime": "Ngày và giờ",
+      "network": "Mạng lưới",
+      "txHash": "Hash giao dịch",
+      "roundId": "Mã ván",
+      "reference": "Tham chiếu",
+      "copyReference": "Sao chép",
+      "referenceCopied": "Đã sao chép"
+    },
+    "txnNotFound": "Giao dịch đó không còn trong hoạt động gần đây của bạn.",
+    "withdrawalState": {
+      "pending": "Đang chờ",
+      "approved": "Đã duyệt",
+      "sent": "Đã gửi",
+      "completed": "Hoàn tất",
+      "returned": "Đã hoàn lại"
+    }
   },
   "table": {
     "fold": "Bỏ bài",
@@ -460,7 +480,10 @@
     "promo": "{{text}}",
     "depositCredited": "Đã ghi có khoản nạp ${{amount}}",
     "withdrawalRequested": "Đã yêu cầu rút ${{amount}}",
-    "withdrawalSent": "Đã gửi khoản rút ${{amount}}"
+    "withdrawalSent": "Đã gửi khoản rút ${{amount}}",
+    "depositRejected": "Khoản nạp ${{amount}} không được ghi có",
+    "withdrawalConfirmed": "Rút ${{amount}} đã hoàn tất",
+    "withdrawalReturned": "Khoản rút ${{amount}} đã hoàn lại"
   },
   "agent": {
     "title": "Trung tâm Đại lý",
@@ -628,7 +651,10 @@
     "resetPasswordSubmit": "Đặt lại mật khẩu",
     "resetting": "Đang đặt lại…",
     "resetPasswordSuccess": "Đã đặt lại mật khẩu. Hãy đăng nhập bằng mật khẩu mới.",
-    "resetPasswordFailed": "Không thể đặt lại mật khẩu. Vui lòng thử lại."
+    "resetPasswordFailed": "Không thể đặt lại mật khẩu. Vui lòng thử lại.",
+    "errNoAccount": "Không tìm thấy tài khoản với email hoặc số điện thoại đó",
+    "errWrongPassword": "Mật khẩu không đúng",
+    "errUseGoogle": "Tài khoản này được tạo bằng Google — hãy dùng \"Tiếp tục với Google\""
   },
   "personalInfo": {
     "saveDisplayName": "Lưu tên",

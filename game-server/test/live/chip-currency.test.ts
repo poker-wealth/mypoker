@@ -1,10 +1,10 @@
 import { chipsToUsdt, usdtToChips } from '../../src/live/chip-currency';
 
 /**
- * The unit boundary. 1 chip = 1 cent = ₮0.01 (v5.9 spec: amounts are integer cents). If this ever
+ * The unit boundary. 1 chip = 1 cent = $0.01 (v5.9 spec: amounts are integer cents). If this ever
  * drifts, every buy-in and settlement is silently mis-priced by a factor of 100 — so it is pinned.
  */
-describe('chip ↔ USDT (1 chip = ₮0.01)', () => {
+describe('chip ↔ USDT (1 chip = $0.01)', () => {
   it('converts chips to USDT decimals exactly', () => {
     expect(chipsToUsdt('2000')).toBe('20.00');
     expect(chipsToUsdt('5')).toBe('0.05');

@@ -261,7 +261,7 @@ export class BaccaratRoom extends BaseLiveRoom<BaccaratRoomConfig, RoomSeat> {
           isWinner: (s.net ?? 0) > 0,
           isYou: s.playerId === playerId,
           cards: [],
-          ...(s.betType ? { lastAction: `${s.betType.toUpperCase()} ₮${s.bet}` } : {}),
+          ...(s.betType ? { lastAction: `${s.betType.toUpperCase()} $${s.bet}` } : {}),
         };
       }),
       insurance: null,

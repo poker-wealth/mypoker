@@ -25,7 +25,7 @@ import type { TableSummary } from '../live/room-state';
  * clients already render as "OPEN" rather than as a prize. That is the whole point: the lobby is
  * now allowed to look empty, because it is.
  *
- * Expect the visible numbers to fall. The placeholder advertised a ₮3,265 grand jackpot and five
+ * Expect the visible numbers to fall. The placeholder advertised a $3,265 grand jackpot and five
  * Texas tables; the truth is one Texas table and pools that start at nothing. A smaller honest
  * lobby beats a large fictional one.
  */

@@ -21,55 +21,78 @@ import { AdminPlayers } from '@/pages/admin/Players';
 import { AdminAlerts } from '@/pages/admin/Alerts';
 import { AdminLeagues } from '@/pages/admin/Leagues';
 import { AdminWithdrawals } from '@/pages/admin/Withdrawals';
+import { AdminAdmins } from '@/pages/admin/Admins';
 // The styled admin dead-end (the "crash tab" fix) lives in route-fallbacks now; the withdrawals
 // stub that file also carries is unused here — the real review queue landed with league-funding.
 import { AdminRouteError } from '@/pages/admin/route-fallbacks';
+import { isAdminHost } from '@/lib/adminHost';
 
-export const router = createBrowserRouter([
-  {
-    path: '/',
-    element: <AppShell />,
-    children: [
-      // Lobby stays the landing route; Alliance is tab 1 but not the entry screen.
-      { index: true, element: <Lobby /> },
-      { path: 'alliance', element: <Alliance /> },
-      { path: 'games', element: <Games /> },
-      { path: 'data', element: <Data /> },
-      { path: 'profile', element: <Profile /> },
-      // Not a tab — reached from My Account's deposit/withdraw.
-      { path: 'wallet', element: <Wallet /> },
-      { path: 'settings', element: <Settings /> },
-      // Not a tab — reached from Profile's "Personal Info" row.
-      { path: 'personal', element: <PersonalInfo /> },
-      // Browser sign-in (email/password + Google); inside Telegram the Mini App
-      // signs in automatically and this screen is never routed to.
-      { path: 'login', element: <Login /> },
-      { path: 'fairness', element: <Fairness /> },
-      { path: 'jackpot', element: <Jackpot /> },
-      { path: 'vip', element: <Vip /> },
-      { path: 'notifications', element: <Notifications /> },
-      { path: 'agent', element: <AgentCenter /> },
-    ],
-  },
-  // Full-screen game table (no bottom nav / shell chrome).
-  // Admin. Its own shell, deliberately outside AppShell so it never appears in
-  // BottomNav — a player should not learn the panel exists from their own nav.
-  // The real gate is server-side: every /admin API answers 404 to non-ops.
-  {
-    path: '/admin',
-    element: <AdminShell />,
-    // Without this, any admin URL that fails to match — which for a while
-    // included a TAB — replaces the whole app with React Router's raw crash
-    // page: unstyled, stack-trace-shaped, and confirming to a curious player
-    // that something lives under /admin. A styled dead-end instead.
-    errorElement: <AdminRouteError />,
-    children: [
-      { index: true, element: <AdminOverview /> },
-      { path: 'withdrawals', element: <AdminWithdrawals /> },
-      { path: 'players', element: <AdminPlayers /> },
-      { path: 'leagues', element: <AdminLeagues /> },
-      { path: 'alerts', element: <AdminAlerts /> },
-    ],
-  },
-  { path: '/table/:id', element: <Table /> },
-]);
+// The panel's sections, mounted at whatever base the host uses (root on the admin
+// subdomain, /admin on the player host — see below).
+const adminChildren = [
+  { index: true, element: <AdminOverview /> },
+  { path: 'withdrawals', element: <AdminWithdrawals /> },
+  { path: 'users', element: <AdminPlayers /> },
+  { path: 'leagues', element: <AdminLeagues /> },
+  { path: 'alerts', element: <AdminAlerts /> },
+  { path: 'admins', element: <AdminAdmins /> },
+];
+
+/**
+ * Two shapes, chosen by host:
+ *
+ *   admin.mypoker777.com → the panel IS the site. It lives at the ROOT (no
+ *     /admin prefix, no redirect): `/` is Overview, `/withdrawals` etc. The
+ *     player app is not reachable here, which is the point.
+ *
+ *   mypoker777.com → the player app at the root, with the admin panel nested
+ *     under /admin (reached by URL, never linked from player navigation).
+ *
+ * AdminShell's own gate still decides who may see the panel on either host.
+ */
+export const router = isAdminHost()
+  ? createBrowserRouter([
+      {
+        path: '/',
+        element: <AdminShell />,
+        errorElement: <AdminRouteError />,
+        children: adminChildren,
+      },
+    ])
+  : createBrowserRouter([
+      {
+        path: '/',
+        element: <AppShell />,
+        children: [
+          // Lobby stays the landing route; Alliance is tab 1 but not the entry screen.
+          { index: true, element: <Lobby /> },
+          { path: 'alliance', element: <Alliance /> },
+          { path: 'games', element: <Games /> },
+          { path: 'data', element: <Data /> },
+          { path: 'profile', element: <Profile /> },
+          // Not a tab — reached from My Account's deposit/withdraw.
+          { path: 'wallet', element: <Wallet /> },
+          { path: 'settings', element: <Settings /> },
+          // Not a tab — reached from Profile's "Personal Info" row.
+          { path: 'personal', element: <PersonalInfo /> },
+          // Browser sign-in (email/password + Google); inside Telegram the Mini App
+          // signs in automatically and this screen is never routed to.
+          { path: 'login', element: <Login /> },
+          { path: 'fairness', element: <Fairness /> },
+          { path: 'jackpot', element: <Jackpot /> },
+          { path: 'vip', element: <Vip /> },
+          { path: 'notifications', element: <Notifications /> },
+          { path: 'agent', element: <AgentCenter /> },
+        ],
+      },
+      // Admin. Its own shell, deliberately outside AppShell so it never appears in
+      // BottomNav — a player should not learn the panel exists from their own nav.
+      // The real gate is server-side: every /admin API answers 404 to non-ops.
+      {
+        path: '/admin',
+        element: <AdminShell />,
+        errorElement: <AdminRouteError />,
+        children: adminChildren,
+      },
+      { path: '/table/:id', element: <Table /> },
+    ]);

@@ -228,7 +228,27 @@
     "saveAddress": "アドレスを保存",
     "changeAddress": "変更",
     "addressCooldownNote": "出金はこのアドレスにのみ送られます。変更すると48時間の保留期間が始まります。",
-    "addressLocked": "このアドレスへの出金は {{when}} に開始されます"
+    "addressLocked": "このアドレスへの出金は {{when}} に開始されます",
+    "txnDetail": {
+      "title": "取引の詳細",
+      "status": "ステータス",
+      "completed": "完了",
+      "dateTime": "日時",
+      "network": "ネットワーク",
+      "txHash": "トランザクションハッシュ",
+      "roundId": "ラウンドID",
+      "reference": "参照番号",
+      "copyReference": "コピー",
+      "referenceCopied": "コピーしました"
+    },
+    "txnNotFound": "その取引は最近の履歴に残っていません。",
+    "withdrawalState": {
+      "pending": "保留中",
+      "approved": "承認済み",
+      "sent": "送信済み",
+      "completed": "完了",
+      "returned": "返金済み"
+    }
   },
   "table": {
     "fold": "フォールド",
@@ -460,7 +480,10 @@
     "promo": "{{text}}",
     "depositCredited": "${{amount}} の入金が反映されました",
     "withdrawalRequested": "${{amount}} の出金を受け付けました",
-    "withdrawalSent": "${{amount}} の出金を送信しました"
+    "withdrawalSent": "${{amount}} の出金を送信しました",
+    "depositRejected": "${{amount}} の入金は反映されませんでした",
+    "withdrawalConfirmed": "${{amount}} の出金が完了しました",
+    "withdrawalReturned": "${{amount}} の出金が返金されました"
   },
   "agent": {
     "title": "エージェントセンター",
@@ -628,7 +651,10 @@
     "resetPasswordSubmit": "パスワードを再設定",
     "resetting": "再設定中…",
     "resetPasswordSuccess": "パスワードを再設定しました。新しいパスワードでログインしてください。",
-    "resetPasswordFailed": "パスワードを再設定できませんでした。もう一度お試しください。"
+    "resetPasswordFailed": "パスワードを再設定できませんでした。もう一度お試しください。",
+    "errNoAccount": "そのメールアドレスまたは電話番号のアカウントが見つかりません",
+    "errWrongPassword": "パスワードが正しくありません",
+    "errUseGoogle": "このアカウントは Google で作成されています。「Google で続行」をご利用ください"
   },
   "personalInfo": {
     "saveDisplayName": "名前を保存",

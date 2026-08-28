@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Banknote, ShieldAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Sheet } from '@/components/ui/Sheet';
+import { Modal } from '@/components/ui/Modal';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -171,9 +171,9 @@ function ReviewSheet({
   withdrawal: QueuedWithdrawal | null;
   onClose: () => void;
 }) {
-  const { approve, reject } = useWithdrawalActions();
+  const { approve, reject, send } = useWithdrawalActions();
   const { confirm, prompt, sheet: confirmSheet } = useConfirmSheet();
-  const busy = approve.isPending || reject.isPending;
+  const busy = approve.isPending || reject.isPending || send.isPending;
   if (!withdrawal) return null;
 
   const isLarge = Number(withdrawal.amount) > SECOND_APPROVAL_THRESHOLD;
@@ -219,10 +219,38 @@ function ReviewSheet({
     });
   };
 
+  const onSend = async (): Promise<void> => {
+    // The button that actually pushes money onto the chain — so it asks first,
+    // with the amount and destination in front of the reviewer.
+    const ok = await confirm({
+      title: 'Send on-chain',
+      confirmLabel: 'Broadcast now',
+      danger: true,
+      body: (
+        <>
+          Broadcast <strong className="text-text">{moneyFromDecimal(withdrawal.amount)}</strong> to{' '}
+          <span className="break-all font-mono">{withdrawal.address}</span>?
+          <br />
+          <br />
+          This signs and sends the USDT transfer from the hot wallet. It cannot be recalled.
+        </>
+      ),
+    });
+    if (!ok) return;
+
+    send.mutate(withdrawal.withdrawalId, {
+      onSuccess: (res) => {
+        toast.success(`Broadcast — tx ${res.txHash.slice(0, 10)}…. The watcher will confirm it.`);
+        onClose();
+      },
+      onError: (e) => toast.error(e instanceof Error ? e.message : 'Send failed'),
+    });
+  };
+
   return (
     <>
-    <Sheet open onClose={onClose} title="Review withdrawal">
-      <div className="space-y-3 py-1">
+    <Modal open onClose={onClose} title="Review withdrawal">
+      <div className="space-y-3">
         <div>
           <div className="text-2xl font-black tabular-nums">
             {moneyFromDecimal(withdrawal.amount)}
@@ -301,13 +329,18 @@ function ReviewSheet({
         )}
 
         {withdrawal.state === 'APPROVED' && (
-          <p className="text-[0.66rem] leading-relaxed text-dim">
-            Funds are held in clearing and no longer spendable. Broadcasting to the chain is a
-            separate step and is not done from here.
-          </p>
+          <div className="space-y-2">
+            <p className="text-[0.66rem] leading-relaxed text-dim">
+              Funds are held in clearing and no longer spendable. Broadcast the USDT transfer from
+              the hot wallet to send it on-chain — the watcher then confirms it and writes the ledger.
+            </p>
+            <Button full disabled={busy} onClick={() => void onSend()}>
+              Send on-chain
+            </Button>
+          </div>
         )}
       </div>
-    </Sheet>
+    </Modal>
     {confirmSheet}
     </>
   );

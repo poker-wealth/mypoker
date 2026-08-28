@@ -100,6 +100,21 @@ export interface AdminPlayerDetail {
 export const searchPlayers = (q: string): Promise<PlayerSearchResult> =>
   api.get<PlayerSearchResult>(`/admin/players?q=${encodeURIComponent(q)}`);
 
+/** One row of the full Users list. `balance` is always a string (the player has an account). */
+export interface AdminUserRow {
+  playerId: string;
+  displayName: string | null;
+  email: string | null;
+  balance: string;
+  available: string;
+  joinedAt: string;
+}
+
+export const fetchUsers = (limit?: number): Promise<{ users: AdminUserRow[]; truncated: boolean }> =>
+  api.get<{ users: AdminUserRow[]; truncated: boolean }>(
+    `/admin/users${limit ? `?limit=${limit}` : ''}`,
+  );
+
 export const fetchPlayerDetail = (playerId: string): Promise<AdminPlayerDetail> =>
   api.get<AdminPlayerDetail>(`/admin/players/${encodeURIComponent(playerId)}`);
 
@@ -214,6 +229,35 @@ export interface LeagueOverviewRow {
 export const fetchAdminLeagues = (): Promise<{ leagues: LeagueOverviewRow[] }> =>
   api.get<{ leagues: LeagueOverviewRow[] }>('/admin/leagues');
 
+export interface LeagueMemberDetail {
+  playerId: string;
+  role: string;
+  joinedAt: string;
+  displayName: string | null;
+  email: string | null;
+}
+
+/** One league in full — for the admin drill-into-a-club view. */
+export interface LeagueDetail {
+  leagueId: string;
+  name: string;
+  ownerId: string;
+  memberCount: number;
+  inviteOnly: boolean;
+  inventory: string;
+  rake: string;
+  insurance: string;
+  createdAt: string;
+  description: string | null;
+  settings: { rakeBps: number; tableHours: number; buyIn: number; spectatorsAllowed: boolean } | null;
+  pendingRakeChange: { rakeBps: number; effectiveAt: string } | null;
+  owner: { playerId: string; displayName: string | null; email: string | null };
+  members: LeagueMemberDetail[];
+}
+
+export const fetchLeagueDetail = (leagueId: string): Promise<LeagueDetail> =>
+  api.get<LeagueDetail>(`/admin/leagues/${encodeURIComponent(leagueId)}`);
+
 export type LeagueFundingKind = 'TOPUP' | 'CASHOUT';
 export type LeagueFundingState = 'REQUESTED' | 'APPROVED' | 'EXECUTED' | 'REJECTED';
 
@@ -292,3 +336,35 @@ export const approveWithdrawal = (id: string): Promise<WithdrawalApproval> =>
 
 export const rejectWithdrawal = (id: string, reason: string): Promise<{ state: string }> =>
   api.post<{ state: string }>(`/admin/withdrawals/${encodeURIComponent(id)}/reject`, { reason });
+
+/**
+ * Take an APPROVED withdrawal on-chain: sign + broadcast the USDT transfer from
+ * the hot wallet, moving it to BROADCASTING with a real tx hash. On any failure
+ * the withdrawal rolls back (the clearing hold is released), so a failed send
+ * never strands the player's money.
+ */
+export const sendWithdrawal = (id: string): Promise<{ state: string; txHash: string }> =>
+  api.post<{ state: string; txHash: string }>(
+    `/admin/withdrawals/${encodeURIComponent(id)}/send`,
+    {},
+  );
+
+// ── Admins ───────────────────────────────────────────────────────────────────
+
+/** A platform administrator, as the Admins screen lists them. */
+export interface AdminAccount {
+  playerId: string;
+  email?: string;
+  displayName?: string;
+  createdAt: string;
+}
+
+export const fetchAdmins = (): Promise<{ admins: AdminAccount[] }> =>
+  api.get<{ admins: AdminAccount[] }>('/admin/admins');
+
+export const createAdmin = (body: {
+  email: string;
+  password: string;
+  displayName?: string;
+}): Promise<{ admin: AdminAccount }> =>
+  api.post<{ admin: AdminAccount }>('/admin/admins', body);

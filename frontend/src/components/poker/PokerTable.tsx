@@ -31,8 +31,11 @@ export function PokerTable({ state, onSit, onChallenge, design: override }: Poke
   const [failed, setFailed] = useState<string | null>(null);
   const useArt = Boolean(design.artUrl) && failed !== design.artUrl;
 
+  // Mobile keeps the 440px felt; desktop scales it up so the table fills the
+  // screen instead of sitting as a small oval in a sea of empty space. The felt
+  // is aspect-ratio + %-positioned, so the whole table (seats) scales together.
   return (
-    <div className="relative mx-auto flex w-full max-w-[440px] items-center justify-center px-5">
+    <div className="relative mx-auto flex w-full max-w-[440px] items-center justify-center px-5 md:max-w-[620px] lg:max-w-[780px]">
       <div className="relative w-full" style={{ aspectRatio: design.aspect }}>
 
         {/* Embedded HTML5 Canvas Element for inspection */}

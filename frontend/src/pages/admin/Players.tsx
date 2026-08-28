@@ -1,142 +1,188 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Search, Users, Lock } from 'lucide-react';
-import { Sheet } from '@/components/ui/Sheet';
+import { Search, Users, Lock, ChevronRight } from 'lucide-react';
+import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { UserEditor } from './UserEditor';
-import { usePlayerSearch, usePlayerDetail } from '@/api/hooks';
+import { usePlayerSearch, usePlayerDetail, useUsers } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
 import { moneyFromDecimal, money } from '@/lib/money';
 import { useDebounced } from '@/lib/useDebounced';
 
 /**
- * Admin — Players.
+ * Admin — Users.
  *
- * Identity IS editable here (see `UserEditor`); BALANCE is not, and that is
- * enforced by there being nothing to write with: no endpoint, no mutation hook,
- * no form. The spec's acceptance criteria are explicit — "DBA direct balance
- * update attempt → MongoDB RBAC rejects" — and the way that survives a future
- * refactor is for the write path not to exist rather than for it to be hidden.
+ * The full list of players by default, in a table, each row opening a detail.
+ * A search box narrows it (by id, nickname, email or phone) — and search is the
+ * only way to reach a Telegram player who has never touched money, since they
+ * have neither an identity document nor a financial account to list.
  *
- * An admin who needs to move a player's money uses the withdrawal and
- * settlement paths, which are audited, idempotent and double-entry.
+ * IDENTITY is editable here (see `UserEditor`). BALANCE is not, and that is
+ * structural rather than hidden: there is no endpoint, hook or form that writes
+ * one. The spec's acceptance criteria are explicit — "DBA direct balance update
+ * attempt → MongoDB RBAC rejects" — and the way that survives a future refactor
+ * is for the write path not to exist. Money moves through the audited
+ * withdrawal and settlement paths.
  */
+
+/** One table row, normalised from either the full list or a search result. */
+interface UserRow {
+  playerId: string;
+  displayName: string | null;
+  email: string | null;
+  /** null only for a search hit with no financial account. */
+  balance: string | null;
+  joinedAt?: string;
+}
+
 export function AdminPlayers() {
   const { t } = useTranslation();
   const [q, setQ] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
   // Debounced so a search runs on a typed word, not on every keystroke.
   const debounced = useDebounced(q, 300);
-  const results = usePlayerSearch(debounced);
+  const searching = debounced.trim().length >= 2;
+
+  const search = usePlayerSearch(debounced);
+  const users = useUsers(!searching); // full list only when not actively searching
+
+  const active = searching ? search : users;
+  const rows: UserRow[] = searching
+    ? (search.data?.players ?? []).map((p) => ({
+        playerId: p.playerId,
+        displayName: p.displayName,
+        email: p.email,
+        balance: p.balance,
+      }))
+    : (users.data?.users ?? []).map((u) => ({
+        playerId: u.playerId,
+        displayName: u.displayName,
+        email: u.email,
+        balance: u.balance,
+        joinedAt: u.joinedAt,
+      }));
+
+  const balancesUnavailable = searching ? search.data?.balancesUnavailable : false;
+  const truncated = searching ? search.data?.truncated : users.data?.truncated;
 
   return (
     <div className="space-y-4">
+      <header className="flex items-end justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-black">Users</h1>
+          <p className="mt-0.5 text-xs text-dim">
+            {searching ? 'Search results' : 'Every player, newest first'}
+          </p>
+        </div>
+        {!searching && users.isSuccess && (
+          <span className="text-xs text-dim">
+            {rows.length}
+            {truncated ? '+' : ''} {rows.length === 1 ? 'user' : 'users'}
+          </span>
+        )}
+      </header>
+
       <div className="flex items-center gap-2 rounded-(--radius-app) border border-border bg-surface px-3.5 py-2.5">
         <Search size={17} className="shrink-0 text-dim" />
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Player id, nickname, email or phone"
+          placeholder="Search by player id, nickname, email or phone"
           spellCheck={false}
           className="w-full bg-transparent text-sm text-text placeholder:text-dim focus:outline-none"
         />
       </div>
 
-      {q.trim().length < 2 && (
+      {/* A search-only note: how to reach Telegram players who don't list. */}
+      {searching && search.data?.note && (
+        <p className="rounded-lg bg-surface-2 px-3 py-2 text-[0.66rem] leading-relaxed text-dim">
+          {search.data.note}
+        </p>
+      )}
+
+      {active.isPending ? (
+        <div className="space-y-2">
+          {[0, 1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-12 w-full rounded-(--radius-app)" />
+          ))}
+        </div>
+      ) : active.isError ? (
+        <div className="rounded-(--radius-app) border border-border bg-surface">
+          <ErrorState message={t(errorKey(active.error))} onRetry={() => void active.refetch()} />
+        </div>
+      ) : rows.length === 0 ? (
         <div className="rounded-(--radius-app) border border-border bg-surface">
           <EmptyState
             icon={Users}
-            title="Search for a player"
-            description="By player id, nickname, email or phone. At least two characters."
+            title={searching ? 'No match' : 'No users yet'}
+            description={
+              searching
+                ? 'No player matched. Telegram players are findable by exact player id.'
+                : 'Players appear here the first time they deposit or play.'
+            }
           />
         </div>
-      )}
-
-      {results.isPending && debounced.trim().length >= 2 && (
-        <div className="space-y-2">
-          {[0, 1, 2].map((i) => (
-            <Skeleton key={i} className="h-14 w-full rounded-(--radius-app)" />
-          ))}
-        </div>
-      )}
-
-      {results.isError && (
-        <div className="rounded-(--radius-app) border border-border bg-surface">
-          <ErrorState
-            message={t(errorKey(results.error))}
-            onRetry={() => void results.refetch()}
-          />
-        </div>
-      )}
-
-      {results.isSuccess && (
-        <>
-          {/*
-            The note explains an empty or partial result rather than leaving the
-            admin to guess. "No match" and "not searchable that way" are
-            different answers, and Telegram players are only the second.
-          */}
-          {results.data.note && (
-            <p className="rounded-lg bg-surface-2 px-3 py-2 text-[0.66rem] leading-relaxed text-dim">
-              {results.data.note}
-            </p>
-          )}
-
-          {results.data.players.length > 0 && (
-            <ul className="divide-y divide-border overflow-hidden rounded-(--radius-app) border border-border bg-surface">
-              {results.data.players.map((p) => (
-                <li key={p.playerId}>
-                  <button
-                    onClick={() => setSelected(p.playerId)}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-left active:bg-surface-2"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-semibold">
-                        {p.displayName ?? p.playerId}
-                      </div>
-                      <div className="truncate font-mono text-[0.62rem] text-dim">
-                        {p.email ?? p.playerId}
-                      </div>
+      ) : (
+        <div className="overflow-x-auto rounded-(--radius-app) border border-border bg-surface">
+          <table className="w-full min-w-[32rem] text-left text-sm">
+            <thead>
+              <tr className="border-b border-border/60 text-[0.6rem] uppercase tracking-wide text-dim">
+                <th className="px-4 py-2.5 font-semibold">User</th>
+                <th className="px-4 py-2.5 text-right font-semibold">Balance</th>
+                <th className="hidden px-4 py-2.5 text-right font-semibold sm:table-cell">Joined</th>
+                <th className="w-8 px-2 py-2.5"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/60">
+              {rows.map((r) => (
+                <tr
+                  key={r.playerId}
+                  onClick={() => setSelected(r.playerId)}
+                  className="cursor-pointer transition-colors hover:bg-surface-2"
+                >
+                  <td className="max-w-0 px-4 py-3">
+                    <div className="truncate font-semibold">{r.displayName ?? r.playerId}</div>
+                    <div className="truncate font-mono text-[0.62rem] text-dim">
+                      {r.email ?? r.playerId}
                     </div>
-                    <div className="shrink-0 text-right">
-                      {/*
-                        A dash, not $0.00. No account is a different fact from
-                        an empty one, and an admin reading zero would conclude
-                        the player had funds and spent them. And "no account" is
-                        only claimed when financial-core actually ANSWERED —
-                        with it down, every balance is null, and an admin
-                        reading "no account" on a player holding funds would
-                        act on the wrong fact entirely.
-                      */}
-                      <div className="text-sm font-bold tabular-nums">
-                        {p.balance === null ? '—' : moneyFromDecimal(p.balance)}
-                      </div>
-                      {p.balance === null && (
-                        <div className="text-[0.58rem] text-dim">
-                          {results.data.balancesUnavailable ? 'balance unavailable' : 'no account'}
-                        </div>
-                      )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="font-bold tabular-nums">
+                      {r.balance === null ? '—' : moneyFromDecimal(r.balance)}
                     </div>
-                  </button>
-                </li>
+                    {r.balance === null && (
+                      <div className="text-[0.56rem] text-dim">
+                        {balancesUnavailable ? 'unavailable' : 'no account'}
+                      </div>
+                    )}
+                  </td>
+                  <td className="hidden px-4 py-3 text-right text-[0.66rem] text-dim sm:table-cell">
+                    {r.joinedAt ? new Date(r.joinedAt).toLocaleDateString() : '—'}
+                  </td>
+                  <td className="px-2 py-3 text-right">
+                    <ChevronRight size={15} className="text-dim" />
+                  </td>
+                </tr>
               ))}
-            </ul>
-          )}
-
-          {results.data.truncated && (
-            <p className="px-1 text-[0.66rem] text-dim">
-              Showing the first 50. Narrow the search to see more.
-            </p>
-          )}
-        </>
+            </tbody>
+          </table>
+        </div>
       )}
 
-      <Sheet open={selected !== null} onClose={() => setSelected(null)} title="Player">
+      {truncated && (
+        <p className="px-1 text-[0.66rem] text-dim">
+          {searching
+            ? 'Showing the first 50. Narrow the search to see more.'
+            : 'Showing the most recent 200. Use search to find an older player.'}
+        </p>
+      )}
+
+      <Modal open={selected !== null} onClose={() => setSelected(null)} title="User">
         {selected && <PlayerDetail playerId={selected} />}
-      </Sheet>
+      </Modal>
     </div>
   );
 }
@@ -147,7 +193,7 @@ function PlayerDetail({ playerId }: { playerId: string }) {
 
   if (detail.isPending) {
     return (
-      <div className="space-y-3 py-2">
+      <div className="space-y-3">
         <Skeleton className="h-4 w-32" />
         <Skeleton className="h-8 w-40" />
         <Skeleton className="h-20 w-full" />
@@ -162,7 +208,7 @@ function PlayerDetail({ playerId }: { playerId: string }) {
   const d = detail.data;
 
   return (
-    <div className="space-y-4 py-1">
+    <div className="space-y-4">
       <div>
         <div className="text-sm font-bold">{d.identity?.displayName ?? d.playerId}</div>
         <div className="mt-0.5 break-all font-mono text-[0.62rem] text-dim">{d.playerId}</div>

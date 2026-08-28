@@ -371,7 +371,7 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
     const totalExposure = activeExposure + requestedBet * multiplier;
     if (bankerSeat.stack < totalExposure) {
       throw new RoomError(
-        `aggregate bets (₮${totalExposure}) exceed banker stack capacity (₮${bankerSeat.stack})`,
+        `aggregate bets ($${totalExposure}) exceed banker stack capacity ($${bankerSeat.stack})`,
       );
     }
   }

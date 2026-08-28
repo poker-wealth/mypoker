@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowDownLeft, ArrowUpRight, Info, Copy, Loader2 } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Info, Copy, ChevronRight, Loader2 } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Sheet';
+import { FullScreenModal } from '@/components/ui/FullScreenModal';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import {
@@ -16,7 +17,45 @@ import {
   useSetWithdrawalAddress,
 } from '@/api/hooks';
 import { ApiError } from '@/api/client';
+import type { WalletTxn, WithdrawalState } from '@/api/wallet';
+import { Badge } from '@/components/ui/Badge';
 import { toast } from '@/lib/toast';
+
+/**
+ * A withdrawal's state as the PLAYER should read it, not the enum name.
+ *
+ * The list used to render `w.state` raw, so someone who had just asked for
+ * their money saw the word `REQUESTED`. The states are also not equally
+ * reassuring: REJECTED is the one that needs to stand out, and CONFIRMED is the
+ * only one that means the money has actually landed.
+ *
+ * `warn` is the danger tone — Badge has no `danger`; see the frontend notes.
+ */
+type StateTone = 'neutral' | 'accent' | 'success' | 'warn';
+
+const WITHDRAWAL_STATE: Record<WithdrawalState | 'PENDING', { key: string; tone: StateTone }> = {
+  // A deposit the chain has seen but not confirmed. Not in any balance yet.
+  PENDING: { key: 'wallet.withdrawalState.pending', tone: 'neutral' },
+  REQUESTED: { key: 'wallet.withdrawalState.pending', tone: 'neutral' },
+  APPROVED: { key: 'wallet.withdrawalState.approved', tone: 'accent' },
+  BROADCASTING: { key: 'wallet.withdrawalState.sent', tone: 'accent' },
+  CONFIRMED: { key: 'wallet.withdrawalState.completed', tone: 'success' },
+  // Covers an ops refusal AND a failed broadcast. Neutral wording on purpose:
+  // in both cases the money is simply back in the player's balance.
+  ROLLED_BACK: { key: 'wallet.withdrawalState.returned', tone: 'warn' },
+};
+
+/**
+ * Never throws on a state this build has not heard of.
+ *
+ * The type used to disagree with the service's enum, and a bare map lookup on
+ * an unknown state returns undefined — which took the whole wallet down on
+ * `.tone`. A new state added server-side must degrade to a plain label, not a
+ * white screen on the money page.
+ */
+function stateBadge(state: string): { key: string; tone: StateTone } | null {
+  return WITHDRAWAL_STATE[state as WithdrawalState | 'PENDING'] ?? null;
+}
 
 /** DEPOSIT/WITHDRAW/BET/WIN_PAYOUT/RAKE/JACKPOT_PAYOUT → a short readable label. */
 const TXN_LABEL: Record<string, string> = {
@@ -39,6 +78,35 @@ export function Wallet() {
   const [params] = useSearchParams();
   const [depositOpen, setDepositOpen] = useState(params.get('action') === 'deposit');
   const [withdrawOpen, setWithdrawOpen] = useState(params.get('action') === 'withdraw');
+  // Tap a row to open its full detail. `detailOpen` is kept separate from
+  // `detailTxn` so the sheet's slide-out animation still has data to render
+  // while it closes (clearing the txn immediately would blank it mid-exit).
+  const [detailTxn, setDetailTxn] = useState<WalletTxn | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+
+  // Arriving from a notification: `?txn=<businessId>` opens that transaction's
+  // detail once the list has loaded. Matched on businessId because that is what
+  // the notification's own event id carries — see lib/notificationLink.ts.
+  //
+  // Fires ONCE (the ref), so closing the sheet does not immediately reopen it
+  // while the query string is still in the URL — the same reason `action=` is
+  // read as initial state above rather than watched.
+  const wantedTxn = params.get('txn');
+  const deepLinkHandled = useRef(false);
+  useEffect(() => {
+    if (!wantedTxn || deepLinkHandled.current || !txns.data) return;
+    deepLinkHandled.current = true;
+    const match = txns.data.transactions.find((tx) => tx.businessId === wantedTxn);
+    if (match) {
+      setDetailTxn(match);
+      setDetailOpen(true);
+    } else {
+      // The list is capped, so a notification older than it has nothing to
+      // open. Say so — landing on the wallet with nothing happening reads as a
+      // broken link.
+      toast.error(t('wallet.txnNotFound'));
+    }
+  }, [wantedTxn, txns.data, t]);
 
   return (
     <div className="space-y-4">
@@ -116,34 +184,74 @@ export function Wallet() {
             txns.data.transactions.map((tx, i) => {
               const credit = tx.direction === 'CREDIT';
               return (
-                <div key={`${tx.at}-${i}`} className="flex items-center justify-between px-4 py-3">
+                <button
+                  key={`${tx.at}-${i}`}
+                  type="button"
+                  onClick={() => {
+                    setDetailTxn(tx);
+                    setDetailOpen(true);
+                  }}
+                  className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-surface-2 active:bg-surface-2"
+                >
                   <div>
-                    <div className="text-sm font-semibold">{TXN_LABEL[tx.type] ?? tx.type}</div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-sm font-semibold">{TXN_LABEL[tx.type] ?? tx.type}</span>
+                      {/* Only in-flight rows carry a state; a settled entry
+                          needs no qualifier and gets no badge. */}
+                      {(() => {
+                        const badge = tx.state ? stateBadge(tx.state) : null;
+                        return badge ? <Badge tone={badge.tone}>{t(badge.key)}</Badge> : null;
+                      })()}
+                    </div>
                     <div className="text-[0.66rem] text-dim">{new Date(tx.at).toLocaleString()}</div>
                   </div>
-                  <div className={`text-sm font-bold tabular-nums ${credit ? 'text-success' : 'text-text'}`}>
-                    {credit ? '+' : '−'}${tx.amount}
+                  <div className="flex items-center gap-1.5">
+                    {/* An unsettled row is dimmed and never green: green reads
+                        as "this is yours now", and a pending deposit is not in
+                        any balance until the chain confirms it. */}
+                    <span
+                      className={`text-sm font-bold tabular-nums ${
+                        tx.state ? 'text-dim' : credit ? 'text-success' : 'text-text'
+                      }`}
+                    >
+                      {credit ? '+' : '−'}${tx.amount}
+                    </span>
+                    <ChevronRight size={16} className="shrink-0 text-dim" />
                   </div>
-                </div>
+                </button>
               );
             })
           )}
         </div>
       </div>
 
-      <DepositSheet open={depositOpen} onClose={() => setDepositOpen(false)} />
+      <DepositModal open={depositOpen} onClose={() => setDepositOpen(false)} />
       <WithdrawSheet
         open={withdrawOpen}
         onClose={() => setWithdrawOpen(false)}
         available={balance.data?.available ?? '0'}
       />
+      <TxnDetailSheet open={detailOpen} txn={detailTxn} onClose={() => setDetailOpen(false)} />
     </div>
   );
 }
 
 // ── Deposit ─────────────────────────────────────────────────────────────────
 
-function DepositSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+/**
+ * The deposit address, full screen.
+ *
+ * Not a bottom sheet: an address someone is about to send real money to has to
+ * be readable in one look, and the network it must be sent on has to be read
+ * BEFORE the address rather than in small print under it. The drawer put a
+ * 34-character string in a 13px box halfway up the screen with the wallet page
+ * still bright behind it.
+ *
+ * Order here is deliberate — network, then address, then the warning. Sending
+ * USDT on the wrong chain cannot be undone or refunded, so the chain is the
+ * first thing on screen, not a footnote.
+ */
+function DepositModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
   const deposit = useDepositAddress();
 
@@ -155,32 +263,156 @@ function DepositSheet({ open, onClose }: { open: boolean; onClose: () => void })
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title={t('wallet.depositTitle')}>
-      <div className="space-y-4 p-4">
+    <FullScreenModal open={open} onClose={onClose} title={t('wallet.depositTitle')}>
+      {/* Centred in the viewport rather than stacked under the header: this
+          screen is one short block of content, and pinning it to the top left
+          it floating in a mostly empty phone screen. min-h-full so it centres
+          against the modal body, and still scrolls if the text wraps long. */}
+      <div className="mx-auto flex min-h-full max-w-[520px] flex-col justify-center gap-5 p-5">
         {deposit.isPending ? (
-          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-40 w-full" />
         ) : deposit.isError || !deposit.data.configured || !deposit.data.address ? (
-          <div className="rounded-(--radius-app) border border-border bg-surface px-4 py-6 text-center text-sm text-dim">
+          <div className="rounded-(--radius-app) border border-border bg-surface px-4 py-8 text-center text-sm text-dim">
             {t('wallet.depositNotConfigured')}
           </div>
         ) : (
           <>
-            <div className="text-xs font-semibold text-dim">{t('wallet.depositAddressLabel')}</div>
-            <div className="rounded-(--radius-app) border border-border bg-surface p-3">
-              <div className="break-all font-mono text-sm text-text">{deposit.data.address}</div>
+            {/* The chain, first and unmissable. */}
+            <div className="rounded-(--radius-app) border border-accent/25 bg-accent/5 px-4 py-3 text-center text-sm font-semibold text-accent">
+              {t('wallet.depositNetwork')}
             </div>
+
+            <div>
+              <div className="text-xs font-semibold text-dim">
+                {t('wallet.depositAddressLabel')}
+              </div>
+              {/* select-all so one tap takes the whole address. The characters
+                  are NOT grouped for readability — spaces injected for the eye
+                  become spaces in a manual copy, and a mis-pasted address is
+                  the exact failure this screen exists to prevent. */}
+              <div className="mt-2 rounded-(--radius-app) border border-border bg-surface p-4">
+                <div className="select-all break-all text-center font-mono text-base leading-relaxed tracking-wide text-text">
+                  {deposit.data.address}
+                </div>
+              </div>
+            </div>
+
             <Button full onClick={() => copy(deposit.data.address!)}>
               <Copy size={16} /> {t('wallet.copyAddress')}
             </Button>
-            <div className="text-[0.7rem] text-dim">{t('wallet.depositNetwork')}</div>
-            <div className="flex items-start gap-2 rounded-(--radius-app) border border-danger/25 bg-danger/5 px-3 py-2">
-              <Info size={15} className="mt-0.5 shrink-0 text-danger" />
-              <p className="text-[0.72rem] text-dim">{t('wallet.depositWarn')}</p>
+
+            <div className="flex items-start gap-2 rounded-(--radius-app) border border-danger/25 bg-danger/5 px-4 py-3">
+              <Info size={16} className="mt-0.5 shrink-0 text-danger" />
+              <p className="text-xs leading-snug text-dim">{t('wallet.depositWarn')}</p>
             </div>
           </>
         )}
       </div>
+    </FullScreenModal>
+  );
+}
+
+// ── Transaction detail ───────────────────────────────────────────────────────
+
+/** Ledger types that settle a live-table hand — their businessId is the round id. */
+const GAME_TXN_TYPES = ['BET', 'WIN_PAYOUT', 'RAKE', 'JACKPOT_PAYOUT'];
+
+function TxnDetailSheet({
+  open,
+  txn,
+  onClose,
+}: {
+  open: boolean;
+  txn: WalletTxn | null;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Sheet open={open} onClose={onClose} title={t('wallet.txnDetail.title')}>
+      {/* Rendered only when a txn is selected; the sheet keeps its last txn while
+          it animates closed, so this stays populated through the exit. */}
+      {txn && <TxnDetailContent txn={txn} />}
     </Sheet>
+  );
+}
+
+function TxnDetailContent({ txn }: { txn: WalletTxn }) {
+  const { t } = useTranslation();
+  const credit = txn.direction === 'CREDIT';
+  const onChain = txn.type === 'DEPOSIT' || txn.type === 'WITHDRAW';
+  // businessId is the on-chain tx hash for deposits/withdrawals and the round id
+  // for a hand's bet/win/rake/jackpot legs — label it for what it actually is.
+  const refLabel = onChain
+    ? t('wallet.txnDetail.txHash')
+    : GAME_TXN_TYPES.includes(txn.type)
+      ? t('wallet.txnDetail.roundId')
+      : t('wallet.txnDetail.reference');
+
+  const copyRef = (value: string): void => {
+    void navigator.clipboard
+      .writeText(value)
+      .then(() => toast.success(t('wallet.txnDetail.referenceCopied')))
+      .catch(() => toast.error(t('toasts.copyFailed')));
+  };
+
+  return (
+    <div className="space-y-4 p-4">
+      {/* Header — type + signed amount */}
+      <div className="flex flex-col items-center gap-2 py-1">
+        <div
+          className={`flex h-11 w-11 items-center justify-center rounded-full ${
+            credit ? 'bg-success/15 text-success' : 'bg-surface-2 text-text'
+          }`}
+        >
+          {credit ? <ArrowDownLeft size={20} /> : <ArrowUpRight size={20} />}
+        </div>
+        <div className="text-sm font-semibold text-dim">{TXN_LABEL[txn.type] ?? txn.type}</div>
+        <div className={`text-2xl font-black tabular-nums ${credit ? 'text-success' : 'text-text'}`}>
+          {credit ? '+' : '−'}${txn.amount}
+        </div>
+      </div>
+
+      {/* Facts the ledger states for certain */}
+      <div className="divide-y divide-border overflow-hidden rounded-(--radius-app) border border-border bg-surface">
+        {/* A settled ledger leg IS complete for everything except a withdrawal,
+            whose leg is written at request time and stays in clearing until it
+            is approved and broadcast. Claiming "Completed" there told a player
+            their money had gone when it had not left the platform. */}
+        <DetailRow
+          label={t('wallet.txnDetail.status')}
+          value={(() => {
+            const badge = txn.state ? stateBadge(txn.state) : null;
+            // Unknown state → the raw value, which is honest, rather than
+            // "Completed", which would be a claim about someone's money.
+            return badge ? t(badge.key) : (txn.state ?? t('wallet.txnDetail.completed'));
+          })()}
+        />
+        <DetailRow label={t('wallet.txnDetail.dateTime')} value={new Date(txn.at).toLocaleString()} />
+        {onChain && <DetailRow label={t('wallet.txnDetail.network')} value="TRON (TRC-20)" />}
+      </div>
+
+      {/* Reference — the on-chain tx hash or round id, in full and copyable */}
+      {txn.businessId && (
+        <div className="space-y-1.5">
+          <div className="text-xs font-semibold text-dim">{refLabel}</div>
+          <div className="rounded-(--radius-app) border border-border bg-surface p-3">
+            <div className="break-all font-mono text-xs text-text">{txn.businessId}</div>
+          </div>
+          <Button full variant="secondary" onClick={() => copyRef(txn.businessId!)}>
+            <Copy size={16} /> {t('wallet.txnDetail.copyReference')}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <span className="text-xs text-dim">{label}</span>
+      <span className="text-right text-sm font-medium tabular-nums">{value}</span>
+    </div>
   );
 }
 
@@ -348,9 +580,17 @@ function WithdrawSheet({
                     <div className="text-sm font-bold tabular-nums">${w.amount}</div>
                     <div className="text-[0.62rem] text-dim">{new Date(w.at).toLocaleString()}</div>
                   </div>
-                  <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[0.62rem] font-bold text-brand">
-                    {w.state}
-                  </span>
+                  {(() => {
+                    const badge = stateBadge(w.state);
+                    // Unknown state falls back to the raw value in a neutral
+                    // badge — odd-looking, but not a blank space where a
+                    // withdrawal's status should be.
+                    return badge ? (
+                      <Badge tone={badge.tone}>{t(badge.key)}</Badge>
+                    ) : (
+                      <Badge tone="neutral">{w.state}</Badge>
+                    );
+                  })()}
                 </div>
               ))}
             </div>

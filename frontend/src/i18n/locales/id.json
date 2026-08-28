@@ -228,7 +228,27 @@
     "saveAddress": "Simpan alamat",
     "changeAddress": "Ubah",
     "addressCooldownNote": "Penarikan hanya ke alamat ini. Mengubahnya memulai jeda 48 jam.",
-    "addressLocked": "Penarikan ke alamat ini dibuka {{when}}"
+    "addressLocked": "Penarikan ke alamat ini dibuka {{when}}",
+    "txnDetail": {
+      "title": "Detail transaksi",
+      "status": "Status",
+      "completed": "Selesai",
+      "dateTime": "Tanggal & waktu",
+      "network": "Jaringan",
+      "txHash": "Hash transaksi",
+      "roundId": "ID ronde",
+      "reference": "Referensi",
+      "copyReference": "Salin",
+      "referenceCopied": "Tersalin"
+    },
+    "txnNotFound": "Transaksi itu sudah tidak ada di aktivitas terbaru Anda.",
+    "withdrawalState": {
+      "pending": "Menunggu",
+      "approved": "Disetujui",
+      "sent": "Dikirim",
+      "completed": "Selesai",
+      "returned": "Dikembalikan"
+    }
   },
   "table": {
     "fold": "Lipat",
@@ -460,7 +480,10 @@
     "promo": "{{text}}",
     "depositCredited": "Setoran ${{amount}} telah masuk",
     "withdrawalRequested": "Penarikan ${{amount}} telah diminta",
-    "withdrawalSent": "Penarikan ${{amount}} telah dikirim"
+    "withdrawalSent": "Penarikan ${{amount}} telah dikirim",
+    "depositRejected": "Setoran ${{amount}} tidak masuk",
+    "withdrawalConfirmed": "Penarikan ${{amount}} selesai",
+    "withdrawalReturned": "Penarikan ${{amount}} dikembalikan"
   },
   "agent": {
     "title": "Pusat Agen",
@@ -628,7 +651,10 @@
     "resetPasswordSubmit": "Atur ulang kata sandi",
     "resetting": "Mengatur ulang…",
     "resetPasswordSuccess": "Kata sandi direset. Masuk dengan kata sandi baru Anda.",
-    "resetPasswordFailed": "Kata sandi tidak dapat direset. Coba lagi."
+    "resetPasswordFailed": "Kata sandi tidak dapat direset. Coba lagi.",
+    "errNoAccount": "Tidak ada akun dengan email atau nomor telepon tersebut",
+    "errWrongPassword": "Kata sandi salah",
+    "errUseGoogle": "Akun ini dibuat dengan Google — gunakan \"Lanjutkan dengan Google\""
   },
   "personalInfo": {
     "saveDisplayName": "Simpan nama",

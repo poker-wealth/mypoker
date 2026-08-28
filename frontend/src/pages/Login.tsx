@@ -39,6 +39,7 @@ export function Login() {
   const [displayName, setDisplayName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // The confirmation step. `pendingEmail` is the server's normalised spelling,
   // not what was typed — the challenge is keyed on the former.
@@ -94,8 +95,25 @@ export function Login() {
   const handleAuth = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (inFlight.current) return;
+
+    // Validated BEFORE the in-flight latch is taken. Taking it first and then
+    // returning early would leave the form locked with no request in flight and
+    // nothing to release it.
+    //
+    // The same expression the gateway uses (`credential-rules.ts`) — and the
+    // message comes from the locale file, not a hardcoded English string: this
+    // page ships in eight languages, and a validation error is exactly where a
+    // player is least able to guess what was meant.
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(identifier)) {
+      setError(t('auth.emailInvalid'));
+      return;
+    }
+
     inFlight.current = true;
     setIsSubmitting(true);
+    setError(null);
+
 
     try {
       if (view === 'login') {
@@ -107,20 +125,30 @@ export function Login() {
         const pending = await signUpWithEmail(identifier, password, displayName);
         enterConfirm(pending.email, pending.resendAvailableAt);
       }
+      // NO `navigate('/')` here. Main had one, from when sign-up minted a
+      // session directly; it now returns a pending confirmation and the else
+      // branch above sends the player to the code screen. Navigating after that
+      // would bounce them straight off it.
     } catch (err) {
-      // The store has already shown the message. What is left to decide is
-      // where the player goes: an unconfirmed account is not a failed sign-in,
-      // it is a sign-up that was never finished, and the gateway has just
-      // mailed a fresh code for it.
+      // An unconfirmed account is not a failed sign-in — it is a sign-up that
+      // was never finished, and the gateway has just mailed a fresh code for
+      // it. That gets a screen, not an error line.
       const unconfirmed = unconfirmedEmailFrom(err);
       if (unconfirmed) {
         const body = (err as { body?: { resendAvailableAt?: string; sent?: boolean } }).body;
         enterConfirm(unconfirmed, body?.resendAvailableAt ?? null);
         if (body?.sent === false) setResendNote(t('auth.confirmResendUnavailable'));
+        return;
       }
-      // Anything else stays on this form with the toast the store raised.
-      // Swallowed deliberately: this handler is the top of the chain, and
-      // rethrowing here is an unhandled rejection and nothing more.
+      // Everything else shows INLINE, not as a toast. A wrong password raised
+      // as a toast read as "Signed out" and sent people looking for a session
+      // problem they did not have — main fixed that deliberately, and the fix
+      // is kept.
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : 'Authentication failed. Please check your credentials and try again.',
+      );
     } finally {
       inFlight.current = false;
       setIsSubmitting(false);
@@ -340,6 +368,13 @@ export function Login() {
                 </div>
 
                 <form onSubmit={handleAuth} className="flex flex-col gap-3.5">
+                  {error && (
+                    <div className="rounded-xl border border-danger/50 bg-danger/10 p-3 text-sm text-danger">
+                      {error}
+                    </div>
+                  )}
+
+
                   {view === 'signup' && (
                     <div className="space-y-1">
                       <label className="text-xs font-semibold text-dim ml-1">

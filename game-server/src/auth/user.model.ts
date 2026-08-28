@@ -29,17 +29,12 @@ export interface UserDoc {
   displayName?: string;
   photoUrl?: string;
   /**
-   * Platform role. ABSENT MEANS PLAYER — the same reasoning as `emailVerified`:
-   * every account predates this field, and a `default` would only apply on
-   * create, so the read has to handle undefined regardless.
-   *
-   * `ops` is what `requireAdmin` demands, and this document is the ONLY place it
-   * can be granted. There is deliberately no HTTP route that writes it: an
-   * endpoint that promotes an account to administrator is the single most
-   * valuable thing on the platform to compromise. Use `scripts/grant-ops.ts`,
-   * which requires shell access to the server.
+   * Platform authority. `'ops'` is a platform administrator (the admin panel);
+   * absent means a normal player. Deliberately narrow — this is the ONLY thing
+   * that lifts an account into the withdrawal queue and treasury, so there is no
+   * `'ops' | 'league_admin' | …` here until each of those is actually built.
    */
-  role?: 'player' | 'league_admin' | 'ops';
+  role?: 'ops';
   /**
    * Set when an administrator suspends the account; absent means active.
    *
@@ -72,9 +67,7 @@ const userSchema = new Schema<UserDoc>(
     emailVerified: { type: Boolean },
     displayName: { type: String },
     photoUrl: { type: String },
-    // No `default: 'player'`, for the reason given on `emailVerified` above:
-    // it would apply on create only, so undefined must be handled anyway.
-    role: { type: String, enum: ['player', 'league_admin', 'ops'] },
+    role: { type: String, enum: ['ops'], index: true },
     suspendedAt: { type: Date },
     suspendedReason: { type: String },
     suspendedBy: { type: String },
