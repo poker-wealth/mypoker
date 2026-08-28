@@ -24,10 +24,21 @@ export function esc(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-/** ₮ and two decimals, truncated — never rounded up past what the ledger moved. */
+/**
+ * `$` and two decimals, truncated — never rounded up past what the ledger moved.
+ *
+ * `$` because that is the mark the app uses everywhere: all eight locale files
+ * write `${{amount}}`, and the frontend's `SYMBOL` is `$`. This said `₮` until
+ * now, so one deposit told the player `₮30.00` on Telegram and `$30.00` on the
+ * screen they opened next.
+ *
+ * NOTE: these bodies are still English-only, unlike the emails next door, which
+ * render from a per-locale catalog. Localising them is the same exercise and
+ * has not been done yet.
+ */
 export function amount(decimal: string): string {
   const [whole = '0', frac = ''] = decimal.split('.');
-  return `₮${whole}.${(frac + '00').slice(0, 2)}`;
+  return `$${whole}.${(frac + '00').slice(0, 2)}`;
 }
 
 export function depositReceived(input: { amount: string; txHash?: string | undefined }): string {

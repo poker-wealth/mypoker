@@ -25,7 +25,7 @@ jest.mock('nodemailer', () => ({
 
 import { mailConfig, resetMailTransport, mailTransport } from '../../src/notifications/email/transport';
 import {
-  displayAmount,
+  formatAmount,
   depositReceived,
   withdrawalRequested,
   withdrawalSent,
@@ -92,20 +92,20 @@ describe('transport configuration', () => {
   });
 });
 
-describe('displayAmount — the ledger string, not a float', () => {
+describe('formatAmount — the ledger string, not a float', () => {
   it('renders the ledger decimal without arithmetic', () => {
-    expect(displayAmount('20.000000')).toBe('₮20.00');
-    expect(displayAmount('1234.500000')).toBe('₮1234.50');
-    expect(displayAmount('0.010000')).toBe('₮0.01');
+    expect(formatAmount('20.000000')).toBe('20.00');
+    expect(formatAmount('1234.500000')).toBe('1234.50');
+    expect(formatAmount('0.010000')).toBe('0.01');
   });
 
   it('truncates rather than rounds', () => {
     // Rounding up would claim a cent the ledger never moved.
-    expect(displayAmount('9.999999')).toBe('₮9.99');
+    expect(formatAmount('9.999999')).toBe('9.99');
   });
 
   it('survives a whole-number string', () => {
-    expect(displayAmount('500')).toBe('₮500.00');
+    expect(formatAmount('500')).toBe('500.00');
   });
 });
 
@@ -119,9 +119,9 @@ describe('templates', () => {
       network: 'TRC-20',
       at,
     });
-    expect(t.subject).toBe('₮20.00 deposited');
-    expect(t.html).toContain('₮20.00 received');
-    expect(t.text).toContain('₮20.00 received');
+    expect(t.subject).toBe('Deposit of $20.00 credited');
+    expect(t.html).toContain('$20.00 received');
+    expect(t.text).toContain('$20.00 received');
   });
 
   it('always carries a plain-text half', () => {
@@ -225,10 +225,10 @@ describe('sendEmail — at most one email per event', () => {
     expect(await sendEmail('p@example.com', template, 'e-10')).toBe('sent');
     expect(sent).toHaveLength(1);
     expect(sent[0]!.to).toBe('p@example.com');
-    expect(sent[0]!.subject).toBe('₮20.00 deposited');
+    expect(sent[0]!.subject).toBe('Deposit of $20.00 credited');
     // Both halves on the wire — the text part is not optional.
-    expect(sent[0]!.html).toContain('₮20.00');
-    expect(sent[0]!.text).toContain('₮20.00');
+    expect(sent[0]!.html).toContain('$20.00');
+    expect(sent[0]!.text).toContain('$20.00');
 
     const row = await EmailSendModel.findById('e-10').lean();
     expect(row?.sentAt).toBeInstanceOf(Date);

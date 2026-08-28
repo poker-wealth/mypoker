@@ -1,9 +1,10 @@
-import { notify } from '../notification-store';
+import { notify, GOVERNED_BY } from '../notification-store';
 import { sendEmail } from './send-email';
 import { depositReceived, withdrawalRequested, withdrawalSent } from './templates';
 import { sendTelegram } from '../telegram/send-telegram';
 import * as tg from '../telegram/messages';
 import { getSettings } from '../../settings/player-settings';
+import { resolveLocale, DEFAULT_LOCALE, type Locale } from './messages';
 
 /**
  * The money events a player is told about, in one place.
@@ -54,16 +55,63 @@ export function setRecipientResolver(resolver: RecipientResolver): void {
   resolveRecipient = resolver;
 }
 
+/**
+ * One settings read, answering both questions an announcement has: may we send
+ * this, and in what language.
+ *
+ * Read together on purpose. They come from the same document, and splitting
+ * them into two lookups would double the round trips on the money path to learn
+ * two fields of one row.
+ *
+ * FAILS OPEN. A settings read that throws — Mongo blinking, a timeout — must
+ * not silence a money receipt. The cost of one message someone had muted is an
+ * annoyance; the cost of a missing deposit receipt is a player who believes
+ * their funds have vanished. Silence is the expensive direction, so an
+ * unreadable preference is treated as "not muted, in English" rather than as
+ * consent to say nothing.
+ */
+async function preferences(
+  playerId: string,
+  kind: 'DEPOSIT' | 'SYSTEM',
+): Promise<{ allowed: boolean; locale: Locale }> {
+  const toggle = GOVERNED_BY[kind];
+  try {
+    const settings = await getSettings(playerId);
+    return {
+      // SYSTEM — a withdrawal notice is how someone learns about a withdrawal
+      // they did not make. No toggle governs it and none ever should.
+      allowed: toggle === null ? true : settings[toggle],
+      locale: resolveLocale(settings.language),
+    };
+  } catch (err) {
+    console.error(`[money-mail] settings unreadable for ${playerId}, announcing anyway:`, err);
+    return { allowed: true, locale: DEFAULT_LOCALE };
+  }
+}
+
 async function announce(input: {
   playerId: string;
   eventId: string;
   kind: 'DEPOSIT' | 'SYSTEM';
   titleKey: string;
   params: Record<string, string | number>;
-  template: Parameters<typeof sendEmail>[1];
+  /**
+   * Built from the player's locale, so it cannot be constructed before we know
+   * what that is. A factory rather than a value for exactly that reason — and
+   * it is still called inside this function, which the callers wrap, so a throw
+   * here remains a log line rather than a rejected credit.
+   */
+  template: (locale: Locale) => Parameters<typeof sendEmail>[1];
   /** The Telegram body for this event. */
   telegram: string;
 }): Promise<void> {
+  // One preference check covering every channel. notify() checks again for its
+  // own sake — it has callers that never come through here — but a player who
+  // muted deposits must not be reached on Telegram or by email either, and
+  // that is not a decision notify() is in a position to make.
+  const { allowed, locale } = await preferences(input.playerId, input.kind);
+  if (!allowed) return;
+
   try {
     await notify({
       playerId: input.playerId,
@@ -94,7 +142,7 @@ async function announce(input: {
     const to = await resolveRecipient(input.playerId);
     // Same event id as the notification: one event, one message per channel,
     // however many times the credit or the transition is retried.
-    await sendEmail(to, input.template, input.eventId);
+    await sendEmail(to, input.template(locale), input.eventId);
   } catch (err) {
     console.error(`[money-mail] email failed for ${input.eventId}:`, err);
   }
@@ -117,11 +165,6 @@ export async function announceDeposit(input: {
   // the money path we are talking about) must end in a log line, not in a
   // rejected credit.
   try {
-    const settings = await getSettings(input.playerId);
-    if (!settings.notifyDeposits) {
-      return; // The player has opted out of deposit notifications.
-    }
-
     const at = input.at ?? new Date();
     await announce({
       playerId: input.playerId,
@@ -131,12 +174,14 @@ export async function announceDeposit(input: {
       kind: 'DEPOSIT',
       titleKey: 'notifications.depositCredited',
       params: { amount: input.amount },
-      template: depositReceived({
-        amount: input.amount,
-        txHash: input.txHash,
-        network: input.network,
-        at,
-      }),
+      template: (locale) =>
+        depositReceived({
+          amount: input.amount,
+          txHash: input.txHash,
+          network: input.network,
+          at,
+          locale,
+        }),
       telegram: tg.depositReceived({ amount: input.amount, txHash: input.txHash }),
     });
   } catch (err) {
@@ -165,11 +210,13 @@ export async function announceWithdrawalRequested(input: {
       kind: 'SYSTEM',
       titleKey: 'notifications.withdrawalRequested',
       params: { amount: input.amount },
-      template: withdrawalRequested({
-        amount: input.amount,
-        address: input.address,
-        at: input.at ?? new Date(),
-      }),
+      template: (locale) =>
+        withdrawalRequested({
+          amount: input.amount,
+          address: input.address,
+          at: input.at ?? new Date(),
+          locale,
+        }),
       telegram: tg.withdrawalRequested({ amount: input.amount, address: input.address }),
     });
   } catch (err) {
@@ -196,13 +243,15 @@ export async function announceWithdrawalSent(input: {
       kind: 'SYSTEM',
       titleKey: 'notifications.withdrawalSent',
       params: { amount: input.amount },
-      template: withdrawalSent({
-        amount: input.amount,
-        address: input.address,
-        txHash: input.txHash,
-        network: input.network,
-        at: input.at ?? new Date(),
-      }),
+      template: (locale) =>
+        withdrawalSent({
+          amount: input.amount,
+          address: input.address,
+          txHash: input.txHash,
+          network: input.network,
+          at: input.at ?? new Date(),
+          locale,
+        }),
       telegram: tg.withdrawalSent({ amount: input.amount, txHash: input.txHash }),
     });
   } catch (err) {

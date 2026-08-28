@@ -1,3 +1,5 @@
+import { MESSAGES, fill, DEFAULT_LOCALE, type Locale, type EmailMessages } from './messages';
+
 /**
  * The money emails.
  *
@@ -61,6 +63,7 @@ function layout(input: {
   amountNote: string;
   rows: DetailRow[];
   supportUrl: string;
+  footer: EmailMessages['footer'];
 }): string {
   const rows = input.rows
     .map(
@@ -105,8 +108,8 @@ function layout(input: {
           <tr>
             <td style="padding:22px 24px 24px 24px;">
               <div style="font-size:11px;color:${C.dim};line-height:1.6;">
-                Questions? <a href="${esc(input.supportUrl)}" style="color:${C.accent};text-decoration:none;">Contact support</a>.<br>
-                You are receiving this because this address is on a MYPOKER account with wallet activity.
+                ${esc(input.footer.questions)} <a href="${esc(input.supportUrl)}" style="color:${C.accent};text-decoration:none;">${esc(input.footer.contactSupport)}</a><br>
+                ${esc(input.footer.why)}
               </div>
               <div style="font-size:10px;color:${C.dim};padding-top:14px;letter-spacing:1px;">
                 Fair. On-Chain. Always.
@@ -128,6 +131,7 @@ function plain(input: {
   amountNote: string;
   rows: DetailRow[];
   supportUrl: string;
+  footer: EmailMessages['footer'];
 }): string {
   const rows = input.rows.map((r) => `${r.label}: ${r.value}`).join('\n');
   return [
@@ -139,21 +143,30 @@ function plain(input: {
     '',
     rows,
     '',
-    `Questions? ${input.supportUrl}`,
-    'You are receiving this because this address is on a MYPOKER account with wallet activity.',
+    `${input.footer.questions} ${input.supportUrl}`,
+    input.footer.why,
     '',
+    // The tagline stays English in every locale: it is the brand wordmark's
+    // companion, not copy. Translating it would give the brand eight names.
     'Fair. On-Chain. Always.',
   ].join('\n');
 }
 
 const SUPPORT = process.env.SUPPORT_URL ?? 'https://mypoker777.com';
 
-/** A ledger decimal string as players read it: ₮20.00 from "20.000000". */
-export function displayAmount(decimal: string): string {
+/**
+ * A ledger decimal string as players read it: "20.00" from "20.000000".
+ *
+ * DIGITS ONLY, NO CURRENCY MARK. The mark belongs to the phrase — every locale
+ * places it differently — so each string in messages.ts carries its own `$` and
+ * this returns a bare number. Putting one here too is how `$$20.00` reaches an
+ * inbox (docs/TRAPS.md #4, three times on the frontend already).
+ */
+export function formatAmount(decimal: string): string {
   const [whole = '0', frac = ''] = decimal.split('.');
   // Two places, truncated not rounded — a receipt must never claim a cent the
   // ledger did not move.
-  return `₮${whole}.${(frac + '00').slice(0, 2)}`;
+  return `${whole}.${(frac + '00').slice(0, 2)}`;
 }
 
 // ── the three events ─────────────────────────────────────────────────────────
@@ -164,45 +177,60 @@ export function depositReceived(input: {
   txHash: string;
   network: string;
   at: Date;
+  /** The player's language. Defaults to English when they have not chosen one. */
+  locale?: Locale;
 }): EmailTemplate {
-  const amount = displayAmount(input.amount);
+  const m = MESSAGES[input.locale ?? DEFAULT_LOCALE];
+  const amount = formatAmount(input.amount);
   const body = {
-    heading: 'Deposit received',
-    amount: `${amount} received`,
-    amountNote: 'Credited to your wallet and available now.',
+    heading: m.deposit.heading,
+    amount: fill(m.deposit.amountLine, { amount }),
+    amountNote: m.deposit.note,
     rows: [
-      { label: 'Amount', value: amount },
-      { label: 'Network', value: input.network },
-      { label: 'Transaction', value: input.txHash, wrap: true },
-      { label: 'Time', value: input.at.toUTCString() },
-      { label: 'Status', value: 'Credited' },
+      // The row VALUE is the bare number: the label already says "Amount", so a
+      // mark here would be the only place in the mail it appears twice.
+      { label: m.labels.amount, value: amount },
+      { label: m.labels.network, value: input.network },
+      { label: m.labels.transaction, value: input.txHash, wrap: true },
+      { label: m.labels.dateTime, value: input.at.toUTCString() },
+      { label: m.labels.status, value: m.status.credited },
     ],
     supportUrl: SUPPORT,
+    footer: m.footer,
   };
-  return { subject: `${amount} deposited`, html: layout(body), text: plain(body) };
+  return {
+    subject: fill(m.deposit.subject, { amount }),
+    html: layout(body),
+    text: plain(body),
+  };
 }
 
 export function withdrawalRequested(input: {
   amount: string;
   address: string;
   at: Date;
+  locale?: Locale;
 }): EmailTemplate {
-  const amount = displayAmount(input.amount);
+  const m = MESSAGES[input.locale ?? DEFAULT_LOCALE];
+  const amount = formatAmount(input.amount);
   const body = {
-    heading: 'Withdrawal requested',
-    amount: `Withdrawal of ${amount}`,
-    // Deliberately plain. "Pending review" invites the reading that something
-    // is wrong; this states what happens next and nothing more.
-    amountNote: 'We have your request. You will get another email when it is sent.',
+    heading: m.withdrawalRequested.heading,
+    amount: fill(m.withdrawalRequested.amountLine, { amount }),
+    amountNote: m.withdrawalRequested.note,
     rows: [
-      { label: 'Amount', value: amount },
-      { label: 'To address', value: input.address, wrap: true },
-      { label: 'Requested', value: input.at.toUTCString() },
-      { label: 'Status', value: 'Requested' },
+      { label: m.labels.amount, value: amount },
+      { label: m.labels.toAddress, value: input.address, wrap: true },
+      { label: m.labels.requested, value: input.at.toUTCString() },
+      { label: m.labels.status, value: m.status.requested },
     ],
     supportUrl: SUPPORT,
+    footer: m.footer,
   };
-  return { subject: `Withdrawal of ${amount} requested`, html: layout(body), text: plain(body) };
+  return {
+    subject: fill(m.withdrawalRequested.subject, { amount }),
+    html: layout(body),
+    text: plain(body),
+  };
 }
 
 export function withdrawalSent(input: {
@@ -211,21 +239,28 @@ export function withdrawalSent(input: {
   txHash: string;
   network: string;
   at: Date;
+  locale?: Locale;
 }): EmailTemplate {
-  const amount = displayAmount(input.amount);
+  const m = MESSAGES[input.locale ?? DEFAULT_LOCALE];
+  const amount = formatAmount(input.amount);
   const body = {
-    heading: 'Withdrawal sent',
-    amount: `${amount} sent`,
-    amountNote: 'Broadcast to the network. Arrival depends on confirmations.',
+    heading: m.withdrawalSent.heading,
+    amount: fill(m.withdrawalSent.amountLine, { amount }),
+    amountNote: m.withdrawalSent.note,
     rows: [
-      { label: 'Amount', value: amount },
-      { label: 'To address', value: input.address, wrap: true },
-      { label: 'Network', value: input.network },
-      { label: 'Transaction', value: input.txHash, wrap: true },
-      { label: 'Sent', value: input.at.toUTCString() },
-      { label: 'Status', value: 'Sent' },
+      { label: m.labels.amount, value: amount },
+      { label: m.labels.toAddress, value: input.address, wrap: true },
+      { label: m.labels.network, value: input.network },
+      { label: m.labels.transaction, value: input.txHash, wrap: true },
+      { label: m.labels.sent, value: input.at.toUTCString() },
+      { label: m.labels.status, value: m.status.sent },
     ],
     supportUrl: SUPPORT,
+    footer: m.footer,
   };
-  return { subject: `${amount} sent`, html: layout(body), text: plain(body) };
+  return {
+    subject: fill(m.withdrawalSent.subject, { amount }),
+    html: layout(body),
+    text: plain(body),
+  };
 }
