@@ -240,7 +240,8 @@
       "reference": "อ้างอิง",
       "copyReference": "คัดลอก",
       "referenceCopied": "คัดลอกแล้ว"
-    }
+    },
+    "txnNotFound": "ไม่พบธุรกรรมนี้ในรายการล่าสุดของคุณแล้ว"
   },
   "table": {
     "fold": "หมอบ",
@@ -613,6 +614,9 @@
     "passwordTooShort": "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร",
     "signedOut": "คุณออกจากระบบแล้ว",
     "continueWithGoogle": "ดำเนินการต่อด้วย Google",
-    "or": "หรือ"
+    "or": "หรือ",
+    "errNoAccount": "ไม่พบบัญชีที่ใช้อีเมลหรือหมายเลขโทรศัพท์นี้",
+    "errWrongPassword": "รหัสผ่านไม่ถูกต้อง",
+    "errUseGoogle": "บัญชีนี้สร้างด้วย Google โปรดใช้ \"ดำเนินการต่อด้วย Google\""
   }
 }

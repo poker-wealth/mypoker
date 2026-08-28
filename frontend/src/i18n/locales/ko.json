@@ -240,7 +240,8 @@
       "reference": "참조 번호",
       "copyReference": "복사",
       "referenceCopied": "복사됨"
-    }
+    },
+    "txnNotFound": "해당 거래는 최근 내역에 남아 있지 않습니다."
   },
   "table": {
     "fold": "폴드",
@@ -613,6 +614,9 @@
     "passwordTooShort": "비밀번호는 8자 이상이어야 합니다",
     "signedOut": "로그아웃되었습니다",
     "continueWithGoogle": "Google로 계속하기",
-    "or": "또는"
+    "or": "또는",
+    "errNoAccount": "해당 이메일 또는 전화번호로 등록된 계정이 없습니다",
+    "errWrongPassword": "비밀번호가 올바르지 않습니다",
+    "errUseGoogle": "이 계정은 Google로 만들어졌습니다. \"Google로 계속하기\"를 사용하세요"
   }
 }

@@ -240,7 +240,8 @@
       "reference": "参照番号",
       "copyReference": "コピー",
       "referenceCopied": "コピーしました"
-    }
+    },
+    "txnNotFound": "その取引は最近の履歴に残っていません。"
   },
   "table": {
     "fold": "フォールド",
@@ -613,6 +614,9 @@
     "passwordTooShort": "パスワードは8文字以上で入力してください",
     "signedOut": "ログアウトしました",
     "continueWithGoogle": "Google で続ける",
-    "or": "または"
+    "or": "または",
+    "errNoAccount": "そのメールアドレスまたは電話番号のアカウントが見つかりません",
+    "errWrongPassword": "パスワードが正しくありません",
+    "errUseGoogle": "このアカウントは Google で作成されています。「Google で続行」をご利用ください"
   }
 }

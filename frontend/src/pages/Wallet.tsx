@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowDownLeft, ArrowUpRight, Info, Copy, ChevronRight, Loader2 } from 'lucide-react';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Sheet';
+import { FullScreenModal } from '@/components/ui/FullScreenModal';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import {
@@ -45,6 +46,30 @@ export function Wallet() {
   // while it closes (clearing the txn immediately would blank it mid-exit).
   const [detailTxn, setDetailTxn] = useState<WalletTxn | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+
+  // Arriving from a notification: `?txn=<businessId>` opens that transaction's
+  // detail once the list has loaded. Matched on businessId because that is what
+  // the notification's own event id carries — see lib/notificationLink.ts.
+  //
+  // Fires ONCE (the ref), so closing the sheet does not immediately reopen it
+  // while the query string is still in the URL — the same reason `action=` is
+  // read as initial state above rather than watched.
+  const wantedTxn = params.get('txn');
+  const deepLinkHandled = useRef(false);
+  useEffect(() => {
+    if (!wantedTxn || deepLinkHandled.current || !txns.data) return;
+    deepLinkHandled.current = true;
+    const match = txns.data.transactions.find((tx) => tx.businessId === wantedTxn);
+    if (match) {
+      setDetailTxn(match);
+      setDetailOpen(true);
+    } else {
+      // The list is capped, so a notification older than it has nothing to
+      // open. Say so — landing on the wallet with nothing happening reads as a
+      // broken link.
+      toast.error(t('wallet.txnNotFound'));
+    }
+  }, [wantedTxn, txns.data, t]);
 
   return (
     <div className="space-y-4">
@@ -148,7 +173,7 @@ export function Wallet() {
         </div>
       </div>
 
-      <DepositSheet open={depositOpen} onClose={() => setDepositOpen(false)} />
+      <DepositModal open={depositOpen} onClose={() => setDepositOpen(false)} />
       <WithdrawSheet
         open={withdrawOpen}
         onClose={() => setWithdrawOpen(false)}
@@ -161,7 +186,20 @@ export function Wallet() {
 
 // ── Deposit ─────────────────────────────────────────────────────────────────
 
-function DepositSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+/**
+ * The deposit address, full screen.
+ *
+ * Not a bottom sheet: an address someone is about to send real money to has to
+ * be readable in one look, and the network it must be sent on has to be read
+ * BEFORE the address rather than in small print under it. The drawer put a
+ * 34-character string in a 13px box halfway up the screen with the wallet page
+ * still bright behind it.
+ *
+ * Order here is deliberate — network, then address, then the warning. Sending
+ * USDT on the wrong chain cannot be undone or refunded, so the chain is the
+ * first thing on screen, not a footnote.
+ */
+function DepositModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
   const deposit = useDepositAddress();
 
@@ -173,32 +211,52 @@ function DepositSheet({ open, onClose }: { open: boolean; onClose: () => void })
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title={t('wallet.depositTitle')}>
-      <div className="space-y-4 p-4">
+    <FullScreenModal open={open} onClose={onClose} title={t('wallet.depositTitle')}>
+      {/* Centred in the viewport rather than stacked under the header: this
+          screen is one short block of content, and pinning it to the top left
+          it floating in a mostly empty phone screen. min-h-full so it centres
+          against the modal body, and still scrolls if the text wraps long. */}
+      <div className="mx-auto flex min-h-full max-w-[520px] flex-col justify-center gap-5 p-5">
         {deposit.isPending ? (
-          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-40 w-full" />
         ) : deposit.isError || !deposit.data.configured || !deposit.data.address ? (
-          <div className="rounded-(--radius-app) border border-border bg-surface px-4 py-6 text-center text-sm text-dim">
+          <div className="rounded-(--radius-app) border border-border bg-surface px-4 py-8 text-center text-sm text-dim">
             {t('wallet.depositNotConfigured')}
           </div>
         ) : (
           <>
-            <div className="text-xs font-semibold text-dim">{t('wallet.depositAddressLabel')}</div>
-            <div className="rounded-(--radius-app) border border-border bg-surface p-3">
-              <div className="break-all font-mono text-sm text-text">{deposit.data.address}</div>
+            {/* The chain, first and unmissable. */}
+            <div className="rounded-(--radius-app) border border-accent/25 bg-accent/5 px-4 py-3 text-center text-sm font-semibold text-accent">
+              {t('wallet.depositNetwork')}
             </div>
+
+            <div>
+              <div className="text-xs font-semibold text-dim">
+                {t('wallet.depositAddressLabel')}
+              </div>
+              {/* select-all so one tap takes the whole address. The characters
+                  are NOT grouped for readability — spaces injected for the eye
+                  become spaces in a manual copy, and a mis-pasted address is
+                  the exact failure this screen exists to prevent. */}
+              <div className="mt-2 rounded-(--radius-app) border border-border bg-surface p-4">
+                <div className="select-all break-all text-center font-mono text-base leading-relaxed tracking-wide text-text">
+                  {deposit.data.address}
+                </div>
+              </div>
+            </div>
+
             <Button full onClick={() => copy(deposit.data.address!)}>
               <Copy size={16} /> {t('wallet.copyAddress')}
             </Button>
-            <div className="text-[0.7rem] text-dim">{t('wallet.depositNetwork')}</div>
-            <div className="flex items-start gap-2 rounded-(--radius-app) border border-danger/25 bg-danger/5 px-3 py-2">
-              <Info size={15} className="mt-0.5 shrink-0 text-danger" />
-              <p className="text-[0.72rem] text-dim">{t('wallet.depositWarn')}</p>
+
+            <div className="flex items-start gap-2 rounded-(--radius-app) border border-danger/25 bg-danger/5 px-4 py-3">
+              <Info size={16} className="mt-0.5 shrink-0 text-danger" />
+              <p className="text-xs leading-snug text-dim">{t('wallet.depositWarn')}</p>
             </div>
           </>
         )}
       </div>
-    </Sheet>
+    </FullScreenModal>
   );
 }
 

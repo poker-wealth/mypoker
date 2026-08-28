@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { amountOnly } from '@/lib/money';
 import { useTranslation } from 'react-i18next';
-import { Bell, Trophy, Wallet, Megaphone, Crown, Info } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Bell, Trophy, Wallet, Megaphone, Crown, Info, ChevronRight } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -11,6 +12,7 @@ import { useNotifications, useMarkNotificationsRead } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
 import { useSession } from '@/store/session';
 import { cn } from '@/lib/cn';
+import { txnRefFromEventId } from '@/lib/notificationLink';
 import type { NotificationKind } from '@/api/notifications';
 
 /**
@@ -53,6 +55,7 @@ function displayParams(
 export function Notifications() {
   const { t } = useTranslation();
   const signedIn = useSession((s) => s.status === 'authenticated');
+  const navigate = useNavigate();
 
   const list = useNotifications();
   const markRead = useMarkNotificationsRead();
@@ -112,8 +115,12 @@ export function Notifications() {
           <ul className="divide-y divide-border overflow-hidden rounded-(--radius-app) border border-border bg-surface">
             {rows.map((n) => {
               const { icon: Icon, tone } = ICONS[n.kind] ?? ICONS.SYSTEM;
-              return (
-                <li key={n.id} className="flex items-start gap-3 px-4 py-3.5">
+              // Money notifications open the transaction they are about. Ones
+              // with no ledger row behind them (jackpot, system notices) stay
+              // plain, rather than offering a tap that goes nowhere.
+              const ref = txnRefFromEventId(n.id);
+              const body = (
+                <>
                   <div
                     className={cn(
                       'mt-0.5 grid size-8 shrink-0 place-items-center rounded-full bg-surface-2',
@@ -138,6 +145,23 @@ export function Notifications() {
                     </div>
                   </div>
                   {!n.read && <span className="mt-2 size-2 shrink-0 rounded-full bg-brand" />}
+                </>
+              );
+
+              return (
+                <li key={n.id}>
+                  {ref ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/wallet?txn=${encodeURIComponent(ref)}`)}
+                      className="flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-2 active:bg-surface-2"
+                    >
+                      {body}
+                      <ChevronRight size={16} className="mt-1.5 shrink-0 text-dim" />
+                    </button>
+                  ) : (
+                    <div className="flex items-start gap-3 px-4 py-3.5">{body}</div>
+                  )}
                 </li>
               );
             })}

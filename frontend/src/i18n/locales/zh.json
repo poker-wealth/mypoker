@@ -240,7 +240,8 @@
       "reference": "参考编号",
       "copyReference": "复制",
       "referenceCopied": "已复制"
-    }
+    },
+    "txnNotFound": "该交易已不在您的近期记录中。"
   },
   "table": {
     "fold": "弃牌",
@@ -613,6 +614,9 @@
     "passwordTooShort": "密码至少需要 8 个字符",
     "signedOut": "您已退出登录",
     "continueWithGoogle": "使用 Google 继续",
-    "or": "或"
+    "or": "或",
+    "errNoAccount": "未找到使用该邮箱或手机号的账户",
+    "errWrongPassword": "密码错误",
+    "errUseGoogle": "该账户是通过 Google 创建的，请使用“使用 Google 继续”"
   }
 }

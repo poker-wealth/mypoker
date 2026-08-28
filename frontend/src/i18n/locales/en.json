@@ -240,7 +240,8 @@
       "reference": "Reference",
       "copyReference": "Copy",
       "referenceCopied": "Copied"
-    }
+    },
+    "txnNotFound": "That transaction is no longer in your recent activity."
   },
   "table": {
     "fold": "Fold",
@@ -613,6 +614,9 @@
     "passwordTooShort": "Password must be at least 8 characters",
     "signedOut": "You are signed out",
     "continueWithGoogle": "Continue with Google",
-    "or": "or"
+    "or": "or",
+    "errNoAccount": "No account found with that email or phone number",
+    "errWrongPassword": "Incorrect password",
+    "errUseGoogle": "This account was created with Google — use “Continue with Google”"
   }
 }

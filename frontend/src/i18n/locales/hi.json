@@ -240,7 +240,8 @@
       "reference": "संदर्भ",
       "copyReference": "कॉपी करें",
       "referenceCopied": "कॉपी हो गया"
-    }
+    },
+    "txnNotFound": "वह ट्रांज़ैक्शन अब आपकी हाल की गतिविधि में नहीं है।"
   },
   "table": {
     "fold": "फ़ोल्ड",
@@ -613,6 +614,9 @@
     "passwordTooShort": "पासवर्ड कम से कम 8 अक्षरों का होना चाहिए",
     "signedOut": "आप साइन आउट हो गए हैं",
     "continueWithGoogle": "Google से जारी रखें",
-    "or": "या"
+    "or": "या",
+    "errNoAccount": "उस ईमेल या फ़ोन नंबर से कोई खाता नहीं मिला",
+    "errWrongPassword": "गलत पासवर्ड",
+    "errUseGoogle": "यह खाता Google से बनाया गया था — \"Google के साथ जारी रखें\" का उपयोग करें"
   }
 }

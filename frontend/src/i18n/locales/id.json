@@ -240,7 +240,8 @@
       "reference": "Referensi",
       "copyReference": "Salin",
       "referenceCopied": "Tersalin"
-    }
+    },
+    "txnNotFound": "Transaksi itu sudah tidak ada di aktivitas terbaru Anda."
   },
   "table": {
     "fold": "Lipat",
@@ -613,6 +614,9 @@
     "passwordTooShort": "Kata sandi minimal 8 karakter",
     "signedOut": "Anda telah keluar",
     "continueWithGoogle": "Lanjutkan dengan Google",
-    "or": "atau"
+    "or": "atau",
+    "errNoAccount": "Tidak ada akun dengan email atau nomor telepon tersebut",
+    "errWrongPassword": "Kata sandi salah",
+    "errUseGoogle": "Akun ini dibuat dengan Google — gunakan \"Lanjutkan dengan Google\""
   }
 }
