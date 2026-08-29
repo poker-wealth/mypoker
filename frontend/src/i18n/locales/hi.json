@@ -292,7 +292,19 @@
     "recordingUnavailable": "इस डिवाइस पर रिकॉर्डिंग उपलब्ध नहीं है",
     "recordingTooShort": "भेजने के लिए थोड़ा और दबाए रखें",
     "recordingTooLong": "रिकॉर्डिंग भेजने के लिए बहुत बड़ी है",
-    "recordingFailed": "वह रिकॉर्डिंग नहीं भेजी जा सकी"
+    "recordingFailed": "वह रिकॉर्डिंग नहीं भेजी जा सकी",
+    "chat": "चैट",
+    "chatUnread": "चैट, {{count}} अपठित",
+    "handInPlay": "हैंड जारी है",
+    "yourTurn": "आपकी बारी",
+    "playerTurn": "{{name}} की बारी",
+    "action": {
+      "fold": "फोल्ड",
+      "check": "चेक",
+      "call": "कॉल {{amount}}",
+      "raise": "{{amount}} तक रेज़",
+      "allin": "ऑल इन"
+    }
   },
   "a11y": {
     "toggleTheme": "थीम बदलें",

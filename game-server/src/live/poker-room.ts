@@ -53,6 +53,7 @@ import type {
   InsuranceOffer,
   JackpotWinSnapshot,
   TableSummary,
+  SeatAction,
 } from './room-state';
 import { newChatterState, evaluateChat, recordMessage, type ChatterState } from '../social/chat';
 import { evaluateVoice, recordVoice } from '../social/voice';
@@ -159,7 +160,7 @@ interface RoomSeat {
   leaveAfterHand: boolean;
   /** Dealt into the hand in progress. */
   inHand: boolean;
-  lastAction?: string;
+  lastAction?: SeatAction;
   /** Fires when the disconnect grace expires (sit them out). */
   graceTimer?: NodeJS.Timeout;
   /** Fires when they've been gone long enough to give the chair back. */
@@ -525,7 +526,7 @@ export class PokerRoom implements LiveRoom {
       // You can't take chips off the table mid-hand: fold if it's on you, leave when the hand ends.
       seat.leaveAfterHand = true;
       seat.sittingOut = true;
-      if (this.toActPlayer() === playerId) await this.applyAction(playerId, { type: 'fold' }, 'Fold');
+      if (this.toActPlayer() === playerId) await this.applyAction(playerId, { type: 'fold' }, { kind: 'fold' });
       else this.push();
       return;
     }
@@ -874,11 +875,26 @@ export class PokerRoom implements LiveRoom {
     this.push();
   }
 
-  private async applyAction(playerId: string, action: Action, label?: string): Promise<void> {
+  private async applyAction(playerId: string, action: Action, label?: SeatAction): Promise<void> {
     const seat = this.seatOf(playerId);
+    // Captured BEFORE the action: afterwards the amount that was called is gone
+    // from the engine, and "Call" with no number tells the table nothing.
+    const callAmount = this.game?.legalActions()?.callAmount ?? null;
     this.clearActionClock();
     await this.game!.handleAction(playerId, action);
-    if (seat && label) seat.lastAction = label;
+
+    if (seat && label) {
+      // All-in is decided by the engine, not by comparing numbers here: a call
+      // that happens to consume a short stack is an all-in and must say so, and
+      // only the engine knows what the seat's status became.
+      const wentAllIn =
+        this.game?.handSeats().find((s) => s.id === playerId)?.status === 'allin';
+      seat.lastAction = wentAllIn
+        ? { kind: 'allin' }
+        : label.kind === 'call' && callAmount && callAmount > 0
+          ? { kind: 'call', amount: callAmount }
+          : label;
+    }
 
     if (this.game!.state === 'WAITING') await this.finishHand();
     else {
@@ -922,7 +938,7 @@ export class PokerRoom implements LiveRoom {
     const check = legal?.canCheck ?? false;
     const seat = this.seatOf(playerId);
     if (seat && !seat.connected) seat.sittingOut = true;
-    await this.applyAction(playerId, check ? { type: 'check' } : { type: 'fold' }, check ? 'Check' : 'Fold');
+    await this.applyAction(playerId, check ? { type: 'check' } : { type: 'fold' }, { kind: check ? 'check' : 'fold' });
   }
 
   private async finishHand(): Promise<void> {
@@ -1379,18 +1395,24 @@ export class PokerRoom implements LiveRoom {
     };
   }
 
-  private describeAction(action: Action): string {
+  /**
+   * The FACT of what happened, not words for it.
+   *
+   * The client turns this into the player's own language — see `SeatAction` in
+   * room-state.ts for why the server no longer renders prose.
+   */
+  private describeAction(action: Action): SeatAction | undefined {
     switch (action.type) {
       case 'fold':
-        return 'Fold';
+        return { kind: 'fold' };
       case 'check':
-        return 'Check';
+        return { kind: 'check' };
       case 'call':
-        return 'Call';
+        return { kind: 'call' };
       case 'raise':
-        return `Raise to ${chips(action.amount ?? 0)}`;
+        return { kind: 'raise', amount: action.amount ?? 0 };
       default:
-        return '';
+        return undefined;
     }
   }
 

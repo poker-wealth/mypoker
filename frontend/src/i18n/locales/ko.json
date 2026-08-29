@@ -292,7 +292,19 @@
     "recordingUnavailable": "이 기기에서는 녹음할 수 없습니다",
     "recordingTooShort": "조금 더 길게 눌러 주세요",
     "recordingTooLong": "녹음이 너무 커서 보낼 수 없습니다",
-    "recordingFailed": "녹음을 보내지 못했습니다"
+    "recordingFailed": "녹음을 보내지 못했습니다",
+    "chat": "채팅",
+    "chatUnread": "채팅, 읽지 않음 {{count}}개",
+    "handInPlay": "핸드 진행 중",
+    "yourTurn": "당신 차례입니다",
+    "playerTurn": "{{name}} 차례입니다",
+    "action": {
+      "fold": "폴드",
+      "check": "체크",
+      "call": "콜 {{amount}}",
+      "raise": "{{amount}} 레이즈",
+      "allin": "올인"
+    }
   },
   "a11y": {
     "toggleTheme": "테마 전환",

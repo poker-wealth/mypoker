@@ -292,7 +292,19 @@
     "recordingUnavailable": "この端末では録音できません",
     "recordingTooShort": "もう少し長押ししてください",
     "recordingTooLong": "録音が大きすぎて送信できません",
-    "recordingFailed": "この録音を送信できませんでした"
+    "recordingFailed": "この録音を送信できませんでした",
+    "chat": "チャット",
+    "chatUnread": "チャット、未読 {{count}} 件",
+    "handInPlay": "ハンド進行中",
+    "yourTurn": "あなたの番です",
+    "playerTurn": "{{name}} の番です",
+    "action": {
+      "fold": "フォールド",
+      "check": "チェック",
+      "call": "コール {{amount}}",
+      "raise": "レイズ {{amount}}",
+      "allin": "オールイン"
+    }
   },
   "a11y": {
     "toggleTheme": "テーマを切り替え",

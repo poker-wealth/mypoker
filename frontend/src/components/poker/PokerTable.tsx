@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { PlayerSeat } from './PlayerSeat';
 import { PlayingCard } from './PlayingCard';
 import { ChipsToPot } from './ChipsToPot';
@@ -87,6 +88,29 @@ export function PokerTable({ state, onSit, onChallenge, design: override }: Poke
               />
             ))}
           </div>
+
+          {/*
+            Who won, directly under the board.
+
+            It used to be a banner BELOW the whole felt, down among the action
+            bar and the chat button — so the one line explaining what just
+            happened sat furthest from the cards it was explaining, in the most
+            crowded part of the screen. Here it lands where the player is
+            already looking when the hand resolves.
+          */}
+          <AnimatePresence>
+            {state.handOver && state.message && (
+              <motion.div
+                initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+                className="max-w-[85%] rounded-full border border-white/15 bg-black/70 px-3.5 py-1 text-center text-[0.72rem] font-bold text-white shadow-lg backdrop-blur-sm"
+              >
+                {state.message}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Chips sweeping into the pot when a street ends. */}

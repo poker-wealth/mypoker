@@ -41,8 +41,34 @@ export interface SeatSnapshot {
    * down at showdown), `null` for a face-down card, empty when they aren't in the hand.
    */
   cards: (string | null)[];
-  /** Their last action this street ("Call", "Raise $120"…), for the seat bubble. */
-  lastAction?: string;
+  /**
+   * Their last action this street, for the seat bubble.
+   *
+   * `SeatAction` is the form to use — the client renders it in the player's own
+   * language. The `string` arm is the legacy shape the other seven game rooms
+   * still emit ('BANKER', 'LANDLORD', 'CELL 3 ($5)'); those are shown verbatim
+   * and are therefore still English-only. Migrate a room by giving it keys of
+   * its own, not by widening this further.
+   */
+  lastAction?: SeatAction | string;
+}
+
+/**
+ * What a seat last did — as a KEY and a number, never as prose.
+ *
+ * This used to be a rendered English string ("Call 20", "Raise to 120") built
+ * on the server and shown verbatim. The app ships eight locales, so a player
+ * reading Chinese watched the table narrate itself in English. Same mistake the
+ * money emails made: the server has no business deciding what language a
+ * player reads.
+ *
+ * The client owns the wording; the server owns the fact. `amount` is in table
+ * chips and absent where the action has no number (fold, check, all-in).
+ */
+export interface SeatAction {
+  kind: 'fold' | 'check' | 'call' | 'raise' | 'allin';
+  /** Chips called, or raised TO. Absent for fold/check/all-in. */
+  amount?: number;
 }
 
 /** Provably-fair data for the hand — the commit before, the seed after. */

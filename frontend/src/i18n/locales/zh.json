@@ -292,7 +292,19 @@
     "recordingUnavailable": "此设备不支持录音",
     "recordingTooShort": "请按住久一点再发送语音",
     "recordingTooLong": "录音过大，无法发送",
-    "recordingFailed": "无法发送该录音"
+    "recordingFailed": "无法发送该录音",
+    "chat": "聊天",
+    "chatUnread": "聊天，{{count}} 条未读",
+    "handInPlay": "牌局进行中",
+    "yourTurn": "轮到你了",
+    "playerTurn": "轮到 {{name}}",
+    "action": {
+      "fold": "弃牌",
+      "check": "过牌",
+      "call": "跟注 {{amount}}",
+      "raise": "加注至 {{amount}}",
+      "allin": "全下"
+    }
   },
   "a11y": {
     "toggleTheme": "切换主题",

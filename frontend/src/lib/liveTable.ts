@@ -8,6 +8,18 @@ import type { Card } from './cards';
  */
 
 export type RoomPhase = 'WAITING' | 'DEALING' | 'IN_HAND' | 'SHOWDOWN';
+/**
+ * What a seat last did, as a fact rather than prose — mirrors game-server's
+ * SeatAction. The client owns the wording so the bubble speaks the player's
+ * language; the `string` arm is the legacy shape the other game rooms still
+ * send ('BANKER', 'LANDLORD'), rendered verbatim and therefore English-only.
+ */
+export interface SeatAction {
+  kind: 'fold' | 'check' | 'call' | 'raise' | 'allin';
+  /** Chips called, or raised TO. Absent for fold/check/all-in. */
+  amount?: number;
+}
+
 export type LiveSeatStatus = 'active' | 'folded' | 'allin' | 'waiting' | 'sittingout';
 export type LiveStreet = 'PREFLOP' | 'FLOP' | 'TURN' | 'RIVER' | 'SHOWDOWN';
 
@@ -39,7 +51,7 @@ export interface LiveSeat {
   isBot?: boolean;
   /** Card strings you're allowed to see; `null` is a face-down card. */
   cards: (Card | null)[];
-  lastAction?: string;
+  lastAction?: SeatAction | string;
 }
 
 export interface FairnessSnapshot {

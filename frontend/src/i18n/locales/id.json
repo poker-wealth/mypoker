@@ -292,7 +292,19 @@
     "recordingUnavailable": "Perekaman tidak tersedia di perangkat ini",
     "recordingTooShort": "Tahan sedikit lebih lama untuk mengirim",
     "recordingTooLong": "Rekaman terlalu besar untuk dikirim",
-    "recordingFailed": "Tidak dapat mengirim rekaman itu"
+    "recordingFailed": "Tidak dapat mengirim rekaman itu",
+    "chat": "Obrolan",
+    "chatUnread": "Obrolan, {{count}} belum dibaca",
+    "handInPlay": "Sedang bermain",
+    "yourTurn": "Giliran Anda",
+    "playerTurn": "Giliran {{name}}",
+    "action": {
+      "fold": "Lipat",
+      "check": "Cek",
+      "call": "Call {{amount}}",
+      "raise": "Naikkan ke {{amount}}",
+      "allin": "All in"
+    }
   },
   "a11y": {
     "toggleTheme": "Ganti tema",
