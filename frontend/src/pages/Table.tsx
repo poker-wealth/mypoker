@@ -18,6 +18,7 @@ import { useDemoHand } from '@/hooks/useDemoHand';
 import { useLiveTable } from '@/hooks/useLiveTable';
 import type { TableSnapshot } from '@/lib/liveTable';
 import { designForGame } from '@/lib/tableDesigns';
+import { cn } from '@/lib/cn';
 import { useSoundSetting } from '@/hooks/useSoundSetting';
 import { ChatBox } from '@/components/poker/ChatBox';
 import { useTableChat } from '@/hooks/useTableChat';
@@ -127,15 +128,18 @@ function LiveTable({ tableId }: { tableId: string }) {
         onOpenDesigns={() => setDesignsOpen(true)}
       />
 
-      <div className="flex flex-1 items-center px-3 relative">
+      {/* A wide felt loses more to gutters than a tall one — it is short enough
+          that width is the only dimension it is starved of. The chat button is
+          absolutely positioned and unaffected by dropping the padding. */}
+      <div className={cn('relative flex flex-1 items-center', gameDesign ? 'px-0' : 'px-3')}>
         {Felt ? (
           <Felt snapshot={snapshot} onCommand={(cmd) => live.command(cmd)} />
         ) : (
           <PokerTable
             state={view}
-            // The game brings its own felt — Short Deck is not played on the
-            // Hold'em table — but only for a player who never picked one. An
-            // explicit choice always wins; see useTableDesign.chosen.
+            // The game brings its own felt where it has one — Short Deck is a
+            // different table, not a skin of Hold'em — and that wins over the
+            // picker. Games with no felt of their own leave the choice alone.
             {...(gameDesign ? { design: gameDesign } : {})}
             {...(seated ? {} : { onSit: (seatIndex: number): void => setBuyInFor(seatIndex) })}
             onChallenge={(playerId) => live.challenge(playerId)}

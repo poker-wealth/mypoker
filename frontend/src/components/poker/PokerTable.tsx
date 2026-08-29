@@ -44,14 +44,19 @@ export function PokerTable({ state, onSit, onChallenge, design: override }: Poke
   return (
     <div
       className={cn(
-        'relative mx-auto flex w-full items-center justify-center px-5',
+        'relative mx-auto flex w-full items-center justify-center',
         // A LANDSCAPE felt is short, so it can afford to be much wider — capping
         // it at the portrait width leaves a cramped strip with the seats
         // crowding each other. A portrait felt keeps the original ceiling,
         // because widening that one only makes it taller than the screen.
+        //
+        // The PADDING matters more than the cap on a phone: at 360px wide the
+        // ceiling is never reached, and 20px of gutter each side is 11% of the
+        // felt. A wide table gets almost none — it has vertical room to spare
+        // and needs every pixel of width.
         isWide
-          ? 'max-w-[620px] md:max-w-[860px] lg:max-w-[1040px]'
-          : 'max-w-[440px] md:max-w-[620px] lg:max-w-[780px]',
+          ? 'px-0 max-w-none md:max-w-[1100px] lg:max-w-[1400px]'
+          : 'px-5 max-w-[440px] md:max-w-[620px] lg:max-w-[780px]',
       )}
     >
       {/*
