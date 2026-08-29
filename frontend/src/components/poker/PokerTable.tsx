@@ -9,6 +9,7 @@ import { ChipStack } from './ChipStack';
 import type { TableState } from '@/lib/table';
 import { ringFor, type TableDesign } from '@/lib/tableDesigns';
 import { useTableDesign } from '@/store/tableDesign';
+import { cn } from '@/lib/cn';
 
 /**
  * The table: the chosen design's artwork with the seats placed on its rail and the board across the
@@ -32,12 +33,41 @@ export function PokerTable({ state, onSit, onChallenge, design: override }: Poke
   const [failed, setFailed] = useState<string | null>(null);
   const useArt = Boolean(design.artUrl) && failed !== design.artUrl;
 
+  // "1672 / 941" → wider than tall. Short Deck is landscape; everything else is
+  // portrait, and the two want different width ceilings.
+  const [aw = '1', ah = '1'] = design.aspect.split('/').map((n) => n.trim());
+  const isWide = Number(aw) > Number(ah);
+
   // Mobile keeps the 440px felt; desktop scales it up so the table fills the
   // screen instead of sitting as a small oval in a sea of empty space. The felt
   // is aspect-ratio + %-positioned, so the whole table (seats) scales together.
   return (
-    <div className="relative mx-auto flex w-full max-w-[440px] items-center justify-center px-5 md:max-w-[620px] lg:max-w-[780px]">
-      <div className="relative w-full" style={{ aspectRatio: design.aspect }}>
+    <div
+      className={cn(
+        'relative mx-auto flex w-full items-center justify-center px-5',
+        // A LANDSCAPE felt is short, so it can afford to be much wider — capping
+        // it at the portrait width leaves a cramped strip with the seats
+        // crowding each other. A portrait felt keeps the original ceiling,
+        // because widening that one only makes it taller than the screen.
+        isWide
+          ? 'max-w-[620px] md:max-w-[860px] lg:max-w-[1040px]'
+          : 'max-w-[440px] md:max-w-[620px] lg:max-w-[780px]',
+      )}
+    >
+      {/*
+        `container-type: size` makes this box the reference for the seats.
+
+        Seat avatars were a fixed 56–62px while the felt scaled with the screen,
+        which is fine on a tall portrait table and wrong on a short landscape
+        one: the same circle that reads as a chair on a 780px-high felt covers a
+        quarter of a 250px-high one. Sizing them in `cqmin` — a share of the
+        table's SHORTER side — keeps a seat the same fraction of the table on
+        any felt, in either orientation.
+      */}
+      <div
+        className="relative w-full"
+        style={{ aspectRatio: design.aspect, containerType: 'size' }}
+      >
 
         {/* Embedded HTML5 Canvas Element for inspection */}
         <canvas

@@ -28,7 +28,16 @@ interface PlayerSeatProps {
   accent?: string;
 }
 
-const AVATAR = 'size-[56px] sm:size-[62px]';
+/**
+ * A share of the table's SHORTER side, not a fixed pixel size.
+ *
+ * 56px reads as a chair on a tall portrait felt and as a saucer on a short
+ * landscape one — the felt scales with the screen, the seat used not to. `cqmin`
+ * ties it to the table box (see the container in PokerTable), so a seat is the
+ * same fraction of the table on every design. Clamped so it stays tappable on a
+ * small phone and does not balloon on a desktop-width felt.
+ */
+const AVATAR = 'size-[clamp(44px,17cqmin,70px)]';
 
 export function PlayerSeat({ seat, align = 'bottom', onSit, onClick, accent = 'var(--accent)' }: PlayerSeatProps) {
   const { t } = useTranslation();

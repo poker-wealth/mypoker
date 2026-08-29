@@ -128,15 +128,15 @@ export const TABLE_DESIGNS: TableDesign[] = [
    * `table.png` turned on its side (1672×941 against its 941×1672), so the seat
    * ring comes from `wideRings` rather than `stadiumRings`.
    *
-   * They are ordinary entries in this list, so the picker offers them on any
-   * table. Binding them to the short-deck variant is a separate decision about
-   * whether the game or the player chooses the felt.
+   * Short Deck defaults to the green one — see `designForVariant` below — but
+   * they are ordinary entries in this list, so the picker still offers both on
+   * any table, and a player's own choice always wins.
    */
   {
     id: 'shortdeck-green',
     name: 'Short Deck Green',
     blurb: 'Wide six-max felt, classic casino green',
-    artUrl: '/table/shortdeck.png',
+    artUrl: '/table/shortdeck-green.png',
     aspect: '1672 / 941',
     boardTop: '50%',
     accent: '#34d399',
@@ -146,7 +146,7 @@ export const TABLE_DESIGNS: TableDesign[] = [
     id: 'shortdeck-blue',
     name: 'Short Deck Blue',
     blurb: 'The same wide felt in tournament blue',
-    artUrl: '/table/shortdec.png',
+    artUrl: '/table/shortdeck-blue.png',
     aspect: '1672 / 941',
     boardTop: '50%',
     accent: '#3b82f6',
@@ -202,25 +202,38 @@ export function designById(id: string | null | undefined): TableDesign {
 }
 
 /**
- * The felt a game brings with it.
+ * The felt a game is PLAYED ON, where the game has an opinion.
  *
- * Short Deck is played on a different table from Hold'em, so the GAME has an
- * opinion about the surface — but only as a default. A player who has picked a
- * felt of their own keeps it; see `useTableDesign.chosen`. Both matter, and the
- * player's choice is the one that wins.
+ * Short Deck is a different table from Hold'em — not a skin of it — so this
+ * WINS over the player's picker choice rather than merely defaulting when they
+ * have not made one. An earlier version deferred to any stored preference,
+ * which meant anyone who had ever opened the design picker never saw the Short
+ * Deck felt at all: almost everyone, since the default itself is stored.
  *
- * Matched on the variant NAME because that is what the snapshot carries
- * (`variant: this.spec.name`), not the config's variantId. A variant with no
- * entry here has no opinion, and the player's default stands.
+ * A game with no entry here has no opinion and the player's choice stands, so
+ * Hold'em and Omaha are untouched.
+ *
+ * Keyed on the TABLE ID, which is exact, rather than the variant's display name
+ * — the snapshot carries `variant: this.spec.name`, and matching prose is one
+ * apostrophe away from silently never matching. The name is accepted as a
+ * fallback for tables whose id does not name the game.
  */
-const VARIANT_DESIGN: Readonly<Record<string, string>> = {
+const GAME_DESIGN: Readonly<Record<string, string>> = {
+  'short-deck': 'shortdeck-green',
   "Short Deck Hold'em": 'shortdeck-green',
 };
 
-export function designForVariant(variantName: string | null | undefined): TableDesign | null {
-  if (!variantName) return null;
-  const id = VARIANT_DESIGN[variantName];
-  return id ? designById(id) : null;
+export function designForGame(
+  tableId: string | null | undefined,
+  variantName?: string | null,
+): TableDesign | null {
+  // A player-created table is `<game>-<uuid>`, so a prefix match keeps custom
+  // Short Deck tables on the Short Deck felt.
+  for (const key of Object.keys(GAME_DESIGN)) {
+    if (tableId === key || tableId?.startsWith(`${key}-`)) return designById(GAME_DESIGN[key]!);
+  }
+  const byName = variantName ? GAME_DESIGN[variantName] : undefined;
+  return byName ? designById(byName) : null;
 }
 
 /**
