@@ -82,12 +82,18 @@ export function PlayerSeat({ seat, align = 'bottom', onSit, onClick, accent = 'v
   // Poker sends a structured action and the wording is chosen HERE, in the
   // player's language. The other game rooms still send a rendered English
   // string; those are shown as-is until they get keys of their own.
-  const actionLabel =
-    typeof seat.lastAction === 'object'
-      ? t(`table.action.${seat.lastAction.kind}`, {
-          amount: chips(seat.lastAction.amount ?? 0),
-        })
-      : seat.lastAction;
+  // `?? 0` here would read "Call $0" — a figure nobody bet, on the one line the
+  // table uses to see what just happened (TRAPS #3). An absent amount means the
+  // server did not say, so the label drops the number rather than inventing a
+  // zero. Only call/raise carry one; fold/check/all-in never did.
+  const actionLabel = (() => {
+    const a = seat.lastAction;
+    if (typeof a !== 'object' || a === null) return a;
+    if (a.kind !== 'call' && a.kind !== 'raise') return t(`table.action.${a.kind}`);
+    return typeof a.amount === 'number'
+      ? t(`table.action.${a.kind}`, { amount: chips(a.amount) })
+      : t(`table.action.${a.kind}Bare`);
+  })();
   // Live tables send the real deadline, so the ring drains exactly when their clock does.
   const secondsLeft = seat.deadline ? Math.max(0, (seat.deadline - Date.now()) / 1000) : 15;
   const isTop = align === 'top';

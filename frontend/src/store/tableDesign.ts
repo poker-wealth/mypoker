@@ -11,16 +11,6 @@ const STORAGE_KEY = 'fp-table-design';
 interface TableDesignState {
   id: string;
   design: TableDesign;
-  /**
-   * Whether this is a felt the PLAYER picked, rather than the app's default.
-   *
-   * A game can carry its own table (Short Deck is not played on the Hold'em
-   * felt), but only for players who never expressed a preference. Without this
-   * flag the two are indistinguishable — the stored default and a deliberate
-   * choice look identical — and a game default would silently overwrite
-   * something the player had chosen.
-   */
-  chosen: boolean;
   setDesign: (id: string) => void;
 }
 
@@ -32,18 +22,21 @@ interface TableDesignState {
 const hasStorage = typeof localStorage !== 'undefined';
 const stored = (hasStorage ? localStorage.getItem(STORAGE_KEY) : null) ?? DEFAULT_DESIGN_ID;
 
-/** Something was in storage → the player chose it at some point. */
-const wasChosen = hasStorage && localStorage.getItem(STORAGE_KEY) !== null;
-
+/**
+ * There was a `chosen` flag here, to tell "the player picked this felt" apart
+ * from "this is the stored default", so a game's own table could override only
+ * the latter. It was written and never read: the rule settled as the player
+ * picking the COLOUR and the game picking the SHAPE, which needs no such flag —
+ * the two no longer compete for the same property. Removed rather than left
+ * lying around, because a flag nobody reads still has to be disproved by the
+ * next person to touch this.
+ */
 export const useTableDesign = create<TableDesignState>((set) => ({
   id: designById(stored).id, // resolve, so a removed design falls back instead of blanking the table
   design: designById(stored),
-  chosen: wasChosen,
   setDesign: (id) => {
     const design = designById(id);
     if (hasStorage) localStorage.setItem(STORAGE_KEY, design.id);
-    // Picking one — even the same one again — makes it theirs, and from here on
-    // no game default overrides it.
-    set({ id: design.id, design, chosen: true });
+    set({ id: design.id, design });
   },
 }));

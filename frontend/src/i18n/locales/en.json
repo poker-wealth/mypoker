@@ -303,6 +303,8 @@
       "check": "Check",
       "call": "Call {{amount}}",
       "raise": "Raise to {{amount}}",
+      "callBare": "Call",
+      "raiseBare": "Raise",
       "allin": "All in"
     },
     "timeBank": "Time Bank: {{seconds}}s",

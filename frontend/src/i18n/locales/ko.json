@@ -303,6 +303,8 @@
       "check": "체크",
       "call": "콜 {{amount}}",
       "raise": "{{amount}} 레이즈",
+      "callBare": "콜",
+      "raiseBare": "레이즈",
       "allin": "올인"
     },
     "timeBank": "타임뱅크: {{seconds}}초",

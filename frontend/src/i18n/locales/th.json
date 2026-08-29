@@ -303,6 +303,8 @@
       "check": "เช็ค",
       "call": "ตาม {{amount}}",
       "raise": "เพิ่มเป็น {{amount}}",
+      "callBare": "ตาม",
+      "raiseBare": "เพิ่มเดิมพัน",
       "allin": "ออลอิน"
     },
     "timeBank": "เวลาสำรอง: {{seconds}} วิ",

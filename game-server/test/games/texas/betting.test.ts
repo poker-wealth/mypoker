@@ -170,6 +170,44 @@ describe('Texas betting — pot limit', () => {
     expect(g.legalActions().maxRaiseTo).toBe(20);
   });
 
+  /**
+   * The pot cap is not the stack, and the difference is what the all-in
+   * double-confirm gate reads.
+   *
+   * `isAllInAction` used to compare the raise against `maxRaiseTo`. Under
+   * NO_LIMIT those are the same number, so it was right by accident. Under
+   * POT_LIMIT the cap sits well below the stack, and every pot-sized raise —
+   * the ordinary big bet of PLO — started asking the player to confirm an
+   * all-in that was not happening.
+   */
+  it('reports the true all-in separately from the pot cap', () => {
+    const g = plo({ stack: 10_000 });
+    const legal = g.legalActions();
+    expect(legal.maxRaiseTo).toBe(35); // capped by the pot
+    expect(legal.allInRaiseTo).toBe(10_000); // the stack, untouched by the cap
+    expect(legal.allInRaiseTo).toBeGreaterThan(legal.maxRaiseTo!);
+  });
+
+  it('the two coincide under no-limit, which is why one field sufficed before', () => {
+    const g = newGame(3, { stack: 10_000 });
+    const legal = g.legalActions();
+    expect(legal.allInRaiseTo).toBe(legal.maxRaiseTo);
+  });
+
+  it('counts a short stack as all-in even when the pot would allow more', () => {
+    // 20 behind: the pot permits 35, the stack does not — so the cap IS the
+    // stack here, and a raise to 20 is a genuine all-in that must still confirm.
+    const g = new TexasBetting(
+      [
+        { id: 'p0', stack: 20 },
+        { id: 'p1', stack: 500 },
+        { id: 'p2', stack: 500 },
+      ],
+      { smallBlind: 5, bigBlind: 10, buttonIndex: 0, limit: 'POT_LIMIT' },
+    );
+    expect(g.legalActions().allInRaiseTo).toBe(20);
+  });
+
   it('leaves no-limit alone — the whole stack is still legal', () => {
     const g = newGame(3, { stack: 10_000 });
     expect(g.legalActions().maxRaiseTo).toBe(10_000);

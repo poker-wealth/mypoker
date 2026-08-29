@@ -303,6 +303,8 @@
       "check": "Cek",
       "call": "Call {{amount}}",
       "raise": "Naikkan ke {{amount}}",
+      "callBare": "Call",
+      "raiseBare": "Naikkan",
       "allin": "All in"
     },
     "timeBank": "Bank Waktu: {{seconds}}d",

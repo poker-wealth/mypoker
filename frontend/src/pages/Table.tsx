@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, Volume2, VolumeX, Settings2, Wifi, WifiOff, MessageSquare } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
@@ -21,6 +21,7 @@ import { designForGame } from '@/lib/tableDesigns';
 import { useTableDesign } from '@/store/tableDesign';
 import { cn } from '@/lib/cn';
 import { useSoundSetting } from '@/hooks/useSoundSetting';
+import { play } from '@/lib/sound';
 import { ChatBox } from '@/components/poker/ChatBox';
 import { useTableChat } from '@/hooks/useTableChat';
 import { useSettings, useUpdateSettings } from '@/api/hooks';
@@ -60,6 +61,31 @@ function LiveTable({ tableId }: { tableId: string }) {
   useSoundSetting();
   // The player picks the colour; the game picks the shape.
   const chosenDesign = useTableDesign((s) => s.design);
+
+  /**
+   * Your turn, out loud.
+   *
+   * The status line answers "whose turn is it" for anyone watching the screen.
+   * This answers it for the player who has to act and may not be — a Mini App
+   * spends most of its life behind another window, and a turn missed in silence
+   * is a hand folded by the clock.
+   *
+   * Latched rather than fired on every render: the ref clears only when the turn
+   * passes, so a re-render mid-turn cannot chime twice.
+   */
+  const yourTurn =
+    snapshot?.phase === 'IN_HAND' &&
+    snapshot.seats.some((s) => s.isYou && s.index === snapshot.toActSeat);
+  const announcedTurn = useRef(false);
+  useEffect(() => {
+    if (!yourTurn) {
+      announcedTurn.current = false;
+      return;
+    }
+    if (announcedTurn.current) return;
+    announcedTurn.current = true;
+    play('turn');
+  }, [yourTurn]);
 
   /** Buy-in sheet target: a seat index to sit in, `null` to top up, `false` when closed. */
   const { t } = useTranslation();

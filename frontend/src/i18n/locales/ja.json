@@ -303,6 +303,8 @@
       "check": "チェック",
       "call": "コール {{amount}}",
       "raise": "レイズ {{amount}}",
+      "callBare": "コール",
+      "raiseBare": "レイズ",
       "allin": "オールイン"
     },
     "timeBank": "タイムバンク: {{seconds}}秒",

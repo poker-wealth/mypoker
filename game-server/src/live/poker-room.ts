@@ -1015,8 +1015,11 @@ export class PokerRoom implements LiveRoom {
     this.actionDeadline = Date.now() + seat.timeBankMs;
 
     const granted = seat.timeBankMs;
-    // The reserve continues the SAME turn, so it inherits that turn's epoch
-    // rather than starting a new one.
+    // Read AFTER clearActionClock above, which bumps the epoch — so this is the
+    // new one, not the turn's original. That is what makes the swap safe: the
+    // turn clock's already-queued expiry carries the old epoch and is discarded,
+    // while this timer carries the current one. The player has not acted, so the
+    // TURN continues; the CLOCK is a new one, and the epoch tracks clocks.
     const epoch = this.turnEpoch;
     this.actionTimer = setTimeout(() => {
       this.actionTimer = undefined;
@@ -1086,11 +1089,19 @@ export class PokerRoom implements LiveRoom {
     this.pendingMajorConfirm.clear();
   }
 
-  /** An all-in raise — the major commitment the double-confirm gate guards. */
+  /**
+   * An all-in raise — the major commitment the double-confirm gate guards.
+   *
+   * Keyed to the seat's real all-in, NOT to `maxRaiseTo`. Those were the same
+   * number until Omaha went pot-limit; there `maxRaiseTo` is the pot cap, which
+   * normally sits well below the stack, so gating on it asked every pot-sized
+   * raise — the ordinary big bet in PLO — to confirm an all-in that was not
+   * happening.
+   */
   private isAllInAction(action: Action): boolean {
     if (action.type !== 'raise' || !this.game) return false;
     const legal = this.game.legalActions();
-    return legal?.maxRaiseTo != null && (action.amount ?? 0) >= legal.maxRaiseTo;
+    return legal?.allInRaiseTo != null && (action.amount ?? 0) >= legal.allInRaiseTo;
   }
 
   /** The clock ran out: check if it's free, otherwise fold. A missing player is also sat out. */

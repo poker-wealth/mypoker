@@ -165,6 +165,7 @@ export function PokerTable({ state, onSit, onChallenge, design: override }: Poke
           winners={state.seats
             .map((seat, i) => (seat.isWinner ? (positions[i] ?? positions[0]!) : null))
             .filter((p): p is NonNullable<typeof p> => p !== null)}
+          youWon={state.seats.some((seat) => seat.isWinner && seat.isHero)}
         />
 
         {/* Seats */}

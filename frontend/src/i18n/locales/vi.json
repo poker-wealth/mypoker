@@ -303,6 +303,8 @@
       "check": "Xem bài",
       "call": "Theo {{amount}}",
       "raise": "Tố lên {{amount}}",
+      "callBare": "Theo",
+      "raiseBare": "Tố",
       "allin": "Tất tay"
     },
     "timeBank": "Quỹ thời gian: {{seconds}}s",

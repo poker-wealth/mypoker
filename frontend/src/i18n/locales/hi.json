@@ -303,6 +303,8 @@
       "check": "चेक",
       "call": "कॉल {{amount}}",
       "raise": "{{amount}} तक रेज़",
+      "callBare": "कॉल",
+      "raiseBare": "रेज़",
       "allin": "ऑल इन"
     },
     "timeBank": "टाइम बैंक: {{seconds}}से",

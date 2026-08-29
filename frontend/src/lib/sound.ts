@@ -28,14 +28,18 @@
  *    hand noisy before their settings load.
  */
 
+/**
+ * Only cues that something actually plays.
+ *
+ * `chip` and `deal` were synthesised here and called from nowhere. A cue with
+ * no call site is not a feature waiting to be switched on — it reads as one to
+ * the next person, who then has to prove it is dead before touching it. Add
+ * them back with their call site, in the same change.
+ */
 export type Cue =
   /** The pot arriving at the winner. The one the table is really waiting for. */
   | 'win'
-  /** Chips moving — a bet, a call, the sweep into the pot. */
-  | 'chip'
-  /** A card leaving the deck. */
-  | 'deal'
-  /** Your turn to act. */
+  /** Your turn to act — see the latch in `pages/Table.tsx`. */
   | 'turn';
 
 let ctx: AudioContext | null = null;
@@ -102,39 +106,6 @@ function note(
   osc.stop(start + opts.duration + 0.02);
 }
 
-/** A short burst of filtered noise — chips, cards, anything percussive. */
-function noise(
-  c: AudioContext,
-  opts: { at: number; duration: number; freq: number; q: number; gain: number },
-): void {
-  const frames = Math.max(1, Math.floor(c.sampleRate * opts.duration));
-  const buffer = c.createBuffer(1, frames, c.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < frames; i++) {
-    // Faded across its own length so the burst has a shape rather than a click
-    // at each end.
-    data[i] = (Math.random() * 2 - 1) * (1 - i / frames);
-  }
-
-  const src = c.createBufferSource();
-  src.buffer = buffer;
-
-  // Bandpass is what makes it read as "chip" rather than "static".
-  const band = c.createBiquadFilter();
-  band.type = 'bandpass';
-  band.frequency.value = opts.freq;
-  band.Q.value = opts.q;
-
-  const amp = c.createGain();
-  const start = c.currentTime + opts.at;
-  amp.gain.setValueAtTime(opts.gain, start);
-  amp.gain.exponentialRampToValueAtTime(0.0001, start + opts.duration);
-
-  src.connect(band).connect(amp).connect(c.destination);
-  src.start(start);
-  src.stop(start + opts.duration + 0.02);
-}
-
 /**
  * Play a cue. Silent when muted, unsupported, or blocked — never throws.
  *
@@ -163,13 +134,6 @@ export function play(cue: Cue): void {
         note(c, { freq: 1046.5, at: 0.17, duration: 0.5, type: 'sine', gain: 0.07 });
         break;
       }
-      case 'chip':
-        noise(c, { at: 0, duration: 0.07, freq: 2600, q: 1.6, gain: 0.11 });
-        noise(c, { at: 0.045, duration: 0.06, freq: 3300, q: 2.2, gain: 0.07 });
-        break;
-      case 'deal':
-        noise(c, { at: 0, duration: 0.13, freq: 1300, q: 0.7, gain: 0.075 });
-        break;
       case 'turn':
         // Two soft notes, not a buzz: this fires on every one of your turns and
         // anything sharper becomes something players mute the game to escape.

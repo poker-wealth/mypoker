@@ -28,6 +28,7 @@ export function PotToWinner({
   handId,
   amount,
   winners,
+  youWon,
 }: {
   /** Changing this is what arms the next celebration. */
   handId: string | number | null;
@@ -35,6 +36,14 @@ export function PotToWinner({
   amount: number;
   /** Where each winning seat sits. Split pots animate to each of them. */
   winners: SeatPos[];
+  /**
+   * Whether the player watching is one of the winners.
+   *
+   * The chips fly for everybody — that is how the table reads who took the pot.
+   * The chime does not: a win sound on a hand you just lost is the app cheering
+   * at you.
+   */
+  youWon: boolean;
 }) {
   const [showing, setShowing] = useState<SeatPos[]>([]);
   /** The hand we have already celebrated. One celebration per hand, ever. */
@@ -62,15 +71,17 @@ export function PotToWinner({
 
     celebrated.current = handId;
     // The sound rides the same trigger as the chips, so they cannot disagree:
-    // one arming, one moment. play() is silent when the player has muted.
-    play('win');
+    // one arming, one moment. play() is silent when the player has muted — and
+    // the chime is silent when they did not win, because a fanfare on a hand you
+    // just lost reads as the app celebrating at you.
+    if (youWon) play('win');
     setShowing(winners);
     const id = setTimeout(() => setShowing([]), 900);
     return () => clearTimeout(id);
     // winners is rebuilt every render, so it is depended on by LENGTH — the ref
     // above is what actually enforces once-per-hand.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [handId, winners.length, amount, reduced]);
+  }, [handId, winners.length, amount, reduced, youWon]);
 
   // Split pots divide the visible amount so the numbers add up to the pot —
   // showing each winner the full pot would misreport what they received.

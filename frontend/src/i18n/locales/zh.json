@@ -303,6 +303,8 @@
       "check": "过牌",
       "call": "跟注 {{amount}}",
       "raise": "加注至 {{amount}}",
+      "callBare": "跟注",
+      "raiseBare": "加注",
       "allin": "全下"
     },
     "timeBank": "时间银行：{{seconds}} 秒",

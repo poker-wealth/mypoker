@@ -32,8 +32,18 @@ export interface LegalActions {
   callAmount: number | null;
   /** Smallest legal raise-to, or null if a raise isn't possible. */
   minRaiseTo: number | null;
-  /** Largest raise-to (all-in). */
+  /** Largest LEGAL raise-to. Under POT_LIMIT this is the pot cap, not the stack. */
   maxRaiseTo: number | null;
+  /**
+   * The raise-to that would actually put this seat all-in — everything in
+   * front of them plus everything behind.
+   *
+   * Under NO_LIMIT it equals `maxRaiseTo`, which is why one field sufficed
+   * before. Under POT_LIMIT the cap usually sits BELOW the stack, so asking
+   * "is this all-in?" of `maxRaiseTo` calls every pot-sized raise an all-in.
+   * Null only when there is nobody to act.
+   */
+  allInRaiseTo: number | null;
 }
 
 /**
@@ -174,7 +184,15 @@ export class TexasBetting {
 
   legalActions(): LegalActions {
     const seat = this.seats[this.toActIndex];
-    if (!seat) return { canFold: false, canCheck: false, callAmount: null, minRaiseTo: null, maxRaiseTo: null };
+    if (!seat)
+      return {
+        canFold: false,
+        canCheck: false,
+        callAmount: null,
+        minRaiseTo: null,
+        maxRaiseTo: null,
+        allInRaiseTo: null,
+      };
     const toCall = this.currentBet - seat.streetContributed;
     const maxRaiseTo = this.maxRaiseToFor(seat);
     const canRaise = maxRaiseTo > this.currentBet;
@@ -184,6 +202,9 @@ export class TexasBetting {
       callAmount: toCall > 0 ? Math.min(toCall, seat.stack) : null,
       minRaiseTo: canRaise ? Math.min(this.currentBet + this.minRaise, maxRaiseTo) : null,
       maxRaiseTo: canRaise ? maxRaiseTo : null,
+      // Reported whether or not a raise is legal: it is a fact about the seat,
+      // and the confirm gate needs it precisely when the cap has hidden it.
+      allInRaiseTo: seat.streetContributed + seat.stack,
     };
   }
 
