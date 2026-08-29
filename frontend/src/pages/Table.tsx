@@ -18,6 +18,7 @@ import { useDemoHand } from '@/hooks/useDemoHand';
 import { useLiveTable } from '@/hooks/useLiveTable';
 import type { TableSnapshot } from '@/lib/liveTable';
 import { designForGame } from '@/lib/tableDesigns';
+import { useTableDesign } from '@/store/tableDesign';
 import { cn } from '@/lib/cn';
 import { useSoundSetting } from '@/hooks/useSoundSetting';
 import { ChatBox } from '@/components/poker/ChatBox';
@@ -57,6 +58,8 @@ function LiveTable({ tableId }: { tableId: string }) {
   // Mirrors the player's Settings toggle into the sound engine for as long as
   // the table is open. Cues elsewhere just call play() and stay ignorant of it.
   useSoundSetting();
+  // The player picks the colour; the game picks the shape.
+  const chosenDesign = useTableDesign((s) => s.design);
 
   /** Buy-in sheet target: a seat index to sit in, `null` to top up, `false` when closed. */
   const { t } = useTranslation();
@@ -108,7 +111,7 @@ function LiveTable({ tableId }: { tableId: string }) {
   const mySeat = snapshot?.seats.find((s) => s.isYou);
   // The game owns the felt where it has an opinion — Short Deck is a different
   // table, not a skin. Games without one leave the player's choice alone.
-  const gameDesign = designForGame(tableId, snapshot?.variant);
+  const gameDesign = designForGame(tableId, snapshot?.variant, chosenDesign);
   const playersReady = snapshot?.seats.filter((s) => s.status !== 'sittingout').length ?? 0;
   const Felt = feltFor(tableId);
 
@@ -315,11 +318,7 @@ function LiveTable({ tableId }: { tableId: string }) {
         }}
       />
 
-      <TableDesignSheet
-        open={designsOpen}
-        onClose={() => setDesignsOpen(false)}
-        {...(gameDesign ? { activeId: gameDesign.id } : {})}
-      />
+      <TableDesignSheet open={designsOpen} onClose={() => setDesignsOpen(false)} />
     </div>
   );
 }

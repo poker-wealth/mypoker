@@ -34,6 +34,21 @@ export interface TableDesign {
   rings: Record<number, SeatPos[]>;
   /** Accent used for the seat rings and open-chair outlines on this felt. */
   accent: string;
+  /**
+   * The LANDSCAPE counterpart of this felt, for games played on a wide table.
+   *
+   * The player picks the colour; the game picks the shape. Choosing Midnight
+   * Blue and sitting at Short Deck should give the blue WIDE table, not the
+   * green one and not a portrait felt — their preference still means something,
+   * it just gets rendered in the shape the game is played on.
+   */
+  wideId?: string;
+  /**
+   * Kept out of the picker. The wide counterparts are reached by choosing their
+   * portrait sibling, so listing them separately would offer the same felt twice
+   * and let someone pick a landscape table for a portrait game.
+   */
+  hidden?: boolean;
 }
 
 /**
@@ -111,6 +126,7 @@ export const TABLE_DESIGNS: TableDesign[] = [
     aspect: '512 / 768',
     boardTop: '50%',
     accent: '#3b82f6',
+    wideId: 'shortdeck-blue',
     rings: stadiumRings({ x: 17, yTop: 12, yBottom: 92, yMid: 52 }),
   },
   {
@@ -121,6 +137,7 @@ export const TABLE_DESIGNS: TableDesign[] = [
     aspect: '941 / 1672',
     boardTop: '50%',
     accent: '#34d399',
+    wideId: 'shortdeck-green',
     rings: stadiumRings({ x: 14, yTop: 9, yBottom: 91, yMid: 50 }),
   },
   /**
@@ -140,6 +157,7 @@ export const TABLE_DESIGNS: TableDesign[] = [
     aspect: '1672 / 941',
     boardTop: '50%',
     accent: '#34d399',
+    hidden: true,
     rings: wideRings({ x: 22, yTop: 13, yBottom: 87 }),
   },
   {
@@ -150,6 +168,7 @@ export const TABLE_DESIGNS: TableDesign[] = [
     aspect: '1672 / 941',
     boardTop: '50%',
     accent: '#3b82f6',
+    hidden: true,
     rings: wideRings({ x: 22, yTop: 13, yBottom: 87 }),
   },
   {
@@ -218,23 +237,41 @@ export function designById(id: string | null | undefined): TableDesign {
  * apostrophe away from silently never matching. The name is accepted as a
  * fallback for tables whose id does not name the game.
  */
-const GAME_DESIGN: Readonly<Record<string, string>> = {
-  'short-deck': 'shortdeck-green',
-  "Short Deck Hold'em": 'shortdeck-green',
-};
+const WIDE_GAMES: readonly string[] = ['short-deck', "Short Deck Hold'em"];
 
+/**
+ * The felt to render, given the game AND what the player likes.
+ *
+ * The player picks the COLOUR, the game picks the SHAPE. Short Deck is played
+ * on a wide table, so a player on Midnight Blue gets the blue WIDE felt — not
+ * the green one, and not a portrait table. Their choice still means something;
+ * it is simply drawn in the shape the game is played on.
+ *
+ * Null when the game has no shape of its own, which leaves the chosen felt
+ * exactly as it is — Hold'em and Omaha are untouched.
+ *
+ * Matched on the TABLE ID first, which is exact. A player-created table is
+ * `<game>-<uuid>`, so the prefix keeps custom Short Deck tables on a wide felt.
+ * The variant's display name is a fallback for ids that do not name the game.
+ */
 export function designForGame(
   tableId: string | null | undefined,
-  variantName?: string | null,
+  variantName: string | null | undefined,
+  chosen: TableDesign,
 ): TableDesign | null {
-  // A player-created table is `<game>-<uuid>`, so a prefix match keeps custom
-  // Short Deck tables on the Short Deck felt.
-  for (const key of Object.keys(GAME_DESIGN)) {
-    if (tableId === key || tableId?.startsWith(`${key}-`)) return designById(GAME_DESIGN[key]!);
-  }
-  const byName = variantName ? GAME_DESIGN[variantName] : undefined;
-  return byName ? designById(byName) : null;
+  const isWideGame =
+    WIDE_GAMES.some((key) => tableId === key || tableId?.startsWith(`${key}-`)) ||
+    (variantName ? WIDE_GAMES.includes(variantName) : false);
+  if (!isWideGame) return null;
+
+  // Already a wide felt (they chose one directly, or a previous session stored
+  // it) — leave it alone rather than bouncing through the mapping.
+  if (chosen.hidden) return chosen;
+  return chosen.wideId ? designById(chosen.wideId) : null;
 }
+
+/** The felts a player may actually pick. Wide counterparts are reached through their sibling. */
+export const PICKABLE_DESIGNS = TABLE_DESIGNS.filter((d) => !d.hidden);
 
 /**
  * The seat ring for a table of `count` chairs. Sizes the design doesn't spell out fall back to an
