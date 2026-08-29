@@ -59,6 +59,16 @@ interface LobbyTable {
   jackpot: number;
   buyInBB: number | null;
   status: TableStatus;
+  /**
+   * True for the table THIS player is seated at. Per-viewer, sent by the
+   * gateway only when the request carried a token.
+   *
+   * The server enforces one account, one table, so a player who sits down and
+   * navigates away is refused everywhere else until they stand. Nothing used
+   * to say which table held the seat, and with thirteen of them the only way
+   * back was to open each in turn. This is that signpost.
+   */
+  youAreSeated?: boolean;
   /** Set only when the table cannot start: how many more players it needs. */
   waitingFor?: number;
 }
@@ -298,6 +308,10 @@ function TableRow({ table, onOpen }: { table: LobbyTable; onOpen: () => void }) 
             // rendered a ₮52 pool as 52,000,000 — in gold, as a prize.
             <Text style={styles.jackpot}>{money(table.jackpot, { decimals: 0 })}</Text>
           )}
+          {/* Ahead of the status badge, because "your seat is here" is the
+              more urgent fact: it is the reason every other table is refusing
+              this player, and the only row that can release it. */}
+          {table.youAreSeated ? <Badge tone="brand">{t('lobby.yourSeat')}</Badge> : null}
           <Badge tone={STATUS_TONE[table.status]}>
             {t(STATUS_LABEL_KEY[table.status], { defaultValue: table.status })}
           </Badge>

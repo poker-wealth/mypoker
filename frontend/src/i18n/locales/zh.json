@@ -52,7 +52,8 @@
     "wait": "等待",
     "open": "可加入",
     "onlyOpen": "仅显示有空位的牌桌",
-    "createPrivateHint": "私人牌桌属于联盟，请在你的联盟中开设。"
+    "createPrivateHint": "私人牌桌属于联盟，请在你的联盟中开设。",
+    "yourSeat": "您的座位"
   },
   "games": {
     "searchPlaceholder": "搜索游戏",

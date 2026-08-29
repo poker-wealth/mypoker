@@ -29,6 +29,8 @@ interface DisplayTable {
   /** Pooled jackpot on this table, micro-USD. Null when the table has none. */
   jackpot: number | null;
   isFull: boolean;
+  /** The table this player is seated at — the one that is refusing all the others. */
+  youAreSeated: boolean;
   /** Table chips. Null when the game has no stake level — see formatBlinds. */
   stakes: number | null;
 }
@@ -130,6 +132,7 @@ export function Lobby() {
     // send.
     jackpot: t.jackpot > 0 ? t.jackpot : null,
     isFull: t.status === 'FULL' || t.players >= t.maxPlayers,
+    youAreSeated: t.youAreSeated === true,
     stakes: t.stakes,
   }));
 
@@ -289,7 +292,18 @@ export function Lobby() {
                   {/* The table's real id. It used to render `T-00${index}`, a
                       label invented per render that matched nothing a player
                       could be told over support. */}
-                  <td className="px-3 py-3 font-bold text-[#eab308]">{tbl.id}</td>
+                  <td className="px-3 py-3 font-bold text-[#eab308]">
+                    {tbl.id}
+                    {/* The row holding this player's seat. It is the reason every
+                        other table is refusing them, and the only row that can
+                        release it — so it is marked next to the name rather than
+                        buried in the status column. */}
+                    {tbl.youAreSeated && (
+                      <span className="ml-2 rounded-full bg-brand/20 px-2 py-0.5 text-[0.6rem] font-bold text-brand align-middle">
+                        {t('lobby.yourSeat')}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-3 tabular-nums text-dim font-medium">{tbl.blinds}</td>
                   <td className="px-3 py-3 tabular-nums font-semibold text-text">{tbl.players}</td>
                   <td className="px-3 py-3 tabular-nums text-dim font-medium">{tbl.buyIn}</td>

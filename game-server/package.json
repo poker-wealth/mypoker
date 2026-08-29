@@ -20,6 +20,7 @@
     "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
     "all-games-demo": "ts-node scripts/all-games-demo.ts",
     "demo-readiness": "ts-node scripts/demo-readiness.ts",
+    "seat-probe": "ts-node scripts/seat-probe.ts",
     "web": "ts-node scripts/web-demo.ts",
     "app": "ts-node scripts/app-server.ts",
     "gateway": "ts-node src/gateway/server.ts",

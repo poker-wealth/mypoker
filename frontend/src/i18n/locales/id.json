@@ -52,7 +52,8 @@
     "wait": "TUNGGU",
     "open": "BUKA",
     "onlyOpen": "Hanya meja dengan kursi kosong",
-    "createPrivateHint": "Meja pribadi milik aliansi — buka dari aliansi Anda."
+    "createPrivateHint": "Meja pribadi milik aliansi — buka dari aliansi Anda.",
+    "yourSeat": "Kursi Anda"
   },
   "games": {
     "searchPlaceholder": "Cari game",

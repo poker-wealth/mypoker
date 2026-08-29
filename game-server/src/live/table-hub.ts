@@ -62,6 +62,26 @@ export class TableHub {
     return [...this.rooms.values()].map((room) => room.summary());
   }
 
+  /**
+   * The table this player is seated at, or null.
+   *
+   * The hub is the only party that can answer this — a room can vouch for its
+   * own seats and nothing else. Two callers need it and they must agree:
+   * the sit refusal below, which has to NAME the table it is talking about,
+   * and the lobby, which marks the row so the player does not have to
+   * remember. One account can be seated at one table (§8.1), so this returns
+   * at most one.
+   */
+  seatedAt(playerId: string): { tableId: string; name: string } | null {
+    for (const room of this.rooms.values()) {
+      if (room.hasSeated(playerId)) {
+        const s = room.summary();
+        return { tableId: s.tableId, name: s.name };
+      }
+    }
+    return null;
+  }
+
   /** Start the WebSocket listener on its own port. */
   listen(port = 0): Promise<number> {
     return this.socket.listen(port);
@@ -131,13 +151,16 @@ export class TableHub {
         // playing several at once, which is the classic multi-boxing tell the
         // anti-bot section exists to prevent.
         if (parsed.data.kind === 'sit') {
-          const seatedElsewhere = [...this.rooms.values()].some(
-            (r) => r !== room && r.hasSeated(playerId),
-          );
-          if (seatedElsewhere) {
+          const elsewhere = this.seatedAt(playerId);
+          if (elsewhere && elsewhere.tableId !== room.summary().tableId) {
+            // NAME THE TABLE. This used to read "stand up at your other table
+            // first" and stop there — true, and useless against thirteen
+            // tables when you cannot remember which one you sat at. The rule
+            // is right; being told which table to go to is what turns a wall
+            // into a direction.
             return ctx.send({
               type: 'error',
-              message: 'one table at a time — stand up at your other table first',
+              message: `one table at a time — stand up at ${elsewhere.name} first`,
             });
           }
         }

@@ -52,7 +52,8 @@
     "wait": "待機",
     "open": "参加可",
     "onlyOpen": "空席のあるテーブルのみ",
-    "createPrivateHint": "プライベートテーブルは同盟のものです。ご自分の同盟から開設してください。"
+    "createPrivateHint": "プライベートテーブルは同盟のものです。ご自分の同盟から開設してください。",
+    "yourSeat": "あなたの席"
   },
   "games": {
     "searchPlaceholder": "ゲームを検索",

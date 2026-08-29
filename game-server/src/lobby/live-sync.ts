@@ -73,13 +73,16 @@ export function syncLobbyWithLiveTables(
 
     const existing = lobby.getTable(s.tableId);
     if (existing) {
-      lobby.updateTable(s.tableId, { players: s.seated, stakes, smallBlind });
+      lobby.updateTable(s.tableId, { players: s.seated, stakes, smallBlind, name: s.name });
       continue;
     }
 
     lobby.addTable({
       id: s.tableId,
       gameId,
+      // The room's own name, so the lobby row and the sit refusal say the same
+      // thing about the same table.
+      name: s.name,
       stakes,
       smallBlind,
       players: s.seated,

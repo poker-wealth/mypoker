@@ -15,6 +15,17 @@ export interface LobbyTable {
   id: string;
   gameId: GameId;
   /**
+   * The table's OWN name, when it has one distinct from its game.
+   *
+   * Rows used to be labelled purely by game, so the two Hold'em tables both
+   * read "Texas Hold'em" and were indistinguishable — and the sit refusal,
+   * which names the table from the room, pointed at a string ("Hold'em ·
+   * $0.50/1") that appeared nowhere in the lobby. One name, from the room,
+   * fixes both. Optional: tables created by a league or a player have no name
+   * of their own and keep falling back to the game's.
+   */
+  name?: string;
+  /**
    * Table stake level — the big blind for poker, a fixed base stake for a game
    * that has one, or NULL for a game with neither.
    *
@@ -128,7 +139,7 @@ export class LobbyService {
   /** Keep the lobby in step with the live table (seat counts, jackpot growth). */
   updateTable(
     tableId: string,
-    patch: Partial<Pick<LobbyTable, 'players' | 'jackpot' | 'stakes' | 'smallBlind'>>,
+    patch: Partial<Pick<LobbyTable, 'players' | 'jackpot' | 'stakes' | 'smallBlind' | 'name'>>,
   ): void {
     const t = this.tables.get(tableId);
     if (!t) throw new RangeError(`unknown table: ${tableId}`);
@@ -159,7 +170,9 @@ export class LobbyService {
     const status = this.statusOf(t);
     return {
       ...t,
-      name: spec.name,
+      // The table's own name wins; the game's is the fallback for rows that
+      // have none. Same string the refusal message uses, deliberately.
+      name: t.name ?? spec.name,
       status,
       minPlayers: spec.minPlayers,
       maxPlayers: spec.maxPlayers,

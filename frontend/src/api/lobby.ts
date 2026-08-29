@@ -60,6 +60,15 @@ export interface TableView {
    */
   buyInBB: number | null;
   status: 'UNAVAILABLE' | 'WAITING' | 'OPEN' | 'FULL';
+  /**
+   * True for the table THIS player is seated at. Per-viewer; the gateway sets
+   * it only when the request carried a token.
+   *
+   * One account, one table — so a player who sits and navigates away is
+   * refused everywhere else until they stand, and nothing used to say which
+   * table held the seat. This is the signpost back to it.
+   */
+  youAreSeated?: boolean;
   minPlayers: number;
   maxPlayers: number;
   fairness: FairnessTier;

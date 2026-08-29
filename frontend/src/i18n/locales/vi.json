@@ -52,7 +52,8 @@
     "wait": "CHỜ",
     "open": "MỞ",
     "onlyOpen": "Chỉ bàn còn chỗ trống",
-    "createPrivateHint": "Bàn riêng thuộc về liên minh — hãy mở từ liên minh của bạn."
+    "createPrivateHint": "Bàn riêng thuộc về liên minh — hãy mở từ liên minh của bạn.",
+    "yourSeat": "Ghế của bạn"
   },
   "games": {
     "searchPlaceholder": "Tìm trò chơi",
