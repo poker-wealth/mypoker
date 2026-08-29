@@ -19,14 +19,55 @@ async function findByIdentifier(identifier: string): Promise<UserDoc | null> {
   }).lean();
 }
 
+/**
+ * Why a signup was refused. Same closed-set discipline as `LoginRefusal`.
+ *
+ * WHAT THIS DOES NOT FIX, stated plainly so nobody reads the codes and assumes
+ * the door is shut: /auth/signup still confirms that an identifier is taken,
+ * because refusing a duplicate account IS that confirmation. There is no
+ * wording that both refuses the request and withholds the reason. Login no
+ * longer distinguishes; signup structurally cannot be made not to.
+ *
+ * Closing it needs the request to stop being answered synchronously at all —
+ * accept the signup, send a verification mail, and let the mailbox owner learn
+ * whether the address was already registered. That machinery is being built in
+ * the email-OTP work, not here. This change does not widen the door; it brings
+ * it into the same shape so the two are comparable.
+ *
+ * `use_google` is answered here for the same account state that answers
+ * `use_google` at login, so probing one endpoint tells you nothing the other
+ * would not.
+ */
+export type SignupRefusal = 'account_exists' | 'use_google';
+
+export class SignupError extends Error {
+  constructor(
+    readonly code: SignupRefusal,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'SignupError';
+  }
+}
+
+const SIGNUP_REFUSAL_TEXT: Readonly<Record<SignupRefusal, string>> = {
+  account_exists: 'An account with this email or phone number already exists',
+  use_google: 'This account was created with Google — use “Continue with Google”',
+};
+
 async function createWithPassword(
   identifier: string,
   passwordPlain: string,
   displayName?: string,
 ): Promise<UserDoc> {
   const clean = identifier.trim();
-  if (await findByIdentifier(clean)) {
-    throw new Error('User with this email or phone number already exists');
+  const existing = await findByIdentifier(clean);
+  if (existing) {
+    // A Google account gets the same answer signing up as it gets signing in,
+    // rather than "already exists" — otherwise the two endpoints disagree about
+    // one account state, and the disagreement is itself the information.
+    const code: SignupRefusal = existing.passwordHash ? 'account_exists' : 'use_google';
+    throw new SignupError(code, SIGNUP_REFUSAL_TEXT[code]);
   }
   const passwordHash = await bcrypt.hash(passwordPlain, SALT_ROUNDS);
   const isEmail = clean.includes('@');
@@ -41,27 +82,35 @@ async function createWithPassword(
 /**
  * Why a sign-in was refused.
  *
- * READ THIS BEFORE WIDENING IT. Telling the caller WHICH half was wrong is a
- * product decision that was taken deliberately and against the usual advice, so
- * that a user who mistypes knows which field to fix rather than re-entering
- * both. It has a real cost, and the cost is not hypothetical:
+ * READ THIS BEFORE WIDENING IT.
  *
- *   `no_account` vs `wrong_password` is an ACCOUNT ENUMERATION ORACLE. Anyone can
- *   feed in a list of email addresses and learn which ones are registered here,
- *   then aim every subsequent password attempt at accounts they know exist. On a
- *   platform that holds money, that list has value on its own.
+ * An earlier revision split this into `no_account` and `wrong_password` so a
+ * user who mistypes knows which field to fix. That is a genuinely nicer form,
+ * and it is an ACCOUNT ENUMERATION ORACLE: anyone can feed in a list of email
+ * addresses and learn which are registered here, then aim every subsequent
+ * password attempt at accounts they know exist. On a platform holding money
+ * that list has value by itself. The two are now one answer, so /auth/login
+ * confirms nothing about who banks here.
  *
- * Two things follow, and neither is optional if this stays:
+ * Two rules follow, and neither is optional:
  *
- *   1. Rate limiting on /auth/login is now load-bearing, not a nice-to-have. It
- *      is the ONLY thing left standing between this endpoint and an unbounded
- *      enumeration sweep. It does not exist yet — see the PR.
- *   2. The reasons must stay a CLOSED set of codes, never free text built from a
+ *   1. Do not re-split this. "Which field was wrong" cannot be told to an
+ *      unauthenticated caller without handing back the oracle. If the UX is
+ *      wanted, it belongs AFTER a verified session, never at the door.
+ *   2. The reasons stay a CLOSED set of codes, never free text built from a
  *      document. A message assembled from what was found in the database is one
- *      refactor away from putting the display name or the email of an account the
- *      caller does not own into the response.
+ *      refactor away from putting the display name or the email of an account
+ *      the caller does not own into the response.
+ *
+ * `use_google` is the one deliberate exception and it is narrower than it
+ * looks: it fires only for an account with no password hash at all, so it
+ * distinguishes Google accounts, not accounts-in-general. It stays because
+ * folding it into the generic answer sends a Google user round a loop they
+ * cannot escape — every password on earth is "wrong" for an account that has
+ * none, so "check your typing" is advice that can never come true. Signup
+ * answers `use_google` for the same account state, so the two doors agree.
  */
-export type LoginRefusal = 'no_account' | 'wrong_password' | 'use_google';
+export type LoginRefusal = 'invalid_credentials' | 'use_google';
 
 export class LoginError extends Error {
   constructor(readonly code: LoginRefusal, message: string) {
@@ -72,28 +121,42 @@ export class LoginError extends Error {
 
 /** English fallback for each refusal. The client translates from the code. */
 const REFUSAL_TEXT: Readonly<Record<LoginRefusal, string>> = {
-  no_account: 'No account found with that email or phone number',
-  wrong_password: 'Incorrect password',
+  invalid_credentials: 'Incorrect email, phone number or password',
   use_google: 'This account was created with Google — use “Continue with Google”',
 };
 
 /**
+ * A real bcrypt hash, of a value no caller can submit, compared against when
+ * the account does not exist.
+ *
+ * Merging the two refusal codes is only half of closing the oracle. A missing
+ * account skips bcrypt entirely and answers in microseconds; a wrong password
+ * spends the full cost of a 10-round hash. That difference is measurable over
+ * a handful of requests, and it rebuilds from response time alone exactly the
+ * distinction the merged code just removed. So the absent case does the same
+ * work as the present one and the two are indistinguishable from outside.
+ */
+const ABSENT_ACCOUNT_HASH = '$2b$10$NrXUDLZ779ib2eUHE/JBqOST9VNyWgfanq/gcOYVxo/rB4T5NWY/G';
+
+/**
  * Resolve a sign-in attempt to a user, or to the reason it failed.
  *
- * `use_google` is its own answer rather than being folded into `wrong_password`:
- * an account created through Google has no password hash at all, so every
- * password on earth is "wrong" for it and telling the user to check their typing
- * would send them round a loop they cannot escape.
+ * Every failure that is about the credentials answers `invalid_credentials`,
+ * whether or not the account exists — see the note on `LoginRefusal`.
  */
 async function verifyCredentials(
   identifier: string,
   passwordPlain: string,
 ): Promise<{ ok: true; user: UserDoc } | { ok: false; code: LoginRefusal }> {
   const user = await findByIdentifier(identifier);
-  if (!user) return { ok: false, code: 'no_account' };
+  if (!user) {
+    // Deliberately not short-circuited. See ABSENT_ACCOUNT_HASH.
+    await bcrypt.compare(passwordPlain, ABSENT_ACCOUNT_HASH);
+    return { ok: false, code: 'invalid_credentials' };
+  }
   if (!user.passwordHash) return { ok: false, code: 'use_google' };
   const matches = await bcrypt.compare(passwordPlain, user.passwordHash);
-  return matches ? { ok: true, user } : { ok: false, code: 'wrong_password' };
+  return matches ? { ok: true, user } : { ok: false, code: 'invalid_credentials' };
 }
 
 async function findOrCreateGoogle(
