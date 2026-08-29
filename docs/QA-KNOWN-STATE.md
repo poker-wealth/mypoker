@@ -100,7 +100,7 @@ refused with a 503, never allowed through unconfirmed. Outside production, with
 
 | # | Line | Status | Note |
 |---|---|---|---|
-| 3 | Personal Info | **F** | No such screen on mobile. Web has it. |
+| 3 | Personal Info | **F -> built, untested** | Was: no such screen on mobile. Now built with full parity — avatar (twelve tiles, clear tile, photo upload), display name, read-only email, password change. `check:parity` passes as a result. **Nothing on it has run on a device**: `expo-image-picker` is a native module, so it needs an EAS build before the upload path in particular can be trusted. Not P until then. |
 | 8 | Support | **F** | **Absent from the entire mobile app** — no row, no URL config. A player with a money problem has no path to a human. |
 
 ---
@@ -145,9 +145,12 @@ a missing affordance around it.
 ### What this section turned up beyond the checklist
 
 - **A parity gap that was invisible while the check was broken:** web's
-  `/personal` (Personal Info) has no mobile screen. Left FAILING rather than
-  added to `ACCEPTED_WEB_ONLY` — it is a real miss, already recorded in section
-  5 above, and silencing it is the exact failure the check exists to prevent.
+  `/personal` (Personal Info) had no mobile screen. Left FAILING rather than
+  added to `ACCEPTED_WEB_ONLY` — it was a real miss, and silencing it is the
+  exact failure the check exists to prevent. **Now closed**: the screen is
+  built and `check:parity` passes at 22 route/screen rows. Note the check only
+  proves a screen EXISTS under that route; that its four sections work is a
+  device question, still open (section 5, line 3).
 - **Four table controls were English in every locale.** Rebuy / Sit in / Sit
   out / Leave were hardcoded on the web while `table.rebuy`, `table.sitIn`,
   `table.sitOut` and `table.leave` sat translated in all eight files, used by
