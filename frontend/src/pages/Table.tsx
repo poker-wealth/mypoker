@@ -17,6 +17,8 @@ import { isOpenableTableId } from '@/config';
 import { useDemoHand } from '@/hooks/useDemoHand';
 import { useLiveTable } from '@/hooks/useLiveTable';
 import type { TableSnapshot } from '@/lib/liveTable';
+import { designForVariant } from '@/lib/tableDesigns';
+import { useTableDesign } from '@/store/tableDesign';
 import { useSoundSetting } from '@/hooks/useSoundSetting';
 import { ChatBox } from '@/components/poker/ChatBox';
 import { useTableChat } from '@/hooks/useTableChat';
@@ -55,6 +57,8 @@ function LiveTable({ tableId }: { tableId: string }) {
   // Mirrors the player's Settings toggle into the sound engine for as long as
   // the table is open. Cues elsewhere just call play() and stay ignorant of it.
   useSoundSetting();
+  // A game default only applies to players who never picked a felt themselves.
+  const designChosen = useTableDesign((s) => s.chosen);
 
   /** Buy-in sheet target: a seat index to sit in, `null` to top up, `false` when closed. */
   const { t } = useTranslation();
@@ -104,6 +108,7 @@ function LiveTable({ tableId }: { tableId: string }) {
 
   const seated = snapshot?.yourSeat != null;
   const mySeat = snapshot?.seats.find((s) => s.isYou);
+  const variantDesign = designForVariant(snapshot?.variant);
   const playersReady = snapshot?.seats.filter((s) => s.status !== 'sittingout').length ?? 0;
   const Felt = feltFor(tableId);
 
@@ -129,6 +134,10 @@ function LiveTable({ tableId }: { tableId: string }) {
         ) : (
           <PokerTable
             state={view}
+            // The game brings its own felt — Short Deck is not played on the
+            // Hold'em table — but only for a player who never picked one. An
+            // explicit choice always wins; see useTableDesign.chosen.
+            {...(!designChosen && variantDesign ? { design: variantDesign } : {})}
             {...(seated ? {} : { onSit: (seatIndex: number): void => setBuyInFor(seatIndex) })}
             onChallenge={(playerId) => live.challenge(playerId)}
           />

@@ -60,6 +60,48 @@ function stadiumRings(edge: { x: number; yTop: number; yBottom: number; yMid: nu
   };
 }
 
+/**
+ * Six seats on a LANDSCAPE stadium table: three along the bottom rail, three
+ * along the top, mirroring the three cushion segments the artwork actually has.
+ *
+ * Not a rotation of `stadiumRings`. That one puts its side pairs on the long
+ * straight edges, which on a wide table are the top and bottom — so reusing it
+ * here would drop four players into the middle of the felt. The rounded ends of
+ * a landscape table are short enough that seating anyone there crowds the
+ * neighbours, so the ends stay empty and the seats spread along the straights.
+ *
+ * Hero is always index 0, bottom-centre.
+ */
+function wideRings(edge: {
+  /** Horizontal inset of the outer seats, as a % of width. */
+  x: number;
+  yTop: number;
+  yBottom: number;
+}): Record<number, SeatPos[]> {
+  const { x, yTop, yBottom } = edge;
+  const right = 100 - x;
+  // Outer seats sit slightly further in from the rail than the centre ones,
+  // following the curve of the oval rather than a straight line.
+  const yTopOuter = yTop + 6;
+  const yBottomOuter = yBottom - 6;
+  const six: SeatPos[] = [
+    { left: '50%', top: `${yBottom}%`, align: 'bottom' },
+    { left: `${x}%`, top: `${yBottomOuter}%`, align: 'bottom' },
+    { left: `${x}%`, top: `${yTopOuter}%`, align: 'top' },
+    { left: '50%', top: `${yTop}%`, align: 'top' },
+    { left: `${right}%`, top: `${yTopOuter}%`, align: 'top' },
+    { left: `${right}%`, top: `${yBottomOuter}%`, align: 'bottom' },
+  ];
+  return {
+    // Heads-up faces you across the table, which on a wide felt is top-centre.
+    2: [six[0]!, six[3]!],
+    3: [six[0]!, six[2]!, six[4]!],
+    4: [six[0]!, six[1]!, six[3]!, six[5]!],
+    5: [six[0]!, six[1]!, six[2]!, six[4]!, six[5]!],
+    6: six,
+  };
+}
+
 export const TABLE_DESIGNS: TableDesign[] = [
   {
     id: 'midnight',
@@ -80,6 +122,35 @@ export const TABLE_DESIGNS: TableDesign[] = [
     boardTop: '50%',
     accent: '#34d399',
     rings: stadiumRings({ x: 14, yTop: 9, yBottom: 91, yMid: 50 }),
+  },
+  /**
+   * The two Short Deck felts. Landscape, unlike everything above — the art is
+   * `table.png` turned on its side (1672×941 against its 941×1672), so the seat
+   * ring comes from `wideRings` rather than `stadiumRings`.
+   *
+   * They are ordinary entries in this list, so the picker offers them on any
+   * table. Binding them to the short-deck variant is a separate decision about
+   * whether the game or the player chooses the felt.
+   */
+  {
+    id: 'shortdeck-green',
+    name: 'Short Deck Green',
+    blurb: 'Wide six-max felt, classic casino green',
+    artUrl: '/table/shortdeck.png',
+    aspect: '1672 / 941',
+    boardTop: '50%',
+    accent: '#34d399',
+    rings: wideRings({ x: 22, yTop: 13, yBottom: 87 }),
+  },
+  {
+    id: 'shortdeck-blue',
+    name: 'Short Deck Blue',
+    blurb: 'The same wide felt in tournament blue',
+    artUrl: '/table/shortdec.png',
+    aspect: '1672 / 941',
+    boardTop: '50%',
+    accent: '#3b82f6',
+    rings: wideRings({ x: 22, yTop: 13, yBottom: 87 }),
   },
   {
     id: 'neon',
@@ -128,6 +199,28 @@ export const DEFAULT_DESIGN_ID = 'midnight';
 
 export function designById(id: string | null | undefined): TableDesign {
   return TABLE_DESIGNS.find((d) => d.id === id) ?? TABLE_DESIGNS[0]!;
+}
+
+/**
+ * The felt a game brings with it.
+ *
+ * Short Deck is played on a different table from Hold'em, so the GAME has an
+ * opinion about the surface — but only as a default. A player who has picked a
+ * felt of their own keeps it; see `useTableDesign.chosen`. Both matter, and the
+ * player's choice is the one that wins.
+ *
+ * Matched on the variant NAME because that is what the snapshot carries
+ * (`variant: this.spec.name`), not the config's variantId. A variant with no
+ * entry here has no opinion, and the player's default stands.
+ */
+const VARIANT_DESIGN: Readonly<Record<string, string>> = {
+  "Short Deck Hold'em": 'shortdeck-green',
+};
+
+export function designForVariant(variantName: string | null | undefined): TableDesign | null {
+  if (!variantName) return null;
+  const id = VARIANT_DESIGN[variantName];
+  return id ? designById(id) : null;
 }
 
 /**
