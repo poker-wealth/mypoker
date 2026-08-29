@@ -2,7 +2,7 @@ import { useState, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Users, Plus, Link2, Check, Globe, Lock } from 'lucide-react';
-import { Sheet } from '@/components/ui/Sheet';
+import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Segmented } from '@/components/ui/Segmented';
 import { useCreatePlayerTable } from '@/api/hooks';
@@ -17,12 +17,15 @@ import type { TableVisibility } from '@/api/tables';
  * ("play with friends", reachable only by the link). A created table hands back
  * a shareable `/table/<id>` link the creator can send to a friend.
  *
- * Hold'em only for now — the create endpoint's enum is `texas` — so the sheet is
- * wired to that one tile in Games; the others still navigate straight to felt.
- * "Join" goes to DEFAULT_TABLE_ID, exactly what the tile did before this existed,
- * so nothing is lost for a player who just wants a seat.
+ * A CENTERED Modal, not a bottom sheet — Victor asked for the dialog in the
+ * middle of the screen with a dimmed backdrop.
+ *
+ * Hold'em only for now — the create endpoint's enum is `texas` — so it is wired
+ * to that one tile in Games; the others still navigate straight to felt. "Join"
+ * goes to DEFAULT_TABLE_ID, exactly what the tile did before this existed, so
+ * nothing is lost for a player who just wants a seat.
  */
-export function TableEntrySheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function TableEntryModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const create = useCreatePlayerTable();
@@ -94,9 +97,9 @@ export function TableEntrySheet({ open, onClose }: { open: boolean; onClose: () 
   const SEAT_CHOICES = [2, 4, 6];
 
   return (
-    <Sheet open={open} onClose={close} title={t('tableEntry.title')}>
+    <Modal open={open} onClose={close} title={t('tableEntry.title')}>
       {createdId ? (
-        <div className="space-y-3 p-4">
+        <div className="space-y-3">
           <div className="space-y-2.5 rounded-(--radius-app) border border-border bg-surface p-4">
             <div className="flex items-center gap-2">
               <Check size={16} className="shrink-0 text-brand" />
@@ -116,7 +119,7 @@ export function TableEntrySheet({ open, onClose }: { open: boolean; onClose: () 
           </Button>
         </div>
       ) : step === 'choose' ? (
-        <div className="space-y-3 p-4">
+        <div className="space-y-3">
           <OptionRow
             icon={Users}
             title={t('tableEntry.joinExisting')}
@@ -131,7 +134,7 @@ export function TableEntrySheet({ open, onClose }: { open: boolean; onClose: () 
           />
         </div>
       ) : (
-        <div className="space-y-3 p-4">
+        <div className="space-y-3">
           <label className="block space-y-1.5">
             <span className="text-[0.66rem] font-semibold text-dim">{t('tableEntry.who')}</span>
             <Segmented
@@ -175,7 +178,7 @@ export function TableEntrySheet({ open, onClose }: { open: boolean; onClose: () 
           </Button>
         </div>
       )}
-    </Sheet>
+    </Modal>
   );
 }
 
