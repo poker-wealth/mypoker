@@ -35,12 +35,30 @@ export interface TableView {
   gameId: string;
   name: string;
   /** micro-USD */
-  stakes: number;
+  /**
+   * Stake level in TABLE CHIPS — the big blind for poker, a fixed base stake
+   * for a game that has one, or null for a game with neither.
+   *
+   * CHIPS, NOT MICRO-USD. This field has been the source of the same bug
+   * twice: it was micro-USD while `dev-seed.ts` supplied the lobby, the
+   * placeholder seeder was replaced by the live rooms, and nothing here
+   * changed. `formatMicros` kept dividing by a million, so a big blind of 100
+   * rendered as "0" and every real table read "Blinds 0/0". See
+   * docs/TRAPS.md #2, which describes exactly this and was written before it
+   * had been fixed on this side.
+   */
+  stakes: number | null;
+  /** The small blind, sent by the server rather than derived as `stakes / 2`. */
+  smallBlind?: number | null;
   players: number;
   /** micro-USD */
   jackpot: number;
-  /** Minimum buy-in in big blinds — comparable across stake levels, unlike cash. */
-  buyInBB: number;
+  /**
+   * Minimum buy-in in big blinds — comparable across stake levels, unlike cash.
+   * Null when the table has no stake level to measure depth against; "0 BB" is
+   * a claim about depth, and an unmeasurable depth is not a shallow one.
+   */
+  buyInBB: number | null;
   status: 'UNAVAILABLE' | 'WAITING' | 'OPEN' | 'FULL';
   minPlayers: number;
   maxPlayers: number;

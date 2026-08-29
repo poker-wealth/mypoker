@@ -436,13 +436,28 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
 
   abstract snapshotFor(playerId: string): TableSnapshot;
 
+  /**
+   * What this room charges per round, for the lobby's stakes column.
+   *
+   * The DEFAULT IS "nothing to report", because that is the truth for eight of
+   * the nine games that inherit it: each player picks their own bet, so there
+   * is no table-level stake at all. It used to default to `bigBlind: 0`, which
+   * the lobby rendered as "Blinds 0/0" — a figure, and a false one.
+   *
+   * A hook rather than a cast on `this.config`: only some room configs have a
+   * stake field, and a game that gains one should have to say so here rather
+   * than have the base class rummage for it.
+   */
+  protected stakeLevel(): Pick<TableSummary, 'smallBlind' | 'bigBlind' | 'baseStake'> {
+    return { smallBlind: null, bigBlind: null, baseStake: null };
+  }
+
   summary(): TableSummary {
     return {
       tableId: this.config.id,
       name: this.config.name,
       variant: VARIANT_NAMES[this.config.game] ?? this.config.game,
-      smallBlind: 0,
-      bigBlind: 0,
+      ...this.stakeLevel(),
       minBuyIn: this.config.minBuyIn,
       maxBuyIn: this.config.maxBuyIn,
       maxSeats: this.config.maxSeats,

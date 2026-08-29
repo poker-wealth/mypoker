@@ -58,16 +58,22 @@ export function syncLobbyWithLiveTables(
 
     live.add(s.tableId);
 
-    // The stake level. `bigBlind` for poker; the non-poker rooms carry their base bet in the same
-    // field, which is why the lobby's `stakes` column is meaningful across all of them.
-    const stakes = s.bigBlind;
-    // Buy-in depth in big blinds — how players actually compare tables. Guarded because a room
-    // with no blind (some fixed-stake games) would divide by zero.
-    const buyInBB = stakes > 0 ? Math.round(s.minBuyIn / stakes) : 0;
+    // The stake level: the big blind for poker, a fixed base stake for a game that has one
+    // (only Dou Di Zhu today), and NULL for the rest.
+    //
+    // The comment that used to sit here said the non-poker rooms "carry their base bet in the
+    // same field, which is why the lobby's stakes column is meaningful across all of them".
+    // That was false — every one of them hardcoded `bigBlind: 0` — and because it read as an
+    // explanation, nobody checked it. Nine of thirteen tables advertised "Blinds 0/0".
+    const stakes = s.bigBlind ?? s.baseStake ?? null;
+    // Buy-in depth in big blinds. Null, not 0, when there is no stake to divide by: "0 BB" is a
+    // claim about depth, and an unmeasurable depth is not a shallow one.
+    const buyInBB = stakes !== null && stakes > 0 ? Math.round(s.minBuyIn / stakes) : null;
+    const smallBlind = s.smallBlind ?? null;
 
     const existing = lobby.getTable(s.tableId);
     if (existing) {
-      lobby.updateTable(s.tableId, { players: s.seated, stakes });
+      lobby.updateTable(s.tableId, { players: s.seated, stakes, smallBlind });
       continue;
     }
 
@@ -75,6 +81,7 @@ export function syncLobbyWithLiveTables(
       id: s.tableId,
       gameId,
       stakes,
+      smallBlind,
       players: s.seated,
       // The room does not report a pooled jackpot in its summary. 0 means "nothing to advertise",
       // and every client already prints OPEN instead of a figure for it. Inventing one here is

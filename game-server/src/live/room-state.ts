@@ -156,8 +156,30 @@ export interface TableSummary {
   tableId: string;
   name: string;
   variant: string;
-  smallBlind: number;
-  bigBlind: number;
+  /**
+   * The blind structure, or NULL for a game that does not have one.
+   *
+   * Null, never 0. Every non-poker room used to report `bigBlind: 0`, which the
+   * lobby faithfully rendered as "Blinds 0/0" on nine of thirteen tables — a
+   * figure the platform asserted about itself and that was never true. A game
+   * where each player picks their own bet per round has no blind level, and
+   * "no blind level" is not the number zero (docs/TRAPS.md #3).
+   *
+   * Poker rooms set both. Everything else leaves them null and, if it has a
+   * fixed stake of its own, reports it as `baseStake` instead.
+   */
+  smallBlind: number | null;
+  bigBlind: number | null;
+  /**
+   * A fixed per-round stake, for games that have one instead of blinds.
+   *
+   * A SEPARATE FIELD rather than smuggling the value through `bigBlind`.
+   * `live-sync.ts` used to claim in a comment that "the non-poker rooms carry
+   * their base bet in the same field" — they did not, they carried a hardcoded
+   * zero, and the comment kept anyone from checking (docs/TRAPS.md #7). Only
+   * Dou Di Zhu has one today.
+   */
+  baseStake?: number | null;
   minBuyIn: number;
   maxBuyIn: number;
   maxSeats: number;

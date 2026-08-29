@@ -42,13 +42,22 @@ interface LobbyTable {
   id: string;
   gameId: string;
   name: string;
-  /** Stake level — big blind for poker, base bet elsewhere. */
-  stakes: number;
+  /**
+   * Stake level in table chips — the big blind for poker, a fixed base stake
+   * for a game that has one, or NULL for a game with neither.
+   *
+   * Nullable because most games here have no table-level stake at all: each
+   * player picks their own bet per round. They used to report 0, which this
+   * screen rendered as "Blinds 0/0" on nine of thirteen tables.
+   */
+  stakes: number | null;
+  /** The small blind, sent by the server rather than derived as `stakes / 2`. */
+  smallBlind?: number | null;
   players: number;
   maxPlayers: number;
   seatsFree: number;
   jackpot: number;
-  buyInBB: number;
+  buyInBB: number | null;
   status: TableStatus;
   /** Set only when the table cannot start: how many more players it needs. */
   waitingFor?: number;
@@ -256,7 +265,22 @@ function TableRow({ table, onOpen }: { table: LobbyTable; onOpen: () => void }) 
   // opposite: print "1000000/2000000" for a 1/2 table. Chips are not
   // currency, so no money() and no micro conversion — just a formatted
   // integer.
-  const blinds = `${(table.stakes / 2).toLocaleString()}/${table.stakes.toLocaleString()}`;
+  //
+  // An em dash when the table has no blind structure at all. Nine of the
+  // thirteen live tables let each player pick their own bet, and "0/0" claimed
+  // a stake level none of them has (docs/TRAPS.md #3).
+  //
+  // The small blind is SENT, never derived. `stakes / 2` is right only while
+  // every table is half-and-half — a league admin sets the two independently,
+  // and Dou Di Zhu has a flat base stake of 100 with no small blind at all,
+  // which a halving fallback rendered as "50/100". A game with one figure
+  // shows one figure.
+  const blinds =
+    table.stakes === null || table.stakes === undefined
+      ? '—'
+      : table.smallBlind === null || table.smallBlind === undefined
+        ? table.stakes.toLocaleString()
+        : `${table.smallBlind.toLocaleString()}/${table.stakes.toLocaleString()}`;
   const hint =
     `${t('lobby.colPlayers')} ${table.players}/${table.maxPlayers}` +
     ` · ${t('lobby.colBlinds')} ${blinds}`;

@@ -67,12 +67,14 @@ export function buildPlayerTableRouter(
       // DEFAULT_ROOM's exported type widens these to `unknown`; they are the
       // poker blinds/buy-in and always numbers at runtime.
       const bigBlind = DEFAULT_ROOM.bigBlind as number;
+      const smallBlind = DEFAULT_ROOM.smallBlind as number;
       const minBuyIn = DEFAULT_ROOM.minBuyIn as number;
       try {
         deps.lobby.addTable({
           id: tableId,
           gameId: 'texas',
           stakes: bigBlind,
+          smallBlind,
           players: 0,
           jackpot: 0,
           buyInBB: Math.max(1, Math.floor(minBuyIn / bigBlind)),
