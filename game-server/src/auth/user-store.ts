@@ -38,10 +38,62 @@ async function createWithPassword(
   return user.toObject();
 }
 
-async function verifyCredentials(identifier: string, passwordPlain: string): Promise<UserDoc | null> {
+/**
+ * Why a sign-in was refused.
+ *
+ * READ THIS BEFORE WIDENING IT. Telling the caller WHICH half was wrong is a
+ * product decision that was taken deliberately and against the usual advice, so
+ * that a user who mistypes knows which field to fix rather than re-entering
+ * both. It has a real cost, and the cost is not hypothetical:
+ *
+ *   `no_account` vs `wrong_password` is an ACCOUNT ENUMERATION ORACLE. Anyone can
+ *   feed in a list of email addresses and learn which ones are registered here,
+ *   then aim every subsequent password attempt at accounts they know exist. On a
+ *   platform that holds money, that list has value on its own.
+ *
+ * Two things follow, and neither is optional if this stays:
+ *
+ *   1. Rate limiting on /auth/login is now load-bearing, not a nice-to-have. It
+ *      is the ONLY thing left standing between this endpoint and an unbounded
+ *      enumeration sweep. It does not exist yet — see the PR.
+ *   2. The reasons must stay a CLOSED set of codes, never free text built from a
+ *      document. A message assembled from what was found in the database is one
+ *      refactor away from putting the display name or the email of an account the
+ *      caller does not own into the response.
+ */
+export type LoginRefusal = 'no_account' | 'wrong_password' | 'use_google';
+
+export class LoginError extends Error {
+  constructor(readonly code: LoginRefusal, message: string) {
+    super(message);
+    this.name = 'LoginError';
+  }
+}
+
+/** English fallback for each refusal. The client translates from the code. */
+const REFUSAL_TEXT: Readonly<Record<LoginRefusal, string>> = {
+  no_account: 'No account found with that email or phone number',
+  wrong_password: 'Incorrect password',
+  use_google: 'This account was created with Google — use “Continue with Google”',
+};
+
+/**
+ * Resolve a sign-in attempt to a user, or to the reason it failed.
+ *
+ * `use_google` is its own answer rather than being folded into `wrong_password`:
+ * an account created through Google has no password hash at all, so every
+ * password on earth is "wrong" for it and telling the user to check their typing
+ * would send them round a loop they cannot escape.
+ */
+async function verifyCredentials(
+  identifier: string,
+  passwordPlain: string,
+): Promise<{ ok: true; user: UserDoc } | { ok: false; code: LoginRefusal }> {
   const user = await findByIdentifier(identifier);
-  if (!user || !user.passwordHash) return null;
-  return (await bcrypt.compare(passwordPlain, user.passwordHash)) ? user : null;
+  if (!user) return { ok: false, code: 'no_account' };
+  if (!user.passwordHash) return { ok: false, code: 'use_google' };
+  const matches = await bcrypt.compare(passwordPlain, user.passwordHash);
+  return matches ? { ok: true, user } : { ok: false, code: 'wrong_password' };
 }
 
 async function findOrCreateGoogle(
@@ -98,9 +150,14 @@ export const userStore = {
     return toIdentity(await createWithPassword(identifier, password, displayName));
   },
   async verifyPassword(identifier: string, password: string): Promise<StoredIdentity> {
-    const user = await verifyCredentials(identifier, password);
-    if (!user) throw new Error('invalid email or password');
-    return toIdentity(user);
+    const result = await verifyCredentials(identifier, password);
+    if (!result.ok) {
+      // English here is the fallback only. The client translates from `code`
+      // (see mobile/src/auth.tsx) — a server that speaks one language cannot be
+      // the source of a user-facing string in an app that ships eight.
+      throw new LoginError(result.code, REFUSAL_TEXT[result.code]);
+    }
+    return toIdentity(result.user);
   },
   async oauth(
     googleId: string,

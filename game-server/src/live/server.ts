@@ -85,7 +85,7 @@ export function defaultTables(): LiveTableConfig[] {
       // the felt shows chairs nobody can sit in.
       maxSeats: 8,
     },
-    { ...DEFAULT_ROOM, id: 'omaha', game: 'omaha', variantId: 'omaha', name: 'Omaha · $0.10/0.20' },
+    { ...DEFAULT_ROOM, id: 'omaha', game: 'omaha', variantId: 'omaha', name: 'Omaha PL · $0.10/0.20' },
     { id: 'baccarat', name: 'Baccarat · Player Banked', game: 'baccarat', minBuyIn: 1_000, maxBuyIn: 50_000, maxSeats: 8, rakeBps: 500, tiePayout: 8 },
     // The buy-in is DERIVED from the exposure rule, not picked: whoever holds the bank must be able
     // to cover every other seat staking the minimum and all of them turning over Five Small (6x).
