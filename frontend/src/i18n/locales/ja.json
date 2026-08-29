@@ -679,7 +679,8 @@
     "avatarUploading": "アバターをアップロード中…",
     "avatarUploaded": "アバターを更新しました",
     "avatarTooLargeClient": "この写真は2MBを超えています。もっと小さい画像を選んでください。",
-    "avatarWrongTypeClient": "JPEG、PNG、WebP形式の画像を選んでください。"
+    "avatarWrongTypeClient": "JPEG、PNG、WebP形式の画像を選んでください。",
+    "avatarPermissionDenied": "写真へのアクセス許可が必要です。端末の設定で許可するか、上のアバターから選んでください。"
   },
   "avatars": {
     "a-spade": "スペード",

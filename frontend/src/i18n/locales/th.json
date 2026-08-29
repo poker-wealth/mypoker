@@ -679,7 +679,8 @@
     "avatarUploading": "กำลังอัปโหลดอวตาร…",
     "avatarUploaded": "อัปเดตอวตารแล้ว",
     "avatarTooLargeClient": "รูปนี้มีขนาดเกิน 2 MB โปรดเลือกรูปที่เล็กกว่านี้",
-    "avatarWrongTypeClient": "โปรดเลือกรูปภาพแบบ JPEG, PNG หรือ WebP"
+    "avatarWrongTypeClient": "โปรดเลือกรูปภาพแบบ JPEG, PNG หรือ WebP",
+    "avatarPermissionDenied": "MYPOKER ต้องการสิทธิ์เข้าถึงรูปภาพของคุณ โปรดอนุญาตในการตั้งค่าอุปกรณ์ หรือเลือกอวาตาร์ด้านบน"
   },
   "avatars": {
     "a-spade": "โพดำ",

@@ -679,7 +679,8 @@
     "avatarUploading": "अवतार अपलोड हो रहा है…",
     "avatarUploaded": "अवतार अपडेट हो गया",
     "avatarTooLargeClient": "यह फ़ोटो 2 MB से बड़ी है — कोई छोटी फ़ोटो चुनें।",
-    "avatarWrongTypeClient": "JPEG, PNG या WebP छवि चुनें।"
+    "avatarWrongTypeClient": "JPEG, PNG या WebP छवि चुनें।",
+    "avatarPermissionDenied": "MYPOKER को आपकी फ़ोटो खोलने की अनुमति चाहिए। डिवाइस सेटिंग में अनुमति दें, या ऊपर दिए अवतार में से चुनें।"
   },
   "avatars": {
     "a-spade": "हुकुम",

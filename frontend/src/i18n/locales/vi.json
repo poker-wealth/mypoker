@@ -679,7 +679,8 @@
     "avatarUploading": "Đang tải ảnh đại diện lên…",
     "avatarUploaded": "Đã cập nhật ảnh đại diện",
     "avatarTooLargeClient": "Ảnh này vượt quá 2 MB — hãy chọn ảnh nhỏ hơn.",
-    "avatarWrongTypeClient": "Hãy chọn ảnh định dạng JPEG, PNG hoặc WebP."
+    "avatarWrongTypeClient": "Hãy chọn ảnh định dạng JPEG, PNG hoặc WebP.",
+    "avatarPermissionDenied": "MYPOKER cần quyền truy cập ảnh của bạn. Hãy cấp quyền trong cài đặt thiết bị, hoặc chọn một ảnh đại diện ở trên."
   },
   "avatars": {
     "a-spade": "Bích",

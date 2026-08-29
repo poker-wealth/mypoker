@@ -679,7 +679,8 @@
     "avatarUploading": "Mengunggah avatar…",
     "avatarUploaded": "Avatar diperbarui",
     "avatarTooLargeClient": "Foto ini lebih dari 2 MB — pilih foto yang lebih kecil.",
-    "avatarWrongTypeClient": "Pilih gambar berformat JPEG, PNG, atau WebP."
+    "avatarWrongTypeClient": "Pilih gambar berformat JPEG, PNG, atau WebP.",
+    "avatarPermissionDenied": "MYPOKER perlu izin untuk membuka foto Anda. Izinkan di pengaturan perangkat, atau pilih salah satu avatar di atas."
   },
   "avatars": {
     "a-spade": "Sekop",

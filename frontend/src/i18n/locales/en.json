@@ -679,7 +679,8 @@
     "avatarUploading": "Uploading avatar…",
     "avatarUploaded": "Avatar updated",
     "avatarTooLargeClient": "That photo is over 2 MB — choose a smaller one.",
-    "avatarWrongTypeClient": "Choose a JPEG, PNG or WebP image."
+    "avatarWrongTypeClient": "Choose a JPEG, PNG or WebP image.",
+    "avatarPermissionDenied": "MYPOKER needs permission to open your photos. Allow it in your device settings, or pick one of the avatars above."
   },
   "avatars": {
     "a-spade": "Spade",

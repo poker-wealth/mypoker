@@ -14,7 +14,8 @@
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSMicrophoneUsageDescription": "MYPOKER uses the microphone so you can send short voice notes at a table."
+        "NSMicrophoneUsageDescription": "MYPOKER uses the microphone so you can send short voice notes at a table.",
+        "NSPhotoLibraryUsageDescription": "MYPOKER uses your photos so you can set one as your profile picture."
       }
     },
     "android": {
@@ -52,6 +53,13 @@
           "resizeMode": "contain",
           "backgroundColor": "#0d0d1a",
           "imageWidth": 200
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "MYPOKER uses your photos so you can set one as your profile picture.",
+          "cameraPermission": false
         }
       ]
     ],

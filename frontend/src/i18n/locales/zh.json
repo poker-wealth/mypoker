@@ -679,7 +679,8 @@
     "avatarUploading": "正在上传头像…",
     "avatarUploaded": "头像已更新",
     "avatarTooLargeClient": "该照片超过 2 MB，请选择更小的图片。",
-    "avatarWrongTypeClient": "请选择 JPEG、PNG 或 WebP 格式的图片。"
+    "avatarWrongTypeClient": "请选择 JPEG、PNG 或 WebP 格式的图片。",
+    "avatarPermissionDenied": "MYPOKER 需要访问照片的权限。请在系统设置中开启，或从上方选择一个头像。"
   },
   "avatars": {
     "a-spade": "黑桃",

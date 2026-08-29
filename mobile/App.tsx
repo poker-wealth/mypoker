@@ -27,6 +27,7 @@ import { DataScreen } from './src/screens/DataScreen';
 import { LobbyScreen } from './src/screens/LobbyScreen';
 import { GamesScreen } from './src/screens/GamesScreen';
 import { FeltGalleryScreen } from './src/screens/FeltGalleryScreen';
+import { PersonalInfoScreen } from './src/screens/PersonalInfoScreen';
 import { JackpotScreen } from './src/screens/JackpotScreen';
 import { FairnessScreen } from './src/screens/FairnessScreen';
 import { VipScreen } from './src/screens/VipScreen';
@@ -337,6 +338,13 @@ function Root() {
           options={{ title: t('notifications.title') }}
         />
         <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: t('account.settings') }} />
+        {/* Not a tab on the web either — reached from Account's "Personal Info"
+            row. Its absence here is what `check:parity` was failing on. */}
+        <Stack.Screen
+          name="PersonalInfo"
+          component={PersonalInfoScreen}
+          options={{ title: t('account.personalInfo') }}
+        />
         <Stack.Screen
           name="AgentCenter"
           component={AgentCenterScreen}

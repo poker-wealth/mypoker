@@ -157,6 +157,10 @@ export function ProfileScreen() {
                 ) : undefined
               }
             />
+            <ListRow
+              label={t('account.personalInfo')}
+              onPress={() => navigation.navigate('PersonalInfo')}
+            />
             <ListRow label={t('account.settings')} onPress={() => navigation.navigate('Settings')} />
             <ListRow label={t('account.signOut')} onPress={() => void signOut()} />
           </Card>

@@ -53,6 +53,15 @@ interface AuthContextValue {
   /** Another code for a confirmation already in flight. */
   resendCode: (email: string) => Promise<PendingConfirmation>;
   signInWithGoogle: () => Promise<void>;
+  /**
+   * Re-read `/auth/me` and replace the cached player.
+   *
+   * For changes made from inside the app that the server is authority on — the
+   * display name is the first. Without it the header and every screen reading
+   * the cached player keep showing the old name until the next cold start,
+   * which reads as the save having silently failed.
+   */
+  refreshPlayer: () => Promise<void>;
   signOut: () => Promise<void>;
   error: string | null;
   clearError: () => void;
@@ -214,6 +223,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshPlayer = useCallback(async () => {
+    try {
+      const profile = await api.get<Player>('/auth/me');
+      setPlayer(profile);
+      void setCachedPlayer(profile);
+    } catch {
+      // Best-effort. A failed refresh leaves the previous player in place,
+      // which is stale but true-as-of-last-read; blanking it would be worse.
+    }
+  }, []);
+
   const signInWithGoogle = useCallback(async () => {
     setBusy(true);
     setError(null);
@@ -257,6 +277,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       confirmEmail,
       resendCode,
       signInWithGoogle,
+      refreshPlayer,
       signOut,
       error,
       clearError,
@@ -270,6 +291,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       confirmEmail,
       resendCode,
       signInWithGoogle,
+      refreshPlayer,
       signOut,
       error,
       clearError,
