@@ -268,6 +268,21 @@ export class PokerRoom implements LiveRoom {
   private handNumber = 0;
   private buttonSeat = -1;
   private actionDeadline: number | null = null;
+  /**
+   * Which turn the clocks belong to. Bumped whenever a turn ends, for any
+   * reason.
+   *
+   * clearTimeout cannot un-queue a timer that has ALREADY fired: by the time an
+   * action is being applied, an expiry callback may already be sitting in the
+   * promise queue behind it. The queue serialises them, so they cannot
+   * interleave — but without this, both would still run, and the second would
+   * act on a turn that no longer exists.
+   *
+   * Every timer captures the epoch it was armed under and returns if it no
+   * longer matches. Exactly one terminal event per turn wins: action, timeout,
+   * or the seat going away.
+   */
+  private turnEpoch = 0;
   /** True while the current clock is the reserve rather than the turn clock. */
   private usingTimeBank = false;
   /** When the reserve clock started, so the unused remainder can be given back. */
@@ -949,11 +964,19 @@ export class PokerRoom implements LiveRoom {
     // A fresh turn is never on reserve — the reserve is only ever entered from
     // an expiring turn clock, deliberately, so it cannot leak away unnoticed.
     this.usingTimeBank = false;
+    this.timeBankStartedAt = null;
     this.turnStartedAt = Date.now();
     this.actionDeadline = Date.now() + this.config.actionTimeoutMs;
+
+    const epoch = this.turnEpoch;
     this.actionTimer = setTimeout(() => {
       this.actionTimer = undefined;
-      void this.enqueue(() => this.onTurnClockExpired(toAct));
+      void this.enqueue(() => {
+        // Already resolved by an action or a departure while this sat in the
+        // queue — that transition won, this one does not get to run.
+        if (epoch !== this.turnEpoch) return Promise.resolve();
+        return this.onTurnClockExpired(toAct);
+      });
     }, this.config.actionTimeoutMs);
   }
 
@@ -966,6 +989,10 @@ export class PokerRoom implements LiveRoom {
    * actually thinking presses the button, which takes the other path.
    */
   private async onTurnClockExpired(playerId: string): Promise<void> {
+    // Same guard actForTimedOutPlayer carries. Belt and braces with the epoch:
+    // entering the reserve for a player who has already acted would charge them
+    // for a decision they never made.
+    if (this.phase !== 'IN_HAND' || !this.game || this.toActPlayer() !== playerId) return;
     const seat = this.seatOf(playerId);
     if (seat && seat.autoTimeBank && seat.timeBankMs > 0 && !this.usingTimeBank) {
       this.enterTimeBank(seat);
@@ -988,13 +1015,18 @@ export class PokerRoom implements LiveRoom {
     this.actionDeadline = Date.now() + seat.timeBankMs;
 
     const granted = seat.timeBankMs;
+    // The reserve continues the SAME turn, so it inherits that turn's epoch
+    // rather than starting a new one.
+    const epoch = this.turnEpoch;
     this.actionTimer = setTimeout(() => {
       this.actionTimer = undefined;
       void this.enqueue(async () => {
+        if (epoch !== this.turnEpoch) return;
         // Reserve exhausted — the original behaviour, unchanged.
         const s = this.seatOf(seat.playerId);
         if (s) s.timeBankMs = 0;
         this.usingTimeBank = false;
+        this.timeBankStartedAt = null;
         await this.actForTimedOutPlayer(seat.playerId);
       });
     }, granted);
@@ -1010,6 +1042,9 @@ export class PokerRoom implements LiveRoom {
    * it, and the feature would exist without being usable.
    */
   private refundUnusedTimeBank(playerId: string): void {
+    // Idempotent by construction: the first call clears both flags, so a second
+    // — from a queued timeout, a departure, or the hand ending — returns here
+    // rather than deducting the same seconds twice.
     if (!this.usingTimeBank || this.timeBankStartedAt === null) return;
     const seat = this.seatOf(playerId);
     if (seat) {
@@ -1034,10 +1069,19 @@ export class PokerRoom implements LiveRoom {
   }
 
   private clearActionClock(): void {
+    // THE turn transition. Bumping the epoch invalidates any timer that has
+    // already fired and is queued behind whatever is calling this — clearTimeout
+    // alone cannot reach those.
+    this.turnEpoch++;
     if (this.actionTimer) clearTimeout(this.actionTimer);
     this.actionTimer = undefined;
     this.actionDeadline = null;
     this.turnStartedAt = null;
+    // A turn cannot end with reserve still notionally running. Whoever ends it
+    // settles it; refundUnusedTimeBank is idempotent, so a second call is a
+    // no-op rather than a second deduction.
+    this.usingTimeBank = false;
+    this.timeBankStartedAt = null;
     // A turn ended (acted or timed out) — drop any un-confirmed all-in arm so it can't carry over.
     this.pendingMajorConfirm.clear();
   }
@@ -1149,6 +1193,13 @@ export class PokerRoom implements LiveRoom {
   private async releaseSeat(index: number): Promise<void> {
     const seat = this.seats[index];
     if (!seat) return;
+    // Leaving mid-decision is a turn transition like any other: settle whatever
+    // reserve was running and invalidate the clock, so a timer that fires after
+    // the chair is empty cannot act for someone who is no longer at the table.
+    if (this.toActPlayer() === seat.playerId) {
+      this.refundUnusedTimeBank(seat.playerId);
+      this.clearActionClock();
+    }
     this.clearAwayTimers(seat);
     if (seat.stack > 0) await this.fc.release(seat.playerId, String(seat.stack));
     this.behavior.delete(seat.playerId); // the seat's behaviour session ends when they leave
