@@ -29,6 +29,12 @@ export function TableEntrySheet({ open, onClose }: { open: boolean; onClose: () 
 
   const [step, setStep] = useState<'choose' | 'create'>('choose');
   const [visibility, setVisibility] = useState<TableVisibility>('public');
+  /**
+   * Chairs, not players required. Two ready players deal a hand at any size —
+   * a smaller table just fills up faster, which is usually what someone opening
+   * one for friends actually wants.
+   */
+  const [seats, setSeats] = useState(6);
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -50,7 +56,7 @@ export function TableEntrySheet({ open, onClose }: { open: boolean; onClose: () 
 
   const submit = (): void => {
     create.mutate(
-      { game: 'texas', visibility },
+      { game: 'texas', visibility, seats },
       {
         onSuccess: (table) => setCreatedId(table.tableId),
         onError: (e) => {
@@ -82,6 +88,10 @@ export function TableEntrySheet({ open, onClose }: { open: boolean; onClose: () 
   };
 
   const VIS: TableVisibility[] = ['public', 'private'];
+  // Capped at 6: the portrait felt draws six chairs, and the server refuses
+  // more. Short Deck's wide felt draws eight, so this grows with the game once
+  // creating a non-Hold'em table is possible.
+  const SEAT_CHOICES = [2, 4, 6];
 
   return (
     <Sheet open={open} onClose={close} title={t('tableEntry.title')}>
@@ -129,6 +139,24 @@ export function TableEntrySheet({ open, onClose }: { open: boolean; onClose: () 
               value={visibility}
               onChange={setVisibility}
             />
+          </label>
+
+          {/* Chairs at the table. Labelled as seats rather than "players"
+              because it is not a requirement — two ready players deal a hand at
+              any size, and the rest of the chairs simply wait. */}
+          <label className="block space-y-1.5">
+            <span className="text-[0.66rem] font-semibold text-dim">{t('tableEntry.seats')}</span>
+            {/* Segmented speaks strings; the seat count is a number on the wire
+                and in the server's range check, so it is converted at the edge
+                rather than kept as a string and parsed later. */}
+            <Segmented
+              options={SEAT_CHOICES.map((n) => ({ value: String(n), label: String(n) }))}
+              value={String(seats)}
+              onChange={(v) => setSeats(Number(v))}
+            />
+            <span className="block text-[0.66rem] text-dim">
+              {t('tableEntry.seatsBlurb', { count: seats })}
+            </span>
           </label>
 
           <div className="flex items-start gap-2.5 rounded-(--radius-app) border border-border bg-surface p-3">

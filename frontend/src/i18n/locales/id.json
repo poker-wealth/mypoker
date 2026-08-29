@@ -661,6 +661,8 @@
     "copy": "Salin tautan undangan",
     "copied": "Tautan disalin",
     "enter": "Masuk meja",
-    "error": "Tidak bisa membuat meja. Silakan coba lagi."
+    "error": "Tidak bisa membuat meja. Silakan coba lagi.",
+    "seats": "Kursi",
+    "seatsBlurb": "{{count}} kursi. Dua pemain sudah cukup untuk mulai."
   }
 }

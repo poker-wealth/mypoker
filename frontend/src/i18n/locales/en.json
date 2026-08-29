@@ -661,6 +661,8 @@
     "copy": "Copy invite link",
     "copied": "Link copied",
     "enter": "Enter table",
-    "error": "Couldn't open the table. Please try again."
+    "error": "Couldn't open the table. Please try again.",
+    "seats": "Seats",
+    "seatsBlurb": "{{count}} chairs. Two players is enough to start."
   }
 }

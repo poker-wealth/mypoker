@@ -661,6 +661,8 @@
     "copy": "Sao chép liên kết mời",
     "copied": "Đã sao chép liên kết",
     "enter": "Vào bàn",
-    "error": "Không thể tạo bàn. Vui lòng thử lại."
+    "error": "Không thể tạo bàn. Vui lòng thử lại.",
+    "seats": "Chỗ ngồi",
+    "seatsBlurb": "{{count}} chỗ. Hai người là đủ để bắt đầu."
   }
 }

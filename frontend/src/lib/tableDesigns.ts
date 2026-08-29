@@ -76,44 +76,53 @@ function stadiumRings(edge: { x: number; yTop: number; yBottom: number; yMid: nu
 }
 
 /**
- * Six seats on a LANDSCAPE stadium table: three along the bottom rail, three
- * along the top, mirroring the three cushion segments the artwork actually has.
+ * EIGHT seats on a LANDSCAPE stadium table, following the chairs the artwork
+ * actually draws: three cushion segments along the bottom rail, three along the
+ * top, and one at each rounded end.
  *
  * Not a rotation of `stadiumRings`. That one puts its side pairs on the long
  * straight edges, which on a wide table are the top and bottom — so reusing it
- * here would drop four players into the middle of the felt. The rounded ends of
- * a landscape table are short enough that seating anyone there crowds the
- * neighbours, so the ends stay empty and the seats spread along the straights.
+ * here would drop four players into the middle of the felt.
  *
- * Hero is always index 0, bottom-centre.
+ * Hero is always index 0, bottom-centre, and the ring runs the same direction
+ * as the portrait one: bottom → left → top → right.
  */
 function wideRings(edge: {
-  /** Horizontal inset of the outer seats, as a % of width. */
+  /** Horizontal inset of the rail seats, as a % of width. */
   x: number;
+  /** Horizontal inset of the two END seats — further out, on the curve. */
+  endX: number;
   yTop: number;
   yBottom: number;
 }): Record<number, SeatPos[]> {
-  const { x, yTop, yBottom } = edge;
+  const { x, endX, yTop, yBottom } = edge;
   const right = 100 - x;
-  // Outer seats sit slightly further in from the rail than the centre ones,
-  // following the curve of the oval rather than a straight line.
+  const endRight = 100 - endX;
+  // Rail seats either side of centre sit slightly inboard, following the curve
+  // of the oval rather than a straight line.
   const yTopOuter = yTop + 6;
   const yBottomOuter = yBottom - 6;
-  const six: SeatPos[] = [
-    { left: '50%', top: `${yBottom}%`, align: 'bottom' },
-    { left: `${x}%`, top: `${yBottomOuter}%`, align: 'bottom' },
-    { left: `${x}%`, top: `${yTopOuter}%`, align: 'top' },
-    { left: '50%', top: `${yTop}%`, align: 'top' },
-    { left: `${right}%`, top: `${yTopOuter}%`, align: 'top' },
-    { left: `${right}%`, top: `${yBottomOuter}%`, align: 'bottom' },
+  const eight: SeatPos[] = [
+    { left: '50%', top: `${yBottom}%`, align: 'bottom' }, // 0 bottom centre — hero
+    { left: `${x}%`, top: `${yBottomOuter}%`, align: 'bottom' }, // 1 bottom left
+    { left: `${endX}%`, top: '50%', align: 'left' }, // 2 left end cap
+    { left: `${x}%`, top: `${yTopOuter}%`, align: 'top' }, // 3 top left
+    { left: '50%', top: `${yTop}%`, align: 'top' }, // 4 top centre
+    { left: `${right}%`, top: `${yTopOuter}%`, align: 'top' }, // 5 top right
+    { left: `${endRight}%`, top: '50%', align: 'right' }, // 6 right end cap
+    { left: `${right}%`, top: `${yBottomOuter}%`, align: 'bottom' }, // 7 bottom right
   ];
+  const pick = (...i: number[]): SeatPos[] => i.map((n) => eight[n]!);
   return {
-    // Heads-up faces you across the table, which on a wide felt is top-centre.
-    2: [six[0]!, six[3]!],
-    3: [six[0]!, six[2]!, six[4]!],
-    4: [six[0]!, six[1]!, six[3]!, six[5]!],
-    5: [six[0]!, six[1]!, six[2]!, six[4]!, six[5]!],
-    6: six,
+    // Every size stays symmetric about the hero, so a short-handed table reads
+    // as a table rather than as everyone bunched down one end.
+    2: pick(0, 4), // heads-up faces you across the felt
+    3: pick(0, 3, 5),
+    4: pick(0, 2, 4, 6), // the four compass points
+    5: pick(0, 1, 3, 5, 7),
+    6: pick(0, 1, 3, 4, 5, 7), // three along each long rail
+    7: pick(0, 1, 2, 3, 4, 5, 7),
+    8: eight,
   };
 }
 
@@ -145,20 +154,24 @@ export const TABLE_DESIGNS: TableDesign[] = [
    * `table.png` turned on its side (1672×941 against its 941×1672), so the seat
    * ring comes from `wideRings` rather than `stadiumRings`.
    *
-   * Short Deck defaults to the green one — see `designForVariant` below — but
-   * they are ordinary entries in this list, so the picker still offers both on
-   * any table, and a player's own choice always wins.
+   * EIGHT seats: three cushion segments along each long rail plus a rounded end
+   * cap either side, which is what the artwork actually draws.
+   *
+   * Both are `hidden` — they are not picked directly. A player chooses Midnight
+   * Blue or Emerald Classic and `designForGame` swaps in the matching wide felt
+   * when the game is played on one. The colour is theirs; the shape is the
+   * game's.
    */
   {
     id: 'shortdeck-green',
     name: 'Short Deck Green',
-    blurb: 'Wide six-max felt, classic casino green',
+    blurb: 'Wide eight-seat felt, classic casino green',
     artUrl: '/table/shortdeck-green.png',
     aspect: '1672 / 941',
     boardTop: '50%',
     accent: '#34d399',
     hidden: true,
-    rings: wideRings({ x: 22, yTop: 13, yBottom: 87 }),
+    rings: wideRings({ x: 26, endX: 6, yTop: 13, yBottom: 87 }),
   },
   {
     id: 'shortdeck-blue',
@@ -169,7 +182,7 @@ export const TABLE_DESIGNS: TableDesign[] = [
     boardTop: '50%',
     accent: '#3b82f6',
     hidden: true,
-    rings: wideRings({ x: 22, yTop: 13, yBottom: 87 }),
+    rings: wideRings({ x: 26, endX: 6, yTop: 13, yBottom: 87 }),
   },
   {
     id: 'neon',
@@ -179,6 +192,9 @@ export const TABLE_DESIGNS: TableDesign[] = [
     aspect: '3 / 4',
     boardTop: '50%',
     accent: 'var(--accent)',
+    // No violet wide art exists, so a Neon player gets the blue landscape felt —
+    // the nearer of the two to the brand.
+    wideId: 'shortdeck-blue',
     rings: {
       2: [
         { left: '50%', top: '89%', align: 'bottom' },
