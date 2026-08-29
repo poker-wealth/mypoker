@@ -124,9 +124,23 @@ checklist.
 |---|---|---|---|
 | 1 | Bottom navigation | **P** | Alliance · Games · Lobby · Data · My Account, same five in the same order on both clients, both landing on Lobby. Note the guard for this had **stopped running**: `check:parity` died with a PARSE FAILURE after the router hoisted `adminChildren` and mounted it at a host-dependent base. Repaired — and it immediately caught a real gap it had been blind to (see below). |
 | 2 | Lobby list | **F → fixed on this branch** | Names and seated counts were always right. **Stakes were wrong three ways**, all one root cause — `stakes` is table CHIPS and code written when it was micro-USD was never updated. (a) The web ran `formatMicros()` over it, so **all 13 tables read "Blinds 0/0"**, and the two rows both named "Texas Hold'em" were indistinguishable. (b) The web's filter thresholds were micro-USD against a server comparing chips, so **tapping any blinds filter emptied the lobby** (0 of 13). (c) Nine tables genuinely have no stake level and the server hardcoded `bigBlind: 0` for them, which both clients printed as "0/0". Now: poker reads 10/20 and 50/100 with the server's real small blind, Dou Di Zhu reads its 100 base stake, the other nine read an em dash, and the filter returns 5/5/2/0. |
-| 3 | Open a table | **P** (routing) | Four lists must agree — the tables the server serves, `LIVE_TABLE_IDS`, and the web and mobile felt registries. Cross-checked all four against the live lobby: every served table is openable and routes to its own game, and nothing routes to a game the server does not serve. Player-created (`t-…`) and league (`lg-…`) tables are Hold'em and correctly fall through to the poker felt. **Whether each felt RENDERS its game correctly is not verified** — that needs eyes. |
+| 3 | Open a table | **P** | Two halves, both now done. ROUTING: four lists must agree — the tables the server serves, `LIVE_TABLE_IDS`, and the web and mobile felt registries. Cross-checked all four against the live lobby: every served table is openable and routes to its own game, and nothing routes to a game the server does not serve. Player-created (`t-…`) and league (`lg-…`) tables are Hold'em and correctly fall through to the poker felt. RENDERING: **all 13 felts walked on an Android device** (29 Aug) through the dev Felt gallery. Each draws its own game, nothing collapsed, nothing crashed. The four poker ids share one felt by design and did. |
 | 4 | Hidden / "coming soon" games | **P** | Rendered as a plain `div` / `View` with a dashed border and a SOON badge on both clients. No press handler, so not tappable. |
-| 5 | No dead ends; Back works | **P** (mechanically) | Every `navigate()` target in both clients resolves to a route/screen that exists — no dead taps. Mobile's only headerless stack screen is `Tabs`, the tab root, which correctly has no back; every other screen gets a native one. Web sub-pages sit inside AppShell and always have BottomNav, and the one standalone route (`/table/:id`) carries its own back control. The TRAPS §12 dead end — seated with no way to stand — is **closed on both platforms**. Android hardware-back at a table still needs a device. |
+| 5 | No dead ends; Back works | **P** | Every `navigate()` target in both clients resolves to a route/screen that exists — no dead taps. Mobile's only headerless stack screen is `Tabs`, the tab root, which correctly has no back; every other screen gets a native one. Web sub-pages sit inside AppShell and always have BottomNav, and the one standalone route (`/table/:id`) carries its own back control. The TRAPS §12 dead end is closed on both platforms, and the whole sequence is now proven end to end by `npm run seat-probe` against a running gateway — sit, the lobby marks that row and only that row, an anonymous viewer sees nothing, a second table refuses BY NAME, stand, seat released, second table accepts. Eleven checks. Hardware back was exercised on a device and behaves as designed: the seat is kept, and the other table refuses. |
+
+### The gap behind "I pressed back and now I cannot join"
+
+Reported from the device, and worth writing down because the RULE was never
+wrong. `leave` (back button, unmount) deliberately does not vacate the seat — a
+network blip must not cost a stack mid-hand — and §8.1 refuses a second table
+while one is held. Both correct. What was missing was any way to find the seat
+doing the refusing: the message read "stand up at your other table first" and
+stopped there, and the lobby had no idea where you were sitting. With thirteen
+tables the only recovery was to open each in turn.
+
+Now: the refusal names the table, and the lobby marks the row with a "Your
+seat" badge. Same shape as TRAPS §12 one step further on — a correct rule with
+a missing affordance around it.
 
 ### What this section turned up beyond the checklist
 
@@ -138,6 +152,13 @@ checklist.
   out / Leave were hardcoded on the web while `table.rebuy`, `table.sitIn`,
   `table.sitOut` and `table.leave` sat translated in all eight files, used by
   mobile since it was built. Fixed.
+- **A name was cut to a silent stump.** Red Packet showed the claimant under
+  each packet as `name.slice(0, 6)` with no ellipsis, so "YOU (FIXTURE)" read as
+  "YOU (F" and two players called Christopher and Christina would both read
+  "Christ" — indistinguishable, and looking like whole names. The sweeper list
+  below renders the same name in full, which is what made the stump look
+  deliberate. Found by walking the gallery. Fixed to truncate on width and say
+  that it did.
 - **Felt routing is no longer a hand-maintained list.** `registry.test.ts` now
   reads the server's `defaultTables()`, so a new game cannot reach the lobby
   without a felt. Its old docstring admitted the hole: "adding a game to the
@@ -161,10 +182,14 @@ checklist.
 | 10 | Rejoin | **P** | Verified. |
 | 11 | Reconnect banner | **P** | Verified on a real network drop. |
 
-Also on the felts, found by audit and not yet fixed: **Niu Niu misstates the
-stake in both directions** (button says "Stake T500" when T100 is staked and up
-to T3,000 is at risk), and **Slots renders an invented CHERRY-BELL-STAR line**
-to any spectator as though it had been rolled.
+Also on the felts, found by audit. **Niu Niu misstating the stake in both
+directions is FIXED** (29 Aug) — the button read "Stake T500 (T100 x 5)" before
+the bet and "Staked T100" after, the same bet stated two ways. It now reads
+"Stake $500 - 5x on the result": the amount committed, with the multiplier
+named as what it is, something that scales SETTLEMENT rather than the stake.
+Still open: **Slots renders an invented CHERRY-BELL-STAR line** to any spectator
+as though it had been rolled. The dev Felt gallery cannot settle that one — every
+figure in it is fixture data — so it needs a real table.
 
 ---
 
