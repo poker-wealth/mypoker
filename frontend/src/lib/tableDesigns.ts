@@ -38,7 +38,7 @@ export interface TableDesign {
    * The LANDSCAPE counterpart of this felt, for games played on a wide table.
    *
    * The player picks the colour; the game picks the shape. Choosing Midnight
-   * Blue and sitting at Short Deck should give the blue WIDE table, not the
+   * Blue and sitting at Short Deck or Omaha gives the blue WIDE table, not the
    * green one and not a portrait felt — their preference still means something,
    * it just gets rendered in the shape the game is played on.
    */
@@ -135,7 +135,7 @@ export const TABLE_DESIGNS: TableDesign[] = [
     aspect: '512 / 768',
     boardTop: '50%',
     accent: '#3b82f6',
-    wideId: 'shortdeck-blue',
+    wideId: 'wide-blue',
     rings: stadiumRings({ x: 17, yTop: 12, yBottom: 92, yMid: 52 }),
   },
   {
@@ -146,13 +146,16 @@ export const TABLE_DESIGNS: TableDesign[] = [
     aspect: '941 / 1672',
     boardTop: '50%',
     accent: '#34d399',
-    wideId: 'shortdeck-green',
+    wideId: 'wide-green',
     rings: stadiumRings({ x: 14, yTop: 9, yBottom: 91, yMid: 50 }),
   },
   /**
-   * The two Short Deck felts. Landscape, unlike everything above — the art is
-   * `table.png` turned on its side (1672×941 against its 941×1672), so the seat
-   * ring comes from `wideRings` rather than `stadiumRings`.
+   * The two LANDSCAPE felts — used by Short Deck and Omaha. Named for their
+   * shape rather than a game, because they serve more than one: the files are
+   * still `shortdeck-*.png` from when Short Deck was the only wide game.
+   *
+   * The art is `table.png` turned on its side (1672×941 against its 941×1672),
+   * so the seat ring comes from `wideRings` rather than `stadiumRings`.
    *
    * EIGHT seats: three cushion segments along each long rail plus a rounded end
    * cap either side, which is what the artwork actually draws.
@@ -163,9 +166,9 @@ export const TABLE_DESIGNS: TableDesign[] = [
    * game's.
    */
   {
-    id: 'shortdeck-green',
-    name: 'Short Deck Green',
-    blurb: 'Wide eight-seat felt, classic casino green',
+    id: 'wide-green',
+    name: 'Wide Green',
+    blurb: 'Landscape eight-seat felt, classic casino green',
     artUrl: '/table/shortdeck-green.png',
     aspect: '1672 / 941',
     boardTop: '50%',
@@ -174,9 +177,9 @@ export const TABLE_DESIGNS: TableDesign[] = [
     rings: wideRings({ x: 26, endX: 6, yTop: 13, yBottom: 87 }),
   },
   {
-    id: 'shortdeck-blue',
-    name: 'Short Deck Blue',
-    blurb: 'The same wide felt in tournament blue',
+    id: 'wide-blue',
+    name: 'Wide Blue',
+    blurb: 'The same landscape felt in tournament blue',
     artUrl: '/table/shortdeck-blue.png',
     aspect: '1672 / 941',
     boardTop: '50%',
@@ -194,7 +197,7 @@ export const TABLE_DESIGNS: TableDesign[] = [
     accent: 'var(--accent)',
     // No violet wide art exists, so a Neon player gets the blue landscape felt —
     // the nearer of the two to the brand.
-    wideId: 'shortdeck-blue',
+    wideId: 'wide-blue',
     rings: {
       2: [
         { left: '50%', top: '89%', align: 'bottom' },
@@ -253,7 +256,20 @@ export function designById(id: string | null | undefined): TableDesign {
  * apostrophe away from silently never matching. The name is accepted as a
  * fallback for tables whose id does not name the game.
  */
-const WIDE_GAMES: readonly string[] = ['short-deck', "Short Deck Hold'em"];
+/**
+ * Games played on the WIDE felt, by table id and by variant display name.
+ *
+ * Hold'em keeps the portrait table; the variants get the landscape one. Both
+ * ids and names are listed because a fixed table's id names the game while a
+ * player-created one does not, and the snapshot carries the variant's display
+ * name rather than its id.
+ */
+const WIDE_GAMES: readonly string[] = [
+  'short-deck',
+  "Short Deck Hold'em",
+  'omaha',
+  'Omaha',
+];
 
 /**
  * The felt to render, given the game AND what the player likes.
