@@ -315,7 +315,11 @@ function LiveTable({ tableId }: { tableId: string }) {
         }}
       />
 
-      <TableDesignSheet open={designsOpen} onClose={() => setDesignsOpen(false)} />
+      <TableDesignSheet
+        open={designsOpen}
+        onClose={() => setDesignsOpen(false)}
+        {...(gameDesign ? { activeId: gameDesign.id } : {})}
+      />
     </div>
   );
 }

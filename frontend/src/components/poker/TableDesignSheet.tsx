@@ -12,11 +12,27 @@ import { cn } from '@/lib/cn';
  * Each option shows the actual felt rather than a swatch — the whole reason to offer a choice is
  * how the table looks, so the choice is made by looking at it. The pick is saved, so the felt you
  * chose is the one waiting next time you sit down.
+ *
+ * `activeId` is what is ACTUALLY on screen, which is not always what the player
+ * picked: a game can bring its own table (Short Deck is not played on the
+ * Hold'em felt). Without it the tick sat on the stored preference while a
+ * different felt filled the screen behind the sheet — the picker contradicting
+ * the table it is a picker for.
  */
-export function TableDesignSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function TableDesignSheet({
+  open,
+  onClose,
+  activeId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /** The felt actually rendered, when the game overrides the player's choice. */
+  activeId?: string;
+}) {
   const { t } = useTranslation();
-  const current = useTableDesign((s) => s.id);
+  const chosen = useTableDesign((s) => s.id);
   const setDesign = useTableDesign((s) => s.setDesign);
+  const current = activeId ?? chosen;
 
   return (
     <Sheet open={open} onClose={onClose} title={t('table.tableDesign')}>
