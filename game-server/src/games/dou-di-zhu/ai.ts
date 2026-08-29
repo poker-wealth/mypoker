@@ -187,6 +187,46 @@ export function findAllLegalMoves(hand: string[], previousCombo: Combo | null): 
     }
   }
 
+  /**
+   * Four-with-two — a quad plus two loose singles, or a quad plus two pairs.
+   *
+   * These were missing for the same reason pair-straights once were, but this
+   * one costs money rather than tempo. Four-with-two is NOT a bomb (see
+   * classifyPlay: it is deliberately its own shape, beaten by any bomb), so
+   * with the generator skipping it the ONLY way the AI could answer one was to
+   * detonate the quad as a bomb — and a bomb doubles the round multiplier
+   * (dou-di-zhu-game.ts). Answering four-with-two in kind leaves the stake
+   * where it is; every hand the AI plays it as a bomb doubles what the table
+   * pays out. It also could not lead the shape at all, so it never shed two
+   * dead cards behind a quad.
+   *
+   * Wings are cheapest-first, as with airplanes: only the quad's rank enters
+   * the comparison, so one attachment per quad is enough to answer wherever an
+   * answer is legal.
+   */
+  for (const q of sortedRanks) {
+    if (ranksMap.get(q)!.length !== 4) continue;
+    const core = take(q, 4);
+    const spare = sortedRanks.filter((r) => r !== q);
+
+    // Two lowest cards not in the quad. sortedRanks is ascending, so this is
+    // the cheapest pair of cards available — and it reaches the jokers only
+    // when there is genuinely nothing else to hang off the quad.
+    const loose = spare.flatMap((r) => ranksMap.get(r)!).slice(0, 2);
+    if (loose.length === 2) {
+      const cards = [...core, ...loose];
+      const res = validateMove(cards, previousCombo, hand);
+      if (res.valid && res.combination) legalMoves.push({ cards, combo: res.combination });
+    }
+
+    const wingPairs = spare.filter((r) => ranksMap.get(r)!.length >= 2).slice(0, 2);
+    if (wingPairs.length === 2) {
+      const cards = [...core, ...wingPairs.flatMap((r) => take(r, 2))];
+      const res = validateMove(cards, previousCombo, hand);
+      if (res.valid && res.combination) legalMoves.push({ cards, combo: res.combination });
+    }
+  }
+
   // Straights (5 to 12 consecutive singles, <= 14)
   const validSeqRanks = sortedRanks.filter((r) => r <= 14);
   for (let len = 5; len <= validSeqRanks.length; len++) {
@@ -240,7 +280,7 @@ export function analyseHand(hand: string[]): HandAnalysis {
   const hasRocket = Boolean(counts.get(16) && counts.get(17));
   const twos = counts.get(15) ?? 0;
 
-  let remaining = [...hand];
+  const remaining = [...hand];
   let combinationsNeeded = 0;
   while (remaining.length > 0 && combinationsNeeded < 30) {
     const moves = findAllLegalMoves(remaining, null);
