@@ -304,7 +304,10 @@
       "call": "跟注 {{amount}}",
       "raise": "加注至 {{amount}}",
       "allin": "全下"
-    }
+    },
+    "timeBank": "时间银行：{{seconds}} 秒",
+    "timeBankRunning": "时间银行使用中",
+    "timeBankAuto": "自动"
   },
   "a11y": {
     "toggleTheme": "切换主题",

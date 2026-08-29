@@ -123,6 +123,12 @@ export interface TableSnapshot {
   you: { playerId: string; name: string; available: number } | null;
   toActSeat: number | null;
   actionDeadline: number | null;
+  /** YOUR reserve time in ms — never an opponent's. */
+  timeBankMs?: number;
+  /** True while your current clock is reserve rather than the turn clock. */
+  usingTimeBank?: boolean;
+  /** Whether you opted into spending reserve automatically. */
+  autoTimeBank?: boolean;
   legal: LegalActions | null;
   winners: number[];
   message?: string;
@@ -174,4 +180,8 @@ export type TableCommand =
   | { kind: 'voice'; clip: string; durationMs: number; mime: string }
   | { kind: 'challenge'; targetId: string }
   | { kind: 'answer_challenge'; passed: boolean; responseMs: number }
-  | { kind: 'set_client_seed'; seed: string };
+  | { kind: 'set_client_seed'; seed: string }
+  /** Spend reserve time on this decision. Carries no duration — the server decides. */
+  | { kind: 'useTimeBank' }
+  /** Opt in to spending reserve automatically when the turn clock expires. */
+  | { kind: 'autoTimeBank'; on: boolean };

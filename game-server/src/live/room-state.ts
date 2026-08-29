@@ -169,6 +169,19 @@ export interface TableSnapshot {
   toActSeat: number | null;
   /** Epoch ms the player to act times out; compare against `serverTime`, not the local clock. */
   actionDeadline: number | null;
+  /**
+   * YOUR reserve time, in ms — never anyone else's. How long an opponent can
+   * still tank for is information they have and you do not, the same reason
+   * hole cards are per-viewer.
+   *
+   * Optional because only the poker rooms run a turn clock — the banker and
+   * lottery games have no per-player decision to reserve time for.
+   */
+  timeBankMs?: number;
+  /** True while the current clock is running on reserve rather than the turn clock. */
+  usingTimeBank?: boolean;
+  /** Whether YOU have opted into spending reserve automatically. */
+  autoTimeBank?: boolean;
   /** Present only in YOUR snapshot, only when it is your turn. */
   legal: LegalActions | null;
   winners: number[];
@@ -279,6 +292,23 @@ export const tableCommandSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('act'), action: betActionSchema }),
   z.object({ kind: z.literal('sitOut') }),
   z.object({ kind: z.literal('sitIn') }),
+  /**
+   * Spend reserve time on the decision in front of you.
+   *
+   * Carries NO duration. The client asks; the server decides whether it is your
+   * turn, whether the hand is live, whether you have any reserve left, and how
+   * much of it to grant — a client that could name its own extension could stall
+   * a table forever.
+   */
+  z.object({ kind: z.literal('useTimeBank') }),
+  /**
+   * Opt in to spending reserve automatically when the turn clock runs out.
+   *
+   * A preference, not a mechanism: the server still owns the reserve and every
+   * rule about it. Off by default, so nobody's bank drains while they are away
+   * from their phone.
+   */
+  z.object({ kind: z.literal('autoTimeBank'), on: z.boolean() }),
   /** Top up / rebuy an occupied seat between hands. */
   z.object({ kind: z.literal('buyIn'), amount: z.number().int().positive() }),
   /** Send a chat message to the room. */

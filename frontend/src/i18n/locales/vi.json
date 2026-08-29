@@ -304,7 +304,10 @@
       "call": "Theo {{amount}}",
       "raise": "Tố lên {{amount}}",
       "allin": "Tất tay"
-    }
+    },
+    "timeBank": "Quỹ thời gian: {{seconds}}s",
+    "timeBankRunning": "Đang dùng quỹ thời gian",
+    "timeBankAuto": "Tự động"
   },
   "a11y": {
     "toggleTheme": "Đổi giao diện",

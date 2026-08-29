@@ -304,7 +304,10 @@
       "call": "Call {{amount}}",
       "raise": "Raise to {{amount}}",
       "allin": "All in"
-    }
+    },
+    "timeBank": "Time Bank: {{seconds}}s",
+    "timeBankRunning": "Time bank running",
+    "timeBankAuto": "Auto"
   },
   "a11y": {
     "toggleTheme": "Toggle theme",

@@ -304,7 +304,10 @@
       "call": "ตาม {{amount}}",
       "raise": "เพิ่มเป็น {{amount}}",
       "allin": "ออลอิน"
-    }
+    },
+    "timeBank": "เวลาสำรอง: {{seconds}} วิ",
+    "timeBankRunning": "กำลังใช้เวลาสำรอง",
+    "timeBankAuto": "อัตโนมัติ"
   },
   "a11y": {
     "toggleTheme": "สลับธีม",

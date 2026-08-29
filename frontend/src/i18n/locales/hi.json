@@ -304,7 +304,10 @@
       "call": "कॉल {{amount}}",
       "raise": "{{amount}} तक रेज़",
       "allin": "ऑल इन"
-    }
+    },
+    "timeBank": "टाइम बैंक: {{seconds}}से",
+    "timeBankRunning": "टाइम बैंक चल रहा है",
+    "timeBankAuto": "स्वतः"
   },
   "a11y": {
     "toggleTheme": "थीम बदलें",

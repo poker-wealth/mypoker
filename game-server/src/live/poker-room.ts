@@ -92,6 +92,15 @@ export interface PokerRoomConfig extends LiveTableConfig {
   maxSeats: number;
   /** How long a player has to act before the clock acts for them. */
   actionTimeoutMs: number;
+  /**
+   * Reserve thinking time each player starts a session with, in ms.
+   *
+   * A SECOND clock, not a longer first one. The turn clock stays short so the
+   * table keeps moving; the reserve exists so a genuinely hard decision is lost
+   * to an opponent rather than to a timer. 0 disables the feature entirely and
+   * restores the plain per-turn clock.
+   */
+  initialTimeBankMs?: number;
   /** Breather between "enough players" and the cards coming out. */
   handStartDelayMs: number;
   /** How long the result stays on screen before the next hand. */
@@ -161,6 +170,14 @@ interface RoomSeat {
   /** Dealt into the hand in progress. */
   inHand: boolean;
   lastAction?: SeatAction;
+  /**
+   * Reserve thinking time left, in ms. Seeded on sit-down and spent across the
+   * whole session — it is not refilled between hands, which is what makes
+   * spending it a decision.
+   */
+  timeBankMs: number;
+  /** Opted in to spending reserve automatically when the turn clock expires. */
+  autoTimeBank: boolean;
   /** Fires when the disconnect grace expires (sit them out). */
   graceTimer?: NodeJS.Timeout;
   /** Fires when they've been gone long enough to give the chair back. */
@@ -251,6 +268,10 @@ export class PokerRoom implements LiveRoom {
   private handNumber = 0;
   private buttonSeat = -1;
   private actionDeadline: number | null = null;
+  /** True while the current clock is the reserve rather than the turn clock. */
+  private usingTimeBank = false;
+  /** When the reserve clock started, so the unused remainder can be given back. */
+  private timeBankStartedAt: number | null = null;
   /** When the current player's turn began (for the anti-bot decision-time gate). */
   private turnStartedAt: number | null = null;
   /** First-click time of an as-yet-unconfirmed major (all-in) action, per player (double-confirm). */
@@ -456,6 +477,17 @@ export class PokerRoom implements LiveRoom {
       case 'sitIn':
         this.setSittingOut(playerId, false);
         break;
+      case 'useTimeBank':
+        this.useTimeBank(playerId);
+        break;
+      case 'autoTimeBank': {
+        // A preference only. The reserve itself, and every rule about it, stays
+        // server-side — see the command schema for why.
+        const s = this.seatOf(playerId);
+        if (s) s.autoTimeBank = cmd.on;
+        this.push();
+        break;
+      }
       case 'act':
         await this.playerAct(playerId, cmd.action as Action);
         break;
@@ -515,6 +547,10 @@ export class PokerRoom implements LiveRoom {
       disconnectedAt: null,
       leaveAfterHand: false,
       inHand: false,
+      // Seeded per sit-down, spent across the session. Not refilled between
+      // hands — that is what makes spending it a decision.
+      timeBankMs: this.config.initialTimeBankMs ?? 60_000,
+      autoTimeBank: false,
     };
     this.push();
     this.maybeStartHand();
@@ -880,6 +916,9 @@ export class PokerRoom implements LiveRoom {
     // Captured BEFORE the action: afterwards the amount that was called is gone
     // from the engine, and "Call" with no number tells the table nothing.
     const callAmount = this.game?.legalActions()?.callAmount ?? null;
+    // Hand back whatever reserve this decision did not consume, BEFORE the
+    // clock is torn down — otherwise dipping in for a second costs the lot.
+    this.refundUnusedTimeBank(playerId);
     this.clearActionClock();
     await this.game!.handleAction(playerId, action);
 
@@ -907,12 +946,91 @@ export class PokerRoom implements LiveRoom {
     this.clearActionClock();
     const toAct = this.toActPlayer();
     if (!toAct) return;
+    // A fresh turn is never on reserve — the reserve is only ever entered from
+    // an expiring turn clock, deliberately, so it cannot leak away unnoticed.
+    this.usingTimeBank = false;
     this.turnStartedAt = Date.now();
     this.actionDeadline = Date.now() + this.config.actionTimeoutMs;
     this.actionTimer = setTimeout(() => {
       this.actionTimer = undefined;
-      void this.enqueue(() => this.actForTimedOutPlayer(toAct));
+      void this.enqueue(() => this.onTurnClockExpired(toAct));
     }, this.config.actionTimeoutMs);
+  }
+
+  /**
+   * The turn clock ran out.
+   *
+   * Reserve is spent here ONLY if the player asked for that in advance. The
+   * default is unchanged and deliberate: an unattended player still checks or
+   * folds rather than silently burning a minute of everyone's time. Someone
+   * actually thinking presses the button, which takes the other path.
+   */
+  private async onTurnClockExpired(playerId: string): Promise<void> {
+    const seat = this.seatOf(playerId);
+    if (seat && seat.autoTimeBank && seat.timeBankMs > 0 && !this.usingTimeBank) {
+      this.enterTimeBank(seat);
+      return;
+    }
+    await this.actForTimedOutPlayer(playerId);
+  }
+
+  /**
+   * Move this turn onto the player's reserve.
+   *
+   * Grants whatever they have left, in one go, and zeroes nothing up front: the
+   * unused remainder is returned when they act (see `refundUnusedTimeBank`), so
+   * tanking for three seconds costs three seconds and not the whole bank.
+   */
+  private enterTimeBank(seat: RoomSeat): void {
+    this.clearActionClock();
+    this.usingTimeBank = true;
+    this.timeBankStartedAt = Date.now();
+    this.actionDeadline = Date.now() + seat.timeBankMs;
+
+    const granted = seat.timeBankMs;
+    this.actionTimer = setTimeout(() => {
+      this.actionTimer = undefined;
+      void this.enqueue(async () => {
+        // Reserve exhausted — the original behaviour, unchanged.
+        const s = this.seatOf(seat.playerId);
+        if (s) s.timeBankMs = 0;
+        this.usingTimeBank = false;
+        await this.actForTimedOutPlayer(seat.playerId);
+      });
+    }, granted);
+
+    this.push();
+  }
+
+  /**
+   * Give back the reserve they did not use.
+   *
+   * Called as the action lands. Without this, dipping into the bank for one
+   * second would cost the entire bank — which would teach players never to use
+   * it, and the feature would exist without being usable.
+   */
+  private refundUnusedTimeBank(playerId: string): void {
+    if (!this.usingTimeBank || this.timeBankStartedAt === null) return;
+    const seat = this.seatOf(playerId);
+    if (seat) {
+      const spent = Date.now() - this.timeBankStartedAt;
+      seat.timeBankMs = Math.max(0, seat.timeBankMs - Math.max(0, spent));
+    }
+    this.usingTimeBank = false;
+    this.timeBankStartedAt = null;
+  }
+
+  /**
+   * A player asking for their reserve. Every check here is the server's, and
+   * none of them can be asserted by the client.
+   */
+  private useTimeBank(playerId: string): void {
+    if (this.phase !== 'IN_HAND') throw new RoomError('no hand in progress');
+    if (this.toActPlayer() !== playerId) throw new RoomError('not your turn');
+    if (this.usingTimeBank) throw new RoomError('time bank already running');
+    const seat = this.seatOf(playerId);
+    if (!seat || seat.timeBankMs <= 0) throw new RoomError('no time bank left');
+    this.enterTimeBank(seat);
   }
 
   private clearActionClock(): void {
@@ -1315,6 +1433,11 @@ export class PokerRoom implements LiveRoom {
       you: me ? { playerId: me.id, name: me.displayName, available: me.available } : null,
       toActSeat: toAct ? (this.seatOf(toAct)?.index ?? null) : null,
       actionDeadline: this.actionDeadline,
+      // Per-viewer: your own reserve only. How long an opponent can still tank
+      // for is information they have and you do not.
+      timeBankMs: mySeat?.timeBankMs ?? 0,
+      usingTimeBank: this.usingTimeBank && this.toActPlayer() === playerId,
+      autoTimeBank: mySeat?.autoTimeBank ?? false,
       // Legal actions are computed for the seat to act and sent ONLY to them.
       legal: toAct === playerId && this.game ? this.game.legalActions() : null,
       winners: [...this.winners],

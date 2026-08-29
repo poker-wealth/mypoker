@@ -304,7 +304,10 @@
       "call": "콜 {{amount}}",
       "raise": "{{amount}} 레이즈",
       "allin": "올인"
-    }
+    },
+    "timeBank": "타임뱅크: {{seconds}}초",
+    "timeBankRunning": "타임뱅크 사용 중",
+    "timeBankAuto": "자동"
   },
   "a11y": {
     "toggleTheme": "테마 전환",

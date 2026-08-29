@@ -4,6 +4,7 @@ import { ChevronLeft, Volume2, VolumeX, Settings2, Wifi, WifiOff, MessageSquare 
 import { AnimatePresence, motion } from 'motion/react';
 import { PokerTable } from '@/components/poker/PokerTable';
 import { ActionBar } from '@/components/poker/ActionBar';
+import { TimeBank } from '@/components/poker/TimeBank';
 import { InsurancePrompt } from '@/components/poker/InsurancePrompt';
 import { JackpotBurst } from '@/components/poker/JackpotBurst';
 import { chips } from '@/lib/money';
@@ -224,7 +225,18 @@ function LiveTable({ tableId }: { tableId: string }) {
       {/* Action dock */}
       <div className="border-t border-border bg-surface/80 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 backdrop-blur">
         {live.heroToAct ? (
-          <ActionBar state={view} onAction={live.heroAct} />
+          <>
+            {/* Above the buttons, and only while it is your turn — an opponent's
+                remaining reserve is not yours to see. */}
+            <TimeBank
+              timeBankMs={snapshot?.timeBankMs ?? 0}
+              usingTimeBank={snapshot?.usingTimeBank ?? false}
+              autoTimeBank={snapshot?.autoTimeBank ?? false}
+              onUse={() => live.command({ kind: 'useTimeBank' })}
+              onToggleAuto={(on) => live.command({ kind: 'autoTimeBank', on })}
+            />
+            <ActionBar state={view} onAction={live.heroAct} />
+          </>
         ) : seated ? (
           <div className="flex items-center gap-2">
             <div className="flex-1 text-[0.8rem] text-dim">

@@ -304,7 +304,10 @@
       "call": "コール {{amount}}",
       "raise": "レイズ {{amount}}",
       "allin": "オールイン"
-    }
+    },
+    "timeBank": "タイムバンク: {{seconds}}秒",
+    "timeBankRunning": "タイムバンク使用中",
+    "timeBankAuto": "自動"
   },
   "a11y": {
     "toggleTheme": "テーマを切り替え",

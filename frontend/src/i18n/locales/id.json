@@ -304,7 +304,10 @@
       "call": "Call {{amount}}",
       "raise": "Naikkan ke {{amount}}",
       "allin": "All in"
-    }
+    },
+    "timeBank": "Bank Waktu: {{seconds}}d",
+    "timeBankRunning": "Bank waktu berjalan",
+    "timeBankAuto": "Otomatis"
   },
   "a11y": {
     "toggleTheme": "Ganti tema",
