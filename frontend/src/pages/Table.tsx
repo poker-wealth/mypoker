@@ -95,7 +95,7 @@ function LiveTable({ tableId }: { tableId: string }) {
   return (
     <div
       className="flex min-h-full flex-col"
-      style={{ background: 'radial-gradient(ellipse at top, #14142a 0%, var(--bg) 70%)' }}
+      style={{ background: '#000' }}
     >
       <TopBar
         subtitle={
@@ -308,7 +308,7 @@ function NoTableYet({ gameId }: { gameId: string | undefined }) {
   return (
     <div
       className="flex min-h-full flex-col"
-      style={{ background: 'radial-gradient(ellipse at top, #14142a 0%, var(--bg) 70%)' }}
+      style={{ background: '#000' }}
     >
       <TopBar subtitle={game?.name ?? 'Game'} onBack={() => navigate(-1)} />
       <div className="mx-auto w-full max-w-sm flex-1 px-6 pt-20 text-center">
@@ -397,7 +397,7 @@ function SigningIn({ onBack }: { onBack: () => void }) {
   return (
     <div
       className="flex min-h-full flex-col"
-      style={{ background: 'radial-gradient(ellipse at top, #14142a 0%, var(--bg) 70%)' }}
+      style={{ background: '#000' }}
     >
       <TopBar subtitle={t('table.livePoker')} onBack={onBack} />
       <div className="flex flex-1 items-center justify-center text-sm text-dim">{t('table.signingIn')}</div>
@@ -416,7 +416,7 @@ function SignedOut({ onBack }: { onBack: () => void }) {
   return (
     <div
       className="flex min-h-full flex-col"
-      style={{ background: 'radial-gradient(ellipse at top, #14142a 0%, var(--bg) 70%)' }}
+      style={{ background: '#000' }}
     >
       <TopBar subtitle={t('table.livePoker')} onBack={onBack} />
       <div className="mx-auto w-full max-w-sm flex-1 px-6 pt-16 text-center">
@@ -452,7 +452,7 @@ function DemoTable() {
   return (
     <div
       className="flex min-h-full flex-col"
-      style={{ background: 'radial-gradient(ellipse at top, #14142a 0%, var(--bg) 70%)' }}
+      style={{ background: '#000' }}
     >
       <TopBar
         subtitle={t('table.demoSubtitle', {

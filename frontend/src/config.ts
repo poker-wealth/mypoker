@@ -87,7 +87,10 @@ export const LIVE_TABLE_IDS = new Set([
  * connection error for genuinely unwired games.
  */
 const LEAGUE_TABLE_ID = /^lg-.+-[0-9a-f]{8}$/;
+/** A player-created table (public or private) — the server mints `t-<hex>`. */
+const PLAYER_TABLE_ID = /^t-[0-9a-f]{8,}$/;
 
 export const isOpenableTableId = (id: string | undefined): id is string =>
-  Boolean(id) && (LIVE_TABLE_IDS.has(id!) || LEAGUE_TABLE_ID.test(id!));
+  Boolean(id) &&
+  (LIVE_TABLE_IDS.has(id!) || LEAGUE_TABLE_ID.test(id!) || PLAYER_TABLE_ID.test(id!));
 

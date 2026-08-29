@@ -693,5 +693,24 @@
     "a-flame": "火焰",
     "a-clover": "四叶草",
     "a-dragon": "龙"
+  },
+  "tableEntry": {
+    "title": "德州扑克",
+    "joinExisting": "加入牌桌",
+    "joinBlurb": "坐到当前公开的牌桌。",
+    "createNew": "创建牌桌",
+    "createBlurb": "开设自己的牌桌并邀请好友。",
+    "who": "谁可以加入？",
+    "public": "公开",
+    "publicBlurb": "在大厅中显示——任何人都可加入。",
+    "private": "私人",
+    "privateBlurb": "仅限邀请——只能通过你分享的链接加入。",
+    "createCta": "创建牌桌",
+    "ready": "你的牌桌已就绪",
+    "shareBlurb": "发送此链接，邀请好友加入这张牌桌。",
+    "copy": "复制邀请链接",
+    "copied": "链接已复制",
+    "enter": "进入牌桌",
+    "error": "无法创建牌桌，请重试。"
   }
 }

@@ -16,6 +16,8 @@ import { currentRuleManifest, ruleVersionFor } from '../fairness/rule-version';
 import { ruleCommitment } from '../fairness/rule-commitment';
 import { mountLiveTables } from '../live/mount';
 import { buildLeagueTableRouter } from './league-table-routes';
+import { buildPlayerTableRouter } from './player-table-routes';
+import { runtimePublicTables } from '../live/runtime-tables';
 import { defaultTables } from '../live/server';
 import type { LobbyService } from '../lobby';
 
@@ -172,7 +174,13 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
      */
     if (lobby) {
       const resync = (): void =>
-        syncLobbyWithLiveTables(lobby, mounted.hub.tables(), liveTables);
+        // Include public player-created tables so the resync lists and keeps them
+        // (it removes any lobby row not in this identity list). Private ones are
+        // deliberately absent — hub-only, reachable by link.
+        syncLobbyWithLiveTables(lobby, mounted.hub.tables(), [
+          ...liveTables,
+          ...runtimePublicTables(),
+        ]);
       resync();
       setInterval(resync, 5_000).unref();
     }
@@ -183,6 +191,9 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
     // open a table would 500 rather than refuse.
     if (lobby) {
       app.use('/leagues', buildLeagueTableRouter(config, { hub: mounted.hub, lobby }));
+      // Any player can open a public/private table (owner-approved). Same deps —
+      // it needs the hub to open the room and the lobby to list a public one.
+      app.use('/tables', buildPlayerTableRouter(config, { hub: mounted.hub, lobby }));
     }
   }
 
@@ -230,12 +241,17 @@ function cors(allowed: string[]) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Vary', 'Origin');
       res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type');
-      // PATCH is here because the admin user-edit route uses it. It was missed
-      // when that route was added, and NOTHING in the test suite noticed:
-      // supertest talks to the app directly and never performs a preflight, so
-      // every route test passed while a browser refused to send the request at
-      // all. It surfaced as "cannot reach the server" — accurate, and pointing
-      // nowhere near the cause. Adding a verb to a route means adding it here.
+      // PATCH has TWO callers — settings updates (the table sound toggle) and the
+      // admin user-edit route — and both were broken by its absence here. Two
+      // people found it independently, from opposite symptoms: "Reconnecting"
+      // on every settings change, and "cannot reach the server" on an admin
+      // save. Both were accurate and neither pointed near the cause.
+      //
+      // NOTHING in the test suite noticed either time: supertest talks to the
+      // app directly and never performs a preflight, so every route test passed
+      // while a browser refused to send the request at all.
+      //
+      // Adding a verb to any route means adding it here.
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
       res.setHeader('Access-Control-Max-Age', '600');
     }

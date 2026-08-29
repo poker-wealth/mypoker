@@ -42,6 +42,7 @@ import {
   fetchLeagueMembers,
   grantToMemberApi,
 } from './leagues';
+import { createPlayerTableApi } from './tables';
 import { fetchNotifications, markNotificationsRead, type NotificationPage } from './notifications';
 import { fetchRtp } from './fairnessFeed';
 import {
@@ -418,6 +419,25 @@ export function useCreateLeagueTable() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: createLeagueTableApi,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['lobby', 'tables'] });
+      void queryClient.invalidateQueries({ queryKey: ['lobby', 'games'] });
+    },
+  });
+}
+
+/**
+ * Open a player-created table (public or private).
+ *
+ * A PUBLIC one lands in the lobby via the gateway's 5s resync, so invalidate the
+ * lobby lists for the same reason useCreateLeagueTable does — otherwise the
+ * creator's own lobby wouldn't show it until the next poll. A PRIVATE one is
+ * absent from the lobby by design; its creator shares the link instead.
+ */
+export function useCreatePlayerTable() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createPlayerTableApi,
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['lobby', 'tables'] });
       void queryClient.invalidateQueries({ queryKey: ['lobby', 'games'] });
