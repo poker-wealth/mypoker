@@ -115,6 +115,36 @@ refused with a 503, never allowed through unconfirmed. Outside production, with
 
 ---
 
+## 8. Lobby & Navigation
+
+Re-tested 29 Aug 2026 against a running lobby. Numbered to match the owner's
+checklist.
+
+| # | Line | Status | Note |
+|---|---|---|---|
+| 1 | Bottom navigation | **P** | Alliance · Games · Lobby · Data · My Account, same five in the same order on both clients, both landing on Lobby. Note the guard for this had **stopped running**: `check:parity` died with a PARSE FAILURE after the router hoisted `adminChildren` and mounted it at a host-dependent base. Repaired — and it immediately caught a real gap it had been blind to (see below). |
+| 2 | Lobby list | **F → fixed on this branch** | Names and seated counts were always right. **Stakes were wrong three ways**, all one root cause — `stakes` is table CHIPS and code written when it was micro-USD was never updated. (a) The web ran `formatMicros()` over it, so **all 13 tables read "Blinds 0/0"**, and the two rows both named "Texas Hold'em" were indistinguishable. (b) The web's filter thresholds were micro-USD against a server comparing chips, so **tapping any blinds filter emptied the lobby** (0 of 13). (c) Nine tables genuinely have no stake level and the server hardcoded `bigBlind: 0` for them, which both clients printed as "0/0". Now: poker reads 10/20 and 50/100 with the server's real small blind, Dou Di Zhu reads its 100 base stake, the other nine read an em dash, and the filter returns 5/5/2/0. |
+| 3 | Open a table | **P** (routing) | Four lists must agree — the tables the server serves, `LIVE_TABLE_IDS`, and the web and mobile felt registries. Cross-checked all four against the live lobby: every served table is openable and routes to its own game, and nothing routes to a game the server does not serve. Player-created (`t-…`) and league (`lg-…`) tables are Hold'em and correctly fall through to the poker felt. **Whether each felt RENDERS its game correctly is not verified** — that needs eyes. |
+| 4 | Hidden / "coming soon" games | **P** | Rendered as a plain `div` / `View` with a dashed border and a SOON badge on both clients. No press handler, so not tappable. |
+| 5 | No dead ends; Back works | **P** (mechanically) | Every `navigate()` target in both clients resolves to a route/screen that exists — no dead taps. Mobile's only headerless stack screen is `Tabs`, the tab root, which correctly has no back; every other screen gets a native one. Web sub-pages sit inside AppShell and always have BottomNav, and the one standalone route (`/table/:id`) carries its own back control. The TRAPS §12 dead end — seated with no way to stand — is **closed on both platforms**. Android hardware-back at a table still needs a device. |
+
+### What this section turned up beyond the checklist
+
+- **A parity gap that was invisible while the check was broken:** web's
+  `/personal` (Personal Info) has no mobile screen. Left FAILING rather than
+  added to `ACCEPTED_WEB_ONLY` — it is a real miss, already recorded in section
+  5 above, and silencing it is the exact failure the check exists to prevent.
+- **Four table controls were English in every locale.** Rebuy / Sit in / Sit
+  out / Leave were hardcoded on the web while `table.rebuy`, `table.sitIn`,
+  `table.sitOut` and `table.leave` sat translated in all eight files, used by
+  mobile since it was built. Fixed.
+- **Felt routing is no longer a hand-maintained list.** `registry.test.ts` now
+  reads the server's `defaultTables()`, so a new game cannot reach the lobby
+  without a felt. Its old docstring admitted the hole: "adding a game to the
+  lobby does NOT automatically get covered — add it to both places."
+
+---
+
 ## 9. Games
 
 **Texas Hold'em is the only game played end to end on a device.**
