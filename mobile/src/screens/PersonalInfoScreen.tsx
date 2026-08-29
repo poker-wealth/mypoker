@@ -20,6 +20,7 @@ import { useAuth } from '../auth';
 import { AVATARS, UPLOADED_AVATAR, type AvatarId } from '../lib/avatars';
 import { radius, space, theme, weight } from '../theme';
 import { Button, Card, EmptyState, Skeleton } from '../ui';
+import { Avatar } from '../components/ui/Avatar';
 
 /**
  * Personal Info — the native port of `frontend/src/pages/PersonalInfo.tsx`.
@@ -135,6 +136,20 @@ function AvatarSection() {
 
   return (
     <Section title={t('personalInfo.avatarTitle')}>
+      {/* What the choice below actually resolves to, through the same fallback
+          chain every other surface uses. Without this the grid shows which tile
+          is selected but never what an UPLOADED photo or an OAuth one looks
+          like — and those are exactly the two the player cannot otherwise see. */}
+      <View style={styles.avatarPreview}>
+        <Avatar
+          avatarId={current}
+          playerId={player?.playerId}
+          photoUrl={player?.photoUrl}
+          name={player ? player.displayName : 'M'}
+          size={72}
+        />
+      </View>
+
       <View style={styles.avatarGrid}>
         {AVATARS.map((a) => {
           const selected = current === a.id;
@@ -511,6 +526,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: weight('400'),
   },
+  avatarPreview: { alignItems: 'center' },
   avatarGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   avatarTile: {
     width: TILE,
