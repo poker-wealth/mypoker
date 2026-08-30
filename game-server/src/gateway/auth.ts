@@ -1,7 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import type { GatewayConfig } from './config';
-import { userStore } from '../auth/user-store';
+import { LoginError, SignupError, userStore } from '../auth/user-store';
 import { signToken, verifyToken, TokenError } from './tokens';
 import {
   verifyInitData,
@@ -161,7 +161,16 @@ export function buildAuthRouter(config: GatewayConfig): Router {
     authClient
       .signup(email, password, displayName)
       .then((u) => res.json(issue(asProfile(u))))
-      .catch((err: Error) => res.status(400).json({ error: err.message }));
+      .catch((err: Error) =>
+        // Same shape as /login below: a closed `code` for the app to translate,
+        // and a generic English fallback for anything unexpected. A database
+        // outage must not be reported to the user as "that email is taken".
+        res.status(400).json(
+          err instanceof SignupError
+            ? { error: err.message, code: err.code }
+            : { error: 'could not create the account' },
+        ),
+      );
   });
 
   r.post('/login', (req: Request, res: Response) => {
@@ -176,7 +185,19 @@ export function buildAuthRouter(config: GatewayConfig): Router {
     authClient
       .verifyPassword(email, password)
       .then((u) => res.json(issue(asProfile(u))))
-      .catch((err: Error) => res.status(401).json({ error: err.message }));
+      .catch((err: Error) =>
+        // `code` is the machine-readable half — a closed set from user-store.ts,
+        // never free text — so the app can show this in the player's own
+        // language instead of the English `error`. Anything that is not a
+        // LoginError (a database outage, say) carries no code and keeps the old
+        // generic wording: an unexpected failure must not be reported to the
+        // user as "incorrect password".
+        res.status(401).json(
+          err instanceof LoginError
+            ? { error: err.message, code: err.code }
+            : { error: 'invalid email or password' },
+        ),
+      );
   });
 
   r.post('/google', async (req: Request, res: Response) => {

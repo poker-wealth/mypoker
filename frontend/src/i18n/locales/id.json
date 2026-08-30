@@ -292,7 +292,24 @@
     "recordingUnavailable": "Perekaman tidak tersedia di perangkat ini",
     "recordingTooShort": "Tahan sedikit lebih lama untuk mengirim",
     "recordingTooLong": "Rekaman terlalu besar untuk dikirim",
-    "recordingFailed": "Tidak dapat mengirim rekaman itu"
+    "recordingFailed": "Tidak dapat mengirim rekaman itu",
+    "chat": "Obrolan",
+    "chatUnread": "Obrolan, {{count}} belum dibaca",
+    "handInPlay": "Sedang bermain",
+    "yourTurn": "Giliran Anda",
+    "playerTurn": "Giliran {{name}}",
+    "action": {
+      "fold": "Lipat",
+      "check": "Cek",
+      "call": "Call {{amount}}",
+      "raise": "Naikkan ke {{amount}}",
+      "callBare": "Call",
+      "raiseBare": "Naikkan",
+      "allin": "All in"
+    },
+    "timeBank": "Bank Waktu: {{seconds}}d",
+    "timeBankRunning": "Bank waktu berjalan",
+    "timeBankAuto": "Otomatis"
   },
   "a11y": {
     "toggleTheme": "Ganti tema",
@@ -646,6 +663,8 @@
     "copy": "Salin tautan undangan",
     "copied": "Tautan disalin",
     "enter": "Masuk meja",
-    "error": "Tidak bisa membuat meja. Silakan coba lagi."
+    "error": "Tidak bisa membuat meja. Silakan coba lagi.",
+    "seats": "Kursi",
+    "seatsBlurb": "{{count}} kursi. Dua pemain sudah cukup untuk mulai."
   }
 }

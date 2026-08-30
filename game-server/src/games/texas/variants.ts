@@ -1,3 +1,4 @@
+import type { BetLimit } from './betting';
 import { shuffle } from '../../fairness/shuffle';
 import { standardDeck } from '../../fairness/shuffle';
 import {
@@ -39,6 +40,12 @@ export interface PokerVariant {
   deckFor(seed: string): string[];
   /** Score a player's hand against the finished board. */
   evaluate(hole: readonly string[], board: readonly string[]): HandRank;
+  /**
+   * How big a raise may be. Omaha is POT_LIMIT — that is what makes PLO play
+   * differently from a game where anyone can shove on any street. Absent means
+   * NO_LIMIT, which is Hold'em and Short Deck.
+   */
+  limit?: BetLimit;
 }
 
 export const TEXAS: PokerVariant = {
@@ -65,6 +72,9 @@ export const OMAHA: PokerVariant = {
   deckFor: (seed) => shuffle(standardDeck(), seed),
   // Exactly two from hand, exactly three from the board — enforced by evaluateOmaha.
   evaluate: (hole, board) => evaluateOmaha([...hole], [...board], STANDARD_RULES),
+  // Omaha is POT-limit. With four hole cards everyone flops something, and
+  // no-limit sizing on top of that turns every board into a shove-or-fold.
+  limit: 'POT_LIMIT',
 };
 
 export const VARIANTS: Readonly<Record<VariantId, PokerVariant>> = {

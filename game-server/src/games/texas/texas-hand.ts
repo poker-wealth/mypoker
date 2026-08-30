@@ -71,7 +71,15 @@ export class TexasHand {
       this.hole.set(players[i]!.id, cards);
     }
     this.fullCommunity = deck.slice(h * n, h * n + 5);
-    this.betting = new TexasBetting(players, config);
+    // The variant carries the betting structure — Omaha is pot-limit — but an
+    // explicit config still wins, so a table can run a non-standard limit
+    // without a new variant. Undefined at both levels means no-limit.
+    this.betting = new TexasBetting(players, {
+      ...config,
+      ...(config.limit ?? this.variant.limit
+        ? { limit: config.limit ?? this.variant.limit! }
+        : {}),
+    });
     this.syncCommunity();
   }
 

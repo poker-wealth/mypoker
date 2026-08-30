@@ -8,6 +8,18 @@ import type { Card } from './cards';
  */
 
 export type RoomPhase = 'WAITING' | 'DEALING' | 'IN_HAND' | 'SHOWDOWN';
+/**
+ * What a seat last did, as a fact rather than prose — mirrors game-server's
+ * SeatAction. The client owns the wording so the bubble speaks the player's
+ * language; the `string` arm is the legacy shape the other game rooms still
+ * send ('BANKER', 'LANDLORD'), rendered verbatim and therefore English-only.
+ */
+export interface SeatAction {
+  kind: 'fold' | 'check' | 'call' | 'raise' | 'allin';
+  /** Chips called, or raised TO. Absent for fold/check/all-in. */
+  amount?: number;
+}
+
 export type LiveSeatStatus = 'active' | 'folded' | 'allin' | 'waiting' | 'sittingout';
 export type LiveStreet = 'PREFLOP' | 'FLOP' | 'TURN' | 'RIVER' | 'SHOWDOWN';
 
@@ -39,7 +51,7 @@ export interface LiveSeat {
   isBot?: boolean;
   /** Card strings you're allowed to see; `null` is a face-down card. */
   cards: (Card | null)[];
-  lastAction?: string;
+  lastAction?: SeatAction | string;
 }
 
 export interface FairnessSnapshot {
@@ -111,6 +123,12 @@ export interface TableSnapshot {
   you: { playerId: string; name: string; available: number } | null;
   toActSeat: number | null;
   actionDeadline: number | null;
+  /** YOUR reserve time in ms — never an opponent's. */
+  timeBankMs?: number;
+  /** True while your current clock is reserve rather than the turn clock. */
+  usingTimeBank?: boolean;
+  /** Whether you opted into spending reserve automatically. */
+  autoTimeBank?: boolean;
   legal: LegalActions | null;
   winners: number[];
   message?: string;
@@ -162,4 +180,8 @@ export type TableCommand =
   | { kind: 'voice'; clip: string; durationMs: number; mime: string }
   | { kind: 'challenge'; targetId: string }
   | { kind: 'answer_challenge'; passed: boolean; responseMs: number }
-  | { kind: 'set_client_seed'; seed: string };
+  | { kind: 'set_client_seed'; seed: string }
+  /** Spend reserve time on this decision. Carries no duration — the server decides. */
+  | { kind: 'useTimeBank' }
+  /** Opt in to spending reserve automatically when the turn clock expires. */
+  | { kind: 'autoTimeBank'; on: boolean };

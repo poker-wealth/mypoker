@@ -64,6 +64,62 @@ describe('Short Deck — the ace plays low below the six', () => {
   });
 });
 
+/**
+ * The rest of the Short Deck ordering — the part that is a CHOICE.
+ *
+ * Flush-over-boat is the famous change and is pinned above. These are the ranks
+ * around it, and they matter because Short Deck has no single ruleset: some
+ * houses also lift trips above a straight. This project follows Triton, where
+ * a straight still beats trips, and nothing failed if someone changed that —
+ * the decision lived only in a comment.
+ *
+ * Full ordering under these rules, strongest first:
+ *   straight flush · quads · FLUSH · full house · straight · trips · two pair
+ */
+describe('Short Deck — the rest of the ordering', () => {
+  const better = (a: string[], b: string[]): number =>
+    compareHands(evaluateFive(a, SHORT_DECK_RULES), evaluateFive(b, SHORT_DECK_RULES));
+
+  it('a straight still beats three of a kind (Triton, not the house variant)', () => {
+    const straight = ['6c', '7d', '8s', '9h', 'Tc'];
+    const trips = ['Kc', 'Kd', 'Ks', '8h', '7c'];
+    expect(evaluateFive(straight, SHORT_DECK_RULES).category).toBe(HandCategory.Straight);
+    expect(evaluateFive(trips, SHORT_DECK_RULES).category).toBe(HandCategory.ThreeOfAKind);
+    expect(better(straight, trips)).toBeGreaterThan(0);
+  });
+
+  it('a full house still beats a straight — only the flush moved', () => {
+    expect(better(['7c', '7d', '7s', '8c', '8d'], ['6c', '7h', '8h', '9h', 'Tc'])).toBeGreaterThan(0);
+  });
+
+  it('quads still beat the flush that was promoted above the full house', () => {
+    expect(better(['9c', '9d', '9s', '9h', 'Kc'], ['6h', '9h', 'Th', 'Jh', 'Kh'])).toBeGreaterThan(0);
+  });
+
+  it('T-J-Q-K-A is an ace-HIGH straight, and beats a king-high one', () => {
+    // The ace is low only in A-6-7-8-9. At the top of the deck it is high, and
+    // an evaluator that made the ace low everywhere would rank this wrong.
+    const broadway = evaluateFive(['Tc', 'Jd', 'Qs', 'Kh', 'Ah'], SHORT_DECK_RULES);
+    expect(broadway.category).toBe(HandCategory.Straight);
+    expect(broadway.tiebreak[0]).toBe(14);
+    expect(better(['Tc', 'Jd', 'Qs', 'Kh', 'Ah'], ['9c', 'Td', 'Js', 'Qh', 'Kc'])).toBeGreaterThan(0);
+  });
+
+  it('compares two full houses on the TRIPS first, not the pair', () => {
+    // Nines full of sixes beats eights full of ACES. The pair is the tiebreak,
+    // never the headline — getting this backwards pays the wrong player.
+    expect(better(['9c', '9d', '9s', '6c', '6d'], ['8c', '8d', '8s', 'Ac', 'Ad'])).toBeGreaterThan(0);
+  });
+
+  it('takes the best FIVE of seven rather than smearing all seven together', () => {
+    // A straight flush sitting alongside a pair of aces: the pair must not
+    // contribute, and the result must be a single straight-flush tiebreak.
+    const best = evaluateBest(['6h', '7h', '8h', '9h', 'Th', 'Ac', 'Ad'], SHORT_DECK_RULES);
+    expect(best.category).toBe(HandCategory.StraightFlush);
+    expect(best.tiebreak).toEqual([10]);
+  });
+});
+
 describe('Omaha — exactly two from hand, exactly three from the board', () => {
   it('four hearts in hand + one on the board is NOT a flush', () => {
     // The classic misread: you may only ever play two of your own cards.

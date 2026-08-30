@@ -292,7 +292,24 @@
     "recordingUnavailable": "この端末では録音できません",
     "recordingTooShort": "もう少し長押ししてください",
     "recordingTooLong": "録音が大きすぎて送信できません",
-    "recordingFailed": "この録音を送信できませんでした"
+    "recordingFailed": "この録音を送信できませんでした",
+    "chat": "チャット",
+    "chatUnread": "チャット、未読 {{count}} 件",
+    "handInPlay": "ハンド進行中",
+    "yourTurn": "あなたの番です",
+    "playerTurn": "{{name}} の番です",
+    "action": {
+      "fold": "フォールド",
+      "check": "チェック",
+      "call": "コール {{amount}}",
+      "raise": "レイズ {{amount}}",
+      "callBare": "コール",
+      "raiseBare": "レイズ",
+      "allin": "オールイン"
+    },
+    "timeBank": "タイムバンク: {{seconds}}秒",
+    "timeBankRunning": "タイムバンク使用中",
+    "timeBankAuto": "自動"
   },
   "a11y": {
     "toggleTheme": "テーマを切り替え",
@@ -646,6 +663,8 @@
     "copy": "招待リンクをコピー",
     "copied": "リンクをコピーしました",
     "enter": "テーブルに入る",
-    "error": "テーブルを作成できませんでした。もう一度お試しください。"
+    "error": "テーブルを作成できませんでした。もう一度お試しください。",
+    "seats": "座席",
+    "seatsBlurb": "{{count}} 席。2 人からゲームを開始できます。"
   }
 }

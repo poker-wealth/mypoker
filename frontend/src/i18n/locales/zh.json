@@ -292,7 +292,24 @@
     "recordingUnavailable": "此设备不支持录音",
     "recordingTooShort": "请按住久一点再发送语音",
     "recordingTooLong": "录音过大，无法发送",
-    "recordingFailed": "无法发送该录音"
+    "recordingFailed": "无法发送该录音",
+    "chat": "聊天",
+    "chatUnread": "聊天，{{count}} 条未读",
+    "handInPlay": "牌局进行中",
+    "yourTurn": "轮到你了",
+    "playerTurn": "轮到 {{name}}",
+    "action": {
+      "fold": "弃牌",
+      "check": "过牌",
+      "call": "跟注 {{amount}}",
+      "raise": "加注至 {{amount}}",
+      "callBare": "跟注",
+      "raiseBare": "加注",
+      "allin": "全下"
+    },
+    "timeBank": "时间银行：{{seconds}} 秒",
+    "timeBankRunning": "时间银行使用中",
+    "timeBankAuto": "自动"
   },
   "a11y": {
     "toggleTheme": "切换主题",
@@ -646,6 +663,8 @@
     "copy": "复制邀请链接",
     "copied": "链接已复制",
     "enter": "进入牌桌",
-    "error": "无法创建牌桌，请重试。"
+    "error": "无法创建牌桌，请重试。",
+    "seats": "座位",
+    "seatsBlurb": "{{count}} 个座位。两人即可开局。"
   }
 }

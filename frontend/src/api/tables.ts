@@ -23,4 +23,11 @@ export interface CreatedTable {
 export const createPlayerTableApi = (body: {
   game?: 'texas';
   visibility: TableVisibility;
+  /**
+   * Chairs at the table, 2–6 — not players required. Two ready players deal a
+   * hand whatever this is; the remaining chairs wait for someone to take one.
+   * The server clamps it, so an out-of-range value is refused rather than
+   * silently producing a table the felt cannot draw.
+   */
+  seats?: number;
 }): Promise<CreatedTable> => api.post<CreatedTable>('/tables', body);

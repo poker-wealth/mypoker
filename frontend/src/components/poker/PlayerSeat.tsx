@@ -1,7 +1,10 @@
 import { motion } from 'motion/react';
+import { useTranslation } from 'react-i18next';
 import { PlayingCard } from './PlayingCard';
 import type { Seat } from '@/lib/table';
+import type { SeatAction } from '@/lib/liveTable';
 import { cn } from '@/lib/cn';
+import { chips } from '@/lib/money';
 import { ChipStack } from './ChipStack';
 
 /**
@@ -25,9 +28,19 @@ interface PlayerSeatProps {
   accent?: string;
 }
 
-const AVATAR = 'size-[56px] sm:size-[62px]';
+/**
+ * A share of the table's SHORTER side, not a fixed pixel size.
+ *
+ * 56px reads as a chair on a tall portrait felt and as a saucer on a short
+ * landscape one — the felt scales with the screen, the seat used not to. `cqmin`
+ * ties it to the table box (see the container in PokerTable), so a seat is the
+ * same fraction of the table on every design. Clamped so it stays tappable on a
+ * small phone and does not balloon on a desktop-width felt.
+ */
+const AVATAR = 'size-[clamp(44px,17cqmin,70px)]';
 
 export function PlayerSeat({ seat, align = 'bottom', onSit, onClick, accent = 'var(--accent)' }: PlayerSeatProps) {
+  const { t } = useTranslation();
   if (seat.status === 'empty') {
     // An empty chair only invites you to sit when sitting is actually on offer. Once you are
     // seated (or watching a table you cannot join) `onSit` is absent, and a ring of "+ SIT HERE"
@@ -66,6 +79,21 @@ export function PlayerSeat({ seat, align = 'bottom', onSit, onClick, accent = 'v
 
   const folded = seat.status === 'folded';
   const toAct = seat.status === 'toact';
+  // Poker sends a structured action and the wording is chosen HERE, in the
+  // player's language. The other game rooms still send a rendered English
+  // string; those are shown as-is until they get keys of their own.
+  // `?? 0` here would read "Call $0" — a figure nobody bet, on the one line the
+  // table uses to see what just happened (TRAPS #3). An absent amount means the
+  // server did not say, so the label drops the number rather than inventing a
+  // zero. Only call/raise carry one; fold/check/all-in never did.
+  const actionLabel = (() => {
+    const a = seat.lastAction;
+    if (typeof a !== 'object' || a === null) return a;
+    if (a.kind !== 'call' && a.kind !== 'raise') return t(`table.action.${a.kind}`);
+    return typeof a.amount === 'number'
+      ? t(`table.action.${a.kind}`, { amount: chips(a.amount) })
+      : t(`table.action.${a.kind}Bare`);
+  })();
   // Live tables send the real deadline, so the ring drains exactly when their clock does.
   const secondsLeft = seat.deadline ? Math.max(0, (seat.deadline - Date.now()) / 1000) : 15;
   const isTop = align === 'top';
@@ -197,18 +225,31 @@ export function PlayerSeat({ seat, align = 'bottom', onSit, onClick, accent = 'v
         </div>
       </div>
 
-      {/* What they just did */}
-      {seat.lastAction && !folded && (
+      {/*
+        What they just did.
+
+        This was 8px (`text-[0.5rem]`) in white-on-black over a busy felt —
+        present, but unreadable on a phone, so players could not tell whether
+        someone had called or raised without watching the chips. It is the
+        single thing other players most need to see, so it is now sized and
+        COLOURED by what happened: an all-in should not look like a check.
+
+        It pops in slightly oversized and settles, which catches the eye at the
+        moment the action changes without animating on every render.
+      */}
+      {actionLabel && !folded && (
         <motion.div
-          key={seat.lastAction}
-          initial={{ opacity: 0, y: 4, scale: 0.9 }}
+          key={actionLabel}
+          initial={{ opacity: 0, y: 4, scale: 1.25 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: 'spring', damping: 18, stiffness: 420 }}
           className={cn(
-            'absolute z-30 whitespace-nowrap rounded-full border border-white/15 bg-black/85 px-2 py-0.5 text-[0.5rem] font-bold text-white/90 backdrop-blur-sm',
-            isTop ? 'bottom-[-16px]' : 'top-[-14px]',
+            'absolute z-30 whitespace-nowrap rounded-full border px-2.5 py-1 text-[0.68rem] font-black tracking-wide shadow-lg backdrop-blur-sm',
+            actionTone(seat.lastAction),
+            isTop ? 'bottom-[-20px]' : 'top-[-18px]',
           )}
         >
-          {seat.lastAction}
+          {actionLabel}
         </motion.div>
       )}
 
@@ -228,4 +269,36 @@ export function PlayerSeat({ seat, align = 'bottom', onSit, onClick, accent = 'v
       )}
     </div>
   );
+}
+
+/**
+ * Colour an action by what it means, so the table reads at a glance.
+ *
+ * Aggression is warm and loud, passivity is quiet, and folding recedes — a
+ * player scanning six seats should be able to see who raised without reading a
+ * word. All-in gets the danger tone because it is the one action that ends
+ * somebody's tournament.
+ *
+ * Matched on the label's leading word. The server owns these strings
+ * (`describeAction` in poker-room.ts), and an unrecognised one still renders —
+ * it just falls back to the neutral tone rather than disappearing.
+ */
+function actionTone(action: SeatAction | string | undefined): string {
+  // The structured form tells us the kind outright. The legacy string form has
+  // to be sniffed from its first word — which is exactly why the structured
+  // form exists.
+  const word =
+    typeof action === 'object'
+      ? action.kind === 'allin'
+        ? 'all'
+        : action.kind
+      : (action?.split(' ')[0]?.toLowerCase() ?? '');
+  if (word === 'all' || word === 'allin') {
+    return 'border-danger/40 bg-danger/85 text-white';
+  }
+  if (word === 'raise' || word === 'bet') return 'border-brand/40 bg-brand/85 text-white';
+  if (word === 'call') return 'border-accent/40 bg-accent/85 text-black';
+  if (word === 'check') return 'border-white/20 bg-black/85 text-white';
+  if (word === 'fold') return 'border-white/10 bg-black/70 text-white/55';
+  return 'border-white/15 bg-black/85 text-white';
 }

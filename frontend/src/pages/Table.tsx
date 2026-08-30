@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, Volume2, VolumeX, Settings2, Wifi, WifiOff, MessageSquare } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { PokerTable } from '@/components/poker/PokerTable';
 import { ActionBar } from '@/components/poker/ActionBar';
+import { TimeBank } from '@/components/poker/TimeBank';
 import { InsurancePrompt } from '@/components/poker/InsurancePrompt';
 import { JackpotBurst } from '@/components/poker/JackpotBurst';
 import { chips } from '@/lib/money';
@@ -15,6 +16,12 @@ import { GAMES } from '@/lib/games';
 import { isOpenableTableId } from '@/config';
 import { useDemoHand } from '@/hooks/useDemoHand';
 import { useLiveTable } from '@/hooks/useLiveTable';
+import type { TableSnapshot } from '@/lib/liveTable';
+import { designForGame } from '@/lib/tableDesigns';
+import { useTableDesign } from '@/store/tableDesign';
+import { cn } from '@/lib/cn';
+import { useSoundSetting } from '@/hooks/useSoundSetting';
+import { play } from '@/lib/sound';
 import { ChatBox } from '@/components/poker/ChatBox';
 import { useTableChat } from '@/hooks/useTableChat';
 import { useSettings, useUpdateSettings } from '@/api/hooks';
@@ -49,6 +56,36 @@ function LiveTable({ tableId }: { tableId: string }) {
   const navigate = useNavigate();
   const live = useLiveTable(tableId);
   const { snapshot, view, status, error, signedIn, signingIn } = live;
+  // Mirrors the player's Settings toggle into the sound engine for as long as
+  // the table is open. Cues elsewhere just call play() and stay ignorant of it.
+  useSoundSetting();
+  // The player picks the colour; the game picks the shape.
+  const chosenDesign = useTableDesign((s) => s.design);
+
+  /**
+   * Your turn, out loud.
+   *
+   * The status line answers "whose turn is it" for anyone watching the screen.
+   * This answers it for the player who has to act and may not be — a Mini App
+   * spends most of its life behind another window, and a turn missed in silence
+   * is a hand folded by the clock.
+   *
+   * Latched rather than fired on every render: the ref clears only when the turn
+   * passes, so a re-render mid-turn cannot chime twice.
+   */
+  const yourTurn =
+    snapshot?.phase === 'IN_HAND' &&
+    snapshot.seats.some((s) => s.isYou && s.index === snapshot.toActSeat);
+  const announcedTurn = useRef(false);
+  useEffect(() => {
+    if (!yourTurn) {
+      announcedTurn.current = false;
+      return;
+    }
+    if (announcedTurn.current) return;
+    announcedTurn.current = true;
+    play('turn');
+  }, [yourTurn]);
 
   /** Buy-in sheet target: a seat index to sit in, `null` to top up, `false` when closed. */
   const { t } = useTranslation();
@@ -60,7 +97,16 @@ function LiveTable({ tableId }: { tableId: string }) {
   const [chatOpen, setChatOpen] = useState(false);
   const [challengePrompt, setChallengePrompt] = useState<string | null>(null);
 
-  const { messages, sendChat, sendVoice } = useTableChat(live.socket);
+  const { messages, sendChat, sendVoice, unread, markRead } = useTableChat(
+    live.socket,
+    snapshot?.you?.playerId,
+  );
+
+  // Opening the drawer IS reading them. Also clears while it stays open, so
+  // messages arriving as you watch do not queue up a count behind the panel.
+  useEffect(() => {
+    if (chatOpen) markRead();
+  }, [chatOpen, messages.length, markRead]);
 
   // Hook into socket events to show challenge modal
   useEffect(() => {
@@ -89,6 +135,9 @@ function LiveTable({ tableId }: { tableId: string }) {
 
   const seated = snapshot?.yourSeat != null;
   const mySeat = snapshot?.seats.find((s) => s.isYou);
+  // The game owns the felt where it has an opinion — Short Deck is a different
+  // table, not a skin. Games without one leave the player's choice alone.
+  const gameDesign = designForGame(tableId, snapshot?.variant, chosenDesign);
   const playersReady = snapshot?.seats.filter((s) => s.status !== 'sittingout').length ?? 0;
   const Felt = feltFor(tableId);
 
@@ -108,12 +157,19 @@ function LiveTable({ tableId }: { tableId: string }) {
         onOpenDesigns={() => setDesignsOpen(true)}
       />
 
-      <div className="flex flex-1 items-center px-3 relative">
+      {/* A wide felt loses more to gutters than a tall one — it is short enough
+          that width is the only dimension it is starved of. The chat button is
+          absolutely positioned and unaffected by dropping the padding. */}
+      <div className={cn('relative flex flex-1 items-center', gameDesign ? 'px-0' : 'px-3')}>
         {Felt ? (
           <Felt snapshot={snapshot} onCommand={(cmd) => live.command(cmd)} />
         ) : (
           <PokerTable
             state={view}
+            // The game brings its own felt where it has one — Short Deck is a
+            // different table, not a skin of Hold'em — and that wins over the
+            // picker. Games with no felt of their own leave the choice alone.
+            {...(gameDesign ? { design: gameDesign } : {})}
             {...(seated ? {} : { onSit: (seatIndex: number): void => setBuyInFor(seatIndex) })}
             onChallenge={(playerId) => live.challenge(playerId)}
           />
@@ -122,11 +178,21 @@ function LiveTable({ tableId }: { tableId: string }) {
         {/* Floating Chat Toggle Button */}
         <button
           onClick={() => setChatOpen((o) => !o)}
+          aria-label={unread > 0 ? t('table.chatUnread', { count: unread }) : t('table.chat')}
           className={`absolute bottom-[4.5rem] right-4 grid size-12 place-items-center rounded-full shadow-2xl border border-border transition-colors z-50 ${
             chatOpen ? 'bg-brand text-brand-fg' : 'bg-surface text-dim hover:text-text'
           }`}
         >
           <MessageSquare size={20} />
+          {/* Unread count. Without it an incoming message was invisible — the
+              drawer is closed by default, so a player could be spoken to all
+              session and never know. Capped at 9+ so the badge stays a dot-sized
+              thing on the rim rather than growing into the button. */}
+          {unread > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 grid min-w-[1.15rem] place-items-center rounded-full bg-danger px-1 text-[0.62rem] font-black leading-[1.15rem] text-white shadow-lg ring-2 ring-bg">
+              {unread > 9 ? '9+' : unread}
+            </span>
+          )}
         </button>
 
         {/* Chat Drawer Overlay */}
@@ -165,19 +231,8 @@ function LiveTable({ tableId }: { tableId: string }) {
       </div>
 
       {/* Result banner */}
-      <AnimatePresence>
-        {view.handOver && view.message && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="mx-auto mb-2 rounded-full px-4 py-1.5 text-sm font-semibold text-white shadow-lg"
-            style={{ backgroundImage: 'var(--brand-gradient)' }}
-          >
-            {view.message}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* The result now renders under the board, inside PokerTable — it belongs
+          next to the cards it is describing, not down here with the controls. */}
 
       {error && (
         <div className="mx-auto mb-2 rounded-full border border-[color-mix(in_srgb,var(--danger)_35%,transparent)] bg-[color-mix(in_srgb,var(--danger)_15%,transparent)] px-3 py-1 text-[0.72rem] font-semibold text-danger">
@@ -211,11 +266,22 @@ function LiveTable({ tableId }: { tableId: string }) {
       {/* Action dock */}
       <div className="border-t border-border bg-surface/80 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 backdrop-blur">
         {live.heroToAct ? (
-          <ActionBar state={view} onAction={live.heroAct} />
+          <>
+            {/* Above the buttons, and only while it is your turn — an opponent's
+                remaining reserve is not yours to see. */}
+            <TimeBank
+              timeBankMs={snapshot?.timeBankMs ?? 0}
+              usingTimeBank={snapshot?.usingTimeBank ?? false}
+              autoTimeBank={snapshot?.autoTimeBank ?? false}
+              onUse={() => live.command({ kind: 'useTimeBank' })}
+              onToggleAuto={(on) => live.command({ kind: 'autoTimeBank', on })}
+            />
+            <ActionBar state={view} onAction={live.heroAct} />
+          </>
         ) : seated ? (
           <div className="flex items-center gap-2">
             <div className="flex-1 text-[0.8rem] text-dim">
-              {statusLine(t, snapshot?.phase, playersReady, mySeat?.status === 'sittingout')}
+              {statusLine(t, snapshot, playersReady, mySeat?.status === 'sittingout')}
             </div>
             {mySeat && mySeat.stack === 0 ? (
               <Button size="sm" onClick={() => setBuyInFor(null)}>
@@ -285,15 +351,33 @@ function LiveTable({ tableId }: { tableId: string }) {
 
 /** Takes `t` rather than calling a hook: this is module scope, outside React. */
 function statusLine(
-  t: (key: string) => string,
-  phase: string | undefined,
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  snapshot: TableSnapshot | null | undefined,
   playersReady: number,
   sittingOut: boolean,
 ): string {
   if (sittingOut) return t('table.sittingOut');
+  const phase = snapshot?.phase;
   if (phase === 'DEALING') return t('table.dealing');
   if (phase === 'SHOWDOWN') return t('table.nextHand');
-  if (phase === 'IN_HAND') return t('table.waitingPlayers');
+
+  // DURING a hand, name whose turn it is.
+  //
+  // This used to read "Waiting for other players…" for the whole hand, which is
+  // both wrong and the opposite of useful: it says the table is short of people
+  // while the table is busy playing. Two seats is enough to deal (readySeats()
+  // < 2 is the only gate), so it was also telling a full heads-up table it was
+  // waiting for someone who was never coming.
+  //
+  // The seat ring already marks who is on the clock, but a ring on a phone-sized
+  // felt is easy to miss. Saying the name in the one line everybody reads is the
+  // difference between knowing whose turn it is and guessing.
+  if (phase === 'IN_HAND') {
+    const seat = snapshot?.seats.find((s) => s.index === snapshot.toActSeat);
+    if (!seat) return t('table.handInPlay');
+    return seat.isYou ? t('table.yourTurn') : t('table.playerTurn', { name: seat.name });
+  }
+
   return playersReady < 2 ? t('table.waitingOne') : t('table.nextHand');
 }
 
@@ -468,19 +552,8 @@ function DemoTable() {
         <PokerTable state={view} />
       </div>
 
-      <AnimatePresence>
-        {view.handOver && view.message && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            className="mx-auto mb-2 rounded-full px-4 py-1.5 text-sm font-semibold text-white shadow-lg"
-            style={{ backgroundImage: 'var(--brand-gradient)' }}
-          >
-            {view.message}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* The result now renders under the board, inside PokerTable — it belongs
+          next to the cards it is describing, not down here with the controls. */}
 
       <div className="border-t border-border bg-surface/80 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 backdrop-blur">
         {heroToAct ? (
