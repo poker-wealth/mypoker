@@ -14,30 +14,38 @@ This document is the breakdown of that into phases anyone can pick up. Read
 
 **Be aware of this before trusting anything in §2.** Both sites are
 JavaScript-rendered single-page apps. Fetching them returns the page title and
-nothing else — no navigation, no layout, no copy. So:
+nothing else — no navigation, no layout, no copy. Everything in §2.1, and the
+documentation half of §2.2, therefore comes from **public writing about** the two
+platforms rather than from reading the sites.
 
-- What is in §2 comes from **public documentation and reporting about** the two
-  platforms, not from reading the sites.
-- **Nothing about `hhpoker777.com`'s actual visual design has been observed.**
-  Layout, spacing, colour and type — the entire reason it is our UI reference —
-  are unrecorded. §2.2 is therefore nearly empty, honestly.
+**Three real screenshots have since been supplied** and are written up in
+§2.2.1–§2.2.5: the club lobby, the tutorial tab and the events tab. They are
+worth more than all the documentation combined — they added an entire phase
+(Phase 7) that the first draft of this plan did not have, and they corrected a
+colour rule that would have been wrong on every screen.
 
-**This is the first thing that needs fixing, and it needs a person, not a
-fetch.** Someone has to install both apps and walk them. Until that happens the
-UI phases below are structured but not specified: they say *what screen*, not
-*what it looks like*.
+**That is the argument for finishing the capture rather than starting to build.**
+Three screens changed the plan this much; nine are still missing.
 
-**What to capture, per screen** (both apps): splash, loading, login/signup,
-lobby, club list, club interior, table list, the felt itself, the action bar,
-wallet/chips, profile, settings.
+**Still missing, and still Phase 0:**
 
-- A screenshot of each, iPhone and Android
-- A screen recording of: cold start → login → enter a club → sit → play a hand →
-  leave
-- For each: the colour behind it, the corner radius, the spacing rhythm, where
-  the primary action sits, what the type scale looks like
+| Screen | Why it matters |
+|---|---|
+| Splash · loading | Named directly in the brief |
+| Login / sign-up | Phase 3 cannot be specified without it |
+| Club list (not the interior) | How you find a club before joining one |
+| **The felt, and the action bar** | The most important screen in the product |
+| 俱乐部 tab | One of five, entirely unseen |
+| 我的 (profile) · settings | |
+| 教学 → 工具 and 训练 | Two unseen sub-tabs inside Phase 7 |
+| Wallet / deposit / withdraw detail | Feeds decision §4.1 |
 
-That capture is **Phase 0**, and it blocks the UI phases.
+For each: a screenshot on iPhone and Android, the colour behind it, the corner
+radius, the spacing rhythm, where the primary action sits, and the type scale.
+Plus one recording of cold start → login → club → sit → hand → leave.
+
+Until the felt is captured, **Phase 5 is a list of components, not a
+specification** — and Phase 5 is the largest phase in the plan.
 
 ---
 
@@ -65,7 +73,7 @@ waits on.
 
 ### 2.2 hhpoker777.com (HHPoker / 德扑圈) — the UI brief
 
-What is established:
+From documentation:
 
 - Positions itself around **playing with people you know** — private, social,
   club-based — rather than an open cash-game lobby.
@@ -82,7 +90,132 @@ So the reference platform we have been given for iOS and Android **is not
 distributed through the stores** in its main market. That is not an accident,
 and §4.2 explains why it matters to us.
 
-**Everything else about this site — the actual look — is unrecorded.** See §1.
+#### 2.2.1 First real screen — the club lobby
+
+One screenshot has been supplied: the **club interior**, 大厅 (Lobby) tab, club
+永旺德州 / ID 88888. Everything below is read off that image. It is one screen of
+the dozen listed in §1 — Phase 0 still stands — but it is real, and it settles a
+lot.
+
+**Layout, top to bottom.**
+
+1. **Title bar.** Club name centred, dark. A red-packet (红包) badge top-right.
+2. **Club header.** Square rounded club logo left. Club name large and white.
+   **`ID 88888` directly under it with a copy affordance** — the club ID is a
+   first-class, shareable identifier. Right side, two icon-over-label actions:
+   **成员 (12232)** members, and **牌局记录** hand records — both scoped to the club.
+3. **Balance row.** USDT token mark, `USDT: 0`, and an **eye icon to hide the
+   balance**. Right-aligned, three dark pill buttons: **充币** (deposit),
+   **提币** (withdraw), **红包** (red packet).
+4. **Promo banner.** Full-bleed, the one saturated element on the screen:
+   gold/orange, coins and cards, reading **"区块发牌 · 过程可验"** —
+   *blockchain dealing, the process is verifiable*. Provable fairness is
+   marketed, loudly, at the top of the lobby.
+5. **Deck filter.** 全部 (all) · 长牌 (full deck) · 短牌 (short deck), the active
+   one green with a green underline. A sort control at the right.
+6. **Table rows.** Each one:
+   - A **circular occupancy ring** — `5/7`, `4/7` — the arc filled in proportion
+     to seats taken. This is the strongest single design idea on the screen.
+   - Table name and number, dim: `永旺娱乐(短牌) 27121`, `三倍前注(短牌) 27105`
+     — note **三倍前注 = triple ante**, a stake structure we do not have.
+   - Stakes bold and white (`0.2/0.4`, `2/6`) beside a **cyan running clock**
+     (`00:55:36`).
+   - A shield icon and **保险 (insurance)** tag.
+   - Right: **最小买入** (minimum buy-in) over a USDT mark and figure.
+   - A ghosted felt illustration watermarked behind the row.
+7. **Bottom tab bar, five tabs.** 大厅 (lobby) · 教学 (tutorial) · 俱乐部 (club)
+   · 活动 (events) · 我的 (mine). Active tab green.
+
+**Colour, eyeballed from a compressed screenshot — re-sample on device before
+building.**
+
+| Role | Approx. | Notes |
+|---|---|---|
+| Ground | `#0D1117`–`#10161A` | Near-black, slight blue-green cast. Not pure black. |
+| Row / card | one step lighter than ground | Separation by value, not by border. |
+| Primary text | near-white | Club name, stakes, buy-in figure. |
+| Secondary text | mid grey | Table names, labels — a **big** drop from primary. |
+| Accent | bright mint green | Active tab, underline, occupancy arc, USDT mark. |
+| Data | cyan | The running clock only. |
+| Promo | saturated gold/orange | Banner only. Nothing else on the screen is warm. |
+
+**What this tells us about the look:** dark, calm, and almost entirely
+monochrome, with green reserved for *state* (what is active, how full a table
+is) and a single loud banner carrying all the colour. Contrast between primary
+and secondary text is doing most of the hierarchy work — very little is done
+with borders or boxes.
+
+**Three things they have that we do not:** a **tutorial** tab, an **events**
+tab, and a **triple-ante** table type. Two of those are whole product areas —
+see 2.2.2 and 2.2.3.
+
+#### 2.2.2 教学 — the tutorial tab
+
+Not a help page. A **content platform**, with its own four sub-tabs:
+**知识** (knowledge) · **工具** (tools) · **训练** (training) · **我的** (mine).
+
+Under 知识, two filter chips — **策略视频** (strategy video, active, solid green
+pill) and **知识文章** (articles, inactive, dark outlined pill) — over a feed of
+numbered lessons:
+
+- 第1课 — *Where exactly are you losing?*
+- 第2课 — *First step to stop the bleeding: build a starting-hand structure*
+- 第3课 — *Open or Fold: stop limping preflop*
+- 第4课 — *Facing a raise: Call, …*
+
+Each row: title over two lines, then a timestamp (`2026-08-05 12:18`), a **like
+count** (858) and a **view count** (157.8k), with a 16:9 video thumbnail and play
+overlay on the right.
+
+**What that implies for us,** and it is not small: video hosting and streaming, a
+CMS someone publishes lessons through, per-item like and view counters, an
+article reader, and two further sections (**tools**, **training**) not yet seen.
+We have none of it. This is its own phase — see Phase 7.
+
+#### 2.2.3 活动 — the events tab
+
+Titled 永旺专属活动 ("Yongwang exclusive events"), so events are **scoped to the
+club**, not the platform. A green KKPoker banner — *"公平，是竞技的起点"*,
+**fairness is the starting point of competition** — over a list of promotions:
+
+| Item | Meaning |
+|---|---|
+| VIP专属群 | VIP exclusive group |
+| 大牌奖励 | Big-hand reward (a bad-beat/high-hand style bonus) |
+| 推荐红包 | Referral red packet |
+| 幸运骰子 | Lucky dice |
+
+Each is a dark card: a large glossy 3-D icon left, bold label, and a
+**blue pill CTA — 立即查看** ("view now") right.
+
+We have `Jackpot` and `Vip` screens, and a red-packet game, but no events hub and
+no referral or lucky-dice mechanic. Also Phase 7.
+
+#### 2.2.4 Corrections to 2.2.1 now three screens are visible
+
+- **Blue is the action colour, not green.** Green marks *state* — the active
+  tab, the active filter chip, the occupancy arc. Every actual button
+  (立即查看) is **blue**. Reading green as the CTA colour would have been wrong
+  everywhere.
+- **The ghosted watermark behind list rows is a system**, not a one-off on the
+  table list. It recurs on the events list.
+- **Banners are per-context and carry the loud colour**: gold in the lobby,
+  green on events. The rest of every screen stays near-monochrome.
+- **The card is the unit.** Dark rounded rectangle, generous internal padding,
+  separated by gap rather than by rule. Almost nothing on these screens has a
+  visible border.
+
+#### 2.2.5 One thing to settle before building
+
+The screens are branded **KKPoker** — the club logo in the lobby and the events
+banner both say so. `hhpoker777.com` was given as the reference. These gateway
+domains commonly front one of several club apps, so somebody should confirm
+**which app we are actually copying** before Phase 2 samples colours from it.
+It does not change anything above; it does change what gets installed in Phase 0.
+
+**Two things we have that this screen confirms are right:** per-table
+**insurance** (we have `InsurancePrompt`) and **provable fairness** — which they
+put on a banner rather than burying in a menu, and we currently bury in a menu.
 
 ---
 
@@ -130,7 +263,7 @@ withdrawal pipeline, and a full ledger, all in-product.
 
 **Why it cannot be deferred.** It determines whether `financial-core` is central
 or nearly deleted; whether we need a gaming licence; whether the store route in
-§4.2 is even open; and what the Wallet screen is for. Phases 7 and 8 cannot be
+§4.2 is even open; and what the Wallet screen is for. Phases 8 and 9 cannot be
 scoped until it is answered.
 
 **Options.**
@@ -161,7 +294,7 @@ certificate and direct APK (§2.2).
   through disabling a safety setting. It also means the download page in Phase 1
   carries install instructions and a trust walkthrough, which is real design work.
 
-**This must be decided before Phase 8, and it changes Phase 1.**
+**This must be decided before Phase 9, and it changes Phase 1.**
 
 ### 4.3 Telegram and real money
 
@@ -183,12 +316,15 @@ the phase is not done.
 
 **Goal.** Turn both reference apps into material a developer can build from.
 
-**Why.** §1 — we have not seen hhpoker777's interface. Every UI phase below is
-currently a placeholder without this.
+**Why.** §1 — three screens are in, nine are not, and the missing ones include
+the felt. Phase 5 cannot be specified until it is captured.
 
 **Scope.**
-1. Install WePoker and HHPoker on a real iPhone and a real Android device.
-2. Screenshot every screen listed in §1, both platforms.
+1. Install the reference app on a real iPhone and a real Android device.
+   **First settle §2.2.5** — the screenshots are branded KKPoker while the brief
+   names hhpoker777.com, so confirm which app we are copying before sampling
+   anything from it.
+2. Capture the nine screens still listed in §1, both platforms.
 3. Record the cold-start → login → club → sit → hand → leave flow in each.
 4. Write `docs/reference/FLOWS.md`: for each screen, what it shows, what you can
    do, and what happens next. Functionality only — that is wpk's job.
@@ -385,7 +521,50 @@ matching the engine, no untranslated strings.
 
 ---
 
-### Phase 7 — Money, per the §4.1 decision
+### Phase 7 — Tutorial and Events
+
+**Goal.** The two bottom-nav tabs we do not have at all: 教学 and 活动.
+
+**Why.** They are not garnish — they are two of the reference's five tabs, and
+one of them is a video platform. Discovered from the screenshots in §2.2.2 and
+§2.2.3; this phase did not exist in the first draft of this plan, which is a fair
+measure of how much a single screenshot is worth.
+
+**Scope — Tutorial (教学).**
+- Four sub-tabs: knowledge, tools, training, mine.
+- Knowledge feed: numbered lessons, filterable by video vs article, each with
+  timestamp, like count and view count.
+- Video hosting and streaming, with thumbnails. **Decide build vs third-party
+  early** — this is the cost driver in the phase.
+- A CMS for publishing lessons, and who operates it.
+- Article reader.
+- **Tools** and **training** are unseen; capture them in Phase 0 before scoping.
+
+**Scope — Events (活动).**
+- Club-scoped events list: icon, title, CTA.
+- The four seen: VIP group, big-hand reward, referral red packet, lucky dice.
+  Each needs its own rules and payout definition — the list screen is the cheap
+  part.
+- Reuse what exists: `Jackpot` and `Vip` already cover some of this ground, and
+  we already have a red-packet game engine.
+
+**Where.** New sections in `frontend/src/pages/` and `mobile/src/screens/`.
+Events may extend `Jackpot.tsx` and `Vip.tsx` rather than replacing them.
+
+**Done means.** Both tabs are reachable and populated with real content on all
+three surfaces — a player can watch a lesson through, and open an event and
+understand what it pays.
+
+**Depends on.** Phase 2 for the look; Phase 0 for the two unseen sub-tabs.
+**Any event that pays out is money-touching — senior review** (iron rule 5).
+
+**Estimate risk.** Highest of any phase here, because "video platform" and "four
+promotion mechanics" are each larger than they look on a list screen. Do not
+commit a date on this one until Phase 0 has captured tools and training.
+
+---
+
+### Phase 8 — Money, per the §4.1 decision
 
 **Goal.** Implement the chosen money model.
 
@@ -397,7 +576,7 @@ Wallet becomes chips + club balance + history; agent grant/settle flows become
 the only way chips move; decide what remains of `financial-core`.
 
 **Scope — if (B) keep the wallet.** Re-skin the existing deposit/withdrawal flows
-to the reference; begin licensing; drop the store route in Phase 8.
+to the reference; begin licensing; drop the store route in Phase 9.
 
 **Where.** `frontend/src/pages/Wallet.tsx`, `mobile/src/screens/WalletScreen.tsx`,
 `financial-core/`.
@@ -409,7 +588,7 @@ was chosen, with the ledger balancing.
 
 ---
 
-### Phase 8 — Distribution
+### Phase 9 — Distribution
 
 **Goal.** Real people can install it on real phones.
 
@@ -430,7 +609,7 @@ website and reaches a table.
 
 ---
 
-### Phase 9 — Hardening
+### Phase 10 — Hardening
 
 **Goal.** Fit to run with real money and real players.
 
@@ -447,25 +626,31 @@ and no crash.
 ## 6. Sequencing
 
 ```
-Phase 0  Capture references        ── blocks everything visual, START TODAY
+Phase 0  Capture references  ── blocks everything visual, START TODAY
    │
-   ├── Phase 1  Marketing website ──────────────┐  (parallel, own deployable)
-   │                                            │
-   └── Phase 2  Design system                   │
-          │                                     │
-          └── Phase 3  Splash · loading · login  │
-                 │                              │
-                 └── Phase 4  Lobby and clubs   │
-                        │                       │
-                        └── Phase 5  Texas felt │
-                               │                │
-                               └── Phase 6  The other 11 games
+   ├── Phase 1  Marketing website ─────────────┐   parallel, own deployable
+   │                                           │
+   └── Phase 2  Design system                  │
+          │                                    │
+          └── Phase 3  Splash · loading · login│
+                 │                             │
+                 └── Phase 4  Lobby and clubs  │
+                        │                      │
+                        ├── Phase 5  Texas felt│
+                        │      │               │
+                        │      └── Phase 6  The other 11 games
+                        │                      │
+                        └── Phase 7  Tutorial and Events   parallel with 5–6
                                       │
-        §4.1 decision ── Phase 7  Money ────────┤
-        §4.2 decision ── Phase 8  Distribution ─┘
+   4.1 decision ── Phase 8  Money ────────────┤
+   4.2 decision ── Phase 9  Distribution ─────┘
                                       │
-                               Phase 9  Hardening
+                              Phase 10  Hardening
 ```
+
+Phase 7 hangs off Phase 4, not off the felt work — it needs the club context and
+the design system, but nothing from the table. It is the obvious candidate to run
+in parallel with Phases 5 and 6 by a different person.
 
 **Milestones.**
 
@@ -477,12 +662,14 @@ Phase 0  Capture references        ── blocks everything visual, START TODAY
 | M4 | Club loop works | 4 | Join a club, reach a seat |
 | M5 | Hold'em plays everywhere | 5 | The product, minimally |
 | M6 | Full catalogue | 6 | The product, fully |
-| M7 | Money model live | 7 | Players can actually play for something |
-| M8 | Installable by the public | 8 | Launch-ready |
-| M9 | Hardened | 9 | Safe to run |
+| M7 | Tutorial and Events live | 7 | The other two tabs stop being empty |
+| M8 | Money model live | 8 | Players can actually play for something |
+| M9 | Installable by the public | 9 | Launch-ready |
+| M10 | Hardened | 10 | Safe to run |
 
 Phases 1 and 2 can run in parallel by different people. Phase 6's eleven games
-can be split across developers once Phase 5 has set the pattern.
+can be split across developers once Phase 5 has set the pattern, and Phase 7 can
+run alongside both.
 
 ---
 
