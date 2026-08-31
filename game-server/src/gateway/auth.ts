@@ -66,6 +66,14 @@ export interface PlayerProfile {
 export interface SelfProfile extends PlayerProfile {
   email: string | null;
   hasPassword: boolean;
+  /**
+   * Whether a stored identity document backs this profile.
+   *
+   * `false` for a Telegram player, whose `displayName` here is the raw playerId
+   * and whose `photoUrl` is null — display fallbacks, not facts. A client
+   * caching this profile must not overwrite real values with them.
+   */
+  hasStoredIdentity: boolean;
 }
 
 declare global {
@@ -314,9 +322,19 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
    * place and the status codes at the call sites is what stops the rate limits
    * and the dev-console fallback being reimplemented three times.
    */
-  const mintAndSend = async (email: string, playerId: string): Promise<MintOutcome> => {
+  const mintAndSend = async (
+    email: string,
+    playerId: string,
+    /**
+     * Credentials to bind to this challenge — passed only by signup, and only
+     * when the address already had an unconfirmed account. A RESEND passes
+     * nothing and the store keeps whatever is already on the challenge, so
+     * "send it again" does not quietly drop the password it was issued for.
+     */
+    pending?: { passwordHash: string; displayName?: string },
+  ): Promise<MintOutcome> => {
     const at = now();
-    const minted = await otps.issue(email, playerId, at);
+    const minted = await otps.issue(email, playerId, at, pending);
 
     if (!minted.ok) {
       return { status: 'rate_limited', reason: minted.reason, retryAfterMs: minted.retryAfterMs };
@@ -441,15 +459,22 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
         return;
       }
 
-      let identity;
+      let started;
       try {
-        identity = await authClient.startSignup(email, password, displayName);
+        started = await authClient.startSignup(email, password, displayName);
       } catch (err) {
         res.status(400).json({ error: err instanceof Error ? err.message : 'sign-up failed' });
         return;
       }
 
-      answerWithOutcome(res, email, await mintAndSend(email, identity.playerId));
+      // `started.pending` is present only when this signup landed on an account
+      // that already existed unconfirmed. Nothing on that account has changed;
+      // these credentials apply when this challenge's own code comes back.
+      answerWithOutcome(
+        res,
+        email,
+        await mintAndSend(email, started.identity.playerId, started.pending),
+      );
     })().catch((err: unknown) => {
       console.error('[auth] signup failed:', err);
       res.status(500).json({ error: 'internal error' });
@@ -489,8 +514,12 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
         return;
       }
 
-      const identity = await authClient.markEmailVerified(result.playerId);
-      if (!identity) {
+      // The credentials that came back with the code, if this signup was made
+      // against an account that already existed. Nothing was written to that
+      // account until now.
+      const confirmed = await authClient.markEmailVerified(result.playerId, result.pending);
+
+      if (!confirmed.ok && confirmed.reason === 'no_account') {
         // The challenge outlived the account it was for -- only reachable if
         // the row was deleted between signup and confirmation. Not an internal
         // error; there is simply nothing to sign in to.
@@ -500,7 +529,23 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
         return;
       }
 
-      res.json(issue(asProfile(identity)));
+      // A correct code proves control of the mailbox, and nothing else. This
+      // door used to stop there and mint a token, which made it the one sign-in
+      // path a ban did not cover: sign up again with a suspended address, read
+      // the code out of your own inbox, and you were back. Same message and
+      // `code` as the login branch above, because it is the same fact and the
+      // client already switches on it.
+      if (!confirmed.ok) {
+        res.status(403).json({
+          error: confirmed.suspendedReason
+            ? `This account is suspended: ${confirmed.suspendedReason}`
+            : 'This account is suspended. Contact support.',
+          code: 'account_suspended',
+        });
+        return;
+      }
+
+      res.json(issue(asProfile(confirmed.identity)));
     })().catch((err: unknown) => {
       console.error('[auth] verify-otp failed:', err);
       res.status(500).json({ error: 'internal error' });
@@ -1068,13 +1113,33 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
         photoUrl: stored ? stored.photoUrl ?? null : null,
         telegramId: Number.isFinite(telegramId) ? telegramId : null,
         vipTier: 0,
-        // The role rides on the verified token; surfacing it lets the client
-        // decide whether to render the admin panel or the player app.
-        role: req.player!.role === 'ops' ? 'ops' : 'player',
+        /*
+         * The STORED role, not the token's claim.
+         *
+         * These diverge for the life of a token, and reporting the claim made
+         * both directions wrong. `requireAdmin` checks the stored role, so a
+         * newly-granted administrator was refused the panel their own /me told
+         * them they could see — and a demoted one kept a panel where every
+         * call inside it answered 404.
+         *
+         * Falls back to the claim only when there is no identity document at
+         * all: a Telegram player has none and can never be ops anyway.
+         */
+        role: (stored?.role ?? req.player!.role) === 'ops' ? 'ops' : 'player',
         email,
         hasPassword: stored?.hasPassword ?? false,
+        /*
+         * Whether an identity document exists at all.
+         *
+         * A Telegram player has none, so `displayName` above falls back to the
+         * raw playerId and `photoUrl` to null. That fallback is fine for
+         * DISPLAY and disastrous to merge into a cached session — it replaced
+         * real Telegram names and avatars with `tg-123456789` and nothing.
+         * The client uses this to know which fields here are authoritative.
+         */
+        hasStoredIdentity: Boolean(stored),
         // `SelfProfile`, not `PlayerProfile`: this is the one endpoint that tells
-        // a player about their own account, so it carries the two extra fields
+        // a player about their own account, so it carries the extra fields
         // Personal Info needs. It still satisfies the narrower shape.
       } satisfies SelfProfile);
     } catch (err) {

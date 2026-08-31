@@ -49,3 +49,31 @@ export function isSignInAllowed(user: SignInSubject): SignInVerdict {
   if (user.emailVerified === false) return { ok: false, reason: 'email_unverified' };
   return { ok: true };
 }
+
+/**
+ * May a fresh signup TAKE OVER an account that already exists on this address?
+ *
+ * Stated positively, and in this file, because it is the same question
+ * `isSignInAllowed` answers pointed the other way — and the two must not drift.
+ *
+ * It lived inside `createUnverifiedWithPassword` as `!isSignInAllowed(u).ok`,
+ * which reads as "reclaim anyone who cannot sign in". That is true of a
+ * SUSPENDED account as well as an unconfirmed one, so signing up again with a
+ * banned address rewrote its password and cleared `emailVerified` while leaving
+ * `suspendedAt` in place. The confirmation door then handed over a token. A ban
+ * a signup form can lift is not a ban.
+ *
+ * Only an account that has never been confirmed AND is not suspended is
+ * claimable. Note this deliberately does NOT read `emailVerified` as truthy:
+ * only an explicit `false` — an account created by the gated signup — qualifies.
+ * Rows predating confirmation have the field absent, and those are real accounts
+ * belonging to real people, not free addresses.
+ *
+ * Still open, and not what this fixes: an UNCONFIRMED account is claimable by
+ * anyone who knows the address, so an attacker can overwrite a pending signup's
+ * password before its owner confirms. Closing that needs the credentials bound
+ * to the challenge that was mailed rather than written to the row up front.
+ */
+export function isClaimableBySignup(user: SignInSubject): boolean {
+  return user.emailVerified === false && !user.suspendedAt;
+}

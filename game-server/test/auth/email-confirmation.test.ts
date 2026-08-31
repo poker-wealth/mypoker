@@ -4,7 +4,7 @@ import { buildAuthRouter, type AuthUserStore } from '../../src/gateway/auth';
 import { loadConfig } from '../../src/gateway/config';
 import { verifyToken } from '../../src/gateway/tokens';
 import { createOtpStore, type OtpPersistence, type StoredOtp } from '../../src/auth/otp-store';
-import { isSignInAllowed } from '../../src/auth/sign-in-rules';
+import { isSignInAllowed, isClaimableBySignup } from '../../src/auth/sign-in-rules';
 import type { OtpMailRequest, OtpDelivery } from '../../src/gateway/mailer';
 import type { StoredIdentity, PasswordCheck } from '../../src/auth/user-store';
 import { OTP_MAX_ATTEMPTS, OTP_MAX_SENDS, OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS } from '../../src/auth/otp-rules';
@@ -61,6 +61,15 @@ interface FakeUser {
   password: string;
   displayName: string;
   emailVerified?: boolean;
+  /**
+   * Suspension. Absent from this fake until now, which is a large part of why
+   * the ban-evasion path was invisible here: the confirmation suite could not
+   * express a suspended account, so no test could ask what happens when one
+   * signs up again. The fields `isSignInAllowed` and `isClaimableBySignup`
+   * actually read, and nothing else.
+   */
+  suspendedAt?: Date;
+  suspendedReason?: string;
 }
 
 /**
@@ -87,18 +96,33 @@ function memoryUsers(seed: FakeUser[] = []): AuthUserStore & { rows: Map<string,
     async startSignup(rawEmail, password, displayName) {
       const email = rawEmail.trim().toLowerCase();
       const existing = rows.get(email);
-      if (existing && isSignInAllowed(existing).ok) {
+      // The REAL predicate. This fake used to carry `isSignInAllowed(u).ok`,
+      // the same inversion the production code had, so the suite reproduced
+      // the bug faithfully and reported it as correct behaviour.
+      if (existing && !isClaimableBySignup(existing)) {
         throw new Error('User with this email or phone number already exists');
       }
+      // An address that already has an unconfirmed account KEEPS its
+      // credentials. The new ones ride on the challenge and are applied only
+      // when its code comes back — mirrored here because a fake that overwrote
+      // the row would let the takeover test pass while the real store stayed
+      // vulnerable.
+      if (existing) {
+        return {
+          identity: identity(existing),
+          pending: { passwordHash: password, ...(displayName ? { displayName } : {}) },
+        };
+      }
+
       const user: FakeUser = {
-        playerId: existing?.playerId ?? `player-${nextId++}`,
+        playerId: `player-${nextId++}`,
         email,
         password,
         displayName: displayName || email.split('@')[0]!,
         emailVerified: false,
       };
       rows.set(email, user);
-      return identity(user);
+      return { identity: identity(user) };
     },
     async verifyPassword(rawEmail, password): Promise<PasswordCheck> {
       const user = rows.get(rawEmail.trim().toLowerCase());
@@ -109,14 +133,30 @@ function memoryUsers(seed: FakeUser[] = []): AuthUserStore & { rows: Map<string,
       if (!verdict.ok) return { ok: false, reason: verdict.reason, identity: identity(user) };
       return { ok: true, identity: identity(user) };
     },
-    async markEmailVerified(playerId) {
+    async markEmailVerified(playerId, pending) {
       for (const user of rows.values()) {
         if (user.playerId === playerId) {
           user.emailVerified = true;
-          return identity(user);
+          // Applied at confirmation, never at signup — the binding under test.
+          if (pending) {
+            user.password = pending.passwordHash;
+            if (pending.displayName) user.displayName = pending.displayName;
+          }
+          // The fake runs the REAL rule rather than its own copy. A mock that
+          // always says "ok" is how a suspended account got a token through
+          // this door while the suite stayed green (docs/TRAPS.md §1).
+          const verdict = isSignInAllowed(user);
+          if (!verdict.ok && verdict.reason === 'suspended') {
+            return {
+              ok: false,
+              reason: 'suspended',
+              ...(verdict.suspendedReason ? { suspendedReason: verdict.suspendedReason } : {}),
+            };
+          }
+          return { ok: true, identity: identity(user) };
         }
       }
-      return null;
+      return { ok: false, reason: 'no_account' };
     },
     async oauth() {
       throw new Error('not used in this suite');
@@ -248,6 +288,139 @@ describe('sign-up is not finished until the code is confirmed', () => {
     const claims = verifyToken(res.body.token, JWT_SECRET);
     expect(claims.playerId).toBe(res.body.player.playerId);
     expect(claims.role).toBe('player');
+  });
+
+  /**
+   * Ban evasion, as the reviewer described it: suspend a confirmed account,
+   * sign up again on the same address, read the code out of your own inbox.
+   *
+   * Two separate defects had to line up, so this asserts at BOTH doors rather
+   * than only the one that happened to be checked first — a later change that
+   * reopens either half fails here.
+   */
+  it('does not let a suspended account sign up again and confirm its way back in', async () => {
+    const h = harness();
+    await signUp(h);
+    await request(h.app)
+      .post('/auth/verify-otp')
+      .send({ email: 'ada@example.com', code: h.lastCode() });
+
+    // An administrator bans the account.
+    const row = h.users.rows.get('ada@example.com')!;
+    row.suspendedAt = new Date();
+    row.suspendedReason = 'collusion';
+
+    // Door one: signing up again must not hand over the existing account.
+    const again = await request(h.app)
+      .post('/auth/signup')
+      .send({ email: 'ada@example.com', password: 'a brand new password', displayName: 'Ada' });
+    expect(again.status).toBeGreaterThanOrEqual(400);
+
+    // The row is untouched: same password, still confirmed, still suspended.
+    const after = h.users.rows.get('ada@example.com')!;
+    expect(after.password).toBe('correct horse battery');
+    expect(after.emailVerified).toBe(true);
+    expect(after.suspendedAt).toBeDefined();
+
+    // Door two is covered by its own test below. It is deliberately NOT
+    // asserted here: with the reclaim closed, no new challenge is issued, so
+    // the only code in the outbox is the one already spent on the first
+    // confirmation. Asserting a 403 here would pass on `no_challenge` — a
+    // green light for the wrong reason, which is the failure mode this suite
+    // exists to avoid (docs/TRAPS.md §1).
+  });
+
+  /**
+   * The second door, on its own and genuinely reachable: sign up, get
+   * suspended before confirming, then present a perfectly valid code.
+   *
+   * This is what `verify-otp` never checked. It called `markEmailVerified` and
+   * turned the result straight into a token, so a correct code was sufficient
+   * to hold a session regardless of what an administrator had decided.
+   */
+  it('refuses to confirm a valid code for an account suspended while pending', async () => {
+    const h = harness();
+    await signUp(h);
+
+    const row = h.users.rows.get('ada@example.com')!;
+    row.suspendedAt = new Date();
+    row.suspendedReason = 'fraud';
+
+    const confirm = await request(h.app)
+      .post('/auth/verify-otp')
+      .send({ email: 'ada@example.com', code: h.lastCode() });
+
+    expect(confirm.status).toBe(403);
+    expect(confirm.body.code).toBe('account_suspended');
+    // The reason an admin wrote is shown — this is the moment it was for.
+    expect(confirm.body.error).toContain('fraud');
+    // The important half: no session, by any route.
+    expect(confirm.body.token).toBeUndefined();
+  });
+
+  /**
+   * Account takeover through a pending signup.
+   *
+   * An unconfirmed account is claimable by anyone who knows the address — that
+   * is deliberate, so a genuine user who abandoned a signup can start again.
+   * But signup used to write the new password STRAIGHT ONTO the existing row.
+   * So a stranger signed up against someone else's pending signup, set the
+   * password, and waited: the real owner confirmed with the code in their own
+   * inbox and handed over an account whose password the stranger knew. The
+   * attacker never needed the code — the victim delivered it for them.
+   *
+   * Credentials now ride on the challenge and are applied only when THAT
+   * challenge's code is presented.
+   */
+  it('does not let a second signup change the password of a pending account', async () => {
+    const h = harness();
+    await signUp(h); // the real owner, password 'correct horse battery'
+
+    // A stranger signs up against the same address with a password of theirs.
+    await request(h.app)
+      .post('/auth/signup')
+      .send({ email: 'ada@example.com', password: 'attacker password', displayName: 'Ada' });
+
+    // Nothing on the account has changed. This is the assertion that fails on
+    // the old code: the row's password was rewritten on the spot.
+    const row = h.users.rows.get('ada@example.com')!;
+    expect(row.password).toBe('correct horse battery');
+    expect(row.emailVerified).toBe(false);
+  });
+
+  it('applies the password belonging to the code that is actually presented', async () => {
+    // The other half. Binding is per-CHALLENGE: `issue` replaces the challenge,
+    // so the newest code is the only live one and it carries the credentials
+    // typed alongside it. Someone confirming the code they just requested gets
+    // the password they just chose — here, the second signup's.
+    const h = harness();
+    await signUp(h);
+
+    // Past the resend cooldown, or the second signup is rate-limited and mints
+    // no new code — the first version of this test asserted against the FIRST
+    // challenge and failed for that reason rather than for the behaviour.
+    h.advance(61_000);
+
+    await request(h.app)
+      .post('/auth/signup')
+      .send({ email: 'ada@example.com', password: 'the second password', displayName: 'Ada' });
+
+    const confirm = await request(h.app)
+      .post('/auth/verify-otp')
+      .send({ email: 'ada@example.com', code: h.lastCode() });
+    expect(confirm.status).toBe(200);
+
+    // The second attempt's password is now live...
+    const ok = await request(h.app)
+      .post('/auth/login')
+      .send({ email: 'ada@example.com', password: 'the second password' });
+    expect(ok.status).toBe(200);
+
+    // ...and the first one is not.
+    const stale = await request(h.app)
+      .post('/auth/login')
+      .send({ email: 'ada@example.com', password: 'correct horse battery' });
+    expect(stale.status).toBe(401);
   });
 
   it('lets the confirmed account log in with its password afterwards', async () => {

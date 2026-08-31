@@ -1,4 +1,4 @@
-import { isSignInAllowed, type SignInSubject } from '../../src/auth/sign-in-rules';
+import { isSignInAllowed, isClaimableBySignup, type SignInSubject } from '../../src/auth/sign-in-rules';
 
 /**
  * A document whose key is PRESENT and undefined, rather than absent.
@@ -71,5 +71,42 @@ describe('isSignInAllowed', () => {
     expect(
       isSignInAllowed(present({ suspendedAt: undefined, suspendedReason: undefined })),
     ).toEqual({ ok: true });
+  });
+});
+
+describe('isClaimableBySignup', () => {
+  /**
+   * The ban-evasion path, as a test.
+   *
+   * An administrator suspends an account. Its owner signs up again with the
+   * same address. Before this rule existed the predicate was
+   * `!isSignInAllowed(u).ok` — true for a suspended account — so the signup
+   * rewrote the password, cleared `emailVerified`, left `suspendedAt` alone,
+   * and `/auth/verify-otp` handed back a token for a code delivered to the
+   * banned player's own inbox.
+   */
+  it('refuses to hand a suspended account to a new signup', () => {
+    expect(
+      isClaimableBySignup({ emailVerified: false, suspendedAt: new Date(), suspendedReason: 'fraud' }),
+    ).toBe(false);
+  });
+
+  it('refuses a suspended account that had confirmed its address', () => {
+    expect(isClaimableBySignup({ emailVerified: true, suspendedAt: new Date() })).toBe(false);
+  });
+
+  it('refuses a confirmed, active account — that address belongs to someone', () => {
+    expect(isClaimableBySignup({ emailVerified: true })).toBe(false);
+  });
+
+  it('refuses an account predating confirmation, where the field is absent', () => {
+    // Absent is not `false`. Those rows are real accounts belonging to real
+    // people; reading "unknown" as "claimable" would put every one of them up
+    // for grabs (docs/TRAPS.md §3, the same shape applied to identity).
+    expect(isClaimableBySignup({})).toBe(false);
+  });
+
+  it('allows only an unconfirmed, unsuspended account', () => {
+    expect(isClaimableBySignup({ emailVerified: false })).toBe(true);
   });
 });

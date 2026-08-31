@@ -1,7 +1,8 @@
 import * as bcrypt from 'bcrypt';
 import type { ClientSession } from 'mongoose';
 import { UserModel, type UserDoc } from './user.model';
-import { isSignInAllowed } from './sign-in-rules';
+import { isSignInAllowed, isClaimableBySignup } from './sign-in-rules';
+import { validateEmailAddress, validatePasswordStrength } from './credential-rules';
 
 /**
  * Identity store for the gateway's web sign-in (email/phone + Google).
@@ -44,11 +45,24 @@ async function findByIdentifier(identifier: string): Promise<UserDoc | null> {
  * there is no SMS provider — so the gateway rejects one before reaching here;
  * this asserts it rather than trusting that.
  */
+/**
+ * The outcome of starting a signup.
+ *
+ * `pending` is set ONLY when the address already had an unconfirmed account.
+ * In that case nothing about the existing row's credentials is touched, and
+ * these are the ones to bind to the challenge — applied when its code is
+ * presented, and not before.
+ */
+interface StartedSignup {
+  user: UserDoc;
+  pending?: { passwordHash: string; displayName?: string };
+}
+
 async function createUnverifiedWithPassword(
   identifier: string,
   passwordPlain: string,
   displayName?: string,
-): Promise<UserDoc> {
+): Promise<StartedSignup> {
   const clean = identifier.trim();
   if (!clean.includes('@')) {
     throw new Error('a valid email address is required');
@@ -59,24 +73,48 @@ async function createUnverifiedWithPassword(
 
   const existing = await findByIdentifier(clean);
   if (existing) {
-    if (isSignInAllowed(existing).ok) {
+    // WHICH accounts a fresh signup may take over, stated positively.
+    //
+    // This was `!isSignInAllowed(existing).ok`, which reads as "reclaim the
+    // ones that cannot sign in" and is true of a SUSPENDED account as well as
+    // an unconfirmed one. So signing up again with a banned address overwrote
+    // its password and reset `emailVerified`, leaving `suspendedAt` untouched
+    // — and the confirmation door then issued a token. A ban that a signup
+    // form lifts is not a ban.
+    //
+    // Only an unconfirmed, unsuspended account is claimable. Anything else is
+    // an account that exists, and says so.
+    if (!isClaimableBySignup(existing)) {
       throw new Error('User with this email or phone number already exists');
     }
-    const updated = await UserModel.findOneAndUpdate(
-      { _id: existing._id },
-      { $set: { passwordHash, displayName: name, emailVerified: false } },
-      { new: true },
-    ).lean();
-    return updated!;
+    // THE ROW IS NOT TOUCHED.
+    //
+    // This used to $set the new password straight onto the existing account.
+    // An unconfirmed account is claimable by anyone who knows the address, so
+    // that let a stranger set the password on somebody else's pending signup —
+    // and when the real owner confirmed with the code in their own inbox, they
+    // handed over an account whose password the stranger knew. The attacker
+    // never needed the code; the victim delivered it for them.
+    //
+    // Instead the credentials ride on the challenge and are applied by
+    // `markEmailVerified` when that challenge's code is presented. Binding is
+    // per-CHALLENGE and that is the point: `issue` replaces the challenge, so
+    // the newest code is the only live one and it carries the credentials typed
+    // alongside it. Someone confirming the code they just requested gets the
+    // password they just chose.
+    return { user: existing, pending: { passwordHash, ...(displayName ? { displayName: name } : {}) } };
   }
 
+  // A FIRST signup on this address writes its password directly. There is no
+  // account to take over and nobody to protect it from, and deferring it would
+  // leave a row that cannot be signed into if the challenge is never completed.
   const user = await UserModel.create({
     email,
     passwordHash,
     displayName: name,
     emailVerified: false,
   });
-  return user.toObject();
+  return { user: user.toObject() };
 }
 
 async function verifyCredentials(identifier: string, passwordPlain: string): Promise<UserDoc | null> {
@@ -219,6 +257,15 @@ const toAdminRecord = (u: UserDoc): AdminUserRecord => ({
  * the resend path needs the playerId. It is deliberately ABSENT from
  * `invalid_credentials`, where nothing has been proved.
  */
+/**
+ * The outcome of confirming an email address — an identity only when the
+ * account may actually sign in. See `markEmailVerified`.
+ */
+export type EmailVerifyResult =
+  | { ok: true; identity: StoredIdentity }
+  | { ok: false; reason: 'no_account' }
+  | { ok: false; reason: 'suspended'; suspendedReason?: string };
+
 export type PasswordCheck =
   | { ok: true; identity: StoredIdentity }
   | { ok: false; reason: 'invalid_credentials' }
@@ -253,8 +300,16 @@ export const userStore = {
    * Throws only when the address belongs to a CONFIRMED account; an unconfirmed
    * one is reclaimed. See `createUnverifiedWithPassword`.
    */
-  async startSignup(identifier: string, password: string, displayName?: string): Promise<StoredIdentity> {
-    return toIdentity(await createUnverifiedWithPassword(identifier, password, displayName));
+  async startSignup(
+    identifier: string,
+    password: string,
+    displayName?: string,
+  ): Promise<{ identity: StoredIdentity; pending?: { passwordHash: string; displayName?: string } }> {
+    const started = await createUnverifiedWithPassword(identifier, password, displayName);
+    return {
+      identity: toIdentity(started.user),
+      ...(started.pending ? { pending: started.pending } : {}),
+    };
   },
 
   async verifyPassword(identifier: string, password: string): Promise<PasswordCheck> {
@@ -290,13 +345,55 @@ export const userStore = {
    * Keyed on playerId taken from the CHALLENGE, not from anything the client
    * sent, so a correct code can only ever confirm the account it was issued for.
    */
-  async markEmailVerified(playerId: string): Promise<StoredIdentity | null> {
+  async markEmailVerified(
+    playerId: string,
+    /**
+     * Credentials bound to the challenge whose code was just proved. Applied
+     * HERE and nowhere earlier — this is the moment control of the address is
+     * demonstrated, and therefore the only moment at which it is safe to let a
+     * signup attempt set the password on an account that already existed.
+     */
+    pending?: { passwordHash: string; displayName?: string },
+  ): Promise<EmailVerifyResult> {
     const updated = await UserModel.findOneAndUpdate(
       { _id: playerId },
-      { $set: { emailVerified: true } },
+      {
+        $set: {
+          emailVerified: true,
+          ...(pending
+            ? {
+                passwordHash: pending.passwordHash,
+                ...(pending.displayName ? { displayName: pending.displayName } : {}),
+              }
+            : {}),
+        },
+      },
       { new: true },
     ).lean();
-    return updated ? toIdentity(updated as UserDoc) : null;
+    if (!updated) return { ok: false, reason: 'no_account' };
+
+    // THE SAME RULE the password and Google paths run, at the third door.
+    //
+    // Confirming an address proves control of a mailbox. It says nothing about
+    // whether an administrator has since banned the account, and this door used
+    // to return a bare identity that the caller turned straight into a token —
+    // so a suspended player who signed up again walked back in through their own
+    // inbox. Shaped as a verdict for the reason `oauth` is: the caller cannot
+    // reach the identity without stepping past the refusal, so a future call
+    // site cannot forget the check.
+    //
+    // The write above is left standing on purpose: the address genuinely IS
+    // confirmed, and rolling it back would lose a true fact to express a
+    // separate one. Suspension is what blocks, and it is reported as itself.
+    const verdict = isSignInAllowed(updated as UserDoc);
+    if (!verdict.ok && verdict.reason === 'suspended') {
+      return {
+        ok: false,
+        reason: 'suspended',
+        ...(verdict.suspendedReason ? { suspendedReason: verdict.suspendedReason } : {}),
+      };
+    }
+    return { ok: true, identity: toIdentity(updated as UserDoc) };
   },
 
   /**
@@ -647,6 +744,34 @@ export const userStore = {
    * boolean derived from `passwordHash` -- the hash itself is never part of
    * this or any other return value here.
    */
+  /**
+   * May this player hold a live-table socket right now?
+   *
+   * A verdict, not a document, for the reason `oauth` and `markEmailVerified`
+   * are verdicts: the caller cannot reach an "allowed" without stepping past
+   * the refusal. `byPlayerId` cannot answer this — `StoredIdentity` carries no
+   * `suspendedAt`, which is precisely why the socket never asked.
+   *
+   * A MISSING ROW MEANS ALLOWED, and that is not an oversight. Telegram players
+   * have no identity document at all (see `byPlayerIds`), so reading absence as
+   * a ban would lock every Telegram player out of every table — a far larger
+   * outage than the hole being closed. Only an existing, suspended row refuses.
+   *
+   * Only suspension is consulted, not `emailVerified`: an unconfirmed account
+   * can never hold a token in the first place (`verifyPassword` and now
+   * `markEmailVerified` both refuse), so re-checking it here would add a second
+   * copy of a rule for no reachable case.
+   */
+  async canHoldSession(playerId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+    const doc = await UserModel.findById(playerId).lean();
+    if (!doc) return { ok: true };
+    const verdict = isSignInAllowed(doc as UserDoc);
+    if (!verdict.ok && verdict.reason === 'suspended') {
+      return { ok: false, reason: 'suspended' };
+    }
+    return { ok: true };
+  },
+
   async byPlayerId(
     playerId: string,
   ): Promise<(StoredIdentity & { createdAt: string; hasPassword: boolean }) | null> {
@@ -721,19 +846,38 @@ export const userStore = {
    * through the credential path this creates. Throws on a weak password or a
    * taken email rather than silently making a second, unreachable account.
    */
-  async createAdmin(email: string, password: string, displayName?: string): Promise<StoredIdentity> {
+  async createAdmin(
+    email: string,
+    password: string,
+    displayName?: string,
+    /** Runs inside the caller's transaction, so the audit entry cannot be lost. */
+    session?: ClientSession,
+  ): Promise<StoredIdentity> {
     const clean = email.trim().toLowerCase();
-    if (!clean.includes('@')) throw new Error('an admin needs an email address');
-    if (password.length < 8) throw new Error('admin password must be at least 8 characters');
+    // The shared rules, as the route now runs them too. Kept here as well
+    // because this is the store's own guarantee — a future caller that forgets
+    // the route's check must still not mint a weak administrator.
+    const emailVerdict = validateEmailAddress(clean);
+    if (!emailVerdict.ok) throw new Error('an admin needs an email address');
+    const passwordVerdict = validatePasswordStrength(password);
+    if (!passwordVerdict.ok) throw new Error(passwordVerdict.message);
     if (await findByIdentifier(clean)) throw new Error('an account with this email already exists');
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-    const user = await UserModel.create({
-      email: clean,
-      passwordHash,
-      displayName: displayName?.trim() || (clean.split('@')[0] ?? clean),
-      role: 'ops',
-    });
-    return toIdentity(user.toObject());
+    const [user] = await UserModel.create(
+      [
+        {
+          email: clean,
+          passwordHash,
+          displayName: displayName?.trim() || (clean.split('@')[0] ?? clean),
+          role: 'ops',
+        },
+      ],
+      // `create` takes an array when given a session — the single-document form
+      // silently ignores it, which would leave the account committed outside
+      // the transaction that carries its audit entry.
+      session ? { session } : {},
+    );
+    return toIdentity(user!.toObject());
   },
 
   /** Every administrator, newest first — for the admin panel's Admins screen. */

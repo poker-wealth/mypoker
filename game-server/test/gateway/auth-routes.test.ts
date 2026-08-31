@@ -266,6 +266,11 @@ describe('GET /auth/me', () => {
       role: 'player',
       email: 'ada@example.com',
       hasPassword: true,
+      // Added because /auth/me genuinely returns it — the client needs to know
+      // whether `displayName` and `photoUrl` here are stored facts or the
+      // playerId fallback a Telegram player gets. Listed, not accommodated by
+      // relaxing the match: the exhaustiveness is what would catch a hash.
+      hasStoredIdentity: true,
     });
   });
 
@@ -650,7 +655,16 @@ describe('POST /auth/forgot-password + /auth/reset-password', () => {
     // password) -- that is what must differ. The RESPONSE must not, which is
     // what the assertions above check.
     expect(otpStore.issue).toHaveBeenCalledTimes(1);
-    expect(otpStore.issue).toHaveBeenCalledWith('known@example.com', 'player-1', expect.any(Number));
+    // The fourth argument is the signup credentials bound to a challenge. A
+    // password RESET must never carry one: this flow proves control of an
+    // address to let someone choose a NEW password, and a payload here would
+    // apply credentials nobody typed in this flow.
+    expect(otpStore.issue).toHaveBeenCalledWith(
+      'known@example.com',
+      'player-1',
+      expect.any(Number),
+      undefined,
+    );
   });
 
   it('does not mint or mail a code for a Google-linked account with no password', async () => {
