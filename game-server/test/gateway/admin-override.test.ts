@@ -3,6 +3,7 @@ import { createGatewayApp } from '../../src/gateway/app';
 import { loadConfig } from '../../src/gateway/config';
 import { signToken } from '../../src/gateway/tokens';
 import { overrideStore } from '../../src/players/override-store';
+import { userStore } from '../../src/auth/user-store';
 import { adminAudit } from '../../src/auth/admin-audit-store';
 import { MIN_SCORE, MAX_SCORE } from '../../src/players/reputation';
 
@@ -17,6 +18,13 @@ import { MIN_SCORE, MAX_SCORE } from '../../src/players/reputation';
  */
 jest.mock('../../src/players/override-store', () => ({
   overrideStore: { get: jest.fn(), set: jest.fn(), clearCache: jest.fn() },
+}));
+
+// The player-exists check consults the user store as its second source, so it
+// has to be mocked here — unmocked, it reaches a real Mongoose with no
+// connection and the request hangs on a buffered query rather than failing.
+jest.mock('../../src/auth/user-store', () => ({
+  userStore: { byPlayerId: jest.fn(), search: jest.fn(), listIdentities: jest.fn() },
 }));
 
 jest.mock('../../src/auth/admin-audit-store', () => {
@@ -167,17 +175,45 @@ describe('POST /admin/players/:id/override', () => {
   it('refuses an override for a player who does not exist', async () => {
     // A typo'd id would otherwise write an override keyed to nobody — inert
     // today, and silently applied if that id ever became a real player.
+    //
+    // `ok: true` with `hasAccount: false` — NOT a 404. That is what
+    // financial-core actually answers for an unknown id, and an earlier version
+    // of both the guard and this test waited for a 404 that route never sends,
+    // so the check passed for every id including nonsense.
     global.fetch = jest.fn(async () => ({
-      ok: false,
-      status: 404,
-      json: async () => ({ error: 'not found' }),
+      ok: true,
+      status: 200,
+      json: async () => ({ playerId: SUBJECT, hasAccount: false }),
     })) as unknown as typeof fetch;
+    // Unknown to the user store as well: no financial account AND no identity
+    // is what "does not exist" means. Either one alone is an ordinary account.
+    (userStore.byPlayerId as jest.Mock).mockResolvedValue(null);
 
     const res = await post({ reputationScore: 800, reason: 'typo' });
 
     expect(res.status).toBe(404);
     expect(res.body.code).toBe('no_such_player');
     expect(overrideStore.set).not.toHaveBeenCalled();
+  });
+
+  it('ALLOWS an override for a registered player who has never touched money', async () => {
+    // The other half, and the reason `hasAccount: false` alone cannot refuse: a
+    // web sign-up has no financial account until money moves, and refusing them
+    // would exclude every player who has registered and not yet deposited.
+    global.fetch = jest.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ playerId: SUBJECT, hasAccount: false }),
+    })) as unknown as typeof fetch;
+    (userStore.byPlayerId as jest.Mock).mockResolvedValue({
+      playerId: SUBJECT,
+      displayName: 'Registered, never played',
+    });
+
+    const res = await post({ reputationScore: 800, reason: 'goodwill' });
+
+    expect(res.status).toBe(200);
+    expect(overrideStore.set).toHaveBeenCalled();
   });
 
   it('does NOT report a financial-core outage as "no such player"', async () => {
