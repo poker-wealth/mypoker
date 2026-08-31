@@ -48,6 +48,20 @@ export interface OtpChallenge {
   sends: number;
   lastSentAt: number;
   expiresAt: number;
+  /**
+   * Credentials this signup attempt asked for, applied only when THIS
+   * challenge's code is presented.
+   *
+   * Present only when the signup landed on an account that already existed
+   * unconfirmed — the case where writing the password to the row up front let
+   * a stranger set it and the real owner confirm it. A first-time signup has
+   * nobody to take the account from, so it writes its password directly and
+   * leaves this absent.
+   *
+   * The HASH, never the password. This is stored, and a challenge row is not a
+   * place to keep a plaintext credential.
+   */
+  pending?: { passwordHash: string; displayName?: string };
 }
 
 export type SendDecision =

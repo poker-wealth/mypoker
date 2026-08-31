@@ -26,6 +26,8 @@ export interface EmailOtpDoc {
   sends: number;
   lastSentAt: Date;
   expiresAt: Date;
+  pendingPasswordHash?: string;
+  pendingDisplayName?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +45,10 @@ const otpSchema = new Schema<EmailOtpDoc>(
     // expired document is readable for a while after it lapses. Expiry is
     // enforced in the rules against `expiresAt`, never by the absence of a row.
     expiresAt: { type: Date, required: true, index: { expireAfterSeconds: 0 } },
+    // Credentials bound to THIS challenge — see `OtpChallenge.pending`. The
+    // hash only; a challenge row is not a place for a plaintext password.
+    pendingPasswordHash: { type: String },
+    pendingDisplayName: { type: String },
   },
   { timestamps: true, versionKey: false, collection: 'email_otps' },
 );

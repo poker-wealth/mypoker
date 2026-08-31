@@ -57,11 +57,16 @@ export type IssueResult =
   | { ok: false; reason: 'cooldown' | 'too_many_sends'; retryAfterMs: number };
 
 export type VerifyResult =
-  | { ok: true; playerId: string }
+  | { ok: true; playerId: string; pending?: OtpChallenge['pending'] }
   | { ok: false; reason: 'no_challenge' | 'expired' | 'too_many_attempts' | 'incorrect' };
 
 export interface OtpStore {
-  issue(identifier: string, playerId: string, now?: number): Promise<IssueResult>;
+  issue(
+    identifier: string,
+    playerId: string,
+    now?: number,
+    pending?: OtpChallenge['pending'],
+  ): Promise<IssueResult>;
   verify(identifier: string, code: string, now?: number): Promise<VerifyResult>;
   peek(identifier: string): Promise<{ playerId: string; expiresAt: number } | null>;
   discard(identifier: string): Promise<void>;
@@ -82,7 +87,17 @@ export function createOtpStore(persistence: OtpPersistence): OtpStore {
      * punish the addressee. The send ceiling in `otp-rules` is what stops the
      * reset being a free retry machine: five codes per challenge, one a minute.
      */
-    async issue(identifier: string, playerId: string, now: number = Date.now()): Promise<IssueResult> {
+    async issue(
+      identifier: string,
+      playerId: string,
+      now: number = Date.now(),
+      /**
+       * Credentials to apply when THIS challenge's code is presented. See
+       * `OtpChallenge.pending` — passed only when the signup landed on an
+       * account that already existed unconfirmed.
+       */
+      pending?: OtpChallenge['pending'],
+    ): Promise<IssueResult> {
       const key = keyFor(identifier);
       const existing = await persistence.get(key);
 
@@ -113,6 +128,11 @@ export function createOtpStore(persistence: OtpPersistence): OtpStore {
         sends,
         lastSentAt: now,
         expiresAt,
+        // A RESEND with no pending payload keeps the one already on the
+        // challenge: "send me that code again" must not quietly discard the
+        // credentials the code was issued for. A new signup passes its own and
+        // replaces them, which is what makes the newest code the live one.
+        ...(pending ?? existing?.pending ? { pending: pending ?? existing!.pending } : {}),
       });
 
       return {
@@ -149,7 +169,16 @@ export function createOtpStore(persistence: OtpPersistence): OtpStore {
       }
 
       await persistence.delete(key);
-      return { ok: true, playerId: existing.playerId };
+      // The credentials this code was issued for travel back with it. Whoever
+      // holds the code decides what the password becomes — which is the whole
+      // point of binding them to the challenge instead of writing them to the
+      // account at signup, where a stranger could set them and the real owner
+      // would confirm them.
+      return {
+        ok: true,
+        playerId: existing.playerId,
+        ...(existing.pending ? { pending: existing.pending } : {}),
+      };
     },
 
     /** The live challenge for an address, or null. Resend must not mint one blindly. */
@@ -190,6 +219,14 @@ export const mongoOtpPersistence: OtpPersistence = {
       sends: doc.sends,
       lastSentAt: doc.lastSentAt.getTime(),
       expiresAt: doc.expiresAt.getTime(),
+      ...(doc.pendingPasswordHash
+        ? {
+            pending: {
+              passwordHash: doc.pendingPasswordHash,
+              ...(doc.pendingDisplayName ? { displayName: doc.pendingDisplayName } : {}),
+            },
+          }
+        : {}),
     };
   },
   async put(key, value) {
@@ -203,7 +240,20 @@ export const mongoOtpPersistence: OtpPersistence = {
           sends: value.sends,
           lastSentAt: new Date(value.lastSentAt),
           expiresAt: new Date(value.expiresAt),
+          ...(value.pending
+            ? {
+                pendingPasswordHash: value.pending.passwordHash,
+                pendingDisplayName: value.pending.displayName ?? null,
+              }
+            : {}),
         },
+        // $unset when there is no payload, rather than simply not $set-ting it.
+        // `put` REPLACES a challenge wholesale, and this row is upserted in
+        // place — a hash left over from a previous attempt would be applied by
+        // the next code, which is precisely the takeover this exists to stop.
+        ...(value.pending
+          ? {}
+          : { $unset: { pendingPasswordHash: '', pendingDisplayName: '' } }),
       },
       { upsert: true },
     );
