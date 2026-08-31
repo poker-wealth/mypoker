@@ -3,6 +3,7 @@ import { FilterError } from '../lobby';
 import { syncLobbyWithLiveTables } from '../lobby/live-sync';
 import type { GatewayConfig } from './config';
 import { buildAuthRouter } from './auth';
+import { userStore } from '../auth/user-store';
 import { buildLobbyRouter } from './lobby-routes';
 import { buildJackpotRouter } from './jackpot-routes';
 import { buildLeagueRouter } from './league-routes';
@@ -159,6 +160,11 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
       tables: liveTables,
       // The gateway connects to Mongo (the user store), so it can persist round proofs — notarize here.
       notarize: true,
+      // ...and for the same reason it is the deployment that CAN answer whether
+      // a player is banned. The felt used to check only the JWT signature, so a
+      // suspended player kept playing until their token expired and could open
+      // a fresh socket the whole time (docs/TRAPS.md §23).
+      authorizeSession: (playerId) => userStore.canHoldSession(playerId),
     });
     app.locals.tableHub = mounted.hub;
 

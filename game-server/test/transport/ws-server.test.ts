@@ -17,12 +17,14 @@ class TestClient {
   readonly errors: string[] = [];
   private readyResolve?: () => void;
   closedCode?: number;
+  closedReason?: string;
 
   constructor(port: number, private readonly token: string) {
     this.ws = new WebSocket(`ws://127.0.0.1:${port}`);
     this.ws.on('message', (raw: Buffer) => this.onMessage(raw));
-    this.ws.on('close', (code) => {
+    this.ws.on('close', (code, reason) => {
       this.closedCode = code;
+      this.closedReason = reason.toString();
     });
   }
 
@@ -121,5 +123,87 @@ describe('GameSocketServer (secure transport, end-to-end)', () => {
     await wait(200);
     expect(c.closedCode).toBe(4000); // server closed the connection
     c.close();
+  });
+});
+
+/**
+ * Suspension on the socket rail.
+ *
+ * The gate was wired into `requireAuth`/`requireAdmin` and nowhere else, so the
+ * felt authorized on JWT signature and expiry alone: a suspended player kept
+ * their seat until the token ran out, and could open a fresh socket the whole
+ * time. Every suspension test in this repo mounted an HTTP route and never
+ * opened a socket, which is exactly why the suite was green over it.
+ *
+ * These open a real connection. That is the whole point of them.
+ */
+describe('GameSocketServer — authorizeSession', () => {
+  const wait2 = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+  it('refuses a handshake for a suspended player, after the token verifies', async () => {
+    const server = new GameSocketServer({
+      // The token is perfectly valid. That is the scenario: a ban applied after
+      // the JWT was minted, which no amount of signature checking can see.
+      verifyToken: () => ({ playerId: 'banned' }),
+      authorizeSession: (playerId) =>
+        Promise.resolve(playerId === 'banned' ? { ok: false, reason: 'suspended' } : { ok: true }),
+      onInbound: () => {},
+    });
+    const port2 = await server.listen(0);
+
+    const c = new TestClient(port2, 'good');
+    await wait2(250);
+
+    // Never became a session, and the close says why rather than looking like a
+    // network fault the client should retry.
+    expect(c.closedReason).toBe('suspended');
+    await server.close();
+  });
+
+  it('lets an unsuspended player through', async () => {
+    const server = new GameSocketServer({
+      verifyToken: () => ({ playerId: 'fine' }),
+      authorizeSession: () => Promise.resolve({ ok: true }),
+      onInbound: () => {},
+    });
+    const port2 = await server.listen(0);
+
+    const c = new TestClient(port2, 'good');
+    await c.ready();
+    expect(c.closedReason).toBeUndefined();
+    c.close();
+    await server.close();
+  });
+
+  it('fails CLOSED when the lookup itself throws', async () => {
+    // A database blip must not be an open door. Refusing a legitimate player is
+    // recoverable — they reconnect. Seating a banned one is not.
+    const server = new GameSocketServer({
+      verifyToken: () => ({ playerId: 'whoever' }),
+      authorizeSession: () => Promise.reject(new Error('mongo is down')),
+      onInbound: () => {},
+    });
+    const port2 = await server.listen(0);
+
+    const c = new TestClient(port2, 'good');
+    await wait2(250);
+    expect(c.closedReason).toBe('unauthorized');
+    await server.close();
+  });
+
+  it('still works with no authorizeSession configured', async () => {
+    // The standalone table server has no user database and passes none. That
+    // path must keep its existing behaviour rather than fail closed.
+    const server = new GameSocketServer({
+      verifyToken: () => ({ playerId: 'p1' }),
+      onInbound: () => {},
+    });
+    const port2 = await server.listen(0);
+
+    const c = new TestClient(port2, 'good');
+    await c.ready();
+    expect(c.closedReason).toBeUndefined();
+    c.close();
+    await server.close();
   });
 });

@@ -36,13 +36,55 @@ export class TableHub {
     verifyToken: TokenVerifier,
     /** Optional connection log — see `GameSocketServerConfig.onEvent`. */
     onEvent?: GameSocketServerConfig['onEvent'],
+    /** Whether a player may hold a socket — see `GameSocketServerConfig.authorizeSession`. */
+    authorizeSession?: GameSocketServerConfig['authorizeSession'],
   ) {
     this.socket = new GameSocketServer({
       verifyToken,
       onInbound: (ctx, msg): Promise<void> => this.onInbound(ctx, msg),
       onClose: (ctx): void => this.onClose(ctx),
       ...(onEvent ? { onEvent } : {}),
+      ...(authorizeSession ? { authorizeSession } : {}),
     });
+  }
+
+  /**
+   * Remove a player from the felt right now: stand them up, then drop their
+   * sockets.
+   *
+   * The handshake gate only stops the NEXT connection. A player already seated
+   * when the ban lands keeps their socket, and with it their seat and their
+   * turn — so a suspension applied mid-session did nothing until they happened
+   * to reconnect. Called by the admin suspend route.
+   *
+   * Order matters. Standing up first releases the seat through the room's own
+   * path — chips returned, §8.1 freed — so a later reconnect is not refused at
+   * every table by a seat nobody is sitting in. Closing the socket first would
+   * leave that seat held by a connection that no longer exists.
+   *
+   * Returns what it did, so the route can say so rather than claim it.
+   */
+  async evict(playerId: string, reason = 'suspended'): Promise<{ stoodUp: boolean; socketsClosed: number }> {
+    let stoodUp = false;
+    for (const room of this.rooms.values()) {
+      if (!room.hasSeated(playerId)) continue;
+      try {
+        await room.command(playerId, { kind: 'stand' });
+        stoodUp = true;
+      } catch (err) {
+        // A room that refuses the stand (mid-hand rules, say) must not stop the
+        // socket from closing — the point is to get them off the felt.
+        console.error(`[evict] ${playerId} could not stand at ${room.summary().tableId}:`, err);
+      }
+    }
+
+    let socketsClosed = 0;
+    for (const ctx of [...this.subscriptions.keys()]) {
+      if (ctx.session.playerId !== playerId) continue;
+      ctx.close(reason);
+      socketsClosed += 1;
+    }
+    return { stoodUp, socketsClosed };
   }
 
   /** Open a table. The `game` on the config selects which room implementation runs it. The config
