@@ -8,23 +8,13 @@ import {
   validateEmailAddress,
   validatePasswordStrength,
 } from '../auth/credential-rules';
-import { scoreFor, tierOf, tierForVolume, type FindingReason } from '../players/index';
+import { scoreFor, tierForVolume, type FindingReason } from '../players/index';
 import { MIN_SCORE, MAX_SCORE } from '../players/reputation';
-import { VIP_TIERS, vipSpec, type VipTier } from '../players/vip';
+import { VIP_TIERS } from '../players/vip';
+import { effectiveReputation, effectiveVipTier, isVipTier } from '../players/effective';
 import { overrideStore } from '../players/override-store';
 import { severityOf, labelOf } from '../ops/alert-severity';
 import type { GatewayConfig } from './config';
-
-/**
- * Is this a tier the ladder actually defines?
- *
- * A type guard rather than a cast: an override arrives from a request body, and
- * a tier of `'V9'` would sail through a cast and then throw inside `vipSpec`,
- * which indexes the ladder by position.
- */
-function isVipTier(value: unknown): value is VipTier {
-  return typeof value === 'string' && VIP_TIERS.some((t) => t.tier === value);
-}
 
 /**
  * The admin API (SAMUEL.md task 3).
@@ -254,10 +244,19 @@ export function buildAdminRouter(config: GatewayConfig): Router {
         res.status(result.status).json({ error: result.error });
         return;
       }
+      // The same resolver the detail view uses. This queue showed RAW tiers, so
+      // an ops reviewer deciding on a withdrawal saw one tier here and a
+      // different one on the player's own page — with money in the balance.
+      const overrides = await overrideStore.getMany(
+        result.body.withdrawals.map((w) => w.playerId),
+      );
       res.json({
         withdrawals: result.body.withdrawals.map((w) => {
-          const tier = tierForVolume(w.cumulativeEffective);
-          return { ...w, vipTier: tier.tier, vipTitle: tier.title };
+          const vip = effectiveVipTier(
+            tierForVolume(w.cumulativeEffective).tier,
+            overrides.get(w.playerId) ?? null,
+          );
+          return { ...w, vipTier: vip.tier, vipTitle: vip.title };
         }),
       });
     }),
@@ -425,11 +424,13 @@ export function buildAdminRouter(config: GatewayConfig): Router {
       // invisible the moment the page reloaded, and there would be no way to
       // tell a granted tier from an earned one.
       const override = await overrideStore.get(playerId);
-      const score = override?.reputationScore ?? computedScore;
-      // The title comes from `vipSpec`, never stored alongside the tier, so an
-      // override cannot produce a tier whose name disagrees with its privileges.
-      const effectiveTier = isVipTier(override?.vipTier) ? override!.vipTier! : computedTier.tier;
-      const effectiveSpec = vipSpec(effectiveTier as VipTier);
+      // Through the shared resolver, not a local copy of the same two lines.
+      // This view was already correct; routing it through anyway is the point —
+      // one derivation means a change here reaches the gate and the lists at
+      // the same time, which is exactly what was not true before.
+      const rep = effectiveReputation(computedScore, override);
+      const score = rep.score;
+      const vip = effectiveVipTier(computedTier.tier, override);
 
       res.json({
         ...detail.body,
@@ -440,8 +441,8 @@ export function buildAdminRouter(config: GatewayConfig): Router {
               createdAt: identity.createdAt ?? null,
             }
           : null,
-        reputation: { roundsPlayed, findings, score, band: tierOf(score) },
-        vip: { tier: effectiveSpec.tier, title: effectiveSpec.title },
+        reputation: { roundsPlayed, findings, score, band: rep.band },
+        vip: { tier: vip.tier, title: vip.title },
         override: {
           reputationScore: override?.reputationScore ?? null,
           vipTier: override?.vipTier ?? null,
@@ -580,18 +581,32 @@ export function buildAdminRouter(config: GatewayConfig): Router {
        * nobody — inert, but it would apply silently if that id ever became a
        * real player.
        */
-      const exists = await internal<{ playerId: string }>(
+      const detail = await internal<{ playerId: string; hasAccount: boolean }>(
         `/internal/players/${encodeURIComponent(playerId)}`,
       );
-      if (!exists.ok) {
-        // 404 means no such player. Anything else is financial-core failing,
-        // and must not be reported as "that player does not exist" — an admin
-        // would conclude they had the wrong id and go looking for a second one.
-        const status = exists.status === 404 ? 404 : exists.status;
-        res.status(status).json({
-          error: exists.status === 404 ? 'no such player' : exists.error,
-          ...(exists.status === 404 ? { code: 'no_such_player' } : {}),
-        });
+      if (!detail.ok) {
+        // financial-core failing must NOT be reported as "that player does not
+        // exist" — an admin would conclude they had the wrong id and go looking
+        // for a second one that was never wrong.
+        res.status(detail.status).json({ error: detail.error });
+        return;
+      }
+
+      /*
+       * `hasAccount`, not the status code.
+       *
+       * A first version waited for a 404 that financial-core never sends: that
+       * route answers 200 with `hasAccount: false` for ANY string, so the check
+       * passed for every id including nonsense. A guard that cannot fail —
+       * docs/TRAPS.md #1, written about this project, reintroduced by the
+       * person who wrote it.
+       *
+       * `hasAccount: false` alone is not proof of absence: a real web sign-up
+       * has no financial account until money moves. So the user store is asked
+       * too, and only an id unknown to BOTH is refused.
+       */
+      if (!detail.body.hasAccount && !(await userStore.byPlayerId(playerId))) {
+        res.status(404).json({ error: 'no such player', code: 'no_such_player' });
         return;
       }
 
@@ -855,6 +870,23 @@ export function buildAdminRouter(config: GatewayConfig): Router {
       // of a TTL and reasonably concludes the button did nothing.
       defaultSuspensionGate.prime(playerId, body.suspended);
 
+      // The gate covers HTTP. The FELT is a separate rail: a socket authorizes
+      // once at handshake and then runs on that decision, so a player already
+      // seated when the ban lands keeps their seat, their stack and their turn
+      // until the connection drops. Standing them up and closing the socket is
+      // what makes the button mean what an administrator thinks it means.
+      //
+      // Not awaited into the response and never fatal: the suspension IS
+      // committed by this point, and a room that refuses a mid-hand stand must
+      // not turn a successful ban into a 500. The handshake gate catches them
+      // on any reconnect regardless.
+      if (body.suspended) {
+        const hub = req.app.locals.tableHub as { evict?: (id: string) => Promise<unknown> } | undefined;
+        void hub?.evict?.(playerId)?.catch((err: unknown) =>
+          console.error(`[admin] could not evict ${playerId} from the felt:`, err),
+        );
+      }
+
       res.json(result.after);
     }),
   );
@@ -1042,8 +1074,45 @@ export function buildAdminRouter(config: GatewayConfig): Router {
         res.status(400).json({ error: 'email and password are required' });
         return;
       }
+      // The SHARED credential rules, not a third copy. `createAdmin` carried its
+      // own `password.length < 8`, which is the rule `credential-rules.ts`
+      // exists to hold once — and an admin account is the last place to let a
+      // second copy drift looser than the players'.
+      const emailVerdict = validateEmailAddress(email);
+      if (!emailVerdict.ok) {
+        res.status(400).json({ error: emailVerdict.message, code: emailVerdict.code });
+        return;
+      }
+      const passwordVerdict = validatePasswordStrength(password);
+      if (!passwordVerdict.ok) {
+        res.status(400).json({ error: passwordVerdict.message, code: passwordVerdict.code });
+        return;
+      }
+
       try {
-        const admin = await userStore.createAdmin(email, password, body.displayName);
+        // Creation and its audit entry commit together, the same as suspension.
+        // An administrator minted with no record of who minted them is the one
+        // outcome this log exists to prevent — and it is the highest-privilege
+        // write in the panel.
+        const admin = await withAuditTransaction(async (session) => {
+          const created = await userStore.createAdmin(email, password, body.displayName, session);
+          await adminAudit.record(
+            {
+              actorPlayerId: actor(req),
+              subjectPlayerId: created.playerId,
+              action: 'admin.create',
+              // The address, never the password — the auditable fact is WHO was
+              // granted authority, and writing the credential would put a live
+              // secret in a collection built to be read by people.
+              after: { email: created.email ?? email, role: 'ops' },
+              ...(typeof body.reason === 'string' && body.reason.trim()
+                ? { reason: body.reason.trim() }
+                : {}),
+            },
+            session,
+          );
+          return created;
+        });
         res.json({ admin });
       } catch (err) {
         res.status(400).json({ error: err instanceof Error ? err.message : 'could not create admin' });

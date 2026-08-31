@@ -91,6 +91,61 @@ export const overrideStore = {
   },
 
   /**
+   * Overrides for many players in ONE query.
+   *
+   * For the list surfaces — the agent player list, the admin withdrawal queue —
+   * which render a tier per row. Calling `get` per row would be a query per
+   * player on a page that already has the whole page in hand.
+   *
+   * Players with no override are simply absent from the map, so a caller reads
+   * `map.get(id) ?? null` and gets the same shape `get` returns.
+   *
+   * Fails OPEN like `get`, and for the same reason: on a lookup error every
+   * player renders their genuinely computed figure rather than the page failing
+   * to render at all. Note the consequence honestly — during an outage an
+   * administrator's decision is not reflected on these lists. That is the right
+   * trade for a DISPLAY surface, and it is why the eligibility GATE, which
+   * makes a decision rather than showing one, is worth treating differently if
+   * this ever becomes load-bearing there.
+   */
+  async getMany(playerIds: readonly string[]): Promise<Map<string, PlayerOverride>> {
+    const ids = [...new Set(playerIds)];
+    if (ids.length === 0) return new Map();
+
+    const out = new Map<string, PlayerOverride>();
+    const now = Date.now();
+    const missing: string[] = [];
+    for (const id of ids) {
+      const hit = cache.get(id);
+      if (hit && now - hit.at < TTL_MS) {
+        if (hit.value) out.set(id, hit.value);
+      } else {
+        missing.push(id);
+      }
+    }
+    if (missing.length === 0) return out;
+
+    try {
+      const docs = await PlayerOverrideModel.find({ _id: { $in: missing } }).lean();
+      const found = new Map(
+        docs.map((d) => [String((d as PlayerOverrideDoc)._id), toOverride(d as PlayerOverrideDoc)]),
+      );
+      const at = Date.now();
+      for (const id of missing) {
+        const value = found.get(id) ?? null;
+        // A miss is cached as null too — otherwise a page of players with no
+        // overrides re-queries every one of them on every render.
+        cache.set(id, { value, at });
+        if (value) out.set(id, value);
+      }
+      if (cache.size > MAX_ENTRIES) evict(at);
+    } catch {
+      // Nothing cached on failure, same as `get`.
+    }
+    return out;
+  },
+
+  /**
    * Set or clear. `null` on a field clears THAT field; clearing both removes
    * the document entirely, so an account with no override has no row rather
    * than a row full of nulls that reads like a decision someone made.

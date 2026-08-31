@@ -1,6 +1,8 @@
 import { Router, type Request, type Response } from 'express';
 import { requireAuth } from './auth';
 import { scoreFor, GOOD_STANDING_SCORE, tierForVolume, type FindingReason } from '../players/index';
+import { effectiveReputation, effectiveVipTier } from '../players/effective';
+import { overrideStore } from '../players/override-store';
 import { forwardTo } from './me-routes';
 import { assertValidSubAgentRate } from '../agents/commission';
 import { AGENT_RANGES, isAgentRange, windowFor, activityFor } from '../agents/dashboard';
@@ -34,7 +36,19 @@ export function buildAgentRouter(config: GatewayConfig): Router {
         return;
       }
       const { roundsPlayed, findings, alreadyAgent } = facts.body;
-      const score = scoreFor(roundsPlayed, findings);
+
+      // THE OVERRIDE APPLIES HERE TOO. It did not, and that made this gate
+      // disagree with the profile screen about the same number: an
+      // administrator could override someone down to pull their agency and
+      // watch them become an agent anyway, because eligibility was computed
+      // from the raw facts while `/me/reputation` showed the decision.
+      //
+      // Raising works as well as lowering, which is what an override means —
+      // and the two findings checks below are deliberately NOT affected by it.
+      // Those read the findings, not the score, so a confirmed colluder still
+      // cannot be made an agent by granting them a number.
+      const override = await overrideStore.get(req.player!.playerId);
+      const { score } = effectiveReputation(scoreFor(roundsPlayed, findings), override);
 
       const reasons: string[] = [];
       if (score < GOOD_STANDING_SCORE) reasons.push('reputation_below_700');
@@ -68,13 +82,22 @@ export function buildAgentRouter(config: GatewayConfig): Router {
       }
 
       const now = new Date();
+      // One query for the page, not one per row. Without this the list showed
+      // raw tiers beside an admin detail view showing overridden ones — the
+      // same player, two answers, depending which screen you were on.
+      const overrides = await overrideStore.getMany(
+        upstream.body.players.map((p) => p.playerId),
+      );
       res.json({
         players: upstream.body.players.map((p) => {
-          const tier = tierForVolume(p.lifetimeEffective);
+          const vip = effectiveVipTier(
+            tierForVolume(p.lifetimeEffective).tier,
+            overrides.get(p.playerId) ?? null,
+          );
           return {
             ...p,
-            vipTier: tier.tier,
-            vipTitle: tier.title,
+            vipTier: vip.tier,
+            vipTitle: vip.title,
             activity: activityFor(p.lastActiveAt, now),
           };
         }),

@@ -3,7 +3,6 @@ import type { GatewayConfig } from './config';
 import { requireAuth } from './auth';
 import {
   scoreFor,
-  tierOf,
   DEDUCTION,
   NORMAL_ROUNDS_TO_GOOD,
   vipProgress,
@@ -15,7 +14,10 @@ import {
   processAvatarUpload,
   AvatarRejected,
 } from '../uploads/avatar-processing';
+import { vipSpec, VIP_TIERS } from '../players/vip';
 import { overrideStore } from '../players/override-store';
+
+import { effectiveReputation, isVipTier } from '../players/effective';
 import { avatarUploadLimiter as defaultAvatarUploadLimiter } from '../auth/avatar-upload-store';
 import type { AvatarUploadLimiter } from '../auth/avatar-upload-store';
 
@@ -135,17 +137,18 @@ export function buildMeRouter(config: GatewayConfig, deps: MeRouterDeps = {}): R
       // really played, and the two do not have to agree. They are different
       // claims: one is a history, the other is a decision someone made.
       const override = await overrideStore.get(req.player!.playerId);
-      const score = override?.reputationScore ?? computed;
+      const rep = effectiveReputation(computed, override);
+      const score = rep.score;
 
       res.json({
         score,
-        band: tierOf(score),
+        band: rep.band,
         roundsPlayed,
         roundsToAdvance: Math.max(0, NORMAL_ROUNDS_TO_GOOD - roundsPlayed),
         deducted: findings.reduce((sum, f) => sum + DEDUCTION[f], 0),
         // Reported rather than hidden. A score that does not follow from the
         // rounds beside it is confusing unless the screen can say why.
-        ...(override?.reputationScore != null ? { overridden: true, computedScore: computed } : {}),
+        ...(rep.overridden ? { overridden: true, computedScore: rep.computedScore } : {}),
       });
     })();
   });
@@ -165,19 +168,68 @@ export function buildMeRouter(config: GatewayConfig, deps: MeRouterDeps = {}): R
           })
         : null;
 
-      // An override replaces the TIER. Volume, progress and the estimate stay
-      // as computed — they describe real settled play, and rewriting them would
-      // put a number on the screen that the ledger cannot account for.
       const override = await overrideStore.get(req.player!.playerId);
-      const overridden = override?.vipTier != null;
+      const overriddenTier = isVipTier(override?.vipTier) ? override!.vipTier! : null;
 
+      if (!overriddenTier) {
+        res.json({ ...progress, ...facts.body, estimatedDaysToNextTier });
+        return;
+      }
+
+      /*
+       * An override replaces the WHOLE tier, not the identifier alone.
+       *
+       * A first version set `tier` and left `title` computed, so a player
+       * granted V5 saw the V5 badge beside the word "Wanderer" — V1's name.
+       * The title is derived from the tier by `vipSpec` for exactly this
+       * reason, and the admin route already did it that way; this one did not.
+       *
+       * `next` IS RECOMPUTED, not dropped. A later version set it to null,
+       * which was worse than the bug it replaced: the client reads
+       * `next === null` as "you are at the top tier", so a player granted V2
+       * was told they had reached V5's position. That is fixing a wrong label
+       * by making a wrong claim.
+       *
+       * So: `next` is the tier ABOVE the granted one in the ladder, and
+       * `remaining` is the real volume still needed to reach it. That figure is
+       * honest either way — it is what they would have to play to earn that
+       * tier — and it is the same arithmetic an un-overridden player sees. At
+       * the top of the ladder there genuinely is no next, and it stays null.
+       *
+       * Volume itself stays exactly as settled: it is what they really played.
+       */
+      const spec = vipSpec(overriddenTier);
+      const grantedIndex = VIP_TIERS.findIndex((t) => t.tier === spec.tier);
+      const above = VIP_TIERS[grantedIndex + 1];
+      const nextFromGrant = above
+        ? {
+            tier: above.tier,
+            title: above.title,
+            volumeRequired: above.volumeRequired,
+            // Never negative: a granted tier can sit above the volume actually
+            // played, and a negative "remaining" would render as a gap that
+            // does not exist.
+            remaining: Math.max(0, above.volumeRequired - facts.body.cumulativeEffective),
+          }
+        : null;
       res.json({
         ...progress,
         ...facts.body,
-        estimatedDaysToNextTier,
-        ...(overridden
-          ? { tier: override!.vipTier, overridden: true, computedTier: progress.tier }
-          : {}),
+        estimatedDaysToNextTier: null,
+        next: nextFromGrant,
+        tier: spec.tier,
+        title: spec.title,
+        // Consistent with `remaining` above: real volume measured against the
+        // tier ABOVE the granted one. Leaving the computed value here would
+        // describe progress toward a different tier than `next` names, and
+        // pinning it to 100 was how the old version claimed a V2 had topped
+        // out. At the top of the ladder there is nothing left to progress
+        // toward, so 100 is the true answer there and only there.
+        progressPct: nextFromGrant
+          ? Math.min(100, Math.max(0, (facts.body.cumulativeEffective / nextFromGrant.volumeRequired) * 100))
+          : 100,
+        overridden: true,
+        computedTier: progress.tier,
       });
     })();
   });
@@ -224,7 +276,11 @@ async function handleAvatarUpload(
 ): Promise<void> {
   const playerId = req.player!.playerId;
 
-  const gate = await uploadLimiter.check(playerId);
+  // RESERVE, not check. This was `check`, with the slot recorded ~340 lines
+  // later — after a sharp re-encode and an upstream POST. Two uploads arriving
+  // in the same window both passed a check neither had consumed yet
+  // (docs/TRAPS.md §14: the guard has to be taken before the await, not after).
+  const gate = await uploadLimiter.reserve(playerId);
   if (!gate.ok) {
     const seconds = Math.ceil(gate.retryAfterMs / 1000);
     res.set('Retry-After', String(seconds));
@@ -288,7 +344,9 @@ async function handleAvatarUpload(
   // Only counted against the limiter once financial-core actually accepted
   // it — a rejected or failed attempt should not cost quota the player never
   // got any use from.
-  await uploadLimiter.record(playerId);
+  // The slot was already taken by `reserve` above. Nothing to record here —
+  // recording again would charge one upload twice.
+
 
   // Read back the settled settings rather than assert a shape here:
   // whatever financial-core actually persisted (the UPLOADED_AVATAR
