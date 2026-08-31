@@ -43,7 +43,17 @@ export type AdminAuditAction =
   | 'user.clear_avatar'
   | 'user.balance_adjust'
   /** A reputation score or VIP tier set by hand, against the computed value. */
-  | 'user.override';
+  | 'user.override'
+  /**
+   * A new platform administrator was minted.
+   *
+   * The highest-privilege write the panel has — it creates an account that can
+   * suspend players, move balances and mint further admins — and it was the one
+   * write with no audit entry at all. Every lesser action was logged; this was
+   * not, so the log could show who edited a display name and not who granted
+   * the authority to do it.
+   */
+  | 'admin.create';
 
 const adminAuditSchema = new Schema<AdminAuditDoc>(
   {

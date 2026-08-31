@@ -20,6 +20,22 @@ export interface AvatarUploadLimiter {
   check(playerId: string, now?: number): Promise<UploadDecision>;
   /** Call once an upload has actually been accepted and stored. */
   record(playerId: string, now?: number): Promise<void>;
+  /**
+   * Decide AND consume the slot in one step.
+   *
+   * `check` then `record` is the docs/TRAPS.md §14 shape: the route checked,
+   * then re-encoded the image with sharp and posted it upstream — hundreds of
+   * milliseconds — and only then recorded. Two uploads arriving together both
+   * passed a check neither had yet consumed, which is the entire point of the
+   * limit on the most expensive route in the gateway.
+   *
+   * Note what this costs: a reservation is spent even if the image is then
+   * rejected. That is deliberate. The resource being protected is the re-encode
+   * that happens AFTER this returns, and someone posting junk in a loop is
+   * exactly who the limit is for. A slot released on rejection would hand that
+   * back for free.
+   */
+  reserve(playerId: string, now?: number): Promise<UploadDecision>;
 }
 
 export function createAvatarUploadLimiter(persistence: UploadHistoryPersistence): AvatarUploadLimiter {
@@ -30,6 +46,14 @@ export function createAvatarUploadLimiter(persistence: UploadHistoryPersistence)
     async record(playerId, now = Date.now()) {
       const existing = await persistence.get(playerId);
       await persistence.put(playerId, afterUpload(existing, now));
+    },
+    async reserve(playerId, now = Date.now()) {
+      const existing = await persistence.get(playerId);
+      const decision = canUpload(existing, now);
+      // Only a granted slot is consumed — a refusal must not extend its own
+      // cooldown, or a client retrying politely would never get back in.
+      if (decision.ok) await persistence.put(playerId, afterUpload(existing, now));
+      return decision;
     },
   };
 }

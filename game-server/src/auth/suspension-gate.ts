@@ -85,6 +85,17 @@ export const DEFAULT_TTL_MS = 15_000;
  */
 export const LOOKUP_TIMEOUT_MS = 500;
 
+/**
+ * How many players' answers are held at once.
+ *
+ * The cache gains an entry for every distinct playerId that ever authenticates
+ * and, without this, never drops one — expiry only refreshes an entry rather
+ * than removing it. A review named this gate and the override store as twins
+ * on the same defect; the override store was capped and this one was not, which
+ * is the mirror-rule mistake the same review was convened to find.
+ */
+export const MAX_ENTRIES = 10_000;
+
 export class SuspensionGate {
   private readonly cache = new Map<string, Entry>();
   private readonly lookup: SuspensionLookup;
@@ -174,6 +185,34 @@ export class SuspensionGate {
       ops: user?.role === 'ops',
       opsCheckedAt: checkedAt,
     });
+    if (this.cache.size > MAX_ENTRIES) this.evict(checkedAt);
+  }
+
+  /**
+   * Drop fully-expired entries, then the oldest if still over the cap.
+   *
+   * "Fully expired" means BOTH facts are stale — an entry whose role was primed
+   * a moment ago still carries a fresh answer even if its suspension timestamp
+   * is old, and dropping it would throw away truth to save a slot.
+   *
+   * Map preserves insertion order, so the first keys are the oldest inserted.
+   * Oldest-first rather than least-recently-used: an LRU needs a write on every
+   * read, on the hottest path in the gateway, to bound a map that is only a
+   * cache. A wrongly-evicted entry costs one indexed lookup.
+   */
+  private evict(now: number): void {
+    for (const [key, entry] of this.cache) {
+      const stale =
+        now - entry.suspendedCheckedAt >= this.ttlMs && now - entry.opsCheckedAt >= this.ttlMs;
+      if (stale) this.cache.delete(key);
+    }
+    if (this.cache.size <= MAX_ENTRIES) return;
+    let excess = this.cache.size - MAX_ENTRIES;
+    for (const key of this.cache.keys()) {
+      if (excess <= 0) break;
+      this.cache.delete(key);
+      excess -= 1;
+    }
   }
 
   /**
@@ -214,12 +253,18 @@ export class SuspensionGate {
    */
   prime(playerId: string, suspended: boolean): void {
     const existing = this.cache.get(playerId);
+    const at = this.now();
     this.cache.set(playerId, {
       suspended,
-      suspendedCheckedAt: this.now(),
+      suspendedCheckedAt: at,
       ops: existing?.ops ?? false,
       opsCheckedAt: existing?.opsCheckedAt ?? 0,
     });
+    // The cap applies to EVERY way in, not only the read path. This one grows
+    // by admin action rather than by traffic, so it leaks far more slowly —
+    // but "slowly" is still the unbounded-map defect this cache was capped to
+    // fix, and a write path exempt from the rule is how it comes back.
+    if (this.cache.size > MAX_ENTRIES) this.evict(at);
   }
 
   /**
@@ -234,12 +279,14 @@ export class SuspensionGate {
    */
   primeRole(playerId: string, ops: boolean): void {
     const existing = this.cache.get(playerId);
+    const at = this.now();
     this.cache.set(playerId, {
       suspended: existing?.suspended ?? false,
       suspendedCheckedAt: existing?.suspendedCheckedAt ?? 0,
       ops,
-      opsCheckedAt: this.now(),
+      opsCheckedAt: at,
     });
+    if (this.cache.size > MAX_ENTRIES) this.evict(at);
   }
 
   /** Drop a cached answer, forcing the next check to read through. */

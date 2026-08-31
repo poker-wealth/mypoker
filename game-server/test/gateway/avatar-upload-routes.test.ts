@@ -234,6 +234,39 @@ describe('POST /me/avatar', () => {
     expect(second.headers['retry-after']).toBeDefined();
   });
 
+  it('lets only ONE of two simultaneous uploads through', async () => {
+    /*
+     * The race the sequential test above cannot see.
+     *
+     * The route used to `check` the limit, then re-encode with sharp and POST
+     * upstream — hundreds of milliseconds — and only then `record`. Two uploads
+     * arriving together both passed a check neither had consumed yet, so the
+     * limit on the most expensive route in the gateway did not hold for the one
+     * case it exists for (docs/TRAPS.md §14: a guard taken after the await is
+     * not a guard).
+     *
+     * Fired with Promise.all rather than in sequence — in sequence the first
+     * has already recorded by the time the second checks, which is why every
+     * existing test passed over this.
+     */
+    mockFinancialCoreSuccess();
+    const limiter = createAvatarUploadLimiter(memoryPersistence());
+    const app = appWithDeps({ avatarUploadLimiter: limiter });
+    const jpeg = await makeJpeg();
+
+    const upload = () =>
+      request(app)
+        .post('/me/avatar')
+        .set('authorization', `Bearer ${tokenFor(PLAYER)}`)
+        .set('content-type', 'image/jpeg')
+        .send(jpeg);
+
+    const [a, b] = await Promise.all([upload(), upload()]);
+    const statuses = [a.status, b.status].sort();
+
+    expect(statuses).toEqual([200, 429]);
+  }, 20_000);
+
   it('rejects a request body over the size cap with 413, via the real gateway app', async () => {
     // Full createGatewayApp, not the DI harness: the limit AND the
     // error-handling that turns body-parser's rejection into a clean 413
