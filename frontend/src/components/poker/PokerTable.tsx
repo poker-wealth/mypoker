@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { PlayerSeat } from './PlayerSeat';
 import { PlayingCard } from './PlayingCard';
 import { ChipsToPot } from './ChipsToPot';
@@ -8,6 +9,7 @@ import { ChipStack } from './ChipStack';
 import type { TableState } from '@/lib/table';
 import { ringFor, type TableDesign } from '@/lib/tableDesigns';
 import { useTableDesign } from '@/store/tableDesign';
+import { cn } from '@/lib/cn';
 
 /**
  * The table: the chosen design's artwork with the seats placed on its rail and the board across the
@@ -31,12 +33,46 @@ export function PokerTable({ state, onSit, onChallenge, design: override }: Poke
   const [failed, setFailed] = useState<string | null>(null);
   const useArt = Boolean(design.artUrl) && failed !== design.artUrl;
 
+  // "1672 / 941" → wider than tall. Short Deck is landscape; everything else is
+  // portrait, and the two want different width ceilings.
+  const [aw = '1', ah = '1'] = design.aspect.split('/').map((n) => n.trim());
+  const isWide = Number(aw) > Number(ah);
+
   // Mobile keeps the 440px felt; desktop scales it up so the table fills the
   // screen instead of sitting as a small oval in a sea of empty space. The felt
   // is aspect-ratio + %-positioned, so the whole table (seats) scales together.
   return (
-    <div className="relative mx-auto flex w-full max-w-[440px] items-center justify-center px-5 md:max-w-[620px] lg:max-w-[780px]">
-      <div className="relative w-full" style={{ aspectRatio: design.aspect }}>
+    <div
+      className={cn(
+        'relative mx-auto flex w-full items-center justify-center',
+        // A LANDSCAPE felt is short, so it can afford to be much wider — capping
+        // it at the portrait width leaves a cramped strip with the seats
+        // crowding each other. A portrait felt keeps the original ceiling,
+        // because widening that one only makes it taller than the screen.
+        //
+        // The PADDING matters more than the cap on a phone: at 360px wide the
+        // ceiling is never reached, and 20px of gutter each side is 11% of the
+        // felt. A wide table gets almost none — it has vertical room to spare
+        // and needs every pixel of width.
+        isWide
+          ? 'px-0 max-w-none md:max-w-[1100px] lg:max-w-[1400px]'
+          : 'px-5 max-w-[440px] md:max-w-[620px] lg:max-w-[780px]',
+      )}
+    >
+      {/*
+        `container-type: size` makes this box the reference for the seats.
+
+        Seat avatars were a fixed 56–62px while the felt scaled with the screen,
+        which is fine on a tall portrait table and wrong on a short landscape
+        one: the same circle that reads as a chair on a 780px-high felt covers a
+        quarter of a 250px-high one. Sizing them in `cqmin` — a share of the
+        table's SHORTER side — keeps a seat the same fraction of the table on
+        any felt, in either orientation.
+      */}
+      <div
+        className="relative w-full"
+        style={{ aspectRatio: design.aspect, containerType: 'size' }}
+      >
 
         {/* Embedded HTML5 Canvas Element for inspection */}
         <canvas
@@ -87,6 +123,29 @@ export function PokerTable({ state, onSit, onChallenge, design: override }: Poke
               />
             ))}
           </div>
+
+          {/*
+            Who won, directly under the board.
+
+            It used to be a banner BELOW the whole felt, down among the action
+            bar and the chat button — so the one line explaining what just
+            happened sat furthest from the cards it was explaining, in the most
+            crowded part of the screen. Here it lands where the player is
+            already looking when the hand resolves.
+          */}
+          <AnimatePresence>
+            {state.handOver && state.message && (
+              <motion.div
+                initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+                className="max-w-[85%] rounded-full border border-white/15 bg-black/70 px-3.5 py-1 text-center text-[0.72rem] font-bold text-white shadow-lg backdrop-blur-sm"
+              >
+                {state.message}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Chips sweeping into the pot when a street ends. */}
@@ -106,6 +165,7 @@ export function PokerTable({ state, onSit, onChallenge, design: override }: Poke
           winners={state.seats
             .map((seat, i) => (seat.isWinner ? (positions[i] ?? positions[0]!) : null))
             .filter((p): p is NonNullable<typeof p> => p !== null)}
+          youWon={state.seats.some((seat) => seat.isWinner && seat.isHero)}
         />
 
         {/* Seats */}

@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { createGatewayApp } from '../../src/gateway/app';
 import { loadConfig } from '../../src/gateway/config';
-import { userStore } from '../../src/auth/user-store';
+import { LoginError, userStore } from '../../src/auth/user-store';
 
 /**
  * A suspension has to hold on EVERY door.
@@ -17,6 +17,10 @@ import { userStore } from '../../src/auth/user-store';
  * method has an obvious place to be checked.
  */
 jest.mock('../../src/auth/user-store', () => ({
+  // The REAL error class. Mocking the whole module would leave `LoginError`
+  // undefined, so `new LoginError(...)` throws inside the test itself and the
+  // route's `err instanceof LoginError` could never match.
+  ...jest.requireActual('../../src/auth/user-store'),
   userStore: {
     startSignup: jest.fn(),
     verifyPassword: jest.fn(),
@@ -46,11 +50,13 @@ beforeEach(() => {
 
 describe('a suspended account cannot sign in with a password', () => {
   it('is refused with 403 and a distinct code', async () => {
-    (userStore.verifyPassword as jest.Mock).mockResolvedValue({
-      ok: false,
-      reason: 'suspended',
-      suspendedReason: 'chargeback under review',
-    });
+    // THROWS now — main's closed refusal set (#61). The route catches a
+    // LoginError; a resolved verdict would sail past it as a success.
+    (userStore.verifyPassword as jest.Mock).mockRejectedValue(
+      new LoginError('suspended', 'This account is suspended: chargeback under review', {
+        suspendedReason: 'chargeback under review',
+      }),
+    );
 
     const res = await request(app())
       .post('/auth/login')
@@ -67,7 +73,9 @@ describe('a suspended account cannot sign in with a password', () => {
   });
 
   it('says so without a reason when no reason was recorded', async () => {
-    (userStore.verifyPassword as jest.Mock).mockResolvedValue({ ok: false, reason: 'suspended' });
+    (userStore.verifyPassword as jest.Mock).mockRejectedValue(
+      new LoginError('suspended', 'This account is suspended. Contact support.'),
+    );
 
     const res = await request(app())
       .post('/auth/login')

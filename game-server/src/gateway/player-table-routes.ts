@@ -30,6 +30,17 @@ export function buildPlayerTableRouter(
     // Poker only for now; the enum leaves room to widen without a breaking change.
     game: z.enum(['texas']).default('texas'),
     visibility: z.enum(['public', 'private']).default('private'),
+    /**
+     * How many chairs the table has — NOT how many players it needs. Two ready
+     * players is enough to deal whatever this is set to; the rest of the chairs
+     * simply sit empty until someone takes one.
+     *
+     * Capped at 6 because that is what the portrait felt draws, and a chair the
+     * artwork has no seat for is a chair nobody can reach. The wide Short Deck
+     * felt draws 8, so this ceiling rises with the game once the enum above
+     * widens past texas.
+     */
+    seats: z.number().int().min(2).max(6).default(6),
   });
 
   r.post('/', requireAuth(config), (req: Request, res: Response): void => {
@@ -57,6 +68,7 @@ export function buildPlayerTableRouter(
       id: tableId,
       game: 'texas',
       name: "Hold'em · $0.10/0.20",
+      maxSeats: input.seats,
     });
 
     // Public → list it now AND register it so the 5s lobby resync keeps it (the

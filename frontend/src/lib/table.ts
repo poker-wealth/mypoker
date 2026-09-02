@@ -1,4 +1,5 @@
 import type { Card } from './cards';
+import type { SeatAction } from './liveTable';
 
 /**
  * View-model for the poker table screen. This is deliberately UI-shaped (what a seat
@@ -23,7 +24,7 @@ export interface Seat {
 
   // ── Live tables only (the demo engine leaves these undefined) ──
   /** What they last did this street — the bubble over the seat ("Call", "Raise $120"). */
-  lastAction?: string;
+  lastAction?: SeatAction | string;
   /** False while their socket is down; they still have their seat and their clock. */
   connected?: boolean;
   /** They're at the table but not being dealt in. */

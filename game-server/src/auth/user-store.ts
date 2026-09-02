@@ -37,14 +37,54 @@ async function findByIdentifier(identifier: string): Promise<UserDoc | null> {
  * arrived — wrong address, full inbox, SMTP down — leaves a row holding that
  * address forever. Refusing on it would tell the real owner "this email is
  * already taken" by an account nobody has ever proved they own, with no way
- * through. Overwriting the password is safe for exactly the same reason: nobody
- * has demonstrated control of the address yet, so there is no session, no
- * balance and nothing to take over. A CONFIRMED account is never overwritten.
+ * through. A CONFIRMED account is never overwritten, and neither is a
+ * suspended one.
+ *
+ * THE PASSWORD IS NO LONGER OVERWRITTEN, and the sentence that used to say it
+ * was safe has been deleted rather than left to rot. It read: "nobody has
+ * demonstrated control of the address yet, so there is no session, no balance
+ * and nothing to take over." True of the ACCOUNT, false of the OUTCOME — a
+ * stranger could set the password on somebody else's pending signup, and the
+ * real owner then confirmed it with the code in their own inbox. Credentials
+ * now ride on the challenge; see `StartedSignup` below.
  *
  * Email only. A phone signup would create an account no code can ever confirm —
  * there is no SMS provider — so the gateway rejects one before reaching here;
  * this asserts it rather than trusting that.
  */
+
+/**
+ * Why a signup was refused. Same closed-set discipline as `LoginRefusal`.
+ *
+ * From main (#61). Kept in full: an unreclaimable account must answer with the
+ * SAME vocabulary login uses, or probing one endpoint tells you what the other
+ * would not.
+ *
+ * On what it says it does not fix — that /auth/signup still confirms an
+ * identifier is taken — this branch narrows it rather than closing it. An
+ * UNCONFIRMED account is now reclaimed silently instead of refused, so those no
+ * longer answer at all. A CONFIRMED account still refuses, and still tells you
+ * so. Closing that needs the accept-and-mail flow described there, which is a
+ * product decision about what a duplicate signup should DO, not a merge
+ * decision — left for its author.
+ */
+export type SignupRefusal = 'account_exists' | 'use_google';
+
+export class SignupError extends Error {
+  constructor(
+    readonly code: SignupRefusal,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'SignupError';
+  }
+}
+
+const SIGNUP_REFUSAL_TEXT: Readonly<Record<SignupRefusal, string>> = {
+  account_exists: 'An account with this email or phone number already exists',
+  use_google: 'This account was created with Google — use “Continue with Google”',
+};
+
 /**
  * The outcome of starting a signup.
  *
@@ -85,7 +125,12 @@ async function createUnverifiedWithPassword(
     // Only an unconfirmed, unsuspended account is claimable. Anything else is
     // an account that exists, and says so.
     if (!isClaimableBySignup(existing)) {
-      throw new Error('User with this email or phone number already exists');
+      // main's closed set, not a bare Error. A Google account gets the same
+      // answer signing up as it gets signing in, rather than "already exists" —
+      // otherwise the two endpoints disagree about one account state, and the
+      // disagreement is itself the information.
+      const code: SignupRefusal = existing.passwordHash ? 'account_exists' : 'use_google';
+      throw new SignupError(code, SIGNUP_REFUSAL_TEXT[code]);
     }
     // THE ROW IS NOT TOUCHED.
     //
@@ -117,10 +162,109 @@ async function createUnverifiedWithPassword(
   return { user: user.toObject() };
 }
 
-async function verifyCredentials(identifier: string, passwordPlain: string): Promise<UserDoc | null> {
+/**
+ * Why a sign-in was refused.
+ *
+ * READ THIS BEFORE WIDENING IT.
+ *
+ * An earlier revision split this into `no_account` and `wrong_password` so a
+ * user who mistypes knows which field to fix. That is a genuinely nicer form,
+ * and it is an ACCOUNT ENUMERATION ORACLE: anyone can feed in a list of email
+ * addresses and learn which are registered here, then aim every subsequent
+ * password attempt at accounts they know exist. On a platform holding money
+ * that list has value by itself. The two are now one answer, so /auth/login
+ * confirms nothing about who banks here.
+ *
+ * Two rules follow, and neither is optional:
+ *
+ *   1. Do not re-split this. "Which field was wrong" cannot be told to an
+ *      unauthenticated caller without handing back the oracle. If the UX is
+ *      wanted, it belongs AFTER a verified session, never at the door.
+ *   2. The reasons stay a CLOSED set of codes, never free text built from a
+ *      document. A message assembled from what was found in the database is one
+ *      refactor away from putting the display name or the email of an account
+ *      the caller does not own into the response.
+ *
+ * `use_google` is the one deliberate exception and it is narrower than it
+ * looks: it fires only for an account with no password hash at all, so it
+ * distinguishes Google accounts, not accounts-in-general. It stays because
+ * folding it into the generic answer sends a Google user round a loop they
+ * cannot escape — every password on earth is "wrong" for an account that has
+ * none, so "check your typing" is advice that can never come true. Signup
+ * answers `use_google` for the same account state, so the two doors agree.
+ */
+export type LoginRefusal =
+  | 'invalid_credentials'
+  | 'use_google'
+  /**
+   * The two below are reachable ONLY after a correct password, which is what
+   * keeps them out of the oracle this set exists to close. Someone who does not
+   * hold the credential can never see either, so neither tells them whether an
+   * address is registered. `invalid_credentials` still covers absent-account
+   * and wrong-password together, and still burns the same bcrypt round on a
+   * miss so timing does not rebuild what the wording hides.
+   */
+  | 'email_unverified'
+  | 'suspended';
+
+export class LoginError extends Error {
+  /** The account, for `email_unverified` only — the resend path needs the playerId. */
+  readonly identity?: StoredIdentity;
+  /** What an administrator typed, for `suspended` only. */
+  readonly suspendedReason?: string;
+
+  constructor(
+    readonly code: LoginRefusal,
+    message: string,
+    extra?: { identity?: StoredIdentity; suspendedReason?: string },
+  ) {
+    super(message);
+    this.name = 'LoginError';
+    if (extra?.identity) this.identity = extra.identity;
+    if (extra?.suspendedReason) this.suspendedReason = extra.suspendedReason;
+  }
+}
+
+/** English fallback for each refusal. The client translates from the code. */
+const REFUSAL_TEXT: Readonly<Record<LoginRefusal, string>> = {
+  invalid_credentials: 'Incorrect email, phone number or password',
+  use_google: 'This account was created with Google — use “Continue with Google”',
+  email_unverified: 'Confirm your email address to finish signing in',
+  suspended: 'This account is suspended. Contact support.',
+};
+
+/**
+ * A real bcrypt hash, of a value no caller can submit, compared against when
+ * the account does not exist.
+ *
+ * Merging the two refusal codes is only half of closing the oracle. A missing
+ * account skips bcrypt entirely and answers in microseconds; a wrong password
+ * spends the full cost of a 10-round hash. That difference is measurable over
+ * a handful of requests, and it rebuilds from response time alone exactly the
+ * distinction the merged code just removed. So the absent case does the same
+ * work as the present one and the two are indistinguishable from outside.
+ */
+const ABSENT_ACCOUNT_HASH = '$2b$10$NrXUDLZ779ib2eUHE/JBqOST9VNyWgfanq/gcOYVxo/rB4T5NWY/G';
+
+/**
+ * Resolve a sign-in attempt to a user, or to the reason it failed.
+ *
+ * Every failure that is about the credentials answers `invalid_credentials`,
+ * whether or not the account exists — see the note on `LoginRefusal`.
+ */
+async function verifyCredentials(
+  identifier: string,
+  passwordPlain: string,
+): Promise<{ ok: true; user: UserDoc } | { ok: false; code: LoginRefusal }> {
   const user = await findByIdentifier(identifier);
-  if (!user || !user.passwordHash) return null;
-  return (await bcrypt.compare(passwordPlain, user.passwordHash)) ? user : null;
+  if (!user) {
+    // Deliberately not short-circuited. See ABSENT_ACCOUNT_HASH.
+    await bcrypt.compare(passwordPlain, ABSENT_ACCOUNT_HASH);
+    return { ok: false, code: 'invalid_credentials' };
+  }
+  if (!user.passwordHash) return { ok: false, code: 'use_google' };
+  const matches = await bcrypt.compare(passwordPlain, user.passwordHash);
+  return matches ? { ok: true, user } : { ok: false, code: 'invalid_credentials' };
 }
 
 async function findOrCreateGoogle(
@@ -311,32 +455,48 @@ export const userStore = {
       ...(started.pending ? { pending: started.pending } : {}),
     };
   },
-
-  async verifyPassword(identifier: string, password: string): Promise<PasswordCheck> {
-    const user = await verifyCredentials(identifier, password);
-    if (!user) return { ok: false, reason: 'invalid_credentials' };
-
-    // Password first, confirmation second — never the other way round. Checking
-    // confirmation before the password would answer "is this address
-    // registered and unconfirmed?" to anyone who typed it, which is an account
-    // enumeration oracle with a free hint attached.
-    const verdict = isSignInAllowed(user);
-    if (!verdict.ok) {
-      // `identity` accompanies `email_unverified` only — the resend path needs
-      // the playerId. A suspended account gets NO identity back: there is no
-      // second step to offer, and handing out a playerId to a session that will
-      // never be minted is a detail with no use but a caller.
-      if (verdict.reason === 'suspended') {
-        return {
-          ok: false,
-          reason: 'suspended',
-          ...(verdict.suspendedReason ? { suspendedReason: verdict.suspendedReason } : {}),
-        };
-      }
-      return { ok: false, reason: verdict.reason, identity: toIdentity(user) };
+  /**
+   * Sign in with a password.
+   *
+   * THROWS on refusal — main's shape (#61), kept. Success returns the identity;
+   * every refusal is a `LoginError` carrying a code from the closed set.
+   *
+   * Order matters and is not negotiable: password FIRST, account state second.
+   * Checking confirmation or suspension before the password would answer "is
+   * this address registered?" to anyone who typed one, which is the oracle
+   * #61 closed, rebuilt one field over.
+   */
+  async verifyPassword(identifier: string, password: string): Promise<StoredIdentity> {
+    const result = await verifyCredentials(identifier, password);
+    if (!result.ok) {
+      // English here is the fallback only. The client translates from `code`
+      // (see mobile/src/auth.tsx) — a server that speaks one language cannot be
+      // the source of a user-facing string in an app that ships eight.
+      throw new LoginError(result.code, REFUSAL_TEXT[result.code]);
     }
 
-    return { ok: true, identity: toIdentity(user) };
+    // Past the password, so these reveal nothing to anyone who does not already
+    // hold it. `identity` rides on the error for `email_unverified` because the
+    // resend path needs the playerId; a suspended account gets none — there is
+    // no second step to offer, and handing out a playerId for a session that
+    // will never be minted is a detail with no use but to a caller.
+    const verdict = isSignInAllowed(result.user);
+    if (!verdict.ok) {
+      if (verdict.reason === 'suspended') {
+        throw new LoginError(
+          'suspended',
+          verdict.suspendedReason
+            ? `This account is suspended: ${verdict.suspendedReason}`
+            : REFUSAL_TEXT.suspended,
+          { ...(verdict.suspendedReason ? { suspendedReason: verdict.suspendedReason } : {}) },
+        );
+      }
+      throw new LoginError('email_unverified', REFUSAL_TEXT.email_unverified, {
+        identity: toIdentity(result.user),
+      });
+    }
+
+    return toIdentity(result.user);
   },
 
   /**
@@ -481,8 +641,14 @@ export const userStore = {
     const identifier = user.email || user.phone;
     if (!identifier) return { ok: false, reason: 'no_account' };
 
-    const check = await userStore.verifyPassword(identifier, currentPassword);
-    if (!check.ok) return { ok: false, reason: 'invalid_current_password' };
+    // `verifyPassword` throws now (#61's closed refusal set). Any refusal at all
+    // means the current password did not check out, INCLUDING a suspension or an
+    // unconfirmed address — none of which should let someone rotate a password.
+    try {
+      await userStore.verifyPassword(identifier, currentPassword);
+    } catch {
+      return { ok: false, reason: 'invalid_current_password' };
+    }
 
     const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
     await UserModel.updateOne({ _id: playerId }, { $set: { passwordHash } });

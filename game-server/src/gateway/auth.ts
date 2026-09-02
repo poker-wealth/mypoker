@@ -2,7 +2,7 @@ import { Router, type NextFunction, type Request, type Response } from 'express'
 import * as bcrypt from 'bcrypt';
 import { OAuth2Client } from 'google-auth-library';
 import type { GatewayConfig } from './config';
-import { userStore } from '../auth/user-store';
+import { LoginError, SignupError, userStore } from '../auth/user-store';
 import { otpStore, type OtpStore } from '../auth/otp-store';
 import { defaultSuspensionGate, type SuspensionGate } from '../auth/suspension-gate';
 import { OTP_TTL_MS } from '../auth/otp-rules';
@@ -400,9 +400,13 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
 
     if (outcome.status === 'undeliverable') {
       // The unconfirmed ACCOUNT row stays, deliberately. It is reclaimable by
-      // design -- a later signup for the same address overwrites it -- so
-      // leaving it costs nothing and deleting it here would race a concurrent
-      // attempt for the same address.
+      // design -- a later signup for the same address starts a new challenge
+      // against it -- so leaving it costs nothing and deleting it here would
+      // race a concurrent attempt for the same address.
+      //
+      // Note it no longer OVERWRITES the row's password: credentials are bound
+      // to the challenge and applied at confirmation. The previous wording said
+      // "overwrites it", which stopped being true in this branch.
       res.status(503).json({
         error: 'We could not send the confirmation email. Please try again shortly.',
         code: 'email_undeliverable',
@@ -463,7 +467,15 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
       try {
         started = await authClient.startSignup(email, password, displayName);
       } catch (err) {
-        res.status(400).json({ error: err instanceof Error ? err.message : 'sign-up failed' });
+        // main's closed refusal set (#61), not a bare message. A `SignupError`
+        // carries a code the app translates; anything else is unexpected and
+        // gets a generic answer, because a database outage must not reach the
+        // user as "that email is taken".
+        res.status(400).json(
+          err instanceof SignupError
+            ? { error: err.message, code: err.code }
+            : { error: 'could not create the account' },
+        );
         return;
       }
 
@@ -601,37 +613,66 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
       // account is perfectly valid. Only new phone sign-UPS are closed.
       const identifier = raw.includes('@') ? normalizeEmail(raw) : raw.trim();
 
-      const check = await authClient.verifyPassword(identifier, password);
+      // main's contract (#61): THROWS on refusal, returns the identity on
+      // success. The closed set is what keeps `invalid_credentials` from
+      // splitting back into "no such account" and "wrong password", which
+      // together are an enumeration oracle.
+      let identity;
+      try {
+        identity = await authClient.verifyPassword(identifier, password);
+      } catch (err) {
+        if (!(err instanceof LoginError)) throw err;
 
-      if (check.ok) {
-        res.json(issue(asProfile(check.identity)));
+        if (err.code === 'invalid_credentials' || err.code === 'use_google') {
+          // Anything that is not a LoginError (a database outage, say) is
+          // rethrown to the 500 handler rather than reported as a bad password.
+          res.status(401).json({ error: err.message, code: err.code });
+          return;
+        }
+
+        if (err.code === 'suspended') {
+          // 403 like the unconfirmed branch below, but with a `code` the client
+          // switches on — the two must not share a message. "Confirm your
+          // email" shown to a suspended player sends them round a confirmation
+          // loop that can never end in a session, and they would call support
+          // about the wrong thing entirely.
+          //
+          // The reason is included when an admin wrote one. A lockout with no
+          // explanation is a support ticket every time, and the admin typed
+          // that sentence for this exact moment.
+          res.status(403).json({ error: err.message, code: 'account_suspended' });
+          return;
+        }
+
+        await answerUnverified(res, err, identifier);
         return;
       }
 
-      if (check.reason === 'invalid_credentials') {
-        res.status(401).json({ error: 'invalid email or password' });
-        return;
-      }
+      res.json(issue(asProfile(identity)));
+      return;
+    })().catch((err: unknown) => {
+      console.error('[auth] login failed:', err);
+      res.status(500).json({ error: 'internal error' });
+    });
+  });
+
+  /**
+   * The `email_unverified` half of login, lifted out so the try/catch above
+   * stays readable.
+   *
+   * 403, not 401. The password was right — this is a known account that has not
+   * finished signing up, and the client needs to tell those apart to send the
+   * player to the code screen instead of retrying the password. Safe to
+   * disclose: it took the correct password to get here.
+   */
+  async function answerUnverified(
+    res: Response,
+    err: LoginError,
+    identifier: string,
+  ): Promise<void> {
 
       // Suspended by an administrator. 403 like the unconfirmed branch, but with
       // a `code` the client switches on — the two must not share a message.
-      // "Confirm your email" shown to a suspended player sends them round a
-      // confirmation loop that can never end in a session, and they would call
-      // support about the wrong thing entirely.
-      //
-      // The reason is included when an admin wrote one. A lockout with no
-      // explanation is a support ticket every single time, and the admin typed
-      // that sentence for this exact moment.
-      if (check.reason === 'suspended') {
-        res.status(403).json({
-          error: check.suspendedReason
-            ? `This account is suspended: ${check.suspendedReason}`
-            : 'This account is suspended. Contact support.',
-          code: 'account_suspended',
-        });
-        return;
-      }
-
       // 403, not 401. The password was right -- this is a known account that
       // has not finished signing up, and the client needs to tell those apart
       // to send the player to the code screen instead of retrying the password.
@@ -651,27 +692,31 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
       // already control the account for, and the same per-address rate limits
       // apply. `sent` is reported honestly so the screen does not promise a
       // mail that a cooldown or an outage stopped.
-      const confirmEmail = check.identity.email ?? identifier;
-      const outcome = await mintAndSend(confirmEmail, check.identity.playerId);
+    // `identity` rides on the error for this code alone — the resend below needs
+    // the playerId. If it is somehow absent, fall back to a plain refusal rather
+    // than inventing an account to mail.
+    if (!err.identity) {
+      res.status(403).json({ error: err.message, code: 'email_unverified' });
+      return;
+    }
 
-      res.status(403).json({
-        error: 'Confirm your email address to finish signing up.',
-        code: 'email_unverified',
-        email: confirmEmail,
-        sent: outcome.status === 'sent',
-        ...(outcome.status === 'sent'
-          ? {
-              expiresAt: new Date(outcome.expiresAt).toISOString(),
-              resendAvailableAt: new Date(outcome.resendAvailableAt).toISOString(),
-            }
-          : {}),
-        ...(outcome.status === 'rate_limited' ? { retryAfterMs: outcome.retryAfterMs } : {}),
-      });
-    })().catch((err: unknown) => {
-      console.error('[auth] login failed:', err);
-      res.status(500).json({ error: 'internal error' });
+    const confirmEmail = err.identity.email ?? identifier;
+    const outcome = await mintAndSend(confirmEmail, err.identity.playerId);
+
+    res.status(403).json({
+      error: 'Confirm your email address to finish signing up.',
+      code: 'email_unverified',
+      email: confirmEmail,
+      sent: outcome.status === 'sent',
+      ...(outcome.status === 'sent'
+        ? {
+            expiresAt: new Date(outcome.expiresAt).toISOString(),
+            resendAvailableAt: new Date(outcome.resendAvailableAt).toISOString(),
+          }
+        : {}),
+      ...(outcome.status === 'rate_limited' ? { retryAfterMs: outcome.retryAfterMs } : {}),
     });
-  });
+  }
 
   // -- Profile & password self-service --------------------------------------
   //

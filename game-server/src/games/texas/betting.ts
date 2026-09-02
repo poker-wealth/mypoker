@@ -32,14 +32,36 @@ export interface LegalActions {
   callAmount: number | null;
   /** Smallest legal raise-to, or null if a raise isn't possible. */
   minRaiseTo: number | null;
-  /** Largest raise-to (all-in). */
+  /** Largest LEGAL raise-to. Under POT_LIMIT this is the pot cap, not the stack. */
   maxRaiseTo: number | null;
+  /**
+   * The raise-to that would actually put this seat all-in — everything in
+   * front of them plus everything behind.
+   *
+   * Under NO_LIMIT it equals `maxRaiseTo`, which is why one field sufficed
+   * before. Under POT_LIMIT the cap usually sits BELOW the stack, so asking
+   * "is this all-in?" of `maxRaiseTo` calls every pot-sized raise an all-in.
+   * Null only when there is nobody to act.
+   */
+  allInRaiseTo: number | null;
 }
+
+/**
+ * How big a raise may be.
+ *
+ * NO_LIMIT — any amount up to the player's whole stack. Hold'em and Short Deck.
+ * POT_LIMIT — capped at the size of the pot AFTER the raiser has called, which
+ * is the standard Omaha structure and the reason PLO plays differently from a
+ * game where anyone can shove on any street.
+ */
+export type BetLimit = 'NO_LIMIT' | 'POT_LIMIT';
 
 export interface BettingConfig {
   smallBlind: number;
   bigBlind: number;
   buttonIndex?: number;
+  /** Defaults to NO_LIMIT, which is what every existing caller assumed. */
+  limit?: BetLimit;
 }
 
 interface Seat {
@@ -64,6 +86,28 @@ export class TexasBetting {
   private currentBet = 0;
   private minRaise: number;
   private toActIndex = -1;
+  private readonly limit: BetLimit;
+
+  /**
+   * The largest legal raise-TO for the player on the clock.
+   *
+   * No-limit is their whole stack. Pot-limit is the pot AFTER they call:
+   *
+   *   pot 100, opponent bets 50 → they call 50 (pot 200) → may raise 200 more
+   *   → maximum total in = 250
+   *
+   * `pot` already counts every chip committed this hand, including the bet
+   * being called, so the call is added once here and not twice. Still bounded
+   * by the stack: pot-limit raises the ceiling, it never lets someone bet chips
+   * they do not have.
+   */
+  private maxRaiseToFor(seat: Seat): number {
+    const allIn = seat.streetContributed + seat.stack;
+    if (this.limit === 'NO_LIMIT') return allIn;
+    const toCall = this.currentBet - seat.streetContributed;
+    const potAfterCall = this.pot + toCall;
+    return Math.min(allIn, this.currentBet + potAfterCall);
+  }
 
   constructor(players: { id: string; stack: number }[], cfg: BettingConfig) {
     if (players.length < 2) throw new Error('need at least 2 players');
@@ -72,6 +116,7 @@ export class TexasBetting {
     this.smallBlind = cfg.smallBlind;
     this.bigBlind = cfg.bigBlind;
     this.minRaise = cfg.bigBlind;
+    this.limit = cfg.limit ?? 'NO_LIMIT';
     this.seats = players.map((p) => ({
       id: p.id,
       stack: p.stack,
@@ -139,9 +184,17 @@ export class TexasBetting {
 
   legalActions(): LegalActions {
     const seat = this.seats[this.toActIndex];
-    if (!seat) return { canFold: false, canCheck: false, callAmount: null, minRaiseTo: null, maxRaiseTo: null };
+    if (!seat)
+      return {
+        canFold: false,
+        canCheck: false,
+        callAmount: null,
+        minRaiseTo: null,
+        maxRaiseTo: null,
+        allInRaiseTo: null,
+      };
     const toCall = this.currentBet - seat.streetContributed;
-    const maxRaiseTo = seat.streetContributed + seat.stack;
+    const maxRaiseTo = this.maxRaiseToFor(seat);
     const canRaise = maxRaiseTo > this.currentBet;
     return {
       canFold: true,
@@ -149,6 +202,9 @@ export class TexasBetting {
       callAmount: toCall > 0 ? Math.min(toCall, seat.stack) : null,
       minRaiseTo: canRaise ? Math.min(this.currentBet + this.minRaise, maxRaiseTo) : null,
       maxRaiseTo: canRaise ? maxRaiseTo : null,
+      // Reported whether or not a raise is legal: it is a fact about the seat,
+      // and the confirm gate needs it precisely when the cap has hidden it.
+      allInRaiseTo: seat.streetContributed + seat.stack,
     };
   }
 
@@ -188,11 +244,22 @@ export class TexasBetting {
   }
 
   private applyRaise(seat: Seat, raiseTo: number): void {
-    const maxRaiseTo = seat.streetContributed + seat.stack;
+    const allIn = seat.streetContributed + seat.stack;
+    // The pot-limit cap is ENFORCED here, not merely advertised in
+    // legalActions. A client that ignores the number it was sent — or one
+    // written by someone else — must be refused, or "pot limit" is a suggestion.
+    const maxRaiseTo = this.maxRaiseToFor(seat);
     if (raiseTo <= this.currentBet) throw new IllegalActionError('raise must exceed current bet');
-    if (raiseTo > maxRaiseTo) throw new IllegalActionError('raise exceeds stack');
+    if (raiseTo > maxRaiseTo) {
+      throw new IllegalActionError(
+        this.limit === 'POT_LIMIT' ? 'raise exceeds the pot' : 'raise exceeds stack',
+      );
+    }
 
-    const isAllIn = raiseTo === maxRaiseTo;
+    // All-in still means "everything they have", not "the pot-limit ceiling" —
+    // a capped raise below their stack is an ordinary raise, and calling it
+    // all-in would exempt it from the min-raise rule.
+    const isAllIn = raiseTo === allIn;
     const raiseSize = raiseTo - this.currentBet;
     if (raiseSize < this.minRaise && !isAllIn) {
       throw new IllegalActionError(`raise must be at least ${this.minRaise}`);

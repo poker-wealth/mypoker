@@ -293,7 +293,24 @@
     "recordingUnavailable": "อุปกรณ์นี้ไม่รองรับการบันทึกเสียง",
     "recordingTooShort": "กดค้างนานขึ้นอีกนิดเพื่อส่ง",
     "recordingTooLong": "ไฟล์เสียงใหญ่เกินไป",
-    "recordingFailed": "ส่งเสียงนี้ไม่สำเร็จ"
+    "recordingFailed": "ส่งเสียงนี้ไม่สำเร็จ",
+    "chat": "แชท",
+    "chatUnread": "แชท, ยังไม่ได้อ่าน {{count}} ข้อความ",
+    "handInPlay": "กำลังเล่นอยู่",
+    "yourTurn": "ตาของคุณ",
+    "playerTurn": "ตาของ {{name}}",
+    "action": {
+      "fold": "หมอบ",
+      "check": "เช็ค",
+      "call": "ตาม {{amount}}",
+      "raise": "เพิ่มเป็น {{amount}}",
+      "callBare": "ตาม",
+      "raiseBare": "เพิ่มเดิมพัน",
+      "allin": "ออลอิน"
+    },
+    "timeBank": "เวลาสำรอง: {{seconds}} วิ",
+    "timeBankRunning": "กำลังใช้เวลาสำรอง",
+    "timeBankAuto": "อัตโนมัติ"
   },
   "a11y": {
     "toggleTheme": "สลับธีม",
@@ -713,6 +730,8 @@
     "copy": "คัดลอกลิงก์คำเชิญ",
     "copied": "คัดลอกลิงก์แล้ว",
     "enter": "เข้าสู่โต๊ะ",
-    "error": "ไม่สามารถสร้างโต๊ะได้ กรุณาลองใหม่อีกครั้ง"
+    "error": "ไม่สามารถสร้างโต๊ะได้ กรุณาลองใหม่อีกครั้ง",
+    "seats": "ที่นั่ง",
+    "seatsBlurb": "{{count}} ที่นั่ง เริ่มเล่นได้ตั้งแต่ 2 คน"
   }
 }

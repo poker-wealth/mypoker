@@ -119,3 +119,98 @@ describe('Texas betting — all-in shortcut to showdown', () => {
     expect(g.handComplete).toBe(true);
   });
 });
+
+/**
+ * Pot-limit sizing — the Omaha structure.
+ *
+ * The rule that gets implemented wrong is the RAISE: the cap is the pot AFTER
+ * the raiser has called, not the pot as it stands when they act. Getting that
+ * backwards silently under-caps every raise in the game, and nothing else
+ * fails, so these pin the arithmetic rather than trusting it.
+ */
+describe('Texas betting — pot limit', () => {
+  const plo = (opts: { stack?: number } = {}): TexasBetting =>
+    new TexasBetting(
+      Array.from({ length: 3 }, (_, i) => ({ id: `p${i}`, stack: opts.stack ?? 10_000 })),
+      { smallBlind: 5, bigBlind: 10, buttonIndex: 0, limit: 'POT_LIMIT' },
+    );
+
+  it('caps the opening raise at the pot', () => {
+    const g = plo(); // blinds 5 + 10 = pot 15, p0 to act, 10 to call
+    // Call 10 → pot 25 → may raise 25 more → total in 35.
+    expect(g.legalActions().maxRaiseTo).toBe(35);
+  });
+
+  it('caps a re-raise at the pot AFTER the call, not before it', () => {
+    const g = plo();
+    g.act('p0', { type: 'raise', amount: 35 }); // pot 5 + 10 + 35 = 50
+    // p1 (SB) has 5 in and owes 30. Call 30 → pot 80 → may raise 80 MORE than
+    // the current bet, so the ceiling is a raise-TO of 35 + 80 = 115. The
+    // current bet is part of the raise-to, not something added on top of it —
+    // which is the off-by-one-call this test exists to pin.
+    expect(g.legalActions().maxRaiseTo).toBe(115);
+  });
+
+  it('refuses a raise above the cap even when the stack could cover it', () => {
+    const g = plo();
+    expect(() => g.act('p0', { type: 'raise', amount: 36 })).toThrow(IllegalActionError);
+    expect(() => g.act('p0', { type: 'raise', amount: 36 })).toThrow(/pot/);
+  });
+
+  it('never lets the cap exceed the stack', () => {
+    // 20 behind: the pot would allow 35, the stack does not.
+    const g = new TexasBetting(
+      [
+        { id: 'p0', stack: 20 },
+        { id: 'p1', stack: 500 },
+        { id: 'p2', stack: 500 },
+      ],
+      { smallBlind: 5, bigBlind: 10, buttonIndex: 0, limit: 'POT_LIMIT' },
+    );
+    expect(g.legalActions().maxRaiseTo).toBe(20);
+  });
+
+  /**
+   * The pot cap is not the stack, and the difference is what the all-in
+   * double-confirm gate reads.
+   *
+   * `isAllInAction` used to compare the raise against `maxRaiseTo`. Under
+   * NO_LIMIT those are the same number, so it was right by accident. Under
+   * POT_LIMIT the cap sits well below the stack, and every pot-sized raise —
+   * the ordinary big bet of PLO — started asking the player to confirm an
+   * all-in that was not happening.
+   */
+  it('reports the true all-in separately from the pot cap', () => {
+    const g = plo({ stack: 10_000 });
+    const legal = g.legalActions();
+    expect(legal.maxRaiseTo).toBe(35); // capped by the pot
+    expect(legal.allInRaiseTo).toBe(10_000); // the stack, untouched by the cap
+    expect(legal.allInRaiseTo).toBeGreaterThan(legal.maxRaiseTo!);
+  });
+
+  it('the two coincide under no-limit, which is why one field sufficed before', () => {
+    const g = newGame(3, { stack: 10_000 });
+    const legal = g.legalActions();
+    expect(legal.allInRaiseTo).toBe(legal.maxRaiseTo);
+  });
+
+  it('counts a short stack as all-in even when the pot would allow more', () => {
+    // 20 behind: the pot permits 35, the stack does not — so the cap IS the
+    // stack here, and a raise to 20 is a genuine all-in that must still confirm.
+    const g = new TexasBetting(
+      [
+        { id: 'p0', stack: 20 },
+        { id: 'p1', stack: 500 },
+        { id: 'p2', stack: 500 },
+      ],
+      { smallBlind: 5, bigBlind: 10, buttonIndex: 0, limit: 'POT_LIMIT' },
+    );
+    expect(g.legalActions().allInRaiseTo).toBe(20);
+  });
+
+  it('leaves no-limit alone — the whole stack is still legal', () => {
+    const g = newGame(3, { stack: 10_000 });
+    expect(g.legalActions().maxRaiseTo).toBe(10_000);
+    expect(() => g.act('p0', { type: 'raise', amount: 10_000 })).not.toThrow();
+  });
+});

@@ -2,7 +2,7 @@ import { Check } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Sheet } from '@/components/ui/Sheet';
 import { useTranslation } from 'react-i18next';
-import { TABLE_DESIGNS, type TableDesign } from '@/lib/tableDesigns';
+import { PICKABLE_DESIGNS, type TableDesign } from '@/lib/tableDesigns';
 import { useTableDesign } from '@/store/tableDesign';
 import { cn } from '@/lib/cn';
 
@@ -12,6 +12,14 @@ import { cn } from '@/lib/cn';
  * Each option shows the actual felt rather than a swatch — the whole reason to offer a choice is
  * how the table looks, so the choice is made by looking at it. The pick is saved, so the felt you
  * chose is the one waiting next time you sit down.
+ *
+ * Only the PICKABLE felts are listed. Each landscape table is reached by
+ * choosing its portrait sibling — pick Midnight Blue and Short Deck gives you
+ * the blue wide felt — so listing the wide ones here would offer the same
+ * choice twice and let someone select a landscape table for a portrait game.
+ *
+ * The tick therefore sits on what the player chose, which is always what is
+ * driving the felt on screen even when the game changes its shape.
  */
 export function TableDesignSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
@@ -21,7 +29,7 @@ export function TableDesignSheet({ open, onClose }: { open: boolean; onClose: ()
   return (
     <Sheet open={open} onClose={onClose} title={t('table.tableDesign')}>
       <div className="grid grid-cols-2 gap-3 px-4 pt-4">
-        {TABLE_DESIGNS.map((design) => (
+        {PICKABLE_DESIGNS.map((design) => (
           <button
             key={design.id}
             onClick={() => {

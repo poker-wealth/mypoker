@@ -293,7 +293,24 @@
     "recordingUnavailable": "Thiết bị này không hỗ trợ ghi âm",
     "recordingTooShort": "Giữ lâu hơn một chút để gửi",
     "recordingTooLong": "Bản ghi quá lớn để gửi",
-    "recordingFailed": "Không gửi được bản ghi đó"
+    "recordingFailed": "Không gửi được bản ghi đó",
+    "chat": "Trò chuyện",
+    "chatUnread": "Trò chuyện, {{count}} chưa đọc",
+    "handInPlay": "Đang chơi",
+    "yourTurn": "Lượt của bạn",
+    "playerTurn": "Lượt của {{name}}",
+    "action": {
+      "fold": "Bỏ bài",
+      "check": "Xem bài",
+      "call": "Theo {{amount}}",
+      "raise": "Tố lên {{amount}}",
+      "callBare": "Theo",
+      "raiseBare": "Tố",
+      "allin": "Tất tay"
+    },
+    "timeBank": "Quỹ thời gian: {{seconds}}s",
+    "timeBankRunning": "Đang dùng quỹ thời gian",
+    "timeBankAuto": "Tự động"
   },
   "a11y": {
     "toggleTheme": "Đổi giao diện",
@@ -713,6 +730,8 @@
     "copy": "Sao chép liên kết mời",
     "copied": "Đã sao chép liên kết",
     "enter": "Vào bàn",
-    "error": "Không thể tạo bàn. Vui lòng thử lại."
+    "error": "Không thể tạo bàn. Vui lòng thử lại.",
+    "seats": "Chỗ ngồi",
+    "seatsBlurb": "{{count}} chỗ. Hai người là đủ để bắt đầu."
   }
 }

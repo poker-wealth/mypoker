@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { TableSocket } from '@/api/tableSocket';
 import type { VoiceClip } from './useVoiceRecorder';
 
@@ -51,14 +51,40 @@ function trim(list: ChatMessage[]): ChatMessage[] {
   return recent;
 }
 
-export function useTableChat(socket: TableSocket | null) {
+/**
+ * @param selfId the viewer's playerId, so their own messages never count as
+ *   unread. Without it every message you send would badge your own button.
+ */
+export function useTableChat(socket: TableSocket | null, selfId?: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  /**
+   * Messages that have arrived since the player last looked.
+   *
+   * Chat lives behind a floating button, so an incoming message was completely
+   * invisible — someone could be talked to for a whole session and never know.
+   * A count on the button is the difference between a chat feature and a chat
+   * feature nobody uses.
+   */
+  const [unread, setUnread] = useState(0);
+
+  // Read through a ref so a change of identity does not tear down and re-attach
+  // the socket listeners — which would drop any message arriving in that gap.
+  const self = useRef(selfId);
+  self.current = selfId;
+
+  const markRead = useCallback(() => setUnread(0), []);
 
   useEffect(() => {
     if (!socket) return;
 
+    const countIfTheirs = (senderId: string): void => {
+      if (senderId !== self.current) setUnread((n) => n + 1);
+    };
+
     const onText = (data: unknown): void => {
-      setMessages((prev) => trim([...prev, data as ChatMessage]));
+      const m = data as ChatMessage;
+      setMessages((prev) => trim([...prev, m]));
+      countIfTheirs(m.senderId);
     };
     const onVoice = (data: unknown): void => {
       const d = data as {
@@ -77,6 +103,7 @@ export function useTableChat(socket: TableSocket | null) {
           },
         ]),
       );
+      countIfTheirs(d.senderId);
     };
 
     socket.on('chat_message', onText);
@@ -103,5 +130,5 @@ export function useTableChat(socket: TableSocket | null) {
     [socket],
   );
 
-  return { messages, sendChat, sendVoice };
+  return { messages, sendChat, sendVoice, unread, markRead };
 }

@@ -6,7 +6,7 @@ import { verifyToken } from '../../src/gateway/tokens';
 import { createOtpStore, type OtpPersistence, type StoredOtp } from '../../src/auth/otp-store';
 import { isSignInAllowed, isClaimableBySignup } from '../../src/auth/sign-in-rules';
 import type { OtpMailRequest, OtpDelivery } from '../../src/gateway/mailer';
-import type { StoredIdentity, PasswordCheck } from '../../src/auth/user-store';
+import { LoginError, SignupError, type StoredIdentity } from '../../src/auth/user-store';
 import { OTP_MAX_ATTEMPTS, OTP_MAX_SENDS, OTP_RESEND_COOLDOWN_MS, OTP_TTL_MS } from '../../src/auth/otp-rules';
 
 /**
@@ -100,7 +100,16 @@ function memoryUsers(seed: FakeUser[] = []): AuthUserStore & { rows: Map<string,
       // the same inversion the production code had, so the suite reproduced
       // the bug faithfully and reported it as correct behaviour.
       if (existing && !isClaimableBySignup(existing)) {
-        throw new Error('User with this email or phone number already exists');
+        // A SignupError, matching the real store — the route only forwards the
+        // message for this type, and a bare Error falls through to the generic
+        // "could not create the account".
+        const code = existing.password ? 'account_exists' : 'use_google';
+        throw new SignupError(
+          code,
+          code === 'account_exists'
+            ? 'An account with this email or phone number already exists'
+            : 'This account was created with Google — use “Continue with Google”',
+        );
       }
       // An address that already has an unconfirmed account KEEPS its
       // credentials. The new ones ride on the challenge and are applied only
@@ -124,14 +133,32 @@ function memoryUsers(seed: FakeUser[] = []): AuthUserStore & { rows: Map<string,
       rows.set(email, user);
       return { identity: identity(user) };
     },
-    async verifyPassword(rawEmail, password): Promise<PasswordCheck> {
+    async verifyPassword(rawEmail, password): Promise<StoredIdentity> {
+      // Mirrors main's contract (#61): THROWS a `LoginError` from a closed set,
+      // returns the identity on success. `invalid_credentials` deliberately
+      // covers both "no such account" and "wrong password" — told apart they
+      // are an enumeration oracle.
       const user = rows.get(rawEmail.trim().toLowerCase());
       if (!user || user.password !== password) {
-        return { ok: false, reason: 'invalid_credentials' };
+        throw new LoginError('invalid_credentials', 'Incorrect email, phone number or password');
       }
+      // The REAL rule, past the password — see the note on the fake above.
       const verdict = isSignInAllowed(user);
-      if (!verdict.ok) return { ok: false, reason: verdict.reason, identity: identity(user) };
-      return { ok: true, identity: identity(user) };
+      if (!verdict.ok) {
+        if (verdict.reason === 'suspended') {
+          throw new LoginError(
+            'suspended',
+            verdict.suspendedReason
+              ? `This account is suspended: ${verdict.suspendedReason}`
+              : 'This account is suspended. Contact support.',
+            { ...(verdict.suspendedReason ? { suspendedReason: verdict.suspendedReason } : {}) },
+          );
+        }
+        throw new LoginError('email_unverified', 'Confirm your email address to finish signing in', {
+          identity: identity(user),
+        });
+      }
+      return identity(user);
     },
     async markEmailVerified(playerId, pending) {
       for (const user of rows.values()) {
@@ -468,7 +495,11 @@ describe('an unconfirmed account cannot sign in', () => {
     // Password first, confirmation second. A 403 here would answer "is this
     // address registered?" to anyone who typed it.
     expect(res.status).toBe(401);
-    expect(res.body.code).toBeUndefined();
+    // `invalid_credentials` — the SAME code an unknown address gets (#61). This
+    // asserted `code` was undefined, written before login carried codes at all;
+    // asserting the shared code is the stronger check, because it is the code
+    // being shared that closes the oracle.
+    expect(res.body.code).toBe('invalid_credentials');
   });
 
   it('mails a fresh code, so the screen it sends the player to is usable', async () => {
