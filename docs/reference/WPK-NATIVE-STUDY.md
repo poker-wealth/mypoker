@@ -56,6 +56,139 @@ Settings, that confirms the sideload route and settles §4.2 of the phase plan.
 
 ---
 
+## 1A. First pass — six screens, and what they settle
+
+Captured from the native app. Observed unless marked **INFERENCE**.
+
+### 1A.1 Private table creation — the most informative screen so far
+
+Two shots: **NLHE** and **6+** (Short Deck). This is the "play with friends"
+flow from Samuel's Friends tab, and it exposes the whole table-config model in
+one screen.
+
+| Control | NLHE | 6+ (Short Deck) |
+|---|---|---|
+| Table Properties | Private | Private |
+| Blinds | **SB/BB 1/2** | **none — no blind fields at all** |
+| Ante | 0, dropdown | **1, and it is the only forced bet** |
+| Straddle | toggle, off, would be 4 | not offered |
+| Buy-In | 200 | 50 |
+| Max Buy-In | No Limit | No Limit |
+| Duration | 0.5 h — steps 0.5/1/1.5/2/2.5/3/4/6/8 | same |
+| **Table Size** | **8** | **6** |
+| Run It Twice after All-in | toggle, off | toggle, off |
+| Insurance | toggle, off | toggle, off |
+| Advanced Settings | "Expand" — not opened | same |
+| Bottom | name field + green **START** | same |
+
+**Four things follow, in order of how much they cost us.**
+
+**a) Seat counts are settled, from the app's own dropdown.** NLHE **8**, Short
+Deck **6**. That is authoritative — it is the product telling you what it
+spreads, not an observation of one busy table. It matches what Samuel observed
+in the lobby, so the two studies agree.
+
+Our position is a mess and neither number is right:
+`lobby/game-catalog.ts` says `maxPlayers: 9` for texas, short-deck and omaha;
+`live/server.ts` actually seats **6** (Texas, Omaha, from `DEFAULT_ROOM`) and
+**8** (Short Deck). So the catalogue and the live tables already disagree with
+each other, independently of WPK.
+
+> **Do not "fix" Short Deck to 6 without asking.** Its 8 is Victor's explicit
+> instruction and the wide felt artwork has eight chairs drawn on it. WPK says 6.
+> That is a real conflict between the owner and the reference, and it is his to
+> resolve, not ours.
+
+**b) Short Deck is ANTE-ONLY, and ours is not.** The 6+ screen has **no SB/BB
+control whatsoever** — just `Ante: 1`. Ours inherits `smallBlind: 10,
+bigBlind: 20` from `DEFAULT_ROOM` and is listed as "Short Deck · $0.10/0.20".
+
+`grep -ri ante game-server/src/games/texas/` returns **nothing**. We have no ante
+concept at all, so this is not a config change — the betting engine cannot
+currently express how the reference deals its Short Deck. This is the largest
+engine gap the screens have turned up.
+
+**c) Tables have a lifespan.** Duration 0.5–8 hours, set at creation. That
+explains the cyan countdown on the HHPoker lobby rows (`00:55:36`) — it is time
+left on the table, not elapsed time. **We have no concept of a table expiring.**
+
+**d) Two features we do not have, both offered at creation:** **Straddle**
+(toggle, with the amount shown), and **Run It Twice after All-in**. Insurance we
+do have. `grep -ri runItTwice` returns nothing.
+
+### 1A.2 A house-banked casino-poker vertical
+
+A **HOLD'EM** category inside Games holds five tiles: Caribbean Hold'em,
+Caribbean Stud, 3 Card Poker, Ultimate Texas Hold'em, Texas Hold'em Bonus.
+
+These are **player-versus-house** games, not player-versus-player. Our catalogue
+has `texas-cowboy` and `cowboy-beauty` in that family; we have none of these five.
+Header carries three currency counters (gold, a purple "P", and a third).
+
+### 1A.3 Texas Cowboy — a betting game with baccarat furniture
+
+Two shots of a live 德州牛仔 table, landscape, and it is much more elaborate than
+ours.
+
+- Two hands — 牛仔 (Cowboy) vs 公牛 (Bull) — and you bet on the outcome.
+- A **grid of side bets**, each with odds and a live stake count:
+  cowboy wins ~2×, bull wins ~2×, either hand flush/straight/straight-flush
+  1.66×, winning type high-card-or-pair 2.2×, two pair 3.1×, pair 8×, pair of
+  aces 10×, straight/flush, full house 20×, quads/straight-flush/royal 248×.
+- Every region carries **"N 局未出"** — *not seen for N rounds*. A cold-streak
+  counter on each bet.
+- **路单 / 统计** — a **baccarat-style road map**: a bead plate of blue/red/green
+  results, a grid recording the hand type each round (一对 pair, 顺子 straight,
+  同花 flush, 三条 trips, 葫芦 full house, 两对 two pair), and a big-road panel of
+  rings.
+- Chip denominations 1 / 10 / 100 / 500 / 2000, with 续投 (repeat bet) and
+  清屏 (clear).
+- Player avatars and balances ring both sides; a **投注返奖** (betting rebate)
+  badge sits top-right — this is Samuel's "Betback", visible in-game.
+- A countdown runs the betting window (`13`).
+
+**INFERENCE:** the road map and the "rounds since last seen" counters exist to
+make a house-edge game feel trackable. That is a retention device, not a rules
+feature, and it is cheap next to building a new game.
+
+### 1A.4 Message Center
+
+Segmented: **Hall · Mini Game · Club · Room · System**. Empty state is a card
+illustration plus "No message". Note the segmentation — messages are scoped by
+where they came from, including per-**Room**.
+
+### 1A.5 Tournament promo page
+
+The **百万回馈赛** (million-rebate series) — *September total guarantee 8,000,000*,
+**every Thursday and Sunday, 8pm**, with a **27-day countdown to the series
+ending** and a full schedule table (date · weekday · guaranteed prize, 1,000,000
+each). Heavily illustrated night scene with photographic faces composited onto
+cartoon bodies.
+
+This cross-confirms Samuel's promo-centre finding from the H5 build, so the two
+studies agree on it. What is new is the **shape**: a recurring series with a
+published calendar and a per-event guarantee, not a one-off tournament.
+
+### 1A.6 The app runs two visual systems
+
+Worth recording because it changes what "match the reference" means:
+
+- **Utility screens are LIGHT** — near-white, clean, iOS-like, teal-green accent
+  on the START button and slider fills. Private-table creation, Message Center,
+  the casino category grid.
+- **Game and promo screens are DARK and heavily illustrated** — the felt, the
+  tournament page, the club lobby from the HHPoker shots.
+
+So "dark app" is wrong as a blanket rule. Config is light; play is dark.
+
+### What this pass did NOT cover
+
+Wallet → Management, the inside of a club, the buy-in sheet for a *public*
+table, a seated hand with the action bar visible, splash, login. Those remain
+the priorities below.
+
+---
+
 ## 2. Priority one — the four things Samuel could not reach
 
 These are the open questions in his §9. Each one changes a decision.
