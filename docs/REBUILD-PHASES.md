@@ -53,23 +53,46 @@ specification** — and Phase 5 is the largest phase in the plan.
 
 ### 2.1 wpk.com (WePoker / 微扑克) — the functionality brief
 
-A **club-based** poker platform. The structure, which is the important part:
+> **WITHDRAWN — this section was wrong, and wrong in its central claim.**
+> Superseded by Samuel's `REFERENCE-STUDY-WPK.md`, written from **31 first-hand
+> screens** of `h5.wpk.com` covering every tab, the wallet and a live table.
+> Kept rather than deleted so the error is legible, because how it happened
+> matters more than that it happened.
 
-- Sign-up is **email + password, no ID check**.
-- You cannot just play. You **join a club**, and to join you **apply to an
-  agent**.
-- The **agent handles all deposits and withdrawals**, and runs the tables.
-- Clubs group into **unions**. The club/union/agent you belong to determines
-  your experience.
-- Strongest in China, Taiwan, Vietnam and South-East Asia.
+**What this section claimed:** that WPK is a club-and-union platform; that play
+happens inside clubs; that you join via an agent who handles all deposits and
+withdrawals; and — the headline — that WPK carries no gaming licence because
+there are *no financial facilities in the app at all*.
 
-**The single most consequential fact for us:** WePoker carries no gaming licence
-because *there are no financial facilities in the app at all*. Money moves
-between player and agent **outside** the software. The app moves chips; it never
-moves money.
+**What 31 screens show:** none of it.
 
-We are built the opposite way. See §4.1 — this is the decision everything else
-waits on.
+| Claimed here | Actually observed |
+|---|---|
+| Play happens inside clubs | Lobby is the default tab and carries the game |
+| Clubs federate into unions | No union, alliance or federation anywhere |
+| Agents mediate money | **Zero mentions of agent or commission in 31 screens** |
+| No money in the app | A **four-currency wallet** on the player's own profile |
+| You need an agent to join a club | A player creates or joins a club themselves, in two taps |
+
+**How it went wrong, because the failure mode will recur.** Both sites are
+JavaScript-rendered, so the fetch returned nothing (§1) and I fell back to web
+search. The results were `worldpokerdeals.com`, `pokerbotai.com`,
+`crownaipoker.com` — **poker-bot vendors and rakeback brokers**. Those sites
+describe the PPPoker club-and-union model and attach WPK's name to it, because
+that is the model they sell into. I read a bot vendor's sales page as a product
+spec.
+
+Samuel diagnosed this independently before seeing this document, which is a fair
+sign it was the obvious trap and I walked into it.
+
+**The rule that follows:** for a reference platform, a screenshot outranks any
+amount of search. Where we have no screens we say so and stop, rather than
+filling the gap with whatever ranks.
+
+**What WPK actually is:** a **direct-wallet, public-lobby, multi-vertical
+gambling platform** — structurally what MYPOKER already is. The consequences for
+the plan are in §4.1, and they are much smaller than this section originally
+made them.
 
 ### 2.2 hhpoker777.com (HHPoker / 德扑圈) — the UI brief
 
@@ -227,7 +250,7 @@ wrong about the cost. Audit as of today:
 | Piece | State | Under the new direction |
 |---|---|---|
 | `game-server` | 12 games, live WebSocket tables, provably-fair shuffle, gateway/auth/admin | **Keeps.** Direction changes clients, not the engine. |
-| `financial-core` | Ledger, settlement, TRC-20 USDT deposits + withdrawals, notifications | **Blocked on §4.1.** May become far smaller — or move out of the app entirely. |
+| `financial-core` | Ledger, settlement, TRC-20 USDT deposits + withdrawals, notifications | **Keeps, and stays central.** Both references carry an in-app wallet — see §4.1. |
 | `frontend` (React + Vite) | 15 screens, 8 locales, the full game UI, Telegram-aware | **Becomes the Telegram mini app.** It is already that; it just stops being "the website" too. |
 | `mobile` (Expo React Native) | Every screen mirrored: Lobby, Games, Table, Wallet, Alliance, AgentCenter, Vip, Fairness… | **Becomes the iOS + Android app.** Much further along than "start the mobile app" implies. |
 | Marketing website | **Does not exist.** No landing page anywhere in `frontend/src/pages/`. | **Entirely new**, and now the only thing the website is. |
@@ -254,30 +277,38 @@ The brief says that where the direction looks wrong we say so and explain why,
 and that we do not quietly build it our own way. These are those points. Each is
 the owner's call; none should be guessed at by a developer mid-phase.
 
-### 4.1 Does money stay inside the app?
+### 4.1 Does money stay inside the app? — **largely settled: yes**
 
-**The conflict.** wpk.com is the functionality brief, and its defining property
-is that *money is not in the app*. Agents settle with players outside it. We
-currently have the exact opposite: an on-chain USDT deposit watcher, a
-withdrawal pipeline, and a full ledger, all in-product.
+This was posed as the decision everything waited on. It was posed that way
+because §2.1 was wrong. With first-hand evidence it mostly answers itself.
 
-**Why it cannot be deferred.** It determines whether `financial-core` is central
-or nearly deleted; whether we need a gaming licence; whether the store route in
-§4.2 is even open; and what the Wallet screen is for. Phases 8 and 9 cannot be
-scoped until it is answered.
+**Both references keep money in the app.**
 
-**Options.**
+- WPK: a four-currency wallet (Diamond / Gold / USD / Points) on the player's own
+  profile, with Redeem and a Management link. No agent anywhere in 31 screens.
+- The KKPoker screens Esther captured show **充币 (deposit)** and **提币
+  (withdraw)** buttons and a **USDT balance with a hide toggle**, in the club
+  lobby (§2.2.1). Direct crypto wallet, in-product.
 
-- **(A) Follow WePoker.** Chips only in-app; agents settle outside. Lowest legal
-  exposure, opens the store route, and is what the brief actually points at.
-  Cost: the deposit/withdrawal work is stood down.
-- **(B) Keep our wallet.** We are then a licensed-gambling product, not a WePoker
-  clone. Cost: licensing, and the stores are effectively closed (§4.2).
-- **(C) Split.** Chips-only build for the stores; full-wallet build elsewhere.
-  Cost: two builds, two review paths, a permanent source of drift.
+So our on-chain USDT deposit and withdrawal work is **aligned with both
+references, not in conflict with them**. Nothing is stood down. `financial-core`
+stays central.
 
-**Recommendation: (A)**, because it is what the reference does and it is the only
-option where "iOS and Android" means the stores. But this is a business call.
+**What remains open is much narrower**, and it is two things, not a fork:
+
+1. **Does the existing agent system stay as a distribution and commission
+   channel** — referral links, sub-agents, revenue share — while money stays
+   direct player-to-platform? It is already built (`game-server/src/agents/`,
+   `financial-core/src/agent/`), it costs almost nothing to keep, and it is
+   compatible with everything in §5. **Owner's call.**
+2. **WPK's Wallet → "Management" was never opened.** If deposits turn out to
+   route through an agent there, point 1 reopens. One screenshot settles it, and
+   it is the cheapest outstanding item in the whole plan.
+
+**What does *not* follow from this.** Keeping a real-money wallet still closes
+the app-store route (§4.2) — that consequence was correctly identified even
+though the reasoning that led to it was not. Store policy does not care which
+reference we copied.
 
 ### 4.2 "iOS and Android" — stores, or sideload?
 
@@ -359,7 +390,7 @@ the website is.
 - Download: Telegram, iOS, Android. Per §4.2, the sideload route also needs
   step-by-step install instructions with screenshots, including the iOS "trust"
   step and the Android unknown-sources step.
-- Support/contact, and whatever legal pages the §4.1 answer requires.
+- Support/contact, and the legal pages a real-money wallet requires.
 - Responsive, fast, and **it must not import the game client** — the point of the
   split is that the website is not the game.
 - 8 locales, matching the app.
@@ -461,7 +492,7 @@ new direction.
 **Done means.** A new account can apply to a club, be approved by an agent, and
 reach a seat — on all three surfaces, without touching an admin tool.
 
-**Depends on.** Phase 3. §4.1 for whether the agent moves money or only chips.
+**Depends on.** Phase 3.
 
 ---
 
@@ -564,27 +595,35 @@ commit a date on this one until Phase 0 has captured tools and training.
 
 ---
 
-### Phase 8 — Money, per the §4.1 decision
+### Phase 8 — Wallet, to the reference
 
-**Goal.** Implement the chosen money model.
+**Goal.** Bring the wallet we already have up to what the references show.
 
-**Why.** Deliberately late: it is the decision with the widest blast radius, and
-everything above is unaffected by which way it goes.
+**Why this shrank.** It was written as a fork — strip the wallet or keep it —
+because §2.1 said WPK had no in-app money. It does. So does KKPoker, with
+visible 充币 / 提币 buttons. This is now a re-skin and a gap-fill, not a
+rebuild, and `financial-core` is not at risk.
 
-**Scope — if (A) chips-only.** Strip in-app deposit/withdrawal from the clients;
-Wallet becomes chips + club balance + history; agent grant/settle flows become
-the only way chips move; decide what remains of `financial-core`.
-
-**Scope — if (B) keep the wallet.** Re-skin the existing deposit/withdrawal flows
-to the reference; begin licensing; drop the store route in Phase 9.
+**Scope.**
+- Re-skin deposit and withdrawal to the reference's look.
+- **Multi-currency.** WPK carries four balances — Diamond, Gold, USD, Points —
+  and the header shows only the ones the current tab can spend. We have one. Ask
+  the owner how many we want before building; this is a data-model change, not a
+  screen.
+- **Balance privacy:** the hide/show eye on the balance, as KKPoker has.
+- Redeem, and a Backpack/Rewards equivalent if the owner wants the loyalty
+  currency.
 
 **Where.** `frontend/src/pages/Wallet.tsx`, `mobile/src/screens/WalletScreen.tsx`,
 `financial-core/`.
 
-**Done means.** A player can obtain chips, play, and cash out by whichever route
-was chosen, with the ledger balancing.
+**Done means.** A player deposits, plays, and withdraws, with the ledger
+balancing — and the wallet looks like the reference doing it.
 
-**Depends on.** §4.1. **Money-touching — senior review before merge** (iron rule 5).
+**Depends on.** The Wallet → Management screenshot (§4.1, point 2). If deposits
+turn out to route through an agent there, this phase changes shape.
+
+**Money-touching — senior review before merge** (iron rule 5).
 
 ---
 
@@ -642,7 +681,7 @@ Phase 0  Capture references  ── blocks everything visual, START TODAY
                         │                      │
                         └── Phase 7  Tutorial and Events   parallel with 5–6
                                       │
-   4.1 decision ── Phase 8  Money ────────────┤
+   Wallet screenshot ── Phase 8  Wallet ───────┤
    4.2 decision ── Phase 9  Distribution ─────┘
                                       │
                               Phase 10  Hardening
@@ -663,7 +702,7 @@ in parallel with Phases 5 and 6 by a different person.
 | M5 | Hold'em plays everywhere | 5 | The product, minimally |
 | M6 | Full catalogue | 6 | The product, fully |
 | M7 | Tutorial and Events live | 7 | The other two tabs stop being empty |
-| M8 | Money model live | 8 | Players can actually play for something |
+| M8 | Wallet matches the reference | 8 | Deposit, play, withdraw |
 | M9 | Installable by the public | 9 | Launch-ready |
 | M10 | Hardened | 10 | Safe to run |
 
