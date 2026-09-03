@@ -116,6 +116,44 @@ left on the table, not elapsed time. **We have no concept of a table expiring.**
 (toggle, with the amount shown), and **Run It Twice after All-in**. Insurance we
 do have. `grep -ri runItTwice` returns nothing.
 
+### 1A.1b How you get into a table — the access model
+
+From using the app, not from a screenshot:
+
+> **Every game has a code to enter, or you cannot get in — unless it is public.
+> And you choose how many players you want inside.**
+
+So there are exactly two kinds of table, and the creator picks which:
+
+| | Public | Private |
+|---|---|---|
+| How you enter | Open — pick it off the lobby | **You must have the code** |
+| Where it appears | The public lobby | Not listed; the code *is* the address |
+| Seats | Creator chooses | Creator chooses |
+
+That matches the **Table Properties: Private** control at the top of the
+creation screen, and it explains Samuel's Friends tab, which has a
+**"Join Table — join with code"** affordance sitting right next to Create.
+
+**Where we stand.** Two of the three parts already exist and one does not:
+
+- `visibility: z.enum(['public','private'])` — **we have this**, in
+  `gateway/player-table-routes.ts`, defaulting to private.
+- Creator-chosen seat count — **we have this**, `CreateTableSheet` offers 2–9.
+- **A join code — we have nothing.** `grep -ri "joinCode\|inviteCode\|tableCode"`
+  across `game-server/src` and `frontend/src` returns nothing at all.
+
+So today a private table is private in the sense that it is *unlisted*, with no
+mechanism for the creator to let a specific person in. The code is the missing
+half: it is what makes "private" usable rather than merely hidden.
+
+**Open question for the next pass:** the Table Size dropdown showed **8** on
+NLHE and **6** on 6+ — but if the creator chooses, those may be the *current
+selection* rather than the *maximum*. Open the dropdown and write down the full
+range for each format. It matters, because if Short Deck's range tops out at 6,
+then our 8 is above what the reference permits at all, which is a stronger
+version of the conflict in 1A.1(a).
+
 ### 1A.2 A house-banked casino-poker vertical
 
 A **HOLD'EM** category inside Games holds five tiles: Caribbean Hold'em,
