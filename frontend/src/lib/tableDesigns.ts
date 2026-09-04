@@ -35,6 +35,30 @@ export interface TableDesign {
   /** Accent used for the seat rings and open-chair outlines on this felt. */
   accent: string;
   /**
+   * Palette for a felt DRAWN IN CSS (`artUrl: null`). Ignored when there is
+   * artwork, since the picture already carries its own colour.
+   *
+   * Exists so a CSS felt is not stuck being the brand's violet. The reference
+   * table is maroon, and the only way to match it without commissioning art is
+   * to let the design say what colour its cloth is.
+   */
+  cssFelt?: {
+    /** Middle of the cloth, where the light falls. */
+    centre: string;
+    /** The body of the cloth. */
+    mid: string;
+    /** Where it turns into the shadow under the rail. */
+    edge: string;
+    /** The outermost ring of cloth, almost black. */
+    outer: string;
+    /** Rail gradient, outside in. */
+    rail: [string, string, string];
+    /** What the rail throws onto the page behind it. */
+    glow: string;
+    /** The wordmark ghosted across the middle. */
+    wordmark: string;
+  };
+  /**
    * The LANDSCAPE counterpart of this felt, for games played on a wide table.
    *
    * The player picks the colour; the game picks the shape. Choosing Midnight
@@ -294,6 +318,63 @@ export const TABLE_DESIGNS: TableDesign[] = [
         { left: '87%', top: '72%', align: 'right' },
       ],
     },
+  },
+
+  /**
+   * The felt from the UI reference — maroon cloth, gold fittings.
+   *
+   * `hhpoker777.com` is the brief for how the app looks, and its table is not a
+   * green oval or a blue one: the cloth is a dusty burgundy, lit through the
+   * middle and falling to near-black at the rail, with gold reserved for the
+   * things you press.
+   *
+   * Drawn in CSS rather than from artwork, so it needs no asset and scales to
+   * any size — which also means it can be corrected in one place once somebody
+   * checks it against the real app.
+   *
+   * ⚠️ The hex values are EYEBALLED off a compressed screenshot, not sampled on
+   * a device. They are close, not right. Phase 0 of the plan asks for sampled
+   * colours and this is exactly what that is for.
+   */
+  {
+    id: 'house-maroon',
+    name: 'House Maroon',
+    blurb: 'Burgundy cloth and gold fittings, after the reference table',
+    artUrl: null,
+    aspect: '3 / 4',
+    boardTop: '50%',
+    accent: '#d9a441',
+    wideId: 'wide-maroon',
+    cssFelt: {
+      centre: '#7c3742',
+      mid: '#5d2731',
+      edge: '#331319',
+      outer: '#1b090d',
+      rail: ['#4a2027', '#2e1218', '#5c2a32'],
+      glow: '#7c3742',
+      wordmark: 'rgba(255,255,255,0.06)',
+    },
+    rings: stadiumRings({ x: 13, yTop: 11, yBottom: 90, yMid: 51 }),
+  },
+  {
+    id: 'wide-maroon',
+    name: 'Wide Maroon',
+    blurb: 'The reference felt, landscape',
+    artUrl: null,
+    aspect: '1672 / 941',
+    boardTop: '50%',
+    accent: '#d9a441',
+    hidden: true,
+    cssFelt: {
+      centre: '#7c3742',
+      mid: '#5d2731',
+      edge: '#331319',
+      outer: '#1b090d',
+      rail: ['#4a2027', '#2e1218', '#5c2a32'],
+      glow: '#7c3742',
+      wordmark: 'rgba(255,255,255,0.06)',
+    },
+    rings: wideRings({ x: 26, endX: 6, yTop: 13, yBottom: 87 }),
   },
 ];
 
