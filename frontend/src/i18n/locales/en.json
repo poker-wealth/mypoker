@@ -266,6 +266,8 @@
     "leave": "Leave",
     "rebuy": "Rebuy",
     "sitIn": "Sit in",
+    "seatOpen": "Sit here",
+    "seatEmpty": "Empty",
     "sitOut": "Sit out",
     "connecting": "Connecting…",
     "connectingTable": "Connecting to the table…",

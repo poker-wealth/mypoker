@@ -266,6 +266,8 @@
     "leave": "나가기",
     "rebuy": "리바이",
     "sitIn": "참가",
+    "seatOpen": "여기 앉기",
+    "seatEmpty": "빈자리",
     "sitOut": "잠시 쉬기",
     "connecting": "연결 중…",
     "connectingTable": "테이블에 연결 중…",

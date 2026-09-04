@@ -266,6 +266,8 @@
     "leave": "退席",
     "rebuy": "リバイ",
     "sitIn": "着座",
+    "seatOpen": "ここに座る",
+    "seatEmpty": "空席",
     "sitOut": "一時退席",
     "connecting": "接続中…",
     "connectingTable": "テーブルに接続中…",

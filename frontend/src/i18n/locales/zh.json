@@ -266,6 +266,8 @@
     "leave": "离开",
     "rebuy": "再买入",
     "sitIn": "入座",
+    "seatOpen": "坐这里",
+    "seatEmpty": "空位",
     "sitOut": "暂离",
     "connecting": "连接中…",
     "connectingTable": "正在连接牌桌…",
