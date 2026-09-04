@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { variant } from '../games/texas/variants';
 import {
   effectiveSettings,
   validateSettings,
@@ -114,8 +115,16 @@ export function planLeagueRoom(
   if (input.smallBlind >= input.bigBlind) {
     throw new LeagueRoomError('the small blind must be smaller than the big blind', 400);
   }
-  if (input.maxSeats < 2 || input.maxSeats > 9) {
-    throw new LeagueRoomError('a table seats between 2 and 9', 400);
+  // Per VARIANT, not a flat 2..9. The old bound let a caller open a 9-seat
+  // Hold'em table, whose felt only has seat positions for six — the extra three
+  // fell through to an evenly-spaced circle and rendered inside the felt rather
+  // than on the rail. See `PokerVariant.maxSeats`.
+  const seatCap = variant(input.variantId).maxSeats;
+  if (input.maxSeats < 2 || input.maxSeats > seatCap) {
+    throw new LeagueRoomError(
+      `a ${variant(input.variantId).name} table seats between 2 and ${seatCap}`,
+      400,
+    );
   }
 
   // The rate in force NOW. A pending change inside its 7-day transition must not

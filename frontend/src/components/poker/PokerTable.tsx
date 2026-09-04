@@ -91,7 +91,7 @@ export function PokerTable({ state, onSit, onChallenge, design: override }: Poke
             className="absolute inset-0 h-full w-full select-none object-contain"
           />
         ) : (
-          <CssTable />
+          <CssTable design={design} />
         )}
 
         {/* Board + pot, across the middle of the felt */}
@@ -197,15 +197,29 @@ export function PokerTable({ state, onSit, onChallenge, design: override }: Poke
 }
 
 /** The fallback table, built from the brand tokens — no image required. */
-function CssTable() {
+/**
+ * The felt, drawn rather than photographed.
+ *
+ * Takes its palette from the design so a CSS table is not locked to the brand's
+ * violet. `house-maroon` is the reference table's burgundy; anything without a
+ * `cssFelt` keeps exactly the colours this used to hardcode, so Neon is
+ * untouched.
+ */
+function CssTable({ design }: { design: TableDesign }) {
+  const felt = design.cssFelt;
+  const glow = felt?.glow ?? 'var(--brand-2)';
+  const rail: [string, string, string] = felt?.rail ?? [
+    'var(--brand)',
+    'var(--brand-2)',
+    'var(--accent)',
+  ];
   return (
     <>
       {/* Outer glow — the light the rail throws onto the background */}
       <div
         className="pointer-events-none absolute -inset-6 rounded-[50%] opacity-70 blur-2xl"
         style={{
-          background:
-            'radial-gradient(closest-side, color-mix(in srgb, var(--brand-2) 45%, transparent), transparent 75%)',
+          background: `radial-gradient(closest-side, color-mix(in srgb, ${glow} 45%, transparent), transparent 75%)`,
         }}
       />
 
@@ -213,10 +227,10 @@ function CssTable() {
       <div
         className="absolute inset-0 rounded-[50%]"
         style={{
-          background: 'linear-gradient(160deg, var(--brand) 0%, var(--brand-2) 45%, var(--accent) 100%)',
+          background: `linear-gradient(160deg, ${rail[0]} 0%, ${rail[1]} 45%, ${rail[2]} 100%)`,
           padding: '2px',
           boxShadow:
-            '0 0 24px color-mix(in srgb, var(--brand-2) 55%, transparent), 0 0 60px color-mix(in srgb, var(--brand) 25%, transparent)',
+            `0 0 24px color-mix(in srgb, ${glow} 55%, transparent), 0 0 60px color-mix(in srgb, ${rail[0]} 25%, transparent)`,
         }}
       >
         <div className="h-full w-full rounded-[50%]" style={{ background: 'var(--bg)' }} />
@@ -226,16 +240,16 @@ function CssTable() {
       <div
         className="absolute inset-[3.5%] rounded-[50%]"
         style={{
-          background: 'linear-gradient(200deg, var(--accent) 0%, var(--brand-2) 50%, var(--brand) 100%)',
+          background: `linear-gradient(200deg, ${rail[2]} 0%, ${rail[1]} 50%, ${rail[0]} 100%)`,
           padding: '2px',
-          boxShadow: '0 0 18px color-mix(in srgb, var(--accent) 40%, transparent)',
+          boxShadow: `0 0 18px color-mix(in srgb, ${rail[2]} 40%, transparent)`,
         }}
       >
         <div
           className="relative h-full w-full overflow-hidden rounded-[50%]"
           style={{
             background:
-              'radial-gradient(ellipse at 50% 42%, #1e3f74 0%, var(--felt) 45%, #0a162c 78%, #060d1c 100%)',
+              `radial-gradient(ellipse at 50% 42%, ${felt?.centre ?? '#1e3f74'} 0%, ${felt?.mid ?? 'var(--felt)'} 45%, ${felt?.edge ?? '#0a162c'} 78%, ${felt?.outer ?? '#060d1c'} 100%)`,
             boxShadow: 'inset 0 0 60px rgba(0,0,0,0.75), inset 0 2px 20px rgba(255,255,255,0.06)',
           }}
         >
@@ -247,7 +261,8 @@ function CssTable() {
             }}
           />
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <span className="translate-y-[22%] text-2xl font-black tracking-[0.35em] text-white/[0.06] sm:text-3xl">
+            <span className="translate-y-[22%] text-2xl font-black tracking-[0.35em] sm:text-3xl"
+              style={{ color: felt?.wordmark ?? 'rgba(255,255,255,0.06)' }}>
               FAIRPLAY
             </span>
           </div>

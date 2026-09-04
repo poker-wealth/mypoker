@@ -15,7 +15,10 @@ import { useLeague, useCreateLeagueTable } from '@/api/hooks';
 import { errorKey, leagueTableErrorKey, logError } from '@/api/errors';
 import { useContextStore } from '@/store/context';
 import { toast } from '@/lib/toast';
+import { seatCapFor } from '@/lib/tableDesigns';
 import type { League, LeagueDetail, LeagueTable, LeagueTableVariant } from '@/api/leagues';
+
+
 
 /**
  * Open a league private room (v5.9 2 - SAMUEL_V2 task 3).
@@ -101,7 +104,12 @@ export function CreateTableSheet({
   const bb = int(bigBlind);
   const seatCount = int(seats);
   const blindsOk = sb > 0 && bb > 0 && sb < bb;
-  const seatsOk = seatCount >= 2 && seatCount <= 9;
+  // Per variant, and it must match the server — this used to allow up to 9 for
+  // every game while the server capped Hold'em at six, so picking seven offered
+  // the player a table the server then refused. The ceiling is the felt's: each
+  // design defines seat positions per count and stops (portrait 6, wide 8).
+  const seatCap = seatCapFor(variantId);
+  const seatsOk = seatCount >= 2 && seatCount <= seatCap;
   const valid = blindsOk && seatsOk;
 
   const rakeBps = detail.data ? effectiveRakeBps(detail.data, Date.now()) : null;
@@ -265,7 +273,9 @@ export function CreateTableSheet({
                   <Input value={seats} onChange={setSeats} type="number" inputMode="numeric" />
                 </label>
                 {!seatsOk && seats.trim() !== '' && (
-                  <p className="text-[0.66rem] text-danger">{t('alliance.tableSeatRange')}</p>
+                  <p className="text-[0.66rem] text-danger">
+                    {t('alliance.tableSeatRange', { max: seatCap })}
+                  </p>
                 )}
 
                 <label className="block space-y-1">

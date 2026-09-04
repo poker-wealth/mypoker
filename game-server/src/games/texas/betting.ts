@@ -62,6 +62,18 @@ export interface BettingConfig {
   buttonIndex?: number;
   /** Defaults to NO_LIMIT, which is what every existing caller assumed. */
   limit?: BetLimit;
+  /**
+   * A forced bet every player posts before the blinds, dead into the pot.
+   *
+   * NOT a bet. It reaches `totalContributed` — so it is in the pot and in the
+   * side-pot arithmetic — and deliberately never reaches `streetContributed`,
+   * because chips a player owes nobody must not count toward what they have
+   * already put in for the current round. Post it through `commit` and the big
+   * blind would arrive holding an ante's worth of "call" it never made.
+   *
+   * Absent or 0 means no antes, which is every existing caller.
+   */
+  ante?: number;
 }
 
 interface Seat {
@@ -125,6 +137,12 @@ export class TexasBetting {
       totalContributed: 0,
       hasActed: false,
     }));
+
+    // Antes first, from everyone, before either blind. A short stack that cannot
+    // cover the ante posts what it has and is all-in before a card is dealt —
+    // `commitDead` clamps to the stack exactly like `commit` does.
+    const ante = cfg.ante ?? 0;
+    if (ante > 0) for (const seat of this.seats) this.commitDead(seat, ante);
 
     const sb = this.n === 2 ? this.button : (this.button + 1) % this.n;
     const bb = this.n === 2 ? (this.button + 1) % this.n : (this.button + 2) % this.n;
@@ -280,6 +298,20 @@ export class TexasBetting {
     const amount = Math.min(chips, seat.stack);
     seat.stack -= amount;
     seat.streetContributed += amount;
+    seat.totalContributed += amount;
+    if (seat.stack === 0) seat.status = 'allin';
+  }
+
+  /**
+   * Put chips in the pot that buy no claim on the current round.
+   *
+   * The whole difference from `commit` is the missing `streetContributed`.
+   * Antes are dead money: they size the pot and they belong in the side-pot
+   * arithmetic, but nobody is owed a call for having posted one.
+   */
+  private commitDead(seat: Seat, chips: number): void {
+    const amount = Math.min(chips, seat.stack);
+    seat.stack -= amount;
     seat.totalContributed += amount;
     if (seat.stack === 0) seat.status = 'allin';
   }

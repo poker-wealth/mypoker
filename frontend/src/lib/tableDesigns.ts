@@ -35,6 +35,30 @@ export interface TableDesign {
   /** Accent used for the seat rings and open-chair outlines on this felt. */
   accent: string;
   /**
+   * Palette for a felt DRAWN IN CSS (`artUrl: null`). Ignored when there is
+   * artwork, since the picture already carries its own colour.
+   *
+   * Exists so a CSS felt is not stuck being the brand's violet. The reference
+   * table is maroon, and the only way to match it without commissioning art is
+   * to let the design say what colour its cloth is.
+   */
+  cssFelt?: {
+    /** Middle of the cloth, where the light falls. */
+    centre: string;
+    /** The body of the cloth. */
+    mid: string;
+    /** Where it turns into the shadow under the rail. */
+    edge: string;
+    /** The outermost ring of cloth, almost black. */
+    outer: string;
+    /** Rail gradient, outside in. */
+    rail: [string, string, string];
+    /** What the rail throws onto the page behind it. */
+    glow: string;
+    /** The wordmark ghosted across the middle. */
+    wordmark: string;
+  };
+  /**
    * The LANDSCAPE counterpart of this felt, for games played on a wide table.
    *
    * The player picks the colour; the game picks the shape. Choosing Midnight
@@ -58,6 +82,15 @@ export interface TableDesign {
 function stadiumRings(edge: { x: number; yTop: number; yBottom: number; yMid: number }): Record<number, SeatPos[]> {
   const { x, yTop, yBottom, yMid } = edge;
   const right = 100 - x;
+
+  /**
+   * The SIX-seat ring, measured against the artwork. Left exactly as it was.
+   *
+   * Every existing table is six-max, so these positions are the ones players
+   * have actually been sitting on. The wider spread used for seven and eight
+   * below is a separate array rather than a re-tuning of this one, so adding the
+   * bigger sizes cannot move anybody who is already seated.
+   */
   const six: SeatPos[] = [
     { left: '50%', top: `${yBottom}%`, align: 'bottom' },
     { left: `${x}%`, top: `${yMid + 12}%`, align: 'left' },
@@ -66,12 +99,44 @@ function stadiumRings(edge: { x: number; yTop: number; yBottom: number; yMid: nu
     { left: `${right}%`, top: `${yMid - 12}%`, align: 'right' },
     { left: `${right}%`, top: `${yMid + 12}%`, align: 'right' },
   ];
+
+  /**
+   * EIGHT on the portrait felt: three down each long rail, plus the two rounded
+   * ends. On a tall stadium the LEFT and RIGHT edges are the straights, so that
+   * is where the extra chairs go — the top and bottom are curves and hold one
+   * each.
+   *
+   * Index order matches `wideRings`: hero at 0, bottom-centre, running
+   * bottom → left → top → right, so a seat index means the same thing on both
+   * felts.
+   *
+   * ⚠️ These offsets are DERIVED (±22 and the midpoint) rather than measured off
+   * the artwork the way `six` was. They should be checked on a device before
+   * anyone calls the eight-max felt finished — the middle pair especially, since
+   * it is the one position with no equivalent in the six-max ring.
+   */
+  const eight: SeatPos[] = [
+    { left: '50%', top: `${yBottom}%`, align: 'bottom' }, // 0 bottom centre — hero
+    { left: `${x}%`, top: `${yMid + 22}%`, align: 'left' }, // 1 left lower
+    { left: `${x}%`, top: `${yMid}%`, align: 'left' }, // 2 left middle
+    { left: `${x}%`, top: `${yMid - 22}%`, align: 'left' }, // 3 left upper
+    { left: '50%', top: `${yTop}%`, align: 'top' }, // 4 top centre
+    { left: `${right}%`, top: `${yMid - 22}%`, align: 'right' }, // 5 right upper
+    { left: `${right}%`, top: `${yMid}%`, align: 'right' }, // 6 right middle
+    { left: `${right}%`, top: `${yMid + 22}%`, align: 'right' }, // 7 right lower
+  ];
+  const pick = (...i: number[]): SeatPos[] => i.map((n) => eight[n]!);
+
   return {
     2: [six[0]!, six[3]!],
     3: [six[0]!, six[2]!, six[4]!],
     4: [six[0]!, six[1]!, six[3]!, six[5]!],
     5: [six[0]!, six[1]!, six[2]!, six[4]!, six[5]!],
     6: six,
+    // Symmetric about the hero, like every other size: seven drops the right
+    // middle rather than bunching the extra player down one rail.
+    7: pick(0, 1, 2, 3, 4, 5, 7),
+    8: pick(0, 1, 2, 3, 4, 5, 6, 7),
   };
 }
 
@@ -229,7 +294,87 @@ export const TABLE_DESIGNS: TableDesign[] = [
         { left: '87%', top: '28%', align: 'right' },
         { left: '87%', top: '71%', align: 'right' },
       ],
+      // Seven and eight: three down each rail, tucked outward at the waist
+      // where the oval is widest (11% / 89%) and inward at the ends where it
+      // curves. Neon is drawn in CSS rather than from artwork, so these are
+      // free to sit wherever the shape wants them.
+      7: [
+        { left: '50%', top: '89%', align: 'bottom' },
+        { left: '13%', top: '72%', align: 'left' },
+        { left: '11%', top: '50%', align: 'left' },
+        { left: '13%', top: '26%', align: 'left' },
+        { left: '50%', top: '10%', align: 'top' },
+        { left: '87%', top: '26%', align: 'right' },
+        { left: '87%', top: '72%', align: 'right' },
+      ],
+      8: [
+        { left: '50%', top: '89%', align: 'bottom' },
+        { left: '13%', top: '72%', align: 'left' },
+        { left: '11%', top: '50%', align: 'left' },
+        { left: '13%', top: '26%', align: 'left' },
+        { left: '50%', top: '10%', align: 'top' },
+        { left: '87%', top: '26%', align: 'right' },
+        { left: '89%', top: '50%', align: 'right' },
+        { left: '87%', top: '72%', align: 'right' },
+      ],
     },
+  },
+
+  /**
+   * The felt from the UI reference — maroon cloth, gold fittings.
+   *
+   * `hhpoker777.com` is the brief for how the app looks, and its table is not a
+   * green oval or a blue one: the cloth is a dusty burgundy, lit through the
+   * middle and falling to near-black at the rail, with gold reserved for the
+   * things you press.
+   *
+   * Drawn in CSS rather than from artwork, so it needs no asset and scales to
+   * any size — which also means it can be corrected in one place once somebody
+   * checks it against the real app.
+   *
+   * ⚠️ The hex values are EYEBALLED off a compressed screenshot, not sampled on
+   * a device. They are close, not right. Phase 0 of the plan asks for sampled
+   * colours and this is exactly what that is for.
+   */
+  {
+    id: 'house-maroon',
+    name: 'House Maroon',
+    blurb: 'Burgundy cloth and gold fittings, after the reference table',
+    artUrl: null,
+    aspect: '3 / 4',
+    boardTop: '50%',
+    accent: '#d9a441',
+    wideId: 'wide-maroon',
+    cssFelt: {
+      centre: '#7c3742',
+      mid: '#5d2731',
+      edge: '#331319',
+      outer: '#1b090d',
+      rail: ['#4a2027', '#2e1218', '#5c2a32'],
+      glow: '#7c3742',
+      wordmark: 'rgba(255,255,255,0.06)',
+    },
+    rings: stadiumRings({ x: 13, yTop: 11, yBottom: 90, yMid: 51 }),
+  },
+  {
+    id: 'wide-maroon',
+    name: 'Wide Maroon',
+    blurb: 'The reference felt, landscape',
+    artUrl: null,
+    aspect: '1672 / 941',
+    boardTop: '50%',
+    accent: '#d9a441',
+    hidden: true,
+    cssFelt: {
+      centre: '#7c3742',
+      mid: '#5d2731',
+      edge: '#331319',
+      outer: '#1b090d',
+      rail: ['#4a2027', '#2e1218', '#5c2a32'],
+      glow: '#7c3742',
+      wordmark: 'rgba(255,255,255,0.06)',
+    },
+    rings: wideRings({ x: 26, endX: 6, yTop: 13, yBottom: 87 }),
   },
 ];
 
@@ -309,6 +454,34 @@ export const PICKABLE_DESIGNS = TABLE_DESIGNS.filter((d) => !d.hidden);
  * The seat ring for a table of `count` chairs. Sizes the design doesn't spell out fall back to an
  * even ring around a portrait oval, so an unusual table still seats everyone sensibly.
  */
+/** The largest seat count this felt has a real, hand-placed ring for. */
+function ringCeiling(design: TableDesign): number {
+  return Math.max(...Object.keys(design.rings).map(Number));
+}
+
+/**
+ * The most chairs a table of this game may have — DERIVED from the artwork,
+ * not declared.
+ *
+ * Each design places seats per count and then stops: the portrait stadium felt
+ * at six, the wide landscape felt at eight. Above that `ringFor` falls back to
+ * an evenly-spaced circle, which on an oval felt seats people in the middle of
+ * the table instead of on the rail. Nothing throws — it just looks broken.
+ *
+ * Taken as the MINIMUM across every felt the game could be played on, because a
+ * player picks their own design where the game has no opinion, and a table must
+ * render on whichever they picked.
+ *
+ * The server keeps its own copy in `PokerVariant.maxSeats` and refuses anything
+ * above it; `test/lobby/seat-caps.test.ts` pins that side. This is the side that
+ * knows why the number is what it is.
+ */
+export function seatCapFor(gameOrVariant: string | null | undefined): number {
+  const forced = designForGame(gameOrVariant, undefined, designById(DEFAULT_DESIGN_ID));
+  const candidates = forced ? [forced] : PICKABLE_DESIGNS;
+  return Math.min(...candidates.map(ringCeiling));
+}
+
 export function ringFor(design: TableDesign, count: number): SeatPos[] {
   const ring = design.rings[count];
   if (ring) return ring;
