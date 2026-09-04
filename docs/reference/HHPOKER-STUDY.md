@@ -20,10 +20,22 @@ Three sets of screens now exist and **they do not look like the same product**:
 The felt screens carry HHPoker domains, so they are the reference the brief
 names. The KKPoker screens are a different client.
 
-**Somebody has to say which one we are copying before Phase B1 samples a single
-colour**, because "match the reference" currently has three answers. My read:
-the AAPoker/HHPoker set, since those URLs are the ones in the brief — but that
-is a guess and it should not be mine to make.
+**The client has since settled the split:** *the felt looks like HHPoker, the
+functionality works like WPK.* So:
+
+| | Reference |
+|---|---|
+| **How it looks** — felt, palette, type, spacing | **HHPoker** (this document) |
+| **How it behaves** — lobby, liquidity, tabs, money | **WPK** (`WPK-NATIVE-STUDY.md`) |
+
+That is a clean division and it removes the ambiguity about *which study wins*
+where they disagree. It does **not** resolve one thing: the KKPoker screens and
+the AAPoker screens are both filed under "HHPoker" and look nothing like each
+other. Before Phase B1 samples a colour, somebody has to point at one felt and
+say *that one*.
+
+**It also raises the stakes on §4.** If the felt is the visual brief, then a felt
+we have never seen in play is the single biggest hole in the plan.
 
 ---
 
