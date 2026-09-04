@@ -121,7 +121,7 @@
     "tableName": "牌桌名称（可选）",
     "tableNamePlaceholder": "例如：周五之夜",
     "tableBlindOrder": "小盲注必须小于大盲注。",
-    "tableSeatRange": "每张牌桌可坐 2 至 9 名玩家。",
+    "tableSeatRange": "每张牌桌可坐 2 至 {{max}} 名玩家。",
     "tableRakeNote": "抽水 {{pct}}%——联盟当前费率，归联盟所有，不归平台。",
     "tableConfirm": "确认开设这张牌桌？",
     "tableConfirmBody": "盲注 {{sb}}/{{bb}}，{{seats}} 个座位。{{rake}}% 的抽水将计入联盟库存。",

@@ -309,6 +309,34 @@ export const PICKABLE_DESIGNS = TABLE_DESIGNS.filter((d) => !d.hidden);
  * The seat ring for a table of `count` chairs. Sizes the design doesn't spell out fall back to an
  * even ring around a portrait oval, so an unusual table still seats everyone sensibly.
  */
+/** The largest seat count this felt has a real, hand-placed ring for. */
+function ringCeiling(design: TableDesign): number {
+  return Math.max(...Object.keys(design.rings).map(Number));
+}
+
+/**
+ * The most chairs a table of this game may have — DERIVED from the artwork,
+ * not declared.
+ *
+ * Each design places seats per count and then stops: the portrait stadium felt
+ * at six, the wide landscape felt at eight. Above that `ringFor` falls back to
+ * an evenly-spaced circle, which on an oval felt seats people in the middle of
+ * the table instead of on the rail. Nothing throws — it just looks broken.
+ *
+ * Taken as the MINIMUM across every felt the game could be played on, because a
+ * player picks their own design where the game has no opinion, and a table must
+ * render on whichever they picked.
+ *
+ * The server keeps its own copy in `PokerVariant.maxSeats` and refuses anything
+ * above it; `test/lobby/seat-caps.test.ts` pins that side. This is the side that
+ * knows why the number is what it is.
+ */
+export function seatCapFor(gameOrVariant: string | null | undefined): number {
+  const forced = designForGame(gameOrVariant, undefined, designById(DEFAULT_DESIGN_ID));
+  const candidates = forced ? [forced] : PICKABLE_DESIGNS;
+  return Math.min(...candidates.map(ringCeiling));
+}
+
 export function ringFor(design: TableDesign, count: number): SeatPos[] {
   const ring = design.rings[count];
   if (ring) return ring;

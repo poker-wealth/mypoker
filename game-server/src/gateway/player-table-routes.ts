@@ -6,6 +6,7 @@ import type { GatewayConfig } from './config';
 import type { TableHub } from '../live/table-hub';
 import type { LobbyService } from '../lobby';
 import { DEFAULT_ROOM } from '../live/poker-room';
+import { variant } from '../games/texas/variants';
 import { registerPublicTable } from '../live/runtime-tables';
 
 /**
@@ -35,12 +36,12 @@ export function buildPlayerTableRouter(
      * players is enough to deal whatever this is set to; the rest of the chairs
      * simply sit empty until someone takes one.
      *
-     * Capped at 6 because that is what the portrait felt draws, and a chair the
-     * artwork has no seat for is a chair nobody can reach. The wide Short Deck
-     * felt draws 8, so this ceiling rises with the game once the enum above
-     * widens past texas.
+     * The ceiling comes from the VARIANT rather than being written here, so it
+     * follows the felt automatically when the enum above widens past texas —
+     * which is what the previous version of this comment promised and did not
+     * do. See `PokerVariant.maxSeats`.
      */
-    seats: z.number().int().min(2).max(6).default(6),
+    seats: z.number().int().min(2).max(variant('texas').maxSeats).default(6),
   });
 
   r.post('/', requireAuth(config), (req: Request, res: Response): void => {

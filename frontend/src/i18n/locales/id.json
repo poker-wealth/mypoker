@@ -121,7 +121,7 @@
     "tableName": "Nama meja (opsional)",
     "tableNamePlaceholder": "mis. Malam Jumat",
     "tableBlindOrder": "Small blind harus lebih kecil daripada big blind.",
-    "tableSeatRange": "Satu meja memuat 2 sampai 9 pemain.",
+    "tableSeatRange": "Satu meja memuat 2 sampai {{max}} pemain.",
     "tableRakeNote": "Rake {{pct}}% — tarif aliansi saat ini. Rake masuk ke aliansi, bukan ke platform.",
     "tableConfirm": "Buka meja ini?",
     "tableConfirmBody": "Blind {{sb}}/{{bb}}, {{seats}} kursi. Rake {{rake}}% masuk ke inventaris aliansi.",

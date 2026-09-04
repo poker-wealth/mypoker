@@ -121,7 +121,7 @@
     "tableName": "테이블 이름 (선택)",
     "tableNamePlaceholder": "예: 금요일 밤",
     "tableBlindOrder": "스몰 블라인드는 빅 블라인드보다 작아야 합니다.",
-    "tableSeatRange": "테이블 좌석은 2~9석입니다.",
+    "tableSeatRange": "테이블 좌석은 2~{{max}}석입니다.",
     "tableRakeNote": "레이크 {{pct}}% — 얼라이언스의 현재 요율이며, 플랫폼이 아니라 얼라이언스로 갑니다.",
     "tableConfirm": "이 테이블을 개설할까요?",
     "tableConfirmBody": "블라인드 {{sb}}/{{bb}}, {{seats}}석. 레이크 {{rake}}%는 얼라이언스 인벤토리로 들어갑니다.",

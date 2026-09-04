@@ -121,7 +121,7 @@
     "tableName": "テーブル名（任意）",
     "tableNamePlaceholder": "例：金曜ナイト",
     "tableBlindOrder": "スモールブラインドはビッグブラインドより小さくしてください。",
-    "tableSeatRange": "テーブルの座席は 2〜9 席です。",
+    "tableSeatRange": "テーブルの座席は 2〜{{max}} 席です。",
     "tableRakeNote": "レーキ {{pct}}%——同盟の現在のレートで、プラットフォームではなく同盟に入ります。",
     "tableConfirm": "このテーブルを開設しますか？",
     "tableConfirmBody": "ブラインド {{sb}}/{{bb}}、{{seats}} 席。レーキ {{rake}}% は同盟のインベントリに入ります。",
