@@ -70,8 +70,9 @@ export const TEXAS: PokerVariant = {
   holeCards: 2,
   deckFor: (seed) => shuffle(standardDeck(), seed),
   evaluate: (hole, board) => evaluateBest([...hole, ...board], STANDARD_RULES),
-  // Portrait stadium felt: `stadiumRings` defines 2..6 and nothing above.
-  maxSeats: 6,
+  // Portrait stadium felt, now carrying rings for 2..8 — three seats down each
+  // long rail plus the two rounded ends.
+  maxSeats: 8,
 };
 
 export const SHORT_DECK: PokerVariant = {

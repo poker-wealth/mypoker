@@ -58,6 +58,15 @@ export interface TableDesign {
 function stadiumRings(edge: { x: number; yTop: number; yBottom: number; yMid: number }): Record<number, SeatPos[]> {
   const { x, yTop, yBottom, yMid } = edge;
   const right = 100 - x;
+
+  /**
+   * The SIX-seat ring, measured against the artwork. Left exactly as it was.
+   *
+   * Every existing table is six-max, so these positions are the ones players
+   * have actually been sitting on. The wider spread used for seven and eight
+   * below is a separate array rather than a re-tuning of this one, so adding the
+   * bigger sizes cannot move anybody who is already seated.
+   */
   const six: SeatPos[] = [
     { left: '50%', top: `${yBottom}%`, align: 'bottom' },
     { left: `${x}%`, top: `${yMid + 12}%`, align: 'left' },
@@ -66,12 +75,44 @@ function stadiumRings(edge: { x: number; yTop: number; yBottom: number; yMid: nu
     { left: `${right}%`, top: `${yMid - 12}%`, align: 'right' },
     { left: `${right}%`, top: `${yMid + 12}%`, align: 'right' },
   ];
+
+  /**
+   * EIGHT on the portrait felt: three down each long rail, plus the two rounded
+   * ends. On a tall stadium the LEFT and RIGHT edges are the straights, so that
+   * is where the extra chairs go — the top and bottom are curves and hold one
+   * each.
+   *
+   * Index order matches `wideRings`: hero at 0, bottom-centre, running
+   * bottom → left → top → right, so a seat index means the same thing on both
+   * felts.
+   *
+   * ⚠️ These offsets are DERIVED (±22 and the midpoint) rather than measured off
+   * the artwork the way `six` was. They should be checked on a device before
+   * anyone calls the eight-max felt finished — the middle pair especially, since
+   * it is the one position with no equivalent in the six-max ring.
+   */
+  const eight: SeatPos[] = [
+    { left: '50%', top: `${yBottom}%`, align: 'bottom' }, // 0 bottom centre — hero
+    { left: `${x}%`, top: `${yMid + 22}%`, align: 'left' }, // 1 left lower
+    { left: `${x}%`, top: `${yMid}%`, align: 'left' }, // 2 left middle
+    { left: `${x}%`, top: `${yMid - 22}%`, align: 'left' }, // 3 left upper
+    { left: '50%', top: `${yTop}%`, align: 'top' }, // 4 top centre
+    { left: `${right}%`, top: `${yMid - 22}%`, align: 'right' }, // 5 right upper
+    { left: `${right}%`, top: `${yMid}%`, align: 'right' }, // 6 right middle
+    { left: `${right}%`, top: `${yMid + 22}%`, align: 'right' }, // 7 right lower
+  ];
+  const pick = (...i: number[]): SeatPos[] => i.map((n) => eight[n]!);
+
   return {
     2: [six[0]!, six[3]!],
     3: [six[0]!, six[2]!, six[4]!],
     4: [six[0]!, six[1]!, six[3]!, six[5]!],
     5: [six[0]!, six[1]!, six[2]!, six[4]!, six[5]!],
     6: six,
+    // Symmetric about the hero, like every other size: seven drops the right
+    // middle rather than bunching the extra player down one rail.
+    7: pick(0, 1, 2, 3, 4, 5, 7),
+    8: pick(0, 1, 2, 3, 4, 5, 6, 7),
   };
 }
 
@@ -228,6 +269,29 @@ export const TABLE_DESIGNS: TableDesign[] = [
         { left: '50%', top: '10%', align: 'top' },
         { left: '87%', top: '28%', align: 'right' },
         { left: '87%', top: '71%', align: 'right' },
+      ],
+      // Seven and eight: three down each rail, tucked outward at the waist
+      // where the oval is widest (11% / 89%) and inward at the ends where it
+      // curves. Neon is drawn in CSS rather than from artwork, so these are
+      // free to sit wherever the shape wants them.
+      7: [
+        { left: '50%', top: '89%', align: 'bottom' },
+        { left: '13%', top: '72%', align: 'left' },
+        { left: '11%', top: '50%', align: 'left' },
+        { left: '13%', top: '26%', align: 'left' },
+        { left: '50%', top: '10%', align: 'top' },
+        { left: '87%', top: '26%', align: 'right' },
+        { left: '87%', top: '72%', align: 'right' },
+      ],
+      8: [
+        { left: '50%', top: '89%', align: 'bottom' },
+        { left: '13%', top: '72%', align: 'left' },
+        { left: '11%', top: '50%', align: 'left' },
+        { left: '13%', top: '26%', align: 'left' },
+        { left: '50%', top: '10%', align: 'top' },
+        { left: '87%', top: '26%', align: 'right' },
+        { left: '89%', top: '50%', align: 'right' },
+        { left: '87%', top: '72%', align: 'right' },
       ],
     },
   },

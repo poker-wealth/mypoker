@@ -39,22 +39,41 @@ describe('the caps the artwork actually supports', () => {
    * server must agree with.
    */
   it.each([
-    ['texas', 6],
+    ['texas', 8],
     ['short-deck', 8],
     ['omaha', 8],
   ] as const)('%s caps at %i — the server copy must match', (game, expected) => {
     expect(seatCapFor(game)).toBe(expected);
   });
 
-  it('the wide felt really can place every seat up to its cap', () => {
-    // Not "a ring exists" — the ring has to have the right number of distinct
-    // positions in it, which is what actually puts a player on the rail.
-    const wide = designForGame('short-deck', undefined, designById(DEFAULT_DESIGN_ID));
-    expect(wide).not.toBeNull();
-    for (let n = 2; n <= seatCapFor('short-deck'); n++) {
-      const ring = ringFor(wide!, n);
-      expect(ring).toHaveLength(n);
-      expect(new Set(ring.map((s) => `${s.left}/${s.top}`)).size).toBe(n);
+  /**
+   * The client's requirement: a table can be created for anything from two to
+   * eight players, so EVERY felt has to place every one of those counts. It is
+   * not enough that a ring exists — it has to hold the right number of DISTINCT
+   * positions, or two players sit on top of each other.
+   */
+  it.each(TABLE_DESIGNS.map((d) => d.id))('%s places 2 through 8 distinctly', (id) => {
+    const design = designById(id);
+    for (let n = 2; n <= 8; n++) {
+      const ring = design.rings[n];
+      expect({ seats: n, hasRing: Boolean(ring) }).toEqual({ seats: n, hasRing: true });
+      expect(ring!).toHaveLength(n);
+      // Distinct: a duplicated coordinate stacks two players in one chair.
+      expect(new Set(ring!.map((s) => `${s.left}/${s.top}`)).size).toBe(n);
+    }
+  });
+
+  it('the hero is always bottom-centre, on every felt and every size', () => {
+    // Seat 0 is the viewer. If it drifts, the table rotates under the player.
+    for (const design of TABLE_DESIGNS) {
+      for (let n = 2; n <= 8; n++) {
+        const hero = design.rings[n]![0]!;
+        expect({ design: design.id, seats: n, align: hero.align }).toEqual({
+          design: design.id,
+          seats: n,
+          align: 'bottom',
+        });
+      }
     }
   });
 
