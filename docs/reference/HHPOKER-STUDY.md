@@ -7,18 +7,30 @@ actually been seen of it. Observed unless marked **INFERENCE**.
 
 ---
 
-## 0. Read this first — we are looking at more than one client
+## 0. It is one app, and the visual reference is settled
 
-Three sets of screens now exist and **they do not look like the same product**:
+**AAPoker *is* HHPoker** — the client binary carries the AAPOKER wordmark, the
+felt is watermarked `hhpoker177.com` / `hhpoker888.com`, and `hhpoker777.com` in
+the brief is the same family. One product, several domains.
 
-| Set | Branding | Look |
-|---|---|---|
-| Club lobby, tutorial, events | **KKPoker** | Dark lobby; **light** utility screens, teal accent, iOS-like |
-| Create-a-game | — | **Dark navy**, gold text, poker-chip slider thumbs |
-| The felt | **AAPOKER**, watermarked `hhpoker177.com` | **Maroon** radial felt, gold buttons |
+I first read this as three different clients. That was wrong, and re-reading the
+screens with the correction in hand, the evidence was already there: **"KKPoker"
+appears as the club's square logo in the club header and on a banner titled
+永旺专属活动 — "Yongwang *exclusive* events".** Both are club-scoped surfaces. It
+is the club's branding sitting inside the app, not a rival app.
 
-The felt screens carry HHPoker domains, so they are the reference the brief
-names. The KKPoker screens are a different client.
+Which also explains the visual range below, and it is worth stating plainly
+because it changes what "match the reference" means:
+
+| Surface | Look |
+|---|---|
+| Club lobby | Dark, club-branded, promo banner |
+| Utility — create a game, message centre, casino grid | **Light**, teal accent, iOS-like — *and* a **dark navy + gold** create screen |
+| The felt | **Maroon** radial, gold buttons, AAPOKER wordmark |
+
+So the app does not have one skin. Clubs brand their own lobby, utility screens
+are near-stock, and the felt is its own world. Copying "the HHPoker look" means
+copying that *structure* — not flattening everything to one palette.
 
 **The client has since settled the split:** *the felt looks like HHPoker, the
 functionality works like WPK.* So:
@@ -29,10 +41,8 @@ functionality works like WPK.* So:
 | **How it behaves** — lobby, liquidity, tabs, money | **WPK** (`WPK-NATIVE-STUDY.md`) |
 
 That is a clean division and it removes the ambiguity about *which study wins*
-where they disagree. It does **not** resolve one thing: the KKPoker screens and
-the AAPoker screens are both filed under "HHPoker" and look nothing like each
-other. Before Phase B1 samples a colour, somebody has to point at one felt and
-say *that one*.
+where they disagree. Together with §0 that leaves no ambiguity about which app or which felt: it is
+the maroon AAPoker/HHPoker table, and the visual direction comes from there.
 
 **It also raises the stakes on §4.** If the felt is the visual brief, then a felt
 we have never seen in play is the single biggest hole in the plan.
@@ -125,12 +135,24 @@ have no unlock mechanic anywhere.
 | Buy-in amount (100BB) | **a RANGE slider**, 0.5 … 8, set 1–4, with a dotted "in game option" tail |
 | Min. holding chips | 0.5 … 4 |
 
-> ⚠️ **This client allows NINE players.** The KKPoker create screen capped NLHE
-> at 8 and Short Deck at 6. **The references disagree with each other.**
+> ⚠️ **This create screen allows NINE players — and there is a second create
+> screen that does not.**
 >
-> That matters for [#62](https://github.com/poker-wealth/mypoker/pull/62): it is
-> further evidence that our seat cap has to come from **our own felt**, not from
-> "what the reference does", because there is no single answer to copy.
+> The earlier light-teal screens are also a create flow, and they cap **NLHE at
+> 8** and **6+ at 6**, with a `Table Size` dropdown rather than a slider. They
+> also list games one per screen (`NLHE`, `6+`) where this one offers a picker of
+> seven, and they carry `Run It Twice` and `Table Properties: Private`, which
+> this one does not show.
+>
+> **Unresolved.** Two creation flows in one app is plausible — a club table and a
+> private friends game are different things — but nothing seen so far says which
+> is which, and the seat caps genuinely differ. **Worth one screenshot to settle:
+> where each flow is entered from.**
+>
+> Either way it points the same direction for
+> [#62](https://github.com/poker-wealth/mypoker/pull/62): even inside a single
+> reference app the seat ceiling is not one number, so ours has to come from
+> **our own felt** rather than from copying a figure that varies by flow.
 
 **Auto-start players count** is a real idea we do not have: the table deals
 itself once N players are seated, chosen by the creator.
@@ -182,6 +204,7 @@ costs gems**, quoted before you commit. Same currency the join sheet demanded.
   **action bar has still not been seen** — the thing Phase B3 is blocked on.
 - Seat count on a full table (is the ring really nine?).
 - What the locked game types unlock with.
+- **Where each of the two create flows is entered from** — see §3.
 - The advanced panel scrolled to the very bottom.
 - KKPoker's 教学 → 工具 and 训练 sub-tabs.
 
