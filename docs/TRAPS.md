@@ -414,6 +414,15 @@ they encode is not actually running.
   admin routes as `const adminChildren = [...]` (line 31) and the checker still
   expects them inline.
 
+  **Correction, same day: this is already fixed — on a branch that has not
+  merged.** `432007f` ("fix(lobby): stop advertising blinds of 0/0, and repair
+  the parity check") on `feat/email-otp-confirmation--samuel` teaches the
+  checker the hoisted-array shape. It is pushed. It is not on `origin/main`, so
+  `main` is still red. Which makes this §6 again — and makes the paragraph
+  above an example of the thing §6's own update warns about, a note that
+  outlives the bug. Both halves of that mistake are now on record in the same
+  entry, deliberately.
+
 The second one is the sharper lesson. `check:parity` was written **because**
 parity had been claimed wrongly three times (§9), and it fails loudly by
 design — its own header says the discipline is "to fail loudly rather than
@@ -452,3 +461,28 @@ check what it is being *mixed with*. A token surrounded by literals is not a
 token; it is one stop in a hardcoded palette. And a value duplicated as a
 literal somewhere else (`#12233f` in a canvas) will silently disagree the
 moment the token moves.
+
+### §25 postscript — the same commit is holding a live bug off `main`
+
+`432007f` also fixes something worse than a red gate. On `origin/main`,
+`Lobby.tsx` renders blinds as:
+
+```ts
+blinds: `${formatMicros(t.stakes / 2, 0)}/${formatMicros(t.stakes, 0)}`
+```
+
+`formatMicros` divides by 1,000,000 and `stakes` is **table chips** — a big
+blind of 20. So every real table in the lobby on `main` advertises
+**`Blinds 0/0`**, which is the exact incident §2 of this file describes in the
+past tense, as though it had been dealt with. It was dealt with. On a branch.
+
+The fix threads `smallBlind` through `room-state.ts`, `lobby-service.ts`,
+`live-sync.ts` and `api/lobby.ts` and replaces the arithmetic with a
+`formatBlinds` helper that refuses to guess. It has been pushed and unmerged
+long enough for a later session to rediscover the bug from scratch.
+
+**The compounding cost:** a second developer planning lobby work off `main`
+sees a bug that is already fixed, and either rebuilds the fix — conflicting
+with the branch — or records it as new, which is how this entry came to exist.
+`git log origin/main --oneline -- <file>` before writing anything is cheaper
+than either.

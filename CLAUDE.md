@@ -62,8 +62,15 @@ spend an hour bisecting your own change.
   `const adminChildren = [...]`; the checker still expects them inline. So the
   parity guarantee of TRAPS §9 is **not currently being checked**.
 
-Both are recorded in `docs/TRAPS.md` §25. Fix or delete them — a permanently
-red gate teaches people to ignore failures.
+**The parity one is already fixed on an unmerged branch** — `432007f` on
+`feat/email-otp-confirmation--samuel`, pushed, not on `main`. That same commit
+also fixes a live bug: on `main` every lobby table advertises **`Blinds 0/0`**,
+because `Lobby.tsx` runs chip stakes through `formatMicros`, which divides by a
+million. Merging that branch clears both.
+
+Both are recorded in `docs/TRAPS.md` §25. Before writing anything in the lobby
+or the parity checker, run `git log origin/main --oneline -- <file>` and check
+the branch list — a fix sitting unmerged looks exactly like a bug nobody found.
 
 Also known: **16 pre-existing eslint `any` errors** in
 `frontend/src/components/games/`. Not yours.
