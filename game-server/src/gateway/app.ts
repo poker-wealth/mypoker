@@ -3,12 +3,14 @@ import { FilterError } from '../lobby';
 import { syncLobbyWithLiveTables } from '../lobby/live-sync';
 import type { GatewayConfig } from './config';
 import { buildAuthRouter } from './auth';
+import { userStore } from '../auth/user-store';
 import { buildLobbyRouter } from './lobby-routes';
 import { buildJackpotRouter } from './jackpot-routes';
 import { buildLeagueRouter } from './league-routes';
 import { buildAgentRouter } from './agent-routes';
 import { buildAdminRouter } from './admin-routes';
 import { buildMeRouter } from './me-routes';
+import { buildAvatarRouter } from './avatar-routes';
 import { createRedEnvelopeRouter } from './red-envelope-routes';
 import { buildInternalRouter } from './internal-routes';
 import { currentRuleManifest, ruleVersionFor } from '../fairness/rule-version';
@@ -41,6 +43,9 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
 
   app.use('/auth', buildAuthRouter(config));
   app.use('/me', buildMeRouter(config));
+  // Avatar images. Public and unauthenticated (see avatar-routes.ts for why) —
+  // deliberately NOT under /me, which requireAuth guards wholesale.
+  app.use('/avatars', buildAvatarRouter(config));
   app.use('/leagues', buildLeagueRouter(config));
   app.use('/agent', buildAgentRouter(config));
   // Admin. Guarded to role 'ops' inside the router; deliberately NOT a product tab.
@@ -155,6 +160,11 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
       tables: liveTables,
       // The gateway connects to Mongo (the user store), so it can persist round proofs — notarize here.
       notarize: true,
+      // ...and for the same reason it is the deployment that CAN answer whether
+      // a player is banned. The felt used to check only the JWT signature, so a
+      // suspended player kept playing until their token expired and could open
+      // a fresh socket the whole time (docs/TRAPS.md §23).
+      authorizeSession: (playerId) => userStore.canHoldSession(playerId),
     });
     app.locals.tableHub = mounted.hub;
 
@@ -203,6 +213,20 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
       res.status(400).json({ error: err.message });
       return;
     }
+    // body-parser's size-limit rejection (express.json's global 64kb, and the
+    // avatar route's own scoped express.raw limit) throws an error with this
+    // shape. Without this branch it fell through to the generic 500 below —
+    // "internal error" for what is actually a well-formed, correctly-working
+    // rejection of an oversized request. A client cannot tell "the server
+    // broke" from "you sent too much" unless the status says which.
+    if (
+      err &&
+      typeof err === 'object' &&
+      ('type' in err ? (err as { type?: unknown }).type === 'entity.too.large' : false)
+    ) {
+      res.status(413).json({ error: 'request body is too large' });
+      return;
+    }
     const message = err instanceof Error ? err.message : 'internal error';
     console.error('[gateway] unhandled error:', message);
     res.status(500).json({ error: 'internal error' });
@@ -223,9 +247,17 @@ function cors(allowed: string[]) {
       res.setHeader('Access-Control-Allow-Origin', origin);
       res.setHeader('Vary', 'Origin');
       res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type');
-      // PATCH is used by settings updates (e.g. the table sound toggle). Without it
-      // the browser's preflight refuses the PATCH, the fetch rejects, and the
-      // reachability handler flips to "Reconnecting" on every settings change.
+      // PATCH has TWO callers — settings updates (the table sound toggle) and the
+      // admin user-edit route — and both were broken by its absence here. Two
+      // people found it independently, from opposite symptoms: "Reconnecting"
+      // on every settings change, and "cannot reach the server" on an admin
+      // save. Both were accurate and neither pointed near the cause.
+      //
+      // NOTHING in the test suite noticed either time: supertest talks to the
+      // app directly and never performs a preflight, so every route test passed
+      // while a browser refused to send the request at all.
+      //
+      // Adding a verb to any route means adding it here.
       res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
       res.setHeader('Access-Control-Max-Age', '600');
     }

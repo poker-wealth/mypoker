@@ -29,7 +29,10 @@ interface DisplayTable {
   /** Pooled jackpot on this table, micro-USD. Null when the table has none. */
   jackpot: number | null;
   isFull: boolean;
-  stakes: number;
+  /** The table this player is seated at — the one that is refusing all the others. */
+  youAreSeated: boolean;
+  /** Table chips. Null when the game has no stake level — see formatBlinds. */
+  stakes: number | null;
 }
 
 const VARIANTS = [
@@ -38,13 +41,44 @@ const VARIANTS = [
   { id: 'others', label: 'OTHERS' },
 ];
 
+/**
+ * The blind filters, in TABLE CHIPS — the unit the server filters in.
+ *
+ * These were micro-USD (2_000_000 for "1/2") against a server comparing table
+ * chips, whose largest big blind is 100. Every threshold was therefore
+ * unreachable and tapping ANY filter but ALL emptied the lobby completely.
+ * Same root cause as the blinds column: the numbers were correct for
+ * `dev-seed.ts` and nobody re-read them when the live rooms took over.
+ *
+ * `minStakes` is the big blind, so the label's second number is the value.
+ */
 const STAKES_OPTIONS = [
   { id: 'all', label: 'ALL', minStakes: undefined },
-  { id: '1/2', label: '1/2', minStakes: 2_000_000 },
-  { id: '5/10', label: '5/10', minStakes: 10_000_000 },
-  { id: '25/50', label: '25/50', minStakes: 50_000_000 },
-  { id: '100/200', label: '100/200', minStakes: 200_000_000 },
+  { id: '1/2', label: '1/2', minStakes: 2 },
+  { id: '5/10', label: '5/10', minStakes: 10 },
+  { id: '25/50', label: '25/50', minStakes: 50 },
+  { id: '100/200', label: '100/200', minStakes: 200 },
 ];
+
+/**
+ * The blinds cell.
+ *
+ * Chips are not money: no currency mark, no micro conversion, just a grouped
+ * integer. An em dash when the table has no blind structure at all — nine of
+ * the thirteen live tables let each player pick their own bet, and printing
+ * "0/0" for them stated a stake level that does not exist (docs/TRAPS.md #3).
+ *
+ * NO `stakes / 2` FALLBACK. An earlier draft of this used one for tables whose
+ * server had not sent a small blind, and it promptly invented one: Dou Di Zhu
+ * has a flat base stake of 100 and no blinds at all, and the fallback printed
+ * it as "50/100". A missing small blind means there is no pair to show, not
+ * that it can be guessed — so a flat stake renders as the single figure it is.
+ */
+function formatBlinds(stakes: number | null, smallBlind?: number | null): string {
+  if (stakes === null || stakes === undefined) return '—';
+  if (smallBlind === null || smallBlind === undefined) return stakes.toLocaleString();
+  return `${smallBlind.toLocaleString()}/${stakes.toLocaleString()}`;
+}
 
 export function Lobby() {
   const navigate = useNavigate();
@@ -85,11 +119,11 @@ export function Lobby() {
 
   const displayTables: DisplayTable[] = rawTables.map((t) => ({
     id: t.id,
-    blinds: `${formatMicros(t.stakes / 2, 0)}/${formatMicros(t.stakes, 0)}`,
+    blinds: formatBlinds(t.stakes, t.smallBlind),
     players: `${t.players} / ${t.maxPlayers}`,
     // The server's own figure. It used to fall back to 40 when absent, which
     // put a buy-in on the row that the table had never quoted.
-    buyIn: `${t.buyInBB} BB`,
+    buyIn: t.buyInBB === null ? '—' : `${t.buyInBB} BB`,
     // Null rather than a substitute. The old line read
     //   t.jackpot || t.stakes * 10
     // so a table with an empty pool advertised ten times its blind as a dollar
@@ -98,6 +132,7 @@ export function Lobby() {
     // send.
     jackpot: t.jackpot > 0 ? t.jackpot : null,
     isFull: t.status === 'FULL' || t.players >= t.maxPlayers,
+    youAreSeated: t.youAreSeated === true,
     stakes: t.stakes,
   }));
 
@@ -257,7 +292,18 @@ export function Lobby() {
                   {/* The table's real id. It used to render `T-00${index}`, a
                       label invented per render that matched nothing a player
                       could be told over support. */}
-                  <td className="px-3 py-3 font-bold text-[#eab308]">{tbl.id}</td>
+                  <td className="px-3 py-3 font-bold text-[#eab308]">
+                    {tbl.id}
+                    {/* The row holding this player's seat. It is the reason every
+                        other table is refusing them, and the only row that can
+                        release it — so it is marked next to the name rather than
+                        buried in the status column. */}
+                    {tbl.youAreSeated && (
+                      <span className="ml-2 rounded-full bg-brand/20 px-2 py-0.5 text-[0.6rem] font-bold text-brand align-middle">
+                        {t('lobby.yourSeat')}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-3 tabular-nums text-dim font-medium">{tbl.blinds}</td>
                   <td className="px-3 py-3 tabular-nums font-semibold text-text">{tbl.players}</td>
                   <td className="px-3 py-3 tabular-nums text-dim font-medium">{tbl.buyIn}</td>

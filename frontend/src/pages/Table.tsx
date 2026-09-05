@@ -283,21 +283,35 @@ function LiveTable({ tableId }: { tableId: string }) {
             <div className="flex-1 text-[0.8rem] text-dim">
               {statusLine(t, snapshot, playersReady, mySeat?.status === 'sittingout')}
             </div>
+            {/* All four of these were hardcoded English while `table.rebuy`,
+                `table.sitIn`, `table.sitOut` and `table.leave` sat translated
+                in all eight locale files — mobile has used them since it was
+                built (mobile/src/screens/TableScreen.tsx). So a Thai or
+                Japanese player got their own language everywhere on this
+                screen except the four controls that take their money off the
+                table. Same shape as the Login screen, which had a complete
+                translated `auth.*` block that nothing called. */}
             {mySeat && mySeat.stack === 0 ? (
               <Button size="sm" onClick={() => setBuyInFor(null)}>
-                Rebuy
+                {t('table.rebuy')}
               </Button>
             ) : mySeat?.status === 'sittingout' ? (
               <Button size="sm" onClick={live.sitIn}>
-                Sit in
+                {t('table.sitIn')}
               </Button>
             ) : (
               <Button size="sm" variant="secondary" onClick={live.sitOut}>
-                Sit out
+                {t('table.sitOut')}
               </Button>
             )}
+            {/* The only control that actually vacates the seat. `leave` (back
+                button, unmount) merely unsubscribes — the server keeps the seat
+                on purpose so a blip cannot cost a stack mid-hand — so without
+                this a player who backs out is refused at every other table with
+                no way to free themselves (docs/TRAPS.md #12). It exists here;
+                it is `stand`, labelled "Leave". */}
             <Button size="sm" variant="ghost" onClick={live.stand}>
-              Leave
+              {t('table.leave')}
             </Button>
           </div>
         ) : status === 'error' || status === 'closed' ? (

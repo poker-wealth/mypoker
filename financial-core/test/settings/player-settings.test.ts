@@ -3,6 +3,7 @@ import {
   updateSettings,
   DEFAULT_SETTINGS,
   PlayerSettingsModel,
+  AVATAR_IDS,
 } from '../../src/settings/player-settings';
 import { startTestDb, stopTestDb, clearCollections } from '../db-helper';
 
@@ -24,6 +25,10 @@ describe('getSettings', () => {
   it('returns defaults for a player who has never opened Settings', async () => {
     const settings = await getSettings(PLAYER);
     expect(settings).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it('defaults avatarId to null — falls back to photoUrl, then initial, on the client', async () => {
+    expect((await getSettings(PLAYER)).avatarId).toBeNull();
   });
 
   it('defaults promos to off — an opt-out is not consent', async () => {
@@ -99,5 +104,29 @@ describe('updateSettings', () => {
   it('does not create a row for an empty patch on an unknown player', async () => {
     await updateSettings('p-never-seen', {});
     expect(await PlayerSettingsModel.findById('p-never-seen').lean()).toBeNull();
+  });
+
+  it('persists a valid avatarId and reads it back', async () => {
+    const settings = await updateSettings(PLAYER, { avatarId: 'a-dragon' });
+    expect(settings.avatarId).toBe('a-dragon');
+    expect((await getSettings(PLAYER)).avatarId).toBe('a-dragon');
+  });
+
+  it('rejects an unknown avatarId and leaves the stored value unchanged', async () => {
+    await updateSettings(PLAYER, { avatarId: 'a-crown' });
+
+    await expect(
+      updateSettings(PLAYER, { avatarId: 'not-a-real-avatar' as (typeof AVATAR_IDS)[number] }),
+    ).rejects.toThrow();
+
+    // The rejected write must not have touched the previously stored choice.
+    expect((await getSettings(PLAYER)).avatarId).toBe('a-crown');
+  });
+
+  it('leaves an existing avatar choice intact when the patch omits avatarId', async () => {
+    await updateSettings(PLAYER, { avatarId: 'a-star' });
+    const settings = await updateSettings(PLAYER, { sound: false });
+
+    expect(settings.avatarId).toBe('a-star');
   });
 });

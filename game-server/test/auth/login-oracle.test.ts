@@ -125,7 +125,7 @@ describe('the two doors agree', () => {
     resolvesTo(GOOGLE_ACCOUNT);
     let signup: SignupError | undefined;
     try {
-      await userStore.signup('google@example.com', 'anything');
+      await userStore.startSignup('google@example.com', 'anything');
     } catch (err) {
       if (err instanceof SignupError) signup = err;
       else throw err;
@@ -148,7 +148,7 @@ describe('the two doors agree', () => {
     resolvesTo(PASSWORD_ACCOUNT);
     let code: string | undefined;
     try {
-      await userStore.signup('someone@example.com', 'anything');
+      await userStore.startSignup('someone@example.com', 'anything');
     } catch (err) {
       if (err instanceof SignupError) code = err.code;
       else throw err;

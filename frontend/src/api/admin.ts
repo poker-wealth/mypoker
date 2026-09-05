@@ -95,18 +95,30 @@ export interface AdminPlayerDetail {
   vip: { tier: string; title: string };
   volume: { cumulativeEffective: number; monthlyEffective: number };
   identity: { displayName: string | null; email: string | null; createdAt: string | null } | null;
+  /** Present since reputation and VIP became overridable. */
+  override?: PlayerOverride;
 }
 
 export const searchPlayers = (q: string): Promise<PlayerSearchResult> =>
   api.get<PlayerSearchResult>(`/admin/players?q=${encodeURIComponent(q)}`);
 
-/** One row of the full Users list. `balance` is always a string (the player has an account). */
+/**
+ * One row of the full Users list, which is the UNION of two populations:
+ * financial-core's players (everyone money has touched, including Telegram
+ * players with no identity document) and the gateway's registrations (including
+ * accounts that have never deposited or played).
+ *
+ * `balance` is therefore NULLABLE — it was `string` when the list came from
+ * financial-core alone. Null means no financial account exists yet, which the
+ * table already renders as "no account" rather than as zero. Those are
+ * different facts and an admin acts differently on each.
+ */
 export interface AdminUserRow {
   playerId: string;
   displayName: string | null;
   email: string | null;
-  balance: string;
-  available: string;
+  balance: string | null;
+  available: string | null;
   joinedAt: string;
 }
 
@@ -117,6 +129,114 @@ export const fetchUsers = (limit?: number): Promise<{ users: AdminUserRow[]; tru
 
 export const fetchPlayerDetail = (playerId: string): Promise<AdminPlayerDetail> =>
   api.get<AdminPlayerDetail>(`/admin/players/${encodeURIComponent(playerId)}`);
+
+/**
+ * One account as the edit form sees it.
+ *
+ * `hasPassword` and `hasGoogle` rather than the credentials themselves — the
+ * form needs to know whether there is a password to replace, never what it is.
+ *
+ * `emailVerified` is `boolean | null`, and the null matters: an account created
+ * before confirmation existed has never been asked the question, which is not
+ * the same as having failed to confirm. Rendering that third state as "no" would
+ * invite an admin to "fix" something that was never broken.
+ */
+export interface AdminUserRecord {
+  playerId: string;
+  email: string | null;
+  phone: string | null;
+  displayName: string | null;
+  photoUrl: string | null;
+  emailVerified: boolean | null;
+  /**
+   * The document stores `'ops'` or nothing; the server reports the absent case
+   * as `'player'`. `league_admin` exists in the token type but nothing grants or
+   * reads it, so it is deliberately not offered here — a role that confers
+   * nothing is a control an admin would reasonably expect to do something.
+   */
+  role: 'player' | 'ops';
+  hasPassword: boolean;
+  hasGoogle: boolean;
+  suspendedAt: string | null;
+  suspendedReason: string | null;
+  suspendedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Absent = leave alone, null = clear, value = set. The server reads it the same way. */
+export interface AdminUserPatch {
+  displayName?: string;
+  email?: string | null;
+  phone?: string | null;
+  emailVerified?: boolean;
+  role?: 'player' | 'ops';
+  reason?: string;
+}
+
+export interface AdminAuditEntry {
+  id: string;
+  actorPlayerId: string;
+  subjectPlayerId: string;
+  action: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  reason: string | null;
+  at: string;
+}
+
+export const fetchUserRecord = (playerId: string): Promise<AdminUserRecord> =>
+  api.get<AdminUserRecord>(`/admin/players/${encodeURIComponent(playerId)}/account`);
+
+export const fetchUserAudit = (playerId: string): Promise<{ entries: AdminAuditEntry[] }> =>
+  api.get<{ entries: AdminAuditEntry[] }>(`/admin/players/${encodeURIComponent(playerId)}/audit`);
+
+export const updateUser = (playerId: string, patch: AdminUserPatch): Promise<AdminUserRecord> =>
+  api.patch<AdminUserRecord>(`/admin/players/${encodeURIComponent(playerId)}`, patch);
+
+export const setUserSuspension = (
+  playerId: string,
+  suspended: boolean,
+  reason?: string,
+): Promise<AdminUserRecord> =>
+  api.post<AdminUserRecord>(`/admin/players/${encodeURIComponent(playerId)}/suspension`, {
+    suspended,
+    ...(reason ? { reason } : {}),
+  });
+
+/**
+ * An administrator override of a DERIVED value.
+ *
+ * Both the override and the computed value are carried, because the form has to
+ * show what the player would have had as well as what was decided instead — an
+ * override that renders as an ordinary number is indistinguishable from an
+ * earned one, and nobody could tell a granted tier from a played-for tier.
+ */
+export interface PlayerOverride {
+  reputationScore: number | null;
+  vipTier: string | null;
+  computedScore: number;
+  computedTier: string;
+  setBy: string | null;
+  reason: string | null;
+  at: string | null;
+}
+
+export const setPlayerOverride = (
+  playerId: string,
+  patch: { reputationScore?: number | null; vipTier?: string | null; reason: string },
+): Promise<unknown> =>
+  api.post(`/admin/players/${encodeURIComponent(playerId)}/override`, patch);
+
+export const setUserPassword = (
+  playerId: string,
+  newPassword: string,
+  reason?: string,
+): Promise<{ ok: true }> =>
+  api.post<{ ok: true }>(`/admin/players/${encodeURIComponent(playerId)}/password`, {
+    newPassword,
+    ...(reason ? { reason } : {}),
+  });
 
 export interface AdminAlert {
   id: string;

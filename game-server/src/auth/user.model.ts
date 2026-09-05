@@ -15,6 +15,17 @@ export interface UserDoc {
   /** bcrypt hash; absent for OAuth-only accounts. */
   passwordHash?: string;
   googleId?: string;
+  /**
+   * Whether the address on this document has been confirmed by email OTP.
+   *
+   * OPTIONAL ON PURPOSE, and read only through `isSignInAllowed` in
+   * `sign-in-rules.ts`: only an explicit `false` blocks a sign-in. Every
+   * account created before confirmation existed has no field at all, and
+   * treating `undefined` as "unconfirmed" would lock out every one of them on
+   * deploy — a migration disguised as a default. Google accounts are written
+   * `true` explicitly, because Google has already confirmed the address.
+   */
+  emailVerified?: boolean;
   displayName?: string;
   photoUrl?: string;
   /**
@@ -24,6 +35,18 @@ export interface UserDoc {
    * `'ops' | 'league_admin' | …` here until each of those is actually built.
    */
   role?: 'ops';
+  /**
+   * Set when an administrator suspends the account; absent means active.
+   *
+   * A TIMESTAMP RATHER THAN A BOOLEAN, so "when" is answerable without a
+   * separate audit lookup — the first question asked about a locked-out player
+   * is when it happened.
+   */
+  suspendedAt?: Date;
+  /** Shown to the player at sign-in, so a suspension is never silent. */
+  suspendedReason?: string;
+  /** The playerId of the administrator who suspended. Never the request body. */
+  suspendedBy?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -37,9 +60,17 @@ const userSchema = new Schema<UserDoc>(
     phone: { type: String, unique: true, sparse: true, index: true },
     passwordHash: { type: String },
     googleId: { type: String, unique: true, sparse: true, index: true },
+    // No `default` — see the interface. A default would be applied on create
+    // only, leaving existing documents undefined anyway, so the rule that reads
+    // this has to handle undefined regardless; better that it is the single
+    // place the question is answered.
+    emailVerified: { type: Boolean },
     displayName: { type: String },
     photoUrl: { type: String },
     role: { type: String, enum: ['ops'], index: true },
+    suspendedAt: { type: Date },
+    suspendedReason: { type: String },
+    suspendedBy: { type: String },
   },
   { timestamps: true, versionKey: false, collection: 'users' },
 );

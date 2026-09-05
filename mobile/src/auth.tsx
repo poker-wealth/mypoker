@@ -1,6 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './api';
+import {
+  confirmEmailCode,
+  resendEmailCode,
+  signupWithEmail,
+  type AuthResult,
+  type PendingConfirmation,
+  type Player,
+} from './api/auth';
 import { signInWithGoogleNative } from './googleAuth';
 import {
   clearCachedPlayer,
@@ -18,28 +26,42 @@ import {
  * context provider re-rendering its subtree is not a performance concern.
  */
 
-export interface Player {
-  playerId: string;
-  displayName: string;
-  username: string | null;
-  photoUrl: string | null;
-  telegramId: number | null;
-  vipTier: number;
-}
+// Re-exported so existing importers of `Player` from this module keep working;
+// the definition itself lives with the API client that receives it.
+export type { Player };
 
 type Status = 'loading' | 'signedIn' | 'signedOut';
 
-interface AuthResponse {
-  token: string;
-  player: Player;
-}
+/** The wire shape of every endpoint that mints a session. */
+type AuthResponse = AuthResult;
 
 interface AuthContextValue {
   status: Status;
   player: Player | null;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, displayName?: string) => Promise<void>;
+  /**
+   * Start an email sign-up.
+   *
+   * Returns a PENDING CONFIRMATION, not a session. Nothing is stored and nobody
+   * is signed in until `confirmEmail` succeeds — the return type is what makes
+   * that impossible to miss at the call site, and it is why this is not
+   * `Promise<void>` like its neighbours.
+   */
+  signUp: (email: string, password: string, displayName?: string) => Promise<PendingConfirmation>;
+  /** Finish a sign-up: exchange the emailed code for a session. */
+  confirmEmail: (email: string, code: string) => Promise<void>;
+  /** Another code for a confirmation already in flight. */
+  resendCode: (email: string) => Promise<PendingConfirmation>;
   signInWithGoogle: () => Promise<void>;
+  /**
+   * Re-read `/auth/me` and replace the cached player.
+   *
+   * For changes made from inside the app that the server is authority on — the
+   * display name is the first. Without it the header and every screen reading
+   * the cached player keep showing the old name until the next cold start,
+   * which reads as the save having silently failed.
+   */
+  refreshPlayer: () => Promise<void>;
   signOut: () => Promise<void>;
   error: string | null;
   clearError: () => void;
@@ -141,26 +163,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const signUp = useCallback(async (email: string, password: string, displayName?: string) => {
-    setBusy(true);
+  /**
+   * Store a session and switch the app into it.
+   *
+   * Shared by every path that ends in a token — password sign-in, Google, and
+   * now the confirmation step. Previously each one repeated these four lines,
+   * which is how the sign-up path came to do them against a response that no
+   * longer carries a token.
+   */
+  const adoptSession = useCallback(async (res: AuthResponse) => {
+    await setToken(res.token);
+    setPlayer(res.player);
+    void setCachedPlayer(res.player);
+    setStatus('signedIn');
+  }, []);
+
+  const signUp = useCallback(
+    async (email: string, password: string, displayName?: string): Promise<PendingConfirmation> => {
+      setBusy(true);
+      setError(null);
+      try {
+        // No setToken, no setStatus. The account now exists and is unconfirmed;
+        // the caller's next stop is the code screen.
+        return await signupWithEmail(email, password, displayName);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        throw err;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [],
+  );
+
+  const confirmEmail = useCallback(
+    async (email: string, code: string) => {
+      setBusy(true);
+      setError(null);
+      try {
+        await adoptSession(await confirmEmailCode(email, code));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        throw err;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [adoptSession],
+  );
+
+  const resendCode = useCallback(async (email: string): Promise<PendingConfirmation> => {
     setError(null);
     try {
-      const res = await api.post<AuthResponse>('/auth/signup', {
-        email,
-        password,
-        // Omit entirely when empty rather than sending "" — the gateway
-        // treats an absent field differently from a blank one.
-        ...(displayName ? { displayName } : {}),
-      });
-      await setToken(res.token);
-      setPlayer(res.player);
-      void setCachedPlayer(res.player);
-      setStatus('signedIn');
+      return await resendEmailCode(email);
     } catch (err) {
+      // A 429 message already says how long to wait, in the server's own words.
       setError(err instanceof Error ? err.message : String(err));
       throw err;
-    } finally {
-      setBusy(false);
+    }
+  }, []);
+
+  const refreshPlayer = useCallback(async () => {
+    try {
+      const profile = await api.get<Player>('/auth/me');
+      setPlayer(profile);
+      void setCachedPlayer(profile);
+    } catch {
+      // Best-effort. A failed refresh leaves the previous player in place,
+      // which is stale but true-as-of-last-read; blanking it would be worse.
     }
   }, []);
 
@@ -199,8 +269,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ status, player, signIn, signUp, signInWithGoogle, signOut, error, clearError, busy }),
-    [status, player, signIn, signUp, signInWithGoogle, signOut, error, clearError, busy],
+    () => ({
+      status,
+      player,
+      signIn,
+      signUp,
+      confirmEmail,
+      resendCode,
+      signInWithGoogle,
+      refreshPlayer,
+      signOut,
+      error,
+      clearError,
+      busy,
+    }),
+    [
+      status,
+      player,
+      signIn,
+      signUp,
+      confirmEmail,
+      resendCode,
+      signInWithGoogle,
+      refreshPlayer,
+      signOut,
+      error,
+      clearError,
+      busy,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

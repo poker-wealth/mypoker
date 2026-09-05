@@ -1,9 +1,8 @@
-import { Router, type Request, type Response } from 'express';
+import express, { Router, type Request, type Response } from 'express';
 import type { GatewayConfig } from './config';
 import { requireAuth } from './auth';
 import {
   scoreFor,
-  tierOf,
   DEDUCTION,
   NORMAL_ROUNDS_TO_GOOD,
   vipProgress,
@@ -11,6 +10,16 @@ import {
   daysElapsedThisMonth,
   type FindingReason,
 } from '../players/index';
+import {
+  processAvatarUpload,
+  AvatarRejected,
+} from '../uploads/avatar-processing';
+import { vipSpec, VIP_TIERS } from '../players/vip';
+import { overrideStore } from '../players/override-store';
+
+import { effectiveReputation, isVipTier } from '../players/effective';
+import { avatarUploadLimiter as defaultAvatarUploadLimiter } from '../auth/avatar-upload-store';
+import type { AvatarUploadLimiter } from '../auth/avatar-upload-store';
 
 /**
  * Player-scoped reads: stats and game history.
@@ -70,8 +79,21 @@ export async function forwardTo(
   }
 }
 
-export function buildMeRouter(config: GatewayConfig): Router {
+/** A file that big could never become a valid avatar — refused before it is even buffered. */
+const AVATAR_MAX_UPLOAD_BYTES = 2 * 1024 * 1024;
+
+/**
+ * Injectable seams for testing the avatar-upload flow — same idea as
+ * `AuthDeps` in `./auth`. Defaults to the real rate limiter, so nothing about
+ * production wiring changes.
+ */
+export interface MeRouterDeps {
+  avatarUploadLimiter?: AvatarUploadLimiter;
+}
+
+export function buildMeRouter(config: GatewayConfig, deps: MeRouterDeps = {}): Router {
   const r = Router();
+  const uploadLimiter = deps.avatarUploadLimiter ?? defaultAvatarUploadLimiter;
   r.use(requireAuth(config));
 
   r.get('/stats', (req, res) => void forwardTo(config, req, res, '/me/stats'));
@@ -107,13 +129,26 @@ export function buildMeRouter(config: GatewayConfig): Router {
       if (!facts.ok) return sendUpstreamError(res, facts);
 
       const { roundsPlayed, findings } = facts.body;
-      const score = scoreFor(roundsPlayed, findings);
+      const computed = scoreFor(roundsPlayed, findings);
+
+      // An administrator override replaces the SCORE, never the facts under it.
+      // roundsPlayed and the findings below are still what actually happened —
+      // so a player granted a score of 90 still sees the rounds they have
+      // really played, and the two do not have to agree. They are different
+      // claims: one is a history, the other is a decision someone made.
+      const override = await overrideStore.get(req.player!.playerId);
+      const rep = effectiveReputation(computed, override);
+      const score = rep.score;
+
       res.json({
         score,
-        band: tierOf(score),
+        band: rep.band,
         roundsPlayed,
         roundsToAdvance: Math.max(0, NORMAL_ROUNDS_TO_GOOD - roundsPlayed),
         deducted: findings.reduce((sum, f) => sum + DEDUCTION[f], 0),
+        // Reported rather than hidden. A score that does not follow from the
+        // rounds beside it is confusing unless the screen can say why.
+        ...(rep.overridden ? { overridden: true, computedScore: rep.computedScore } : {}),
       });
     })();
   });
@@ -133,7 +168,69 @@ export function buildMeRouter(config: GatewayConfig): Router {
           })
         : null;
 
-      res.json({ ...progress, ...facts.body, estimatedDaysToNextTier });
+      const override = await overrideStore.get(req.player!.playerId);
+      const overriddenTier = isVipTier(override?.vipTier) ? override!.vipTier! : null;
+
+      if (!overriddenTier) {
+        res.json({ ...progress, ...facts.body, estimatedDaysToNextTier });
+        return;
+      }
+
+      /*
+       * An override replaces the WHOLE tier, not the identifier alone.
+       *
+       * A first version set `tier` and left `title` computed, so a player
+       * granted V5 saw the V5 badge beside the word "Wanderer" — V1's name.
+       * The title is derived from the tier by `vipSpec` for exactly this
+       * reason, and the admin route already did it that way; this one did not.
+       *
+       * `next` IS RECOMPUTED, not dropped. A later version set it to null,
+       * which was worse than the bug it replaced: the client reads
+       * `next === null` as "you are at the top tier", so a player granted V2
+       * was told they had reached V5's position. That is fixing a wrong label
+       * by making a wrong claim.
+       *
+       * So: `next` is the tier ABOVE the granted one in the ladder, and
+       * `remaining` is the real volume still needed to reach it. That figure is
+       * honest either way — it is what they would have to play to earn that
+       * tier — and it is the same arithmetic an un-overridden player sees. At
+       * the top of the ladder there genuinely is no next, and it stays null.
+       *
+       * Volume itself stays exactly as settled: it is what they really played.
+       */
+      const spec = vipSpec(overriddenTier);
+      const grantedIndex = VIP_TIERS.findIndex((t) => t.tier === spec.tier);
+      const above = VIP_TIERS[grantedIndex + 1];
+      const nextFromGrant = above
+        ? {
+            tier: above.tier,
+            title: above.title,
+            volumeRequired: above.volumeRequired,
+            // Never negative: a granted tier can sit above the volume actually
+            // played, and a negative "remaining" would render as a gap that
+            // does not exist.
+            remaining: Math.max(0, above.volumeRequired - facts.body.cumulativeEffective),
+          }
+        : null;
+      res.json({
+        ...progress,
+        ...facts.body,
+        estimatedDaysToNextTier: null,
+        next: nextFromGrant,
+        tier: spec.tier,
+        title: spec.title,
+        // Consistent with `remaining` above: real volume measured against the
+        // tier ABOVE the granted one. Leaving the computed value here would
+        // describe progress toward a different tier than `next` names, and
+        // pinning it to 100 was how the old version claimed a V2 had topped
+        // out. At the top of the ladder there is nothing left to progress
+        // toward, so 100 is the true answer there and only there.
+        progressPct: nextFromGrant
+          ? Math.min(100, Math.max(0, (facts.body.cumulativeEffective / nextFromGrant.volumeRequired) * 100))
+          : 100,
+        overridden: true,
+        computedTier: progress.tier,
+      });
     })();
   });
   r.get('/leagues', (req, res) => void forwardTo(config, req, res, '/me/leagues'));
@@ -143,7 +240,134 @@ export function buildMeRouter(config: GatewayConfig): Router {
   r.get('/settings', (req, res) => void forwardTo(config, req, res, '/me/settings'));
   r.patch('/settings', (req, res) => void forwardTo(config, req, res, '/me/settings'));
 
+  // Avatar upload. `requireAuth` above already covers this route — an
+  // unauthenticated POST never reaches the handler. The body is read as raw
+  // bytes, capped well before the resize a real photo needs, scoped to this
+  // one route rather than raising the gateway's app-wide express.json()
+  // limit (see gateway/app.ts) — a bad actor's oversized body is rejected by
+  // Express itself before a single byte of it is handed to sharp.
+  r.post(
+    '/avatar',
+    express.raw({ type: () => true, limit: AVATAR_MAX_UPLOAD_BYTES }),
+    (req: Request, res: Response) => {
+      void handleAvatarUpload(config, uploadLimiter, req, res);
+    },
+  );
+
   return r;
+}
+
+/**
+ * The heavy-lifting behind `POST /me/avatar`.
+ *
+ * Order matters: rate limit first — the cheapest check, and the one that
+ * must run even for an otherwise-perfectly-valid upload — THEN validate and
+ * re-encode (the dangerous part, see `uploads/avatar-processing.ts`), THEN
+ * hand the SAFE, already-processed bytes to financial-core, the only service
+ * with a database a player record can live in. The limiter is only charged
+ * once the whole thing actually succeeded, so a rejected or failed attempt
+ * does not burn quota the player never got any use from.
+ */
+async function handleAvatarUpload(
+  config: GatewayConfig,
+  uploadLimiter: AvatarUploadLimiter,
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const playerId = req.player!.playerId;
+
+  // RESERVE, not check. This was `check`, with the slot recorded ~340 lines
+  // later — after a sharp re-encode and an upstream POST. Two uploads arriving
+  // in the same window both passed a check neither had consumed yet
+  // (docs/TRAPS.md §14: the guard has to be taken before the await, not after).
+  const gate = await uploadLimiter.reserve(playerId);
+  if (!gate.ok) {
+    const seconds = Math.ceil(gate.retryAfterMs / 1000);
+    res.set('Retry-After', String(seconds));
+    res.status(429).json({
+      error:
+        gate.reason === 'cooldown'
+          ? `Please wait ${seconds}s before uploading another avatar.`
+          : 'Too many avatar uploads. Try again later.',
+      code: gate.reason,
+    });
+    return;
+  }
+
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+    res.status(400).json({ error: 'no image data received', code: 'empty_body' });
+    return;
+  }
+
+  let processed;
+  try {
+    processed = await processAvatarUpload(req.body);
+  } catch (err) {
+    if (err instanceof AvatarRejected) {
+      res.status(400).json({ error: err.message, code: err.code });
+      return;
+    }
+    console.error('[gateway] avatar processing failed:', err);
+    res.status(500).json({ error: 'internal error' });
+    return;
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+  try {
+    const upstream = await fetch(
+      `${config.financialCoreUrl}/api/v1/internal/avatars/${encodeURIComponent(playerId)}`,
+      {
+        method: 'PUT',
+        headers: {
+          'x-internal-secret': config.internalApiSecret,
+          'content-type': 'application/octet-stream',
+        },
+        body: processed.data,
+        signal: controller.signal,
+      },
+    );
+    if (!upstream.ok) {
+      console.error('[gateway] financial-core rejected avatar store:', upstream.status);
+      res.status(502).json({ error: 'financial service unavailable' });
+      return;
+    }
+  } catch (err) {
+    const aborted = err instanceof Error && err.name === 'AbortError';
+    console.error('[gateway] financial-core unreachable storing avatar:', err);
+    res.status(aborted ? 504 : 502).json({ error: 'financial service unavailable' });
+    return;
+  } finally {
+    clearTimeout(timer);
+  }
+
+  // Only counted against the limiter once financial-core actually accepted
+  // it — a rejected or failed attempt should not cost quota the player never
+  // got any use from.
+  // The slot was already taken by `reserve` above. Nothing to record here —
+  // recording again would charge one upload twice.
+
+
+  // Read back the settled settings rather than assert a shape here:
+  // whatever financial-core actually persisted (the UPLOADED_AVATAR
+  // sentinel, written by saveUploadedAvatar) is what the client should
+  // render, and this way that sentinel string lives in exactly one place —
+  // financial-core/src/settings/player-settings.ts — rather than being
+  // duplicated into this package too.
+  const settings = await upstreamJson<{ avatarId: string | null }>(config, req, '/me/settings');
+  if (!settings.ok) {
+    // The image itself is safely stored; only the confirmation read failed.
+    // Say so, rather than a bare 502 that reads as "your upload failed" when
+    // it did not.
+    res.status(200).json({
+      avatarUrl: `/avatars/${encodeURIComponent(playerId)}`,
+      settings: null,
+      warning: 'avatar stored, but could not read back settings',
+    });
+    return;
+  }
+
+  res.json({ ...settings.body, avatarUrl: `/avatars/${encodeURIComponent(playerId)}` });
 }
 
 // ── upstream helpers for the shaping routes ──────────────────────────────────

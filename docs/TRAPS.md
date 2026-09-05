@@ -131,6 +131,15 @@ Related: merge checks against a stale local `main` reported six branches as
 clean when they conflicted. Always `git fetch` and compare against
 `origin/main`.
 
+**Update, 26 Aug 2026: the Google fix IS on `origin/main` now.** The audience
+allow-list and the fail-closed 503 are both there — checked with
+`git show origin/main:game-server/src/gateway/auth.ts`, and confirmed against a
+running gateway, which answers 503 "Google sign-in is not configured" rather
+than accepting a token. Session handoffs were still describing it as unmerged
+and exploitable weeks after it landed, which is the same failure in the other
+direction: the note outlived the bug. **Check `origin/main` before repeating
+either claim** — that this entry had to be corrected is the point of it.
+
 ---
 
 ## 7. Comments that describe intentions, not code
@@ -361,3 +370,156 @@ When adding any input, ask what the keyboard covers, and put
 `keyboardShouldPersistTaps="handled"` on the scroller — without it the first
 tap on a button only dismisses the keyboard.
 
+---
+
+## 19. It compiled, it typechecked, and it could never have worked
+
+Two defects in one change, both invisible to `tsc`, `eslint` and the unit
+tests, both found within minutes of running the real thing against a real
+server.
+
+**A regex built in a template literal silently lost its backslash.** The code
+read ``new RegExp(`^\d{${OTP_LENGTH}}$`)`` — which looks exactly right. A
+template literal eats the escape, so the pattern compiled to `^d{6}$` and
+matched the literal string "dddddd" and nothing else. Every genuine
+confirmation code was rejected. It failed *closed*, so nothing crashed and no
+type was wrong; a unit test on the helper is what caught it, and only because
+the test asserted on real six-digit input rather than on the regex.
+
+Build patterns from a plain literal (`/^\d+$/`) and check length separately.
+If a pattern must be interpolated, `String.raw` it.
+
+**A service-to-service URL was missing its mount prefix.** financial-core
+mounts its ENTIRE router under `/api/v1` (`http/app.ts`), and every existing
+gateway → core call carries it. A new call written as `${base}/internal/...`
+typechecked, linted, and passed its tests — the tests inject a fake mailer, so
+the URL is never exercised — and would have 404'd in production, turning every
+sign-up into "we could not send the confirmation email" with nothing saying
+why. Note the trap underneath: the reverse direction genuinely has no prefix,
+because the gateway mounts its internal routes at the root. Two services, two
+mount points, no convention to lean on.
+
+**The pattern:** a string that is only ever read by another process is not
+covered by any check that runs in this one. The way to find out is to run both
+and watch the call happen. Both of these were found by standing the stack up
+locally — in-memory Mongo shared over TCP, a throwaway SMTP server capturing
+the actual message — which took less time than either bug would have taken to
+diagnose from a production report.
+
+## 20. A rule enforced on one door is not enforced
+
+**Suspension was checked on the password sign-in and not on Google.**
+`/auth/login` runs `isSignInAllowed`; `/auth/google` took whatever
+`userStore.oauth` returned and minted a session from it. So an administrator
+could suspend an account and the player would be back in one click on "Sign in
+with Google" — a ban that any banned player would discover was optional within
+about thirty seconds.
+
+Nothing in the suite would have caught it. Every existing sign-in test used the
+password path, so the Google route had full coverage of the questions it was
+already being asked and none of the new one.
+
+The fix that mattered was not adding the check — it was changing `oauth()` to
+return a **verdict** rather than an identity, so the caller cannot reach the
+identity without stepping past the refusal. A third sign-in method now cannot
+skip it by accident; it will not compile.
+
+**And the near-miss underneath:** the first version of that fix re-read
+`user.suspendedAt` inline instead of calling `isSignInAllowed` — a second copy
+of the rule, three lines from the file that exists to be the only copy. It was
+caught by mutation-testing the shared rule and noticing the Google path stayed
+green, which is the whole reason to break a guard on purpose rather than trust
+that a passing suite means it is load-bearing.
+
+**The pattern:** when you add a rule, enumerate the doors. Auth had two and only
+one was counted. Then make the type system carry the rule, because the next door
+will be added by someone who never read this.
+
+## 21. A check that only runs inside the process cannot see a browser's rule
+
+**The admin edit form failed with "cannot reach the server", and nothing was
+down.** The gateway advertised `Access-Control-Allow-Methods: GET, POST,
+OPTIONS`. The edit route is a `PATCH`. The browser reads that list *before*
+sending, refused, and `fetch` rejected with no response at all — which the
+client reports, correctly, as unreachable. The message was true and pointed at
+the network instead of at a header.
+
+All twenty-two route tests for that surface passed. Supertest calls the Express
+app directly and never performs a preflight, so the whole suite was blind to a
+rule only a browser enforces. Adding a verb to a router is therefore two
+changes, and the second one has no local consequence at all.
+
+The test that now covers it enumerates every verb the router actually mounts
+and asserts the preflight allows each — so a future `DELETE` fails in CI rather
+than in someone's browser.
+
+**A near-miss inside the fix:** the first version of that test asserted "more
+than 3 verbs are mounted" as a sanity floor. The app mounts exactly three, so
+the floor was a number nobody had checked, and it failed for the wrong reason.
+It now names the set.
+
+## 22. A cached identity is a claim that stops being true
+
+**An administrator renamed a player and the player's own app kept the old
+name.** The session player object is written to `localStorage` at sign-in and
+never rewritten; every screen reads it from there. `/auth/me` returned the new
+name the whole time — nothing was consulting it.
+
+A reload did not fix it, which is what makes this worse than a stale cache: a
+reload rehydrates the same object from storage. The old name would have
+survived until the player signed out and back in, and nothing on their screen
+would suggest that was the remedy.
+
+**The same bug in a worse costume:** `role` lives on that object too. Grant an
+account `ops` and its cached copy still says `player` — and `AdminShell` gates
+on exactly that copy, so the panel refuses its own newly-created administrator.
+Found by chasing the display name; the role case would have been reported as
+"the admin panel doesn't work for me" and diagnosed nowhere near here.
+
+The fix is one `refreshPlayer()` on boot for a restored session. The general
+shape: anything a SECOND party can change about you cannot be cached at first
+sight and trusted forever.
+
+## 23. A guard on one rail is not a guard
+
+**Suspension revoked HTTP sessions and did nothing on the live table.** The gate
+was consulted in exactly one place — `requireAuth` — so a suspended player's
+REST calls started failing while they carried on playing at the felt with the
+token they already held, for up to the full 24-hour TTL. That is precisely the
+window the feature was built to close.
+
+Eighteen tests covered suspension and every one of them passed, because they
+mount a bare HTTP route and never open a socket. The socket handshake verifies
+a JWT signature and expiry and asks nothing else.
+
+This is #20 ("a rule enforced on one door is not enforced") a second time, at a
+larger scale: there the two doors were password and Google sign-in, here they
+are two entire transports. The lesson did not generalise on its own, which is
+the point worth writing down — enumerate the RAILS, not just the routes, and
+remember that a WebSocket authenticates once at connect while HTTP
+re-authenticates on every request.
+
+**Two more from the same review, both the shape of "the guarantee is stated in
+a comment and not implemented":**
+
+- Every admin write applied BEFORE its audit entry was written. The audit
+  store's own header says a failed log should fail the request "rather than
+  leave an unattributed edit" — but by the time the log ran, the change was
+  already committed. A failed audit insert gave a 500 on a change that had
+  happened, with no record. The comment described an intention; the ordering
+  contradicted it.
+- `requireAdmin` trusted the `ops` claim in the token, so demoting an
+  administrator did nothing until the token expired. Suspension had
+  per-request revocation and role did not — which meant the only way to cut off
+  a rogue admin was to suspend them, and (see above) that would not have
+  reached their socket either.
+
+**And a cache that only ever grew.** Both the suspension gate and the override
+store refreshed entries on expiry without ever removing one, so each held a
+slot per distinct player for the life of the process. Not exploitable; a leak
+that gets worse exactly as the platform succeeds.
+
+**The pattern across all four:** each was a control that looked complete from
+inside the file it lived in. What found them was asking, from outside, "what
+else reaches this state?" — a second transport, a failed second write, a
+second kind of privilege, an unbounded lifetime.

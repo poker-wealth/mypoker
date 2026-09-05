@@ -1,7 +1,18 @@
 import { Router, type Request, type Response } from 'express';
 import { requireAuth, requireAdmin } from './auth';
-import { userStore } from '../auth/user-store';
-import { scoreFor, tierOf, tierForVolume, type FindingReason } from '../players/index';
+import { userStore, type AdminUserPatch } from '../auth/user-store';
+import { adminAudit, changedFields, withAuditTransaction } from '../auth/admin-audit-store';
+import { defaultSuspensionGate } from '../auth/suspension-gate';
+import {
+  validateDisplayName,
+  validateEmailAddress,
+  validatePasswordStrength,
+} from '../auth/credential-rules';
+import { scoreFor, tierForVolume, type FindingReason } from '../players/index';
+import { MIN_SCORE, MAX_SCORE } from '../players/reputation';
+import { VIP_TIERS } from '../players/vip';
+import { effectiveReputation, effectiveVipTier, isVipTier } from '../players/effective';
+import { overrideStore } from '../players/override-store';
 import { severityOf, labelOf } from '../ops/alert-severity';
 import type { GatewayConfig } from './config';
 
@@ -233,10 +244,19 @@ export function buildAdminRouter(config: GatewayConfig): Router {
         res.status(result.status).json({ error: result.error });
         return;
       }
+      // The same resolver the detail view uses. This queue showed RAW tiers, so
+      // an ops reviewer deciding on a withdrawal saw one tier here and a
+      // different one on the player's own page — with money in the balance.
+      const overrides = await overrideStore.getMany(
+        result.body.withdrawals.map((w) => w.playerId),
+      );
       res.json({
         withdrawals: result.body.withdrawals.map((w) => {
-          const tier = tierForVolume(w.cumulativeEffective);
-          return { ...w, vipTier: tier.tier, vipTitle: tier.title };
+          const vip = effectiveVipTier(
+            tierForVolume(w.cumulativeEffective).tier,
+            overrides.get(w.playerId) ?? null,
+          );
+          return { ...w, vipTier: vip.tier, vipTitle: vip.title };
         }),
       });
     }),
@@ -395,8 +415,22 @@ export function buildAdminRouter(config: GatewayConfig): Router {
       // disagree with what the player sees, and an admin and a player holding
       // different numbers for the same account is worse than neither having one.
       const { roundsPlayed, findings } = detail.body.reputation;
-      const score = scoreFor(roundsPlayed, findings);
-      const tier = tierForVolume(detail.body.volume.cumulativeEffective);
+      const computedScore = scoreFor(roundsPlayed, findings);
+      const computedTier = tierForVolume(detail.body.volume.cumulativeEffective);
+
+      // Both the computed value and the override are returned, so the form can
+      // show what the player WOULD have and what an administrator decided
+      // instead. Showing only the effective number would make an override
+      // invisible the moment the page reloaded, and there would be no way to
+      // tell a granted tier from an earned one.
+      const override = await overrideStore.get(playerId);
+      // Through the shared resolver, not a local copy of the same two lines.
+      // This view was already correct; routing it through anyway is the point —
+      // one derivation means a change here reaches the gate and the lists at
+      // the same time, which is exactly what was not true before.
+      const rep = effectiveReputation(computedScore, override);
+      const score = rep.score;
+      const vip = effectiveVipTier(computedTier.tier, override);
 
       res.json({
         ...detail.body,
@@ -407,45 +441,610 @@ export function buildAdminRouter(config: GatewayConfig): Router {
               createdAt: identity.createdAt ?? null,
             }
           : null,
-        reputation: { roundsPlayed, findings, score, band: tierOf(score) },
-        vip: { tier: tier.tier, title: tier.title },
+        reputation: { roundsPlayed, findings, score, band: rep.band },
+        vip: { tier: vip.tier, title: vip.title },
+        override: {
+          reputationScore: override?.reputationScore ?? null,
+          vipTier: override?.vipTier ?? null,
+          computedScore,
+          computedTier: computedTier.tier,
+          setBy: override?.setBy ?? null,
+          reason: override?.reason ?? null,
+          at: override?.at ?? null,
+        },
       });
     }),
   );
 
   /**
-   * Screen 3b — the full Users list.
+   * ── Editing a user ────────────────────────────────────────────────────────
    *
-   * Players ARE financial accounts (Telegram players have no identity document,
-   * so the user store alone would miss them). financial-core returns every
-   * player + balance; this enriches each with the email/nickname it alone holds,
-   * in ONE lookup. Read-only — the row links to the same read-only detail.
+   * Everything below is a write, and everything below is audited. Three rules
+   * hold across all of them, and they are the reason this surface is safe to
+   * hand an administrator:
+   *
+   *  1. The acting admin comes from `actor(req)` — the verified token — never
+   *     the body. Same rule as `approvedBy` on a withdrawal.
+   *  2. Every write records a before/after pair in the admin audit log, and the
+   *     audit write is AWAITED. An action taken with no record of it is the one
+   *     outcome this whole surface exists to prevent.
+   *  3. Validation is the SAME function the player's own self-service route
+   *     calls. An admin form with a looser rule is how a display name of 900
+   *     characters or an unreachable email address gets onto a live account.
+   *
+   * Two fields are deliberately absent, and both are specification, not
+   * caution:
+   *
+   *  - BALANCE. "DBA direct balance update attempt → MongoDB RBAC rejects
+   *    (permission denied logged)" (12-week plan, acceptance criteria). Money
+   *    moves through `transfer()` and leaves a double-entry pair; a figure typed
+   *    into a form leaves a balance no ledger explains, which
+   *    `scripts/ledger-integrity.ts` would then report as a real discrepancy.
+   *  - WITHDRAWAL ADDRESS. "Withdrawal address modification: 48-hour cooldown,
+   *    player must execute via link (CS cannot directly modify)", asserted as
+   *    "CS attempt to modify withdrawal address via API: 403 Forbidden". An
+   *    admin who can retarget a payout address is the entire threat model of an
+   *    insider attack on a poker platform.
    */
+
+  /**
+   * Override a DERIVED value — reputation score or VIP tier.
+   *
+   * The owner asked for these to be editable. They are computed, not stored, so
+   * this records a decision beside the computation rather than rewriting the
+   * facts underneath it: rounds played, findings and settled volume stay
+   * exactly as the ledger says. A profile that contradicts its own history is
+   * the same failure as a balance no ledger entry explains.
+   *
+   * A REASON IS REQUIRED. Every other admin write treats it as optional, and
+   * this one does not: an override has no evidence behind it by definition —
+   * there is no round, no settlement, no deposit to point at — so the sentence
+   * an administrator writes is the entire record of why the number is what it
+   * is. Six months later it is all anyone has.
+   *
+   * `null` clears a field and returns the player to their computed value, so
+   * nothing here is destructive.
+   */
+  r.post(
+    '/players/:playerId/override',
+    handle(async (req, res) => {
+      const playerId = String(req.params.playerId);
+      const body = (req.body ?? {}) as {
+        reputationScore?: unknown;
+        vipTier?: unknown;
+        reason?: unknown;
+      };
+
+      const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+      if (!reason) {
+        res.status(400).json({ error: 'a reason is required for an override', code: 'reason_required' });
+        return;
+      }
+
+      const patch: { reputationScore?: number | null; vipTier?: string | null } = {};
+
+      if (body.reputationScore !== undefined) {
+        if (body.reputationScore === null) {
+          patch.reputationScore = null;
+        } else if (
+          typeof body.reputationScore === 'number' &&
+          Number.isInteger(body.reputationScore) &&
+          body.reputationScore >= MIN_SCORE &&
+          body.reputationScore <= MAX_SCORE
+        ) {
+          patch.reputationScore = body.reputationScore;
+        } else {
+          // FROM THE CONSTANTS, not a number written here. Reputation is a
+          // 0–1000 scale (v5.9 §10.1); an earlier draft of this bound guessed
+          // 0–100, which silently made every allowed value a failing one — 95
+          // on a 1000-point scale is VERY_POOR, so "set their score to 95"
+          // read as a promotion and delivered the worst band on the platform.
+          res
+            .status(400)
+            .json({ error: `reputationScore must be an integer ${MIN_SCORE}–${MAX_SCORE}, or null` });
+          return;
+        }
+      }
+
+      if (body.vipTier !== undefined) {
+        if (body.vipTier === null) {
+          patch.vipTier = null;
+        } else if (isVipTier(body.vipTier)) {
+          patch.vipTier = body.vipTier;
+        } else {
+          res.status(400).json({ error: `vipTier must be one of ${VIP_TIERS.map((t) => t.tier).join(', ')}, or null` });
+          return;
+        }
+      }
+
+      if (patch.reputationScore === undefined && patch.vipTier === undefined) {
+        res.status(400).json({ error: 'nothing to change' });
+        return;
+      }
+
+      /*
+       * Refuse an override for a player who does not exist.
+       *
+       * Checked against FINANCIAL-CORE, not the user store, and that difference
+       * is the whole point. The neighbouring routes (`/suspension`,
+       * `/password`, `/account`) check the user store because they edit
+       * identity fields — a username, an address, a password — which a Telegram
+       * player genuinely does not have.
+       *
+       * Reputation and VIP are not identity. A Telegram player earns both by
+       * playing, and has no user-store record at all, so copying the
+       * neighbours' check would refuse an override for every Telegram player on
+       * the platform: a cosmetic inconsistency traded for a real exclusion of
+       * probably the larger population.
+       *
+       * Without any check, a typo'd id writes an override document keyed to
+       * nobody — inert, but it would apply silently if that id ever became a
+       * real player.
+       */
+      const detail = await internal<{ playerId: string; hasAccount: boolean }>(
+        `/internal/players/${encodeURIComponent(playerId)}`,
+      );
+      if (!detail.ok) {
+        // financial-core failing must NOT be reported as "that player does not
+        // exist" — an admin would conclude they had the wrong id and go looking
+        // for a second one that was never wrong.
+        res.status(detail.status).json({ error: detail.error });
+        return;
+      }
+
+      /*
+       * `hasAccount`, not the status code.
+       *
+       * A first version waited for a 404 that financial-core never sends: that
+       * route answers 200 with `hasAccount: false` for ANY string, so the check
+       * passed for every id including nonsense. A guard that cannot fail —
+       * docs/TRAPS.md #1, written about this project, reintroduced by the
+       * person who wrote it.
+       *
+       * `hasAccount: false` alone is not proof of absence: a real web sign-up
+       * has no financial account until money moves. So the user store is asked
+       * too, and only an id unknown to BOTH is refused.
+       */
+      if (!detail.body.hasAccount && !(await userStore.byPlayerId(playerId))) {
+        res.status(404).json({ error: 'no such player', code: 'no_such_player' });
+        return;
+      }
+
+      // An override has no evidence behind it but the reason written here, so
+      // losing the entry would leave a number nobody can account for at all.
+      const { after } = await withAuditTransaction(async (session) => {
+        const outcome = await overrideStore.set(playerId, patch, actor(req), reason, session);
+
+        await adminAudit.record(
+          {
+            actorPlayerId: actor(req),
+            subjectPlayerId: playerId,
+            action: 'user.override',
+            before: {
+              reputationScore: outcome.before?.reputationScore ?? null,
+              vipTier: outcome.before?.vipTier ?? null,
+            },
+            after: {
+              reputationScore: outcome.after?.reputationScore ?? null,
+              vipTier: outcome.after?.vipTier ?? null,
+            },
+            reason,
+          },
+          session,
+        );
+        return outcome;
+      });
+
+      res.json({
+        reputationScore: after?.reputationScore ?? null,
+        vipTier: after?.vipTier ?? null,
+        setBy: after?.setBy ?? null,
+        reason: after?.reason ?? null,
+        at: after?.at ?? null,
+      });
+    }),
+  );
+
+  /** What an administrator may see and edit about one account. */
+  r.get(
+    '/players/:playerId/account',
+    handle(async (req, res) => {
+      const record = await userStore.adminGet(String(req.params.playerId));
+      if (!record) {
+        // Not an error: a Telegram player genuinely has no identity document.
+        // Said in words, because "null" and "failed to load" look identical in
+        // a UI that does not distinguish them.
+        res.status(404).json({
+          error: 'no web identity for this player',
+          code: 'no_identity',
+          note: 'Telegram players have no identity record — nothing here is editable for them.',
+        });
+        return;
+      }
+      res.json(record);
+    }),
+  );
+
+  /** The audit trail for one account. Read-only; there is no delete path. */
+  r.get(
+    '/players/:playerId/audit',
+    handle(async (req, res) => {
+      const entries = await adminAudit.forSubject(String(req.params.playerId), 100);
+      res.json({ entries });
+    }),
+  );
+
+  /**
+   * Edit the identity fields.
+   *
+   * CHANGING AN EMAIL RESETS CONFIRMATION unless the admin explicitly says
+   * otherwise. Carrying `emailVerified: true` across an address change would
+   * mark an address confirmed that nobody has ever proved control of — the
+   * admin typed it, which is not the same thing. The override exists because
+   * support legitimately needs it (a player who changed provider and can prove
+   * identity another way), but it has to be asked for.
+   */
+  r.patch(
+    '/players/:playerId',
+    handle(async (req, res) => {
+      const playerId = String(req.params.playerId);
+      const body = (req.body ?? {}) as Record<string, unknown>;
+      const patch: AdminUserPatch = {};
+
+      if (body.displayName !== undefined) {
+        if (typeof body.displayName !== 'string') {
+          res.status(400).json({ error: 'displayName must be a string' });
+          return;
+        }
+        const verdict = validateDisplayName(body.displayName);
+        if (!verdict.ok) {
+          res.status(400).json({ error: verdict.message, code: verdict.code });
+          return;
+        }
+        patch.displayName = verdict.displayName;
+      }
+
+      if (body.email !== undefined) {
+        if (body.email === null) {
+          patch.email = null;
+        } else if (typeof body.email === 'string') {
+          const verdict = validateEmailAddress(body.email.trim());
+          if (!verdict.ok) {
+            res.status(400).json({ error: verdict.message, code: verdict.code });
+            return;
+          }
+          patch.email = body.email.trim();
+        } else {
+          res.status(400).json({ error: 'email must be a string or null' });
+          return;
+        }
+      }
+
+      if (body.phone !== undefined) {
+        if (body.phone === null) patch.phone = null;
+        else if (typeof body.phone === 'string') patch.phone = body.phone;
+        else {
+          res.status(400).json({ error: 'phone must be a string or null' });
+          return;
+        }
+      }
+
+      if (body.role !== undefined) {
+        // Only the two the document can actually hold. `league_admin` exists in
+        // the token type but nothing grants or reads it yet, and offering a role
+        // that confers nothing is a control an admin would reasonably expect to
+        // do something.
+        if (body.role !== 'player' && body.role !== 'ops') {
+          res.status(400).json({ error: 'role must be player or ops' });
+          return;
+        }
+        patch.role = body.role;
+      }
+
+      if (typeof body.emailVerified === 'boolean') {
+        patch.emailVerified = body.emailVerified;
+      } else if (patch.email !== undefined && patch.email !== null) {
+        // The address changed and the admin did not speak to confirmation —
+        // so it is unconfirmed. See the route comment.
+        patch.emailVerified = false;
+      }
+
+      // The write and its audit entry commit together or not at all. Applied
+      // first and logged second, a failed log left the change live with no
+      // record of it — the one state the audit log exists to make impossible.
+      const result = await withAuditTransaction(async (session) => {
+        const outcome = await userStore.adminUpdate(playerId, patch, session);
+        if (!outcome.ok) return outcome;
+
+        const diff = changedFields(
+          outcome.before as unknown as Record<string, unknown>,
+          outcome.after as unknown as Record<string, unknown>,
+        );
+
+        // Only write an audit entry when something actually moved. A log full of
+        // no-op saves is a log nobody scrolls through, and the entries that
+        // matter are the ones lost in it.
+        if (Object.keys(diff.after).length > 0) {
+          await adminAudit.record(
+            {
+              actorPlayerId: actor(req),
+              subjectPlayerId: playerId,
+              action: 'user.update',
+              before: diff.before,
+              after: diff.after,
+              ...(typeof body.reason === 'string' && body.reason.trim()
+                ? { reason: body.reason.trim() }
+                : {}),
+            },
+            session,
+          );
+        }
+        return outcome;
+      });
+
+      if (!result.ok) {
+        const status = result.reason === 'no_account' ? 404 : 409;
+        res.status(status).json({ error: result.reason, code: result.reason });
+        return;
+      }
+
+      // AFTER the commit, never inside it. Priming a cache from within a
+      // transaction that then rolls back would leave the process believing a
+      // role change that never landed.
+      if (patch.role !== undefined) {
+        defaultSuspensionGate.primeRole(playerId, result.after.role === 'ops');
+      }
+
+      res.json(result.after);
+    }),
+  );
+
+  /**
+   * Suspend or reinstate.
+   *
+   * Its own route rather than a field on the patch above, so the acting
+   * administrator is recorded ON THE ACCOUNT (`suspendedBy`) and not only in the
+   * audit log. The first question about a locked-out player is who locked them
+   * out, and it should be answerable from the record in front of you.
+   */
+  r.post(
+    '/players/:playerId/suspension',
+    handle(async (req, res) => {
+      const playerId = String(req.params.playerId);
+      const body = (req.body ?? {}) as { suspended?: unknown; reason?: unknown };
+
+      if (typeof body.suspended !== 'boolean') {
+        res.status(400).json({ error: 'suspended must be true or false' });
+        return;
+      }
+
+      // An administrator suspending themselves locks the panel behind an account
+      // that can no longer sign in to unlock it. Refused here rather than
+      // discovered afterwards.
+      if (body.suspended && playerId === actor(req)) {
+        res.status(400).json({
+          error: 'you cannot suspend your own account',
+          code: 'self_suspend',
+        });
+        return;
+      }
+
+      const reason = typeof body.reason === 'string' ? body.reason.trim() : undefined;
+
+      // Suspension and its audit entry commit together. A ban applied with no
+      // record of who issued it is the one outcome this log exists to prevent.
+      const result = await withAuditTransaction(async (session) => {
+        const outcome = await userStore.adminSetSuspended(
+          playerId,
+          body.suspended as boolean,
+          actor(req),
+          reason,
+          session,
+        );
+        if (!outcome) return null;
+
+        await adminAudit.record(
+          {
+            actorPlayerId: actor(req),
+            subjectPlayerId: playerId,
+            action: body.suspended ? 'user.suspend' : 'user.reinstate',
+            before: { suspendedAt: outcome.before.suspendedAt },
+            after: { suspendedAt: outcome.after.suspendedAt },
+            ...(reason ? { reason } : {}),
+          },
+          session,
+        );
+        return outcome;
+      });
+
+      if (!result) {
+        res.status(404).json({ error: 'no web identity for this player', code: 'no_identity' });
+        return;
+      }
+
+      // Primed AFTER the commit. Inside the transaction, a rollback would leave
+      // this process enforcing a suspension the database never recorded.
+      //
+      // It takes effect NOW rather than when the cache next expires: without it
+      // an administrator watches a suspended cheat keep playing for the length
+      // of a TTL and reasonably concludes the button did nothing.
+      defaultSuspensionGate.prime(playerId, body.suspended);
+
+      // The gate covers HTTP. The FELT is a separate rail: a socket authorizes
+      // once at handshake and then runs on that decision, so a player already
+      // seated when the ban lands keeps their seat, their stack and their turn
+      // until the connection drops. Standing them up and closing the socket is
+      // what makes the button mean what an administrator thinks it means.
+      //
+      // Not awaited into the response and never fatal: the suspension IS
+      // committed by this point, and a room that refuses a mid-hand stand must
+      // not turn a successful ban into a 500. The handshake gate catches them
+      // on any reconnect regardless.
+      if (body.suspended) {
+        const hub = req.app.locals.tableHub as { evict?: (id: string) => Promise<unknown> } | undefined;
+        void hub?.evict?.(playerId)?.catch((err: unknown) =>
+          console.error(`[admin] could not evict ${playerId} from the felt:`, err),
+        );
+      }
+
+      res.json(result.after);
+    }),
+  );
+
+  /**
+   * Set a password on behalf of a player.
+   *
+   * The new password is read from the body, hashed, and never returned, logged
+   * or stored in the audit entry — the entry records THAT a password was set and
+   * by whom, which is the auditable fact. Writing the value would put a live
+   * credential in a collection built to be read by people.
+   */
+  r.post(
+    '/players/:playerId/password',
+    handle(async (req, res) => {
+      const playerId = String(req.params.playerId);
+      const body = (req.body ?? {}) as { newPassword?: unknown; reason?: unknown };
+
+      if (typeof body.newPassword !== 'string') {
+        res.status(400).json({ error: 'newPassword is required' });
+        return;
+      }
+      const verdict = validatePasswordStrength(body.newPassword);
+      if (!verdict.ok) {
+        res.status(400).json({ error: verdict.message, code: verdict.code });
+        return;
+      }
+
+      // Of all four writes this is the one where a lost audit entry matters
+      // most: a password changed with no record of who changed it is
+      // indistinguishable from an account takeover.
+      const result = await withAuditTransaction(async (session) => {
+        const outcome = await userStore.adminSetPassword(
+          playerId,
+          body.newPassword as string,
+          session,
+        );
+        if (!outcome.ok) return outcome;
+
+        await adminAudit.record(
+          {
+            actorPlayerId: actor(req),
+            subjectPlayerId: playerId,
+            action: 'user.set_password',
+            ...(typeof body.reason === 'string' && body.reason.trim()
+              ? { reason: body.reason.trim() }
+              : {}),
+          },
+          session,
+        );
+        return outcome;
+      });
+
+      if (!result.ok) {
+        const status = result.reason === 'no_account' ? 404 : 400;
+        res.status(status).json({ error: result.reason, code: result.reason });
+        return;
+      }
+
+      res.json({ ok: true });
+    }),
+  );
+
+  /**
+   * Screen 3b — the full Users list. THE UNION of two populations.
+   *
+   * Neither source alone is the user base, and the list used to be only the
+   * first:
+   *
+   *   financial-core's players — every account money has touched. Includes
+   *     Telegram players, who have no identity document at all and are
+   *     reachable no other way.
+   *   the gateway's user store — every web registration. Includes accounts that
+   *     have never deposited or played, which financial-core has never heard of.
+   *
+   * Built from the first alone, the screen was the INTERSECTION in practice: a
+   * fresh sign-up was invisible until they touched money. Someone could
+   * register, fail to get in, contact support, and be told no such account
+   * exists — and new sign-ups are exactly who support is asked about first.
+   *
+   * `balance: null` on an identity-only row is a fact, not a gap: there is no
+   * financial account yet. The client already renders null as "no account"
+   * rather than as zero, which is the distinction that matters.
+   */
+  const USERS_LIMIT = 200;
+
   r.get(
     '/users',
     handle(async (req, res) => {
-      const limit = typeof req.query.limit === 'string' ? `?limit=${encodeURIComponent(req.query.limit)}` : '';
-      const result = await internal<{ players: PlayerListShape[]; truncated: boolean }>(
-        `/internal/ops/players${limit}`,
-      );
+      const requested = Number(req.query.limit);
+      const limit =
+        Number.isFinite(requested) && requested > 0 ? Math.min(requested, USERS_LIMIT) : USERS_LIMIT;
+
+      // Both sides in parallel — one is over HTTP, the other is a local query,
+      // and running them in sequence would pay the network cost for nothing.
+      const [result, identities] = await Promise.all([
+        internal<{ players: PlayerListShape[]; truncated: boolean }>(
+          `/internal/ops/players?limit=${limit}`,
+        ),
+        userStore.listIdentities(limit + 1),
+      ]);
+
       if (!result.ok) {
+        // financial-core being down is NOT a reason to show an identity-only
+        // list with every balance blank — an admin reading "no account" against
+        // a player who holds funds would act on the wrong fact. Fail loudly.
         res.status(result.status).json({ error: result.error });
         return;
       }
-      const identities = await userStore.byPlayerIds(result.body.players.map((p) => p.playerId));
+
+      const byId = new Map(identities.map((i) => [i.playerId, i]));
+      const seen = new Set<string>();
+
+      /** A row from either source. The money fields are null when there is no account. */
+      interface UserRow {
+        playerId: string;
+        displayName: string | null;
+        email: string | null;
+        balance: string | null;
+        available: string | null;
+        joinedAt: string;
+      }
+
+      const rows: UserRow[] = result.body.players.map((p) => {
+        seen.add(p.playerId);
+        const identity = byId.get(p.playerId);
+        return {
+          playerId: p.playerId,
+          displayName: identity?.displayName ?? null,
+          email: identity?.email ?? null,
+          balance: p.balance,
+          available: p.available,
+          joinedAt: p.joinedAt,
+        };
+      });
+
+      for (const i of identities) {
+        if (seen.has(i.playerId)) continue;
+        rows.push({
+          playerId: i.playerId,
+          displayName: i.displayName ?? null,
+          email: i.email ?? null,
+          // null, never '0' — no account is a different fact from an empty one.
+          balance: null,
+          available: null,
+          joinedAt: i.createdAt,
+        });
+      }
+
+      // Newest first, across both sources, on the one field they share.
+      rows.sort((a, b) => (a.joinedAt < b.joinedAt ? 1 : a.joinedAt > b.joinedAt ? -1 : 0));
+
       res.json({
-        users: result.body.players.map((p) => {
-          const identity = identities.get(p.playerId);
-          return {
-            playerId: p.playerId,
-            displayName: identity?.displayName ?? null,
-            email: identity?.email ?? null,
-            balance: p.balance,
-            available: p.available,
-            joinedAt: p.joinedAt,
-          };
-        }),
-        truncated: result.body.truncated,
+        users: rows.slice(0, limit),
+        // Truncated if EITHER source had more. Said honestly rather than
+        // inferred from the merged length, which can be short of the limit
+        // while one source was still cut off.
+        truncated: result.body.truncated || identities.length > limit || rows.length > limit,
       });
     }),
   );
@@ -475,8 +1074,45 @@ export function buildAdminRouter(config: GatewayConfig): Router {
         res.status(400).json({ error: 'email and password are required' });
         return;
       }
+      // The SHARED credential rules, not a third copy. `createAdmin` carried its
+      // own `password.length < 8`, which is the rule `credential-rules.ts`
+      // exists to hold once — and an admin account is the last place to let a
+      // second copy drift looser than the players'.
+      const emailVerdict = validateEmailAddress(email);
+      if (!emailVerdict.ok) {
+        res.status(400).json({ error: emailVerdict.message, code: emailVerdict.code });
+        return;
+      }
+      const passwordVerdict = validatePasswordStrength(password);
+      if (!passwordVerdict.ok) {
+        res.status(400).json({ error: passwordVerdict.message, code: passwordVerdict.code });
+        return;
+      }
+
       try {
-        const admin = await userStore.createAdmin(email, password, body.displayName);
+        // Creation and its audit entry commit together, the same as suspension.
+        // An administrator minted with no record of who minted them is the one
+        // outcome this log exists to prevent — and it is the highest-privilege
+        // write in the panel.
+        const admin = await withAuditTransaction(async (session) => {
+          const created = await userStore.createAdmin(email, password, body.displayName, session);
+          await adminAudit.record(
+            {
+              actorPlayerId: actor(req),
+              subjectPlayerId: created.playerId,
+              action: 'admin.create',
+              // The address, never the password — the auditable fact is WHO was
+              // granted authority, and writing the credential would put a live
+              // secret in a collection built to be read by people.
+              after: { email: created.email ?? email, role: 'ops' },
+              ...(typeof body.reason === 'string' && body.reason.trim()
+                ? { reason: body.reason.trim() }
+                : {}),
+            },
+            session,
+          );
+          return created;
+        });
         res.json({ admin });
       } catch (err) {
         res.status(400).json({ error: err instanceof Error ? err.message : 'could not create admin' });

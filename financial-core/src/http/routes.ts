@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from 'express';
+import express, { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { Money } from '../domain/money';
 import { LedgerType, LedgerDirection, PLATFORM_SCOPE } from '../domain/account-types';
@@ -59,7 +59,8 @@ import { getDepositAddress } from '../wallet/deposit-address';
 import { getWalletTransactions, getWithdrawals } from '../wallet/wallet-views';
 import { isValidTronAddress } from '../wallet/tron-address';
 import { getPlayerStats, getPlayerHistory } from '../stats/player-stats';
-import { getSettings, updateSettings } from '../settings/player-settings';
+import { getSettings, updateSettings, AVATAR_IDS } from '../settings/player-settings';
+import { saveUploadedAvatar, getAvatarImage } from '../settings/avatar-store';
 import { getReputationFacts } from '../reputation/player-reputation';
 import {
   createLeague,
@@ -92,6 +93,8 @@ import {
   listNotifications,
   markRead,
 } from '../notifications/notification-store';
+import { sendEmail } from '../notifications/email/send-email';
+import { emailConfirmationCode } from '../notifications/email/templates';
 import { getVolumeFacts, recordVolume, getPublicRtp } from '../vip/volume-tracker';
 import { AccountModel } from '../wallet/account.model';
 import { WithdrawalModel } from '../withdrawal/withdrawal.model';
@@ -727,6 +730,49 @@ export function buildRouter(): Router {
     }),
   );
 
+  /**
+   * Send an email-confirmation code on the gateway's behalf.
+   *
+   * WHY THE MONEY SERVICE SENDS AN IDENTITY EMAIL: there is one mailbox, and
+   * the transport, its connection pool and the per-event dedupe all live here
+   * already. A second nodemailer in the gateway would be a second copy of the
+   * port/TLS rules — the pair that hangs rather than fails when they disagree —
+   * and a second place for the owner to keep credentials in step.
+   *
+   * NARROW BY DESIGN. It takes an address, a code and a lifetime; the body is
+   * rendered here from a fixed template. It does NOT accept a subject, HTML or
+   * text. The internal secret is shared with more processes than a general
+   * "send this email" capability should be, and the difference between this
+   * endpoint and a spam relay operating from our own domain is precisely that
+   * the caller cannot choose the content.
+   *
+   * The outcome is REPORTED, not swallowed. Money receipts are best-effort
+   * because the credit matters and the receipt is a courtesy; a confirmation
+   * code is the control itself, and the gateway refuses the signup when it did
+   * not go out.
+   */
+  const otpEmailBody = z.object({
+    // Format-checked, not merely non-empty: this is the one field that decides
+    // where mail from our domain lands, and it arrives from a signup form.
+    to: z.string().email(),
+    code: z.string().regex(/^\d{4,10}$/),
+    expiresInMinutes: z.number().int().positive().max(60),
+    eventId: z.string().min(1).max(200),
+  });
+  r.post(
+    '/internal/email/otp',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const body = otpEmailBody.parse(req.body);
+      const outcome = await sendEmail(
+        body.to,
+        emailConfirmationCode({ code: body.code, expiresInMinutes: body.expiresInMinutes }),
+        body.eventId,
+      );
+      res.json({ outcome });
+    }),
+  );
+
   // ── VIP ──────────────────────────────────────────────────────────────────
   // Volume FACTS. The ladder (thresholds, titles, progress) is applied by the
   // gateway from game-server/src/players/vip.ts.
@@ -808,6 +854,8 @@ export function buildRouter(): Router {
     notifyResults: z.boolean().optional(),
     notifyDeposits: z.boolean().optional(),
     notifyPromos: z.boolean().optional(),
+    // Curated set only — the server is the authority on what avatars exist.
+    avatarId: z.enum(AVATAR_IDS).nullable().optional(),
   });
   r.patch(
     '/me/settings',
@@ -815,6 +863,58 @@ export function buildRouter(): Router {
     asyncHandler(async (req: Request, res: Response) => {
       const patch = settingsBody.parse(req.body);
       res.json(await updateSettings(req.dataScope!.playerId, patch));
+    }),
+  );
+
+  // ── Avatar images (internal) ─────────────────────────────────────────────
+  // The gateway is the only public entry point for an uploaded file. By the
+  // time either route below is called, the bytes have already been
+  // magic-byte-sniffed, pixel-bounded and re-encoded to a metadata-free JPEG
+  // (game-server/src/uploads/avatar-processing.ts) — these routes exist only
+  // because the gateway has no player-scoped database of its own to put the
+  // result in. `internalAuth`, never a player token: a player's own upload
+  // goes through the gateway's `/me/avatar`, which calls this with the
+  // service secret after processing, not with the caller's JWT.
+  r.put(
+    '/internal/avatars/:playerId',
+    internalAuth,
+    // Raw bytes, not base64-in-JSON: this is the exact re-encoded image, and
+    // base64 would burn roughly a third more bytes for no benefit to a
+    // service caller. Scoped to this one route rather than raising the
+    // app-wide express.json() limit above — and since the request's
+    // Content-Type here is never application/json, that global parser skips
+    // it entirely rather than needing a bigger budget.
+    express.raw({ type: () => true, limit: '512kb' }),
+    asyncHandler(async (req: Request, res: Response) => {
+      const playerId = String(req.params.playerId);
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+        throw new ApiError(400, 'expected raw image bytes');
+      }
+      try {
+        await saveUploadedAvatar(playerId, req.body);
+      } catch (err) {
+        // MAX_STORED_AVATAR_BYTES and the empty-buffer guard both throw
+        // RangeError — a caller's problem (400), not this service's (500).
+        if (err instanceof RangeError) throw new ApiError(400, err.message);
+        throw err;
+      }
+      res.status(204).end();
+    }),
+  );
+
+  r.get(
+    '/internal/avatars/:playerId',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const image = await getAvatarImage(String(req.params.playerId));
+      if (!image) throw new ApiError(404, 'no uploaded avatar');
+      // Raw bytes out, mirroring the PUT above. The PUBLIC content-type,
+      // Content-Disposition, nosniff and cache headers are set by the
+      // gateway (game-server/src/gateway/avatar-routes.ts) — never derived
+      // from anything reported here, so a corrupted or tampered row can never
+      // make a browser sniff and execute something other than an image.
+      res.setHeader('X-Avatar-Updated-At', image.updatedAt.toISOString());
+      res.status(200).type('application/octet-stream').send(image.data);
     }),
   );
 

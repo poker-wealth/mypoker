@@ -17,6 +17,7 @@ export type RootStackParamList = {
   Vip: undefined;
   Notifications: undefined;
   Settings: undefined;
+  PersonalInfo: undefined;
   AgentCenter: undefined;
   Wallet: undefined;
   Jackpot: undefined;

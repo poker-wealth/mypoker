@@ -2,6 +2,8 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { LobbyService, parseTableFilter } from '../lobby';
 import { PLATFORM_CONTEXT, type ViewerContext } from '../lobby/lobby-service';
 import type { GatewayConfig } from './config';
+import { verifyToken } from './tokens';
+import type { TableHub } from '../live/table-hub';
 
 /**
  * Lobby reads: what games exist, which tables are running, and how big the
@@ -73,6 +75,44 @@ export function buildLobbyRouter(lobby: LobbyService, config?: GatewayConfig): R
     }),
   );
 
+  /**
+   * The table this caller is seated at, or null. Best-effort and OPTIONAL.
+   *
+   * The platform lobby is public and must stay public — it is the shop window
+   * (see above). So this reads the token only if one happens to be there, and
+   * any failure means "no marker", never an error: a signed-out visitor must
+   * get the same lobby they always did.
+   *
+   * Why the lobby needs to know at all: the server enforces one account, one
+   * table (§8.1), so a player who sits down and navigates away is refused at
+   * every other table until they stand. That rule is right, but nothing
+   * anywhere told them WHICH table held their seat, and with thirteen of them
+   * the only recovery was to open each in turn. The rule was never the dead
+   * end; the missing signpost was.
+   *
+   * Read live from the hub rather than stored on the lobby row, because a seat
+   * is per-viewer state and the lobby's rows are shared by everyone.
+   */
+  const seatedTableFor = (req: Request): string | null => {
+    if (!config) return null;
+    const header = req.headers.authorization;
+    if (!header?.startsWith('Bearer ')) return null;
+
+    const hub = req.app.locals.tableHub as TableHub | undefined;
+    // Read off app.locals rather than taken as a constructor argument: the hub
+    // is built by mountLiveTables AFTER this router is mounted, so at
+    // construction time there is nothing to inject.
+    if (!hub) return null;
+
+    try {
+      const claims = verifyToken(header.slice('Bearer '.length), config.jwtSecret);
+      return hub.seatedAt(claims.playerId)?.tableId ?? null;
+    } catch {
+      // An expired or forged token is simply an anonymous viewer here.
+      return null;
+    }
+  };
+
   /** Running tables, filterable. Powers the Lobby tab's stake and game filters. */
   r.get(
     '/tables',
@@ -82,7 +122,15 @@ export function buildLobbyRouter(lobby: LobbyService, config?: GatewayConfig): R
       const filter = parseTableFilter(req.query);
       const ctx = await contextFor(req);
       const tables = lobby.listTables(filter, ctx);
-      res.json({ tables, count: tables.length });
+      const seatedAt = seatedTableFor(req);
+      res.json({
+        tables: tables.map((t) => (t.id === seatedAt ? { ...t, youAreSeated: true } : t)),
+        count: tables.length,
+        // Also sent at the top level so a client can say "you are seated at X"
+        // even when that table is filtered out of the list the player is
+        // looking at — which is exactly when they are most stuck.
+        ...(seatedAt ? { seatedAt } : {}),
+      });
     }),
   );
 

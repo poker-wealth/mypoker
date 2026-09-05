@@ -7,10 +7,15 @@ import {
   loginWithGoogle,
   loginWithEmail,
   signupWithEmail,
+  confirmEmailCode,
+  resendEmailCode,
+  fetchMe,
   type LoginResponse,
+  type PendingConfirmation,
   type Player,
 } from '@/api/auth';
-import { initData } from '@/lib/telegram';
+import { initData, telegramStartParam } from '@/lib/telegram';
+import { bindReferral } from '@/api/referral';
 import { DEV_AUTH_BYPASS } from '@/config';
 import { toast } from '@/lib/toast';
 
@@ -55,7 +60,40 @@ interface SessionState {
   /** Browser sign-in: exchange a Google OAuth access token for a session. */
   signInWithGoogle: (accessToken: string) => Promise<void>;
   signInWithEmail: (email: string, passwordPlain: string) => Promise<void>;
-  signUpWithEmail: (email: string, passwordPlain: string, displayName?: string) => Promise<void>;
+  /**
+   * Start an email sign-up.
+   *
+   * Returns a PENDING CONFIRMATION, not a session — nothing is stored and
+   * nobody is signed in until `confirmEmail` succeeds. The return type is what
+   * makes that impossible to miss at the call site.
+   */
+  signUpWithEmail: (
+    email: string,
+    passwordPlain: string,
+    displayName?: string,
+  ) => Promise<PendingConfirmation>;
+  /** Finish a sign-up: exchange the emailed code for a session. */
+  confirmEmail: (email: string, code: string) => Promise<void>;
+  /** Ask for another code for a confirmation already in flight. */
+  resendCode: (email: string) => Promise<PendingConfirmation>;
+  /**
+   * Merge a fresh player object into the cached one and persist it.
+   *
+   * For self-service edits (change-display-name) that return the settled
+   * profile straight from the server: the response IS the new truth, so this
+   * writes it through rather than waiting for the next `/auth/me` or login to
+   * pick it up — otherwise Settings/Profile would keep showing the old name
+   * until the next full sign-in.
+   */
+  updatePlayer: (patch: Partial<Player>) => void;
+  /**
+   * Re-read the signed-in player from the server and merge it in.
+   *
+   * Called once on boot when a token exists. Without it the cached player is
+   * whatever sign-in returned, forever — so an admin renaming an account, or
+   * granting it `ops`, never reaches the device it happened to.
+   */
+  refreshPlayer: () => Promise<void>;
   /**
    * Admin-host sign-in. Like `signInWithEmail`, but ONLY establishes a session
    * for an `ops` account — a player who tries the admin login is refused and no
@@ -66,6 +104,49 @@ interface SessionState {
   /** Admin-host Google sign-in — same ops-only rule as `signInAsAdmin`. */
   signInWithGoogleAsAdmin: (accessToken: string) => Promise<void>;
   signOut: () => void;
+}
+
+/**
+ * The email address a failed sign-in says still needs confirming, or null.
+ *
+ * The gateway answers 403 with `code: 'email_unverified'` when the PASSWORD WAS
+ * CORRECT but the address was never confirmed. Matched on that field rather
+ * than on the message text: the message is player-facing copy and will be
+ * reworded, and a rewording must not quietly turn "confirm your email" back
+ * into "wrong password".
+ */
+export function unconfirmedEmailFrom(error: unknown): string | null {
+  if (!(error instanceof ApiError) || error.status !== 403) return null;
+  const body = error.body as { code?: string; email?: string } | undefined;
+  return body?.code === 'email_unverified' ? (body.email ?? null) : null;
+}
+
+/**
+ * Fire the referral bind the moment a session first exists, for whichever of
+ * the three sign-in paths just produced one (Telegram, email confirm, email
+ * sign-in — see `signIn` and `settle` below). Only fires when the Mini App was
+ * actually opened via a referral link; otherwise there is no `start_param` and
+ * nothing to send.
+ *
+ * Deliberately not awaited by its callers and errors are swallowed here: a
+ * referral is attribution, not something the player did or can fix, so it must
+ * never block or interrupt sign-in. `/me/referral` is also set-once and
+ * idempotent server-side, so there is no "already bound?" check on purpose —
+ * calling it on every login and letting the server decide is simpler and
+ * cannot double-bind.
+ *
+ * Commercial note: this also means a pre-existing, unattributed player who
+ * later opens a referral link gets bound to it — the set-once endpoint makes
+ * that safe (an already-attributed player is untouched), but whether a
+ * returning player should be attributable at all like this is a policy call
+ * for the owner to confirm, not something decided here.
+ */
+function bindReferralIfLaunchedFromOne(): void {
+  const linkId = telegramStartParam();
+  if (!linkId) return;
+  bindReferral(linkId).catch((e: unknown) => {
+    console.warn('Referral bind failed (non-fatal):', e);
+  });
 }
 
 const storedToken = localStorage.getItem(TOKEN_KEY);
@@ -82,6 +163,7 @@ export const useSession = create<SessionState>((set, get) => {
       setAuthToken(token);
       persist(token, player);
       set({ token, player, status: 'authenticated', error: null });
+      bindReferralIfLaunchedFromOne();
       toast.success(i18n.t('toasts.signedIn', { name: player.displayName }));
     } catch (e) {
       const message = e instanceof ApiError ? e.message : i18n.t('toasts.signInFailed');
@@ -138,6 +220,7 @@ export const useSession = create<SessionState>((set, get) => {
       setAuthToken(token);
       persist(token, player);
       set({ token, player, status: 'authenticated', error: null });
+      bindReferralIfLaunchedFromOne();
       // i18n.t(), not the hook — this runs outside React, and a raw key would
       // surface on screen as literal `toasts.signedIn`.
       toast.success(i18n.t('toasts.signedIn', { name: player.displayName }));
@@ -157,7 +240,76 @@ export const useSession = create<SessionState>((set, get) => {
   },
 
   signUpWithEmail: async (email, passwordPlain, displayName) => {
-    await settle(() => signupWithEmail(email, passwordPlain, displayName));
+    // Deliberately NOT `settle`. There is no token to store and nobody to greet
+    // — the account exists but is unconfirmed. Routing this through the
+    // sign-in path would toast "Signed in as ..." over a screen asking for a
+    // code, and would have to invent a session out of a response that has none.
+    set({ status: 'authenticating', error: null });
+    try {
+      const pending = await signupWithEmail(email, passwordPlain, displayName);
+      set({ status: 'anonymous', error: null });
+      return pending;
+    } catch (e) {
+      const message = e instanceof ApiError ? e.message : i18n.t('toasts.signUpFailed');
+      set({ status: 'error', error: message });
+      toast.error(message);
+      throw e;
+    }
+  },
+
+  confirmEmail: async (email, code) => {
+    await settle(() => confirmEmailCode(email, code));
+  },
+
+  resendCode: async (email) => {
+    try {
+      const pending = await resendEmailCode(email);
+      toast.success(i18n.t('toasts.codeResent'));
+      return pending;
+    } catch (e) {
+      // Rate limiting arrives here as a 429 whose message already says how long
+      // to wait, in the server's own words. Kept rather than replaced.
+      const message = e instanceof ApiError ? e.message : i18n.t('toasts.codeResendFailed');
+      toast.error(message);
+      throw e;
+    }
+  },
+
+  updatePlayer: (patch) => {
+    const player = get().player;
+    if (!player) return;
+    const next = { ...player, ...patch };
+    persist(get().token, next);
+    set({ player: next });
+  },
+
+  refreshPlayer: async () => {
+    // The cached player is written at sign-in and never again, so anything an
+    // ADMINISTRATOR changes about an account — a display name, a role — was
+    // invisible on that player's own device until they signed out and back in.
+    // Not until a reload: a reload rehydrates from localStorage and shows the
+    // same stale value. This is the only thing that reconciles the two.
+    //
+    // Role matters as much as the name: an account just granted `ops` carries
+    // `role: 'player'` in its cached object, and AdminShell reads that object,
+    // so the panel would refuse its own new administrator.
+    //
+    // Failure is deliberately silent. A dead network or an expired token are
+    // both already handled — the client's 401 handler drops the session — and
+    // a toast here would fire on every cold start with no connection, about
+    // something the player never asked for.
+    if (!get().token) return;
+    try {
+      const me = await fetchMe();
+      get().updatePlayer({
+        displayName: me.displayName,
+        photoUrl: me.photoUrl,
+        role: me.role,
+        vipTier: me.vipTier,
+      });
+    } catch {
+      // Keep the cached player. Stale is better than empty.
+    }
   },
 
   signInAsAdmin: async (email, passwordPlain) => {

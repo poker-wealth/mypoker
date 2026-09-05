@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { api } from '../api';
+import { Avatar } from '../components/ui/Avatar';
 import { useAuth } from '../auth';
 import type { RootStackParamList } from '../navigation';
 import { moneyFromDecimal } from '../money';
@@ -65,7 +66,7 @@ interface VipPreviewData {
 export function ProfileScreen() {
   const { t } = useTranslation();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { signOut } = useAuth();
+  const { signOut, player } = useAuth();
   const [hidden, setHidden] = useState(false);
 
   const balance = useQuery({
@@ -85,6 +86,15 @@ export function ProfileScreen() {
     retry: 1,
   });
 
+  // The avatar the player chose. Its own query rather than a prop, for the same
+  // reason the web's Profile reads it here: this screen is where it is shown,
+  // and PersonalInfo writes the same cache key when it changes.
+  const settings = useQuery({
+    queryKey: ['me', 'settings'],
+    queryFn: () => api.get<{ avatarId: string | null }>('/me/settings'),
+    staleTime: 30_000,
+  });
+
   const unread = useQuery({
     queryKey: ['notifications', 'unread'],
     queryFn: () => api.get<{ unread: number }>('/me/notifications?limit=1').then((p) => p.unread),
@@ -97,6 +107,34 @@ export function ProfileScreen() {
     <Screen query={balance} errorLabel={{ retry: t('common.retry'), fallback: t('states.error') }}>
       {(data) => (
         <>
+          {/* Who you are. The web has carried this since Profile.tsx was
+              written; mobile never had it — no name, no picture anywhere in
+              the app — so the avatar picker wrote a value nothing displayed.
+              Tapping opens Personal Info, which is where it is changed. */}
+          <Pressable
+            style={styles.identity}
+            onPress={() => navigation.navigate('PersonalInfo')}
+            accessibilityRole="button"
+          >
+            <Avatar
+              avatarId={settings.data?.avatarId}
+              playerId={player?.playerId}
+              photoUrl={player?.photoUrl}
+              // 'M' for the brand, not the translated "Guest" word's initial —
+              // matches the web's own untranslated MYPOKER fallback.
+              name={player ? player.displayName : 'M'}
+              size={64}
+            />
+            <View style={styles.identityText}>
+              <Text style={styles.identityName} numberOfLines={1}>
+                {player ? player.displayName : t('account.guest')}
+              </Text>
+              <Text style={styles.identityHint} numberOfLines={1}>
+                {t('account.personalInfo')}
+              </Text>
+            </View>
+          </Pressable>
+
           <Card>
             <View style={styles.balanceHeader}>
               <Text style={styles.balanceLabel}>{t('wallet.totalBalance')}</Text>
@@ -157,6 +195,10 @@ export function ProfileScreen() {
                 ) : undefined
               }
             />
+            <ListRow
+              label={t('account.personalInfo')}
+              onPress={() => navigation.navigate('PersonalInfo')}
+            />
             <ListRow label={t('account.settings')} onPress={() => navigation.navigate('Settings')} />
             <ListRow label={t('account.signOut')} onPress={() => void signOut()} />
           </Card>
@@ -210,6 +252,10 @@ function VipPreview({
 }
 
 const styles = StyleSheet.create({
+  identity: { flexDirection: 'row', alignItems: 'center', gap: space.md },
+  identityText: { flex: 1, minWidth: 0 },
+  identityName: { color: theme.text, fontSize: 17, fontFamily: weight('800') },
+  identityHint: { color: theme.dim, fontSize: 12, fontFamily: weight('400'), marginTop: 2 },
   balanceHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   balanceLabel: { color: theme.dim, fontSize: 11, textTransform: 'uppercase', fontFamily: weight('700') },
   balanceToggle: { color: theme.dim, fontSize: 11, fontFamily: weight('700') },

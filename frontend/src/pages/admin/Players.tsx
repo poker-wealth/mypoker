@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { UserEditor } from './UserEditor';
+import { OverrideEditor } from './OverrideEditor';
 import { usePlayerSearch, usePlayerDetail, useUsers } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
 import { moneyFromDecimal, money } from '@/lib/money';
@@ -14,14 +16,17 @@ import { useDebounced } from '@/lib/useDebounced';
 /**
  * Admin — Users.
  *
- * The full list of players by default, in a table, each row opening a read-only
- * detail. A search box narrows it (by id, nickname, email or phone) — and search
- * is the only way to reach a Telegram player who has never touched money, since
- * they have neither an identity document nor a financial account to list.
+ * The full list of players by default, in a table, each row opening a detail.
+ * A search box narrows it (by id, nickname, email or phone) — and search is the
+ * only way to reach a Telegram player who has never touched money, since they
+ * have neither an identity document nor a financial account to list.
  *
- * Read-only, and structurally so: there is no endpoint, hook or form that writes
- * a balance. "No balance editing from the UI — ever" is held by having nothing
- * that could; money moves through the audited withdrawal and settlement paths.
+ * IDENTITY is editable here (see `UserEditor`). BALANCE is not, and that is
+ * structural rather than hidden: there is no endpoint, hook or form that writes
+ * one. The spec's acceptance criteria are explicit — "DBA direct balance update
+ * attempt → MongoDB RBAC rejects" — and the way that survives a future refactor
+ * is for the write path not to exist. Money moves through the audited
+ * withdrawal and settlement paths.
  */
 
 /** One table row, normalised from either the full list or a search result. */
@@ -258,6 +263,8 @@ function PlayerDetail({ playerId }: { playerId: string }) {
         </div>
       </div>
 
+      {d.override && <OverrideEditor playerId={playerId} override={d.override} />}
+
       {d.reputation.findings.length > 0 && (
         <div>
           <div className="mb-1.5 text-[0.6rem] uppercase tracking-wide text-dim">Findings</div>
@@ -271,11 +278,20 @@ function PlayerDetail({ playerId }: { playerId: string }) {
         </div>
       )}
 
+      {/*
+        The balance note stays exactly as it was, now that the rest of the record
+        IS editable. It has become more necessary rather than less: on a screen
+        with save buttons, the one figure without one needs to say why.
+      */}
       <p className="flex items-start gap-1.5 text-[0.62rem] leading-relaxed text-dim">
         <Lock size={11} className="mt-0.5 shrink-0" />
-        Read-only. Balances move through the withdrawal and settlement paths, which are
-        audited and double-entry — never edited from here.
+        Balances are not editable here. They move through the withdrawal and settlement
+        paths, which are audited and double-entry.
       </p>
+
+      <div className="border-t border-border pt-4">
+        <UserEditor playerId={playerId} />
+      </div>
     </div>
   );
 }
