@@ -18,6 +18,20 @@ import { tableCommandSchema, type TableSummary } from './room-state';
 export type TokenVerifier = (token: string) => { playerId: string };
 
 /**
+ * May this player reach this table at all?
+ *
+ * Supplied by the gateway (`gateway/table-access.ts`), which owns the policy;
+ * the hub only asks. Same shape and same reasoning as `TokenVerifier` above —
+ * one rule, both surfaces — so a private table refuses a stranger on the socket
+ * for the same reason the REST API would.
+ *
+ * Optional, and absent means "no opinion, allow": every existing caller (eleven
+ * test files and `mount.ts`) predates this and must keep working. The tables it
+ * actually guards are registered explicitly, so silence here is not a hole.
+ */
+export type TableGuard = (tableId: string, playerId: string) => boolean;
+
+/**
  * TableHub — the live tables and the socket in front of them.
  *
  * It owns the room list and translates the transport's three verbs (`join` / `action` / `leave`)
@@ -36,6 +50,8 @@ export class TableHub {
     verifyToken: TokenVerifier,
     /** Optional connection log — see `GameSocketServerConfig.onEvent`. */
     onEvent?: GameSocketServerConfig['onEvent'],
+    /** Optional private-table guard — see `TableGuard`. */
+    private readonly mayJoin?: TableGuard,
   ) {
     this.socket = new GameSocketServer({
       verifyToken,
@@ -85,6 +101,20 @@ export class TableHub {
     const room = this.rooms.get(msg.roomId);
     if (!room) return ctx.send({ type: 'error', message: `unknown table: ${msg.roomId}` });
     const playerId = ctx.session.playerId;
+
+    // Private-table access, checked HERE — above the switch, not inside a case.
+    //
+    // There are two doors into a table on this rail and they are independent:
+    // `join` subscribes you to snapshots, and `action` acts on the room without
+    // ever consulting whether you joined. Guarding `join` alone would leave
+    // `action: sit` wide open, which is TRAPS §20 and §23 exactly ("a rule
+    // enforced on one door is not enforced", twice already in this codebase).
+    //
+    // So the check sits at the single point every inbound message passes. A
+    // fourth verb added later inherits it without anyone remembering to.
+    if (this.mayJoin && !this.mayJoin(msg.roomId, playerId)) {
+      return ctx.send({ type: 'error', message: 'this table needs its invite code' });
+    }
 
     switch (msg.type) {
       case 'join': {

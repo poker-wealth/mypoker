@@ -309,7 +309,8 @@
     },
     "timeBank": "Quỹ thời gian: {{seconds}}s",
     "timeBankRunning": "Đang dùng quỹ thời gian",
-    "timeBankAuto": "Tự động"
+    "timeBankAuto": "Tự động",
+    "unlocking": "Đang kiểm tra lời mời…"
   },
   "a11y": {
     "toggleTheme": "Đổi giao diện",
@@ -656,7 +657,7 @@
     "public": "Công khai",
     "publicBlurb": "Hiển thị trong sảnh — ai cũng có thể tham gia.",
     "private": "Riêng tư",
-    "privateBlurb": "Chỉ theo lời mời — chỉ tham gia được qua liên kết bạn chia sẻ.",
+    "privateBlurb": "Chỉ dành cho người được mời — bạn bè cần liên kết hoặc mã để ngồi vào bàn.",
     "createCta": "Tạo bàn",
     "ready": "Bàn của bạn đã sẵn sàng",
     "shareBlurb": "Gửi liên kết này để mời bạn bè vào đúng bàn này.",
@@ -665,6 +666,8 @@
     "enter": "Vào bàn",
     "error": "Không thể tạo bàn. Vui lòng thử lại.",
     "seats": "Chỗ ngồi",
-    "seatsBlurb": "{{count}} chỗ. Hai người là đủ để bắt đầu."
+    "seatsBlurb": "{{count}} chỗ. Hai người là đủ để bắt đầu.",
+    "codeLabel": "Mã mời",
+    "shareBlurbPrivate": "Gửi liên kết này để mời bạn bè — liên kết đã kèm mã. Hoặc đọc mã để họ tự nhập."
   }
 }

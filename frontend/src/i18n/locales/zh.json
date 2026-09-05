@@ -309,7 +309,8 @@
     },
     "timeBank": "时间银行：{{seconds}} 秒",
     "timeBankRunning": "时间银行使用中",
-    "timeBankAuto": "自动"
+    "timeBankAuto": "自动",
+    "unlocking": "正在验证邀请…"
   },
   "a11y": {
     "toggleTheme": "切换主题",
@@ -656,7 +657,7 @@
     "public": "公开",
     "publicBlurb": "在大厅中显示——任何人都可加入。",
     "private": "私人",
-    "privateBlurb": "仅限邀请——只能通过你分享的链接加入。",
+    "privateBlurb": "仅限受邀者 — 朋友需要链接或邀请码才能入座。",
     "createCta": "创建牌桌",
     "ready": "你的牌桌已就绪",
     "shareBlurb": "发送此链接，邀请好友加入这张牌桌。",
@@ -665,6 +666,8 @@
     "enter": "进入牌桌",
     "error": "无法创建牌桌，请重试。",
     "seats": "座位",
-    "seatsBlurb": "{{count}} 个座位。两人即可开局。"
+    "seatsBlurb": "{{count}} 个座位。两人即可开局。",
+    "codeLabel": "邀请码",
+    "shareBlurbPrivate": "把链接发给朋友，链接里已带邀请码。也可以把邀请码念给对方，让他们手动输入。"
   }
 }

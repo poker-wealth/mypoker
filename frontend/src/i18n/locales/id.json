@@ -309,7 +309,8 @@
     },
     "timeBank": "Bank Waktu: {{seconds}}d",
     "timeBankRunning": "Bank waktu berjalan",
-    "timeBankAuto": "Otomatis"
+    "timeBankAuto": "Otomatis",
+    "unlocking": "Memeriksa undangan Anda…"
   },
   "a11y": {
     "toggleTheme": "Ganti tema",
@@ -656,7 +657,7 @@
     "public": "Publik",
     "publicBlurb": "Tampil di lobi — siapa saja bisa gabung.",
     "private": "Pribadi",
-    "privateBlurb": "Hanya undangan — hanya bisa gabung lewat tautan yang kamu bagikan.",
+    "privateBlurb": "Khusus undangan — teman perlu tautan atau kode untuk duduk.",
     "createCta": "Buat meja",
     "ready": "Meja kamu sudah siap",
     "shareBlurb": "Kirim tautan ini untuk mengundang teman ke meja ini.",
@@ -665,6 +666,8 @@
     "enter": "Masuk meja",
     "error": "Tidak bisa membuat meja. Silakan coba lagi.",
     "seats": "Kursi",
-    "seatsBlurb": "{{count}} kursi. Dua pemain sudah cukup untuk mulai."
+    "seatsBlurb": "{{count}} kursi. Dua pemain sudah cukup untuk mulai.",
+    "codeLabel": "Kode undangan",
+    "shareBlurbPrivate": "Kirim tautan ini untuk mengundang teman — kodenya sudah termasuk. Atau bacakan kodenya dan mereka bisa mengetiknya."
   }
 }

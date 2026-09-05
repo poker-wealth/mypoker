@@ -1,7 +1,7 @@
 import { useState, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Users, Plus, Link2, Check, Globe, Lock } from 'lucide-react';
+import { Users, Plus, Link2, Check, Globe, Lock, KeyRound } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { Segmented } from '@/components/ui/Segmented';
@@ -39,18 +39,32 @@ export function TableEntryModal({ open, onClose }: { open: boolean; onClose: () 
    */
   const [seats, setSeats] = useState(6);
   const [createdId, setCreatedId] = useState<string | null>(null);
+  /** Private tables only; null for public. See CreatedTable.joinCode. */
+  const [createdCode, setCreatedCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const close = (): void => {
     setStep('choose');
     setVisibility('public');
     setCreatedId(null);
+    setCreatedCode(null);
     setCopied(false);
     create.reset();
     onClose();
   };
 
-  const inviteLink = createdId ? `${window.location.origin}/table/${createdId}` : '';
+  /**
+   * The code rides in the link.
+   *
+   * Not decoration: a private table now REFUSES anyone who has not presented
+   * its code, and before this change the link was the only thing a creator had
+   * to send. A link without the code would therefore have been a link that no
+   * longer works — closing the hole would have broken sharing. The code is also
+   * shown separately below, for reading aloud when a link cannot be pasted.
+   */
+  const inviteLink = createdId
+    ? `${window.location.origin}/table/${createdId}${createdCode ? `?code=${createdCode}` : ''}`
+    : '';
 
   const join = (): void => {
     navigate(`/table/${DEFAULT_TABLE_ID}`);
@@ -61,7 +75,10 @@ export function TableEntryModal({ open, onClose }: { open: boolean; onClose: () 
     create.mutate(
       { game: 'texas', visibility, seats },
       {
-        onSuccess: (table) => setCreatedId(table.tableId),
+        onSuccess: (table) => {
+          setCreatedId(table.tableId);
+          setCreatedCode(table.joinCode);
+        },
         onError: (e) => {
           logError('createPlayerTable', e);
           toast.error(t('tableEntry.error'));
@@ -86,7 +103,10 @@ export function TableEntryModal({ open, onClose }: { open: boolean; onClose: () 
 
   const enter = (): void => {
     if (!createdId) return;
-    navigate(`/table/${createdId}`);
+    // The creator already holds access server-side — they were just handed the
+    // code — so this needs no `?code=`. It is carried anyway so that a reload
+    // of the resulting URL still works from a fresh session.
+    navigate(`/table/${createdId}${createdCode ? `?code=${createdCode}` : ''}`);
     close();
   };
 
@@ -105,11 +125,28 @@ export function TableEntryModal({ open, onClose }: { open: boolean; onClose: () 
               <Check size={16} className="shrink-0 text-brand" />
               <span className="font-semibold">{t('tableEntry.ready')}</span>
             </div>
-            <p className="text-[0.7rem] leading-relaxed text-dim">{t('tableEntry.shareBlurb')}</p>
+            <p className="text-[0.7rem] leading-relaxed text-dim">
+              {createdCode ? t('tableEntry.shareBlurbPrivate') : t('tableEntry.shareBlurb')}
+            </p>
             <div className="flex items-center gap-2 rounded-(--radius-app) border border-border bg-surface-2 px-3 py-2">
               <Link2 size={14} className="shrink-0 text-dim" />
               <span className="min-w-0 flex-1 truncate text-[0.7rem] text-text">{inviteLink}</span>
             </div>
+            {/* The code, shown on its own so it can be read out. Spaced and
+                tabular so six digits are unambiguous when spoken. */}
+            {createdCode ? (
+              <div className="flex items-center gap-2 rounded-(--radius-app) border border-border bg-surface-2 px-3 py-2">
+                <KeyRound size={14} className="shrink-0 text-brand" />
+                <div className="min-w-0 flex-1">
+                  <span className="block text-[0.62rem] font-semibold text-dim">
+                    {t('tableEntry.codeLabel')}
+                  </span>
+                  <span className="block font-mono text-[0.95rem] tracking-[0.3em] tabular-nums text-text">
+                    {createdCode}
+                  </span>
+                </div>
+              </div>
+            ) : null}
           </div>
           <Button full variant="ghost" onClick={copy}>
             {copied ? t('tableEntry.copied') : t('tableEntry.copy')}

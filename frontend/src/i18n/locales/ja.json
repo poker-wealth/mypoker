@@ -309,7 +309,8 @@
     },
     "timeBank": "タイムバンク: {{seconds}}秒",
     "timeBankRunning": "タイムバンク使用中",
-    "timeBankAuto": "自動"
+    "timeBankAuto": "自動",
+    "unlocking": "招待を確認しています…"
   },
   "a11y": {
     "toggleTheme": "テーマを切り替え",
@@ -656,7 +657,7 @@
     "public": "公開",
     "publicBlurb": "ロビーに表示され、誰でも参加できます。",
     "private": "プライベート",
-    "privateBlurb": "招待制——共有したリンクからのみ参加できます。",
+    "privateBlurb": "招待制 — 着席にはリンクか招待コードが必要です。",
     "createCta": "テーブルを作成",
     "ready": "テーブルの準備ができました",
     "shareBlurb": "このリンクを送って、友達をこのテーブルに招待しましょう。",
@@ -665,6 +666,8 @@
     "enter": "テーブルに入る",
     "error": "テーブルを作成できませんでした。もう一度お試しください。",
     "seats": "座席",
-    "seatsBlurb": "{{count}} 席。2 人からゲームを開始できます。"
+    "seatsBlurb": "{{count}} 席。2 人からゲームを開始できます。",
+    "codeLabel": "招待コード",
+    "shareBlurbPrivate": "このリンクを友達に送ってください。コードが含まれています。コードを読み上げて入力してもらうこともできます。"
   }
 }
