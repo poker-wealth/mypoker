@@ -45,7 +45,28 @@ cd frontend && npx tsc -b && npx eslint src && npx vite build && npx vitest run
 
 **Run `npm test`, not `npx jest`.** Both backend packages pin `--runInBand`; calling jest directly skips it, and parallel in-memory Mongo instances then fail whole suites at setup on a loaded machine — which looks alarming and means nothing.
 
-Known: **16 pre-existing eslint `any` errors** in `frontend/src/components/games/`. Not yours.
+### Both `verify` scripts are RED on `main` — check before blaming yourself
+
+As of 5 Sep 2026, neither gate passes on a clean checkout. Know this before you
+spend an hour bisecting your own change.
+
+- **`npm run verify` (root) dies at lint and never reaches the tests.** 12
+  errors: `no-explicit-any` in `game-server/src/live/slots-room.ts` and
+  `test/games/dou-di-zhu/dou-di-zhu-game.test.ts`, `no-require-imports` in
+  `test/fairness/rule-stamp-propagation.test.ts`. Because lint runs first, a
+  green suite is invisible behind it. **To actually gate on tests, run
+  `npm test` inside each package.**
+- **`mobile/ npm run verify` dies at `check:parity`** —
+  `PARSE FAILURE: could not find the AdminShell ("path: '/admin',") children
+  block in router.tsx`. The router now builds those routes as
+  `const adminChildren = [...]`; the checker still expects them inline. So the
+  parity guarantee of TRAPS §9 is **not currently being checked**.
+
+Both are recorded in `docs/TRAPS.md` §25. Fix or delete them — a permanently
+red gate teaches people to ignore failures.
+
+Also known: **16 pre-existing eslint `any` errors** in
+`frontend/src/components/games/`. Not yours.
 
 ## Local traps
 
