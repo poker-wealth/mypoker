@@ -97,6 +97,17 @@ if (bg && brand) {
 
   const triplet = hexToRgbTriplet(brand);
   const glow = /#splash-mark\s*\{[^}]*drop-shadow\(([^)]*\))?[^;]*;/.exec(html);
+  // A null triplet used to short-circuit the comparison below to PASS: give
+  // --brand a 3-digit hex and the glow could stay any colour at all and this
+  // script would report the boot screens as matching. A check that cannot fail
+  // is worse than no check, because it is trusted (docs/TRAPS.md §1). So an
+  // unreadable token is now a failure in its own right.
+  if (!triplet) {
+    fail(
+      `PARSE FAILURE: --brand is "${brand}", which is not a 6-digit hex, so the glow ` +
+        'cannot be checked against it. Use #rrggbb, or teach hexToRgbTriplet the new form.',
+    );
+  }
   if (!glow) {
     fail('PARSE FAILURE: no drop-shadow inside the #splash-mark rule in index.html.');
   } else if (triplet && !glow[0].includes(triplet)) {

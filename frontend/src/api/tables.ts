@@ -53,5 +53,20 @@ export const createPlayerTableApi = (body: {
  * A wrong code and a table that does not exist both come back 403 on purpose —
  * distinguishing them would turn this into an oracle for which table ids exist.
  */
+/*
+ * KNOWN GAP — there is no way to TYPE a code anywhere in the app.
+ *
+ * This has exactly one caller: `PrivateTableGate` in pages/Table.tsx, which
+ * redeems `?code=` out of the URL. So the only route into a private table is a
+ * link that carries the code. Someone who is told the code out loud, or whose
+ * link loses the query string, reaches the felt, is refused by the socket, and
+ * has nothing to type it into.
+ *
+ * `tableEntry.shareBlurbPrivate` used to promise that path in all eight
+ * locales. The promise has been withdrawn rather than left standing over
+ * nothing (TRAPS §7), but the gap is real and is §12: a rule the player cannot
+ * satisfy. The fix is a six-digit prompt on that socket error which calls this
+ * and reconnects — its own change, with its own tests and eight more strings.
+ */
 export const unlockTableApi = (tableId: string, code: string): Promise<{ unlocked: boolean }> =>
   api.post<{ unlocked: boolean }>(`/tables/${encodeURIComponent(tableId)}/unlock`, { code });

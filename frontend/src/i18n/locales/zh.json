@@ -668,6 +668,6 @@
     "seats": "座位",
     "seatsBlurb": "{{count}} 个座位。两人即可开局。",
     "codeLabel": "邀请码",
-    "shareBlurbPrivate": "把链接发给朋友，链接里已带邀请码。也可以把邀请码念给对方，让他们手动输入。"
+    "shareBlurbPrivate": "把链接发给朋友，链接里已带邀请码。"
   }
 }

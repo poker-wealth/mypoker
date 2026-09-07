@@ -668,6 +668,6 @@
     "seats": "Chỗ ngồi",
     "seatsBlurb": "{{count}} chỗ. Hai người là đủ để bắt đầu.",
     "codeLabel": "Mã mời",
-    "shareBlurbPrivate": "Gửi liên kết này để mời bạn bè — liên kết đã kèm mã. Hoặc đọc mã để họ tự nhập."
+    "shareBlurbPrivate": "Gửi liên kết này để mời bạn bè — liên kết đã kèm mã."
   }
 }

@@ -668,6 +668,6 @@
     "seats": "Seats",
     "seatsBlurb": "{{count}} chairs. Two players is enough to start.",
     "codeLabel": "Invite code",
-    "shareBlurbPrivate": "Send this link to invite a friend — it carries the code. Or read the code out and they can type it."
+    "shareBlurbPrivate": "Send this link to invite a friend — the code travels with it."
   }
 }
