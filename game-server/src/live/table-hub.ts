@@ -27,6 +27,13 @@ export type TokenVerifier = (token: string) => { playerId: string };
  */
 export class TableHub {
   private readonly rooms = new Map<string, LiveRoom>();
+  /**
+   * Which game each room hosts, for stamping onto outbound snapshots. The
+   * client picks the felt to draw from this — a player-created baccarat table
+   * has a `t-…` id the felt registry has never heard of, so the id alone
+   * stopped being enough the day tables became creatable for every game.
+   */
+  private readonly gameByRoom = new Map<string, string>();
   /** Per connection, per room: how to stop sending it snapshots. */
   private readonly subscriptions = new Map<ClientContext, Map<string, () => void>>();
   private readonly socket: GameSocketServer;
@@ -51,6 +58,7 @@ export class TableHub {
     if (this.rooms.has(config.id)) throw new Error(`table already exists: ${config.id}`);
     const room = createRoom(config, this.deps);
     this.rooms.set(config.id, room);
+    this.gameByRoom.set(config.id, config.game);
     return room;
   }
 
@@ -76,6 +84,7 @@ export class TableHub {
     await this.socket.close();
     for (const room of this.rooms.values()) room.dispose();
     this.rooms.clear();
+    this.gameByRoom.clear();
     this.subscriptions.clear();
   }
 
@@ -95,12 +104,20 @@ export class TableHub {
         void this.deps.directory.prime?.(playerId);
         let stop: () => void;
         try {
-          stop = room.join(playerId, {
-            sendSnapshot: (snapshot) =>
-              ctx.send({ type: 'state', roomId: msg.roomId, state: snapshot }),
-            sendEvent: (event, data) =>
-              ctx.send({ type: 'event', roomId: msg.roomId, event, data }),
-          });
+          const game = this.gameByRoom.get(msg.roomId);
+          stop = room.join(
+            playerId,
+            {
+              // Stamped here, once, rather than in nine rooms' snapshot
+              // builders: which game a table hosts is the hub's registry fact.
+              sendSnapshot: (snapshot) =>
+                ctx.send({ type: 'state', roomId: msg.roomId, state: { ...snapshot, game } }),
+              sendEvent: (event, data) =>
+                ctx.send({ type: 'event', roomId: msg.roomId, event, data }),
+            },
+            // The connection's address, for tables with a same-IP seating rule.
+            ctx.ip ? { ip: ctx.ip } : undefined,
+          );
         } catch (err) {
           // The spectator cap. A refused watcher gets told why, not a silent
           // socket with no snapshots.

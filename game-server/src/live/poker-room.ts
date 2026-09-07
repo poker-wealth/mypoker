@@ -136,6 +136,65 @@ export interface PokerRoomConfig extends LiveTableConfig {
    */
   tableType?: 'PLATFORM' | 'LEAGUE';
   leagueId?: string;
+
+  // ── Creator options (the "create a game" screen) ──────────────────────────
+  // All optional, all defaulting to how tables always behaved, so every
+  // existing config — and every test that builds one by hand — is untouched.
+
+  /** Forced ante in chips, dead into the pot before the blinds. 0/absent = none. */
+  ante?: number;
+  /** UTG posts a live 2×BB straddle each hand. See `BettingConfig.straddle`. */
+  straddle?: boolean;
+  /** Every action is the whole stack or the muck. See `BettingConfig.allInOrFold`. */
+  allInOrFold?: boolean;
+  /**
+   * Deal only once this many players are seated with chips (2..maxSeats).
+   * Absent = 2, the floor a hand needs anyway. Once running, a hand deals
+   * whenever 2+ are ready — the threshold gates the FIRST deal of a session,
+   * like the reference app's "auto-start players count".
+   *
+   * 0 is the reference's "None": the table never starts itself — the creator
+   * (`ownerId`) sends `start_game` when their friends are seated. After that
+   * first manual start the table runs like any other.
+   */
+  autoStartPlayers?: number;
+  /**
+   * Who created this table — the one player allowed to `start_game` a manual
+   * (autoStartPlayers: 0) table. Set by the create route from the verified
+   * token, never from the request body.
+   */
+  ownerId?: string;
+  /**
+   * false → nobody watches: only players holding a seat receive snapshots
+   * ("restricting onlookers"). The spectator DELAY protects seated players
+   * from live relays; this removes the audience entirely. Default true.
+   */
+  spectatorsAllowed?: boolean;
+  /**
+   * false → this table never offers insurance, whatever the pool's health.
+   * The pool-side auto-disable rules (§4) still apply when true — this is a
+   * per-table opt-out on top of them, never an opt-in past them.
+   */
+  insuranceEnabled?: boolean;
+  /**
+   * Refuse a seat to anyone whose connection IP matches a seated player's.
+   * A table rule chosen by the creator — coarser than, and independent of,
+   * the platform's automated collusion scoring (players/collusion.ts).
+   */
+  banSameIp?: boolean;
+  /**
+   * Refuse a seat to anyone whose reported GPS point matches a seated
+   * player's. GPS is client-reported (the sit command's `gps` field) and the
+   * Mini App does not report it yet — until it does, this only bites for
+   * clients that send one. Enforced when present, honest about when absent.
+   */
+  banSameGps?: boolean;
+  /**
+   * Hold every player's own hole cards out of their snapshot until it is
+   * their turn to act preflop ("hide hole-cards" — the anti-snap-fold rule).
+   * From the flop on, everyone still in sees their cards as normal.
+   */
+  hideHoleCards?: boolean;
 }
 
 export interface PokerRoomDeps {
@@ -254,6 +313,22 @@ export class PokerRoom implements LiveRoom {
   private readonly viewers = new Map<string, Set<RoomClient>>();
   private readonly chatters = new Map<string, ChatterState>();
   private readonly targets = new Map<string, TargetState>();
+  /**
+   * What we know about each viewer's network position, for the creator's
+   * same-IP / same-GPS table rules. IP arrives from the transport at join
+   * (the socket's own address — never client-claimed); GPS arrives on the sit
+   * command (client-reported, see `banSameGps` on the config). Absent facts
+   * never match: a rule can only bite on evidence actually held.
+   */
+  private readonly netIdentity = new Map<string, { ip?: string; gps?: string }>();
+  /**
+   * Who has been on the clock this hand — the `hideHoleCards` rule's memory.
+   * Cleared at each deal; a player's own cards stay face-down in their own
+   * snapshot until their seat appears here (or the flop arrives).
+   */
+  private readonly turnSeen = new Set<string>();
+  /** A manual-start (autoStartPlayers: 0) table: has the owner said go yet? */
+  private manualStarted = false;
 
   // The last reserve read that succeeded, and when. Null until the first one
   // does — see the fail-closed note on the constants above.
@@ -371,7 +446,20 @@ export class PokerRoom implements LiveRoom {
    * Start receiving snapshots. Anyone authenticated may watch; sitting down is a separate command.
    * Returns the unsubscribe function — call it when the socket closes.
    */
-  join(playerId: string, client: RoomClient): () => void {
+  join(playerId: string, client: RoomClient, meta?: { ip?: string }): () => void {
+    const isSpectator = !this.seatOf(playerId);
+    // The creator's "restricting onlookers" rule: nobody watches, full stop.
+    // Checked before the cap because the answer isn't "try later", it's "no".
+    // A seated player reconnecting is not an onlooker and is never refused.
+    if (isSpectator && this.config.spectatorsAllowed === false) {
+      throw new Error('this table does not allow onlookers');
+    }
+    // The transport's word for where this connection comes from, kept for the
+    // same-IP table rule. Recorded per join so a player who reconnects from a
+    // new network is judged on where they are now.
+    if (meta?.ip) {
+      this.netIdentity.set(playerId, { ...this.netIdentity.get(playerId), ip: meta.ip });
+    }
     // Spec: max 20 spectators per table. A seated player (or one reconnecting
     // to their seat) is never refused — the cap is on watchers, because an
     // unbounded audience is a snapshot-fanout cost every action pays and, past
@@ -379,7 +467,6 @@ export class PokerRoom implements LiveRoom {
     //
     // Complements the 5-second spectator delay rather than duplicating it: the
     // delay decides WHAT a watcher sees, this decides HOW MANY there can be.
-    const isSpectator = !this.seatOf(playerId);
     if (isSpectator && !this.viewers.has(playerId)) {
       const watching = [...this.viewers.keys()].filter((id) => !this.seatOf(id)).length;
       if (watching >= MAX_SPECTATORS) {
@@ -475,6 +562,11 @@ export class PokerRoom implements LiveRoom {
   private async handle(playerId: string, cmd: TableCommand): Promise<void> {
     switch (cmd.kind) {
       case 'sit':
+        // Client-reported location, recorded BEFORE the seat checks so the
+        // same-GPS rule judges this sit-down, not the previous one.
+        if (cmd.gps) {
+          this.netIdentity.set(playerId, { ...this.netIdentity.get(playerId), gps: cmd.gps });
+        }
         await this.sit(playerId, cmd.seat, cmd.buyIn, {
           ...(cmd.name ? { displayName: cmd.name } : {}),
           ...(cmd.avatarUrl ? { avatarUrl: cmd.avatarUrl } : {}),
@@ -521,9 +613,31 @@ export class PokerRoom implements LiveRoom {
       case 'set_client_seed':
         this.setClientSeed(playerId, cmd.seed);
         break;
+      case 'start_game':
+        this.startGame(playerId);
+        break;
       default:
         throw new RoomError('unknown command');
     }
+  }
+
+  /**
+   * The owner starts a manual (auto-start "None") table.
+   *
+   * Owner-only, and only meaningful before the first hand — afterwards the
+   * table runs itself and the command is a harmless no-op rather than an
+   * error, so a double-tap does not put a red banner on a table that started.
+   */
+  private startGame(playerId: string): void {
+    if (this.config.ownerId !== playerId) {
+      throw new RoomError('only the table creator can start the game');
+    }
+    if (this.readySeats().length < 2) {
+      throw new RoomError('two players with chips are needed to start');
+    }
+    this.manualStarted = true;
+    this.push();
+    this.maybeStartHand();
   }
 
   /** A seated player supplies their device-generated client seed; it feeds every subsequent deal. */
@@ -544,6 +658,7 @@ export class PokerRoom implements LiveRoom {
     if (buyIn < this.config.minBuyIn || buyIn > this.config.maxBuyIn) {
       throw new RoomError(`buy-in must be between ${this.config.minBuyIn} and ${this.config.maxBuyIn}`);
     }
+    this.assertNetRulesAllow(playerId);
     // First time we've seen this player id, the directory gets to create their record.
     const player = this.directory.ensure?.(playerId, profile) ?? this.directory.find(playerId);
     if (!player) throw new RoomError('unknown player');
@@ -569,6 +684,33 @@ export class PokerRoom implements LiveRoom {
     };
     this.push();
     this.maybeStartHand();
+  }
+
+  /**
+   * The creator's same-IP / same-GPS seat rules.
+   *
+   * Compares only facts actually held on BOTH sides — a player whose IP the
+   * transport never reported, or whose client sent no location, produces no
+   * match. That is deliberate: these are table rules a creator chose, not the
+   * platform's collusion detection (players/collusion.ts), which keeps its own
+   * scoring and its own consequences regardless of this table's settings.
+   * Checked before the buy-in moves, so a refusal costs nothing.
+   */
+  private assertNetRulesAllow(playerId: string): void {
+    if (!this.config.banSameIp && !this.config.banSameGps) return;
+    const mine = this.netIdentity.get(playerId);
+    if (!mine) return;
+    for (const other of this.occupied()) {
+      if (other.playerId === playerId) continue;
+      const theirs = this.netIdentity.get(other.playerId);
+      if (!theirs) continue;
+      if (this.config.banSameIp && mine.ip && theirs.ip && mine.ip === theirs.ip) {
+        throw new RoomError('this table does not seat two players on the same IP');
+      }
+      if (this.config.banSameGps && mine.gps && theirs.gps && mine.gps === theirs.gps) {
+        throw new RoomError('this table does not seat two players at the same GPS point');
+      }
+    }
   }
 
   private async stand(playerId: string): Promise<void> {
@@ -855,10 +997,21 @@ export class PokerRoom implements LiveRoom {
 
   // ── The hand loop ───────────────────────────────────────────────────────────
 
-  /** Deal as soon as two players with chips are ready — the table runs itself. */
+  /** Deal as soon as enough players with chips are ready — the table runs itself. */
   private maybeStartHand(): void {
     if (this.disposed || this.phase !== 'WAITING' || this.startTimer) return;
-    if (this.readySeats().length < 2) return;
+    // The creator's auto-start count gates the FIRST deal of the session; after
+    // that the table plays on at the 2-player floor like any other, so one
+    // departure from a "start at 5" table doesn't freeze the remaining four.
+    // 0 is "None": the first deal waits for the owner's start_game, however
+    // many are seated.
+    const auto = this.config.autoStartPlayers ?? 2;
+    if (this.handNumber === 0 && auto === 0 && !this.manualStarted) return;
+    const required =
+      this.handNumber === 0 && auto > 0
+        ? Math.max(2, Math.min(auto, this.config.maxSeats))
+        : 2;
+    if (this.readySeats().length < required) return;
 
     this.phase = 'DEALING';
     this.push();
@@ -878,6 +1031,7 @@ export class PokerRoom implements LiveRoom {
     }
 
     this.handNumber += 1;
+    this.turnSeen.clear(); // hide-hole-cards starts every hand knowing nobody
     this.buttonSeat = this.nextButton(players);
     const buttonIndex = Math.max(0, players.findIndex((s) => s.index === this.buttonSeat));
 
@@ -900,6 +1054,10 @@ export class PokerRoom implements LiveRoom {
         jackpotAccounts: this.jackpotAccountIds(),
         rake: this.config.rake,
         ...(this.config.variantId !== 'texas' ? { variant: this.spec } : {}),
+        // The creator's game options, straight through to the betting engine.
+        ...(this.config.ante ? { ante: this.config.ante } : {}),
+        ...(this.config.straddle ? { straddle: true } : {}),
+        ...(this.config.allInOrFold ? { allInOrFold: true } : {}),
       },
       this.chainClient,
     );
@@ -961,6 +1119,9 @@ export class PokerRoom implements LiveRoom {
     this.clearActionClock();
     const toAct = this.toActPlayer();
     if (!toAct) return;
+    // Their turn has arrived — from this moment (and this push) they may see
+    // their own cards on a hide-hole-cards table.
+    this.turnSeen.add(toAct);
     // A fresh turn is never on reserve — the reserve is only ever entered from
     // an expiring turn clock, deliberately, so it cannot leak away unnoticed.
     this.usingTimeBank = false;
@@ -1390,6 +1551,10 @@ export class PokerRoom implements LiveRoom {
    */
   private insuranceFor(playerId: string, engine: EnginePublicState | null): InsuranceOffer | null {
     if (!engine || this.phase !== 'IN_HAND') return null;
+    // The creator's per-table opt-OUT. It sits in front of the pool's own
+    // auto-disable rules and can only ever remove offers, never conjure one
+    // from an unhealthy pool.
+    if (this.config.insuranceEnabled === false) return null;
 
     // Refresh on every ask, so a hand that reaches an all-in has a recent
     // health check waiting; the fetch itself never blocks a snapshot.
@@ -1491,6 +1656,20 @@ export class PokerRoom implements LiveRoom {
       insurance: this.insuranceFor(playerId, engine),
       jackpot: this.lastJackpot,
 
+      // Manual-start tables: the table is waiting for its owner, and this
+      // viewer either is that owner (show the button) or is not (show why
+      // nothing is happening).
+      ...(this.phase === 'WAITING' &&
+      this.handNumber === 0 &&
+      (this.config.autoStartPlayers ?? 2) === 0 &&
+      !this.manualStarted
+        ? { awaitingStart: true, isOwner: this.config.ownerId === playerId }
+        : {}),
+      // Tables with the same-GPS rule: the client should attach a location to
+      // its sit command. A flag, not the rule itself — enforcement stays in
+      // assertNetRulesAllow either way.
+      ...(this.config.banSameGps ? { gpsRequired: true } : {}),
+
       yourSeat: mySeat ? mySeat.index : null,
       you: me ? { playerId: me.id, name: me.displayName, available: me.available } : null,
       toActSeat: toAct ? (this.seatOf(toAct)?.index ?? null) : null,
@@ -1555,7 +1734,22 @@ export class PokerRoom implements LiveRoom {
     detail: SeatPublic | undefined,
   ): (string | null)[] {
     if (!engine || !detail) return [];
-    if (seat.playerId === viewerId) return engine.you.hole ?? [];
+    if (seat.playerId === viewerId) {
+      // Hide-hole-cards: preflop, your own cards are face-down in YOUR OWN
+      // snapshot until your turn arrives. Only while you can still act —
+      // a blind who is all-in before ever acting has no snap-fold to prevent
+      // and gets to watch the runout knowing what they hold.
+      if (
+        this.config.hideHoleCards &&
+        detail.status === 'active' &&
+        this.phase === 'IN_HAND' &&
+        this.streetOf() === 'PREFLOP' &&
+        !this.turnSeen.has(viewerId)
+      ) {
+        return Array.from({ length: this.spec.holeCards }, () => null);
+      }
+      return engine.you.hole ?? [];
+    }
     const shown = this.revealed.get(seat.playerId);
     if (shown) return shown;
     if (detail.status === 'folded') return [];

@@ -48,6 +48,14 @@ export interface TexasGameConfig {
    * the hole-card count and the hand ranking change; betting, side pots and settlement are shared.
    */
   variant?: PokerVariant;
+  /**
+   * Table-creator options, forwarded verbatim to the betting engine each hand.
+   * Their semantics live on `BettingConfig` in betting.ts; this game object
+   * adds nothing to them and defaults to all-off, which is every existing table.
+   */
+  ante?: number;
+  straddle?: boolean;
+  allInOrFold?: boolean;
 }
 
 interface Seat {
@@ -160,6 +168,9 @@ export class TexasGame extends BaseGame<TexasPhase, Action, TexasGameEvents> {
         bigBlind: this.cfg.bigBlind,
         buttonIndex: button,
         ...(this.cfg.variant ? { variant: this.cfg.variant } : {}),
+        ...(this.cfg.ante ? { ante: this.cfg.ante } : {}),
+        ...(this.cfg.straddle ? { straddle: true } : {}),
+        ...(this.cfg.allInOrFold ? { allInOrFold: true } : {}),
       },
     );
     this.sm.transition('IN_HAND');
