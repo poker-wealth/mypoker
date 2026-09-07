@@ -486,3 +486,49 @@ sees a bug that is already fixed, and either rebuilds the fix — conflicting
 with the branch — or records it as new, which is how this entry came to exist.
 `git log origin/main --oneline -- <file>` before writing anything is cheaper
 than either.
+### §26, continued — and the copies I did not find were the ones outside `src/`
+
+Two days after writing the above I found the rest of them, and the way I found
+them says more than the bug did.
+
+The v3 repalette moved `--bg` and `--brand`. I audited the change by grepping
+`frontend/src` and `mobile/src` for the old hexes, found the hits were all in
+felts and per-game art, reasoned correctly that those were someone else's, and
+called the audit clean. Four copies were sitting outside both directories:
+
+```
+frontend/index.html   <meta name="theme-color">      #0d0d1a
+frontend/index.html   #splash { background }         #0d0d1a
+frontend/index.html   #splash-mark drop-shadow       rgb(187 92 246)
+mobile/app.json       expo-splash-screen background  #0d0d1a
+mobile/app.json       android adaptiveIcon background #0d0d1a
+```
+
+So every cold start painted the OLD brand, held it for the length of the boot,
+and then snapped to the new one — on both platforms, on the first screen a
+player sees. `tsc`, `eslint`, `vite build`, `check:locales`, `check:parity`,
+1312 backend tests and a full hand-written audit were all green throughout.
+None of them compares two files.
+
+**Three things worth keeping from this.**
+
+*The warning was already there and already correct.* `index.html` carried the
+sentence "If the brand colours change, this block changes too", in a comment
+block explaining exactly why the duplication was necessary. I read that file,
+changed the brand, and did not act on it. A comment addressed to a future
+reader is not a control — §7 again, from the other side: not a comment that
+lies, a comment that tells the truth to someone not looking for it.
+
+*The audit's scope was the bug.* `src/` is where components live, so `src/` is
+where a colour audit goes looking. But the boot screens exist precisely BECAUSE
+they run before the app does, which is the same reason they cannot be in `src/`.
+The files most likely to hold a duplicate were the files structurally guaranteed
+to be outside the search. When auditing a token, search the repo, not the source
+directory.
+
+*It is a check now.* `frontend/scripts/check-splash.mjs` reads `--bg` and
+`--brand` out of `index.css` and fails if any of the five copies disagrees; it
+runs in `frontend npm run build` and in `mobile npm run verify`. Mutation-tested
+in both directions — each of the five drifts is caught, and renaming the CSS
+rule produces a loud PARSE FAILURE rather than a silent pass, which is the
+mistake `check-parity` made (§25).

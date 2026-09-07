@@ -121,9 +121,27 @@ leaves the suite green.
 
 ### 5. The shell re-skinned to HH
 
-Bottom nav · Discover/lobby · **splash screen** · **loading screen** ·
-login/sign-up. Splash and loading do not exist on any surface today and Victor
-names both as phases by title.
+Bottom nav · Discover/lobby · login/sign-up.
+
+**CORRECTION, 7 Sep.** This item used to read "splash and loading do not exist
+on any surface today". That was wrong, and it was wrong in the way this project
+keeps being wrong — asserted from memory rather than from the files.
+
+Both exist, and both are better than anything I would have written:
+
+- **Web** — an inline boot screen in `frontend/index.html`, deliberately NOT
+  React, with a comment explaining why: a React splash cannot remove the white
+  flash it exists to hide. It paints on the browser's first frame; `main.tsx`
+  dismisses it on a double `requestAnimationFrame`.
+- **Native** — `expo-splash-screen`, `preventAutoHideAsync()` at boot, held
+  until the fonts resolve.
+- **Loading** — `Skeleton` exists and is used across at least eight pages.
+  There is no route-level loading screen because the bundle is a single chunk,
+  so there is nothing to wait on between routes.
+
+What was actually needed was a repair, not a build: the v3 repalette left all
+of them on the old violet brand, so a cold start flashed the previous identity.
+Fixed, and `npm run check:splash` now enforces it.
 
 Sign-up has a spec now: HH uses email + password + email OTP, **6-character
 code, 60-second resend**, plus an optional invitation code — which is what
