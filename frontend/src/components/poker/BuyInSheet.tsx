@@ -1,10 +1,38 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Sheet } from '@/components/ui/Sheet';
-import { Button } from '@/components/ui/Button';
+import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
+import { Modal } from '@/components/ui/Modal';
+import { TipsDialog } from '@/components/ui/TipsDialog';
+import { chips } from '@/lib/money';
 
-interface BuyInSheetProps {
+/**
+ * Joining a table — the reference app's dialog, part for part: the table's
+ * name up top, the blinds and the chosen buy-in as the two gold figures, a
+ * gold Min–Max slider, the "total coins" line, and the gold Join Game button.
+ *
+ * A centered Modal rather than a bottom sheet, because that is what the
+ * reference shows over the felt. The server re-checks every number in here.
+ *
+ * A bankroll below the table minimum gets the reference's "Tips" alert
+ * instead of the form — Cancel stays, Purchase goes to the wallet.
+ */
+export function BuyInSheet({
+  open,
+  onClose,
+  tableName,
+  smallBlind,
+  min,
+  max,
+  bigBlind,
+  available,
+  seatIndex,
+  onConfirm,
+}: {
   open: boolean;
   onClose: () => void;
+  /** Shown as the dialog title, as in the reference. */
+  tableName: string;
+  smallBlind: number;
   /** Chip range this table allows. */
   min: number;
   max: number;
@@ -14,19 +42,9 @@ interface BuyInSheetProps {
   /** Seat being taken — null when topping up the seat you already hold. */
   seatIndex: number | null;
   onConfirm: (amount: number) => void;
-}
-
-/** Choosing what to sit down with. The server re-checks every number in here. */
-export function BuyInSheet({
-  open,
-  onClose,
-  min,
-  max,
-  bigBlind,
-  available,
-  seatIndex,
-  onConfirm,
-}: BuyInSheetProps) {
+}) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
   const ceiling = Math.min(max, available);
   const [amount, setAmount] = useState(() => Math.min(ceiling, max));
 
@@ -38,55 +56,78 @@ export function BuyInSheet({
   const shortfall = available < min;
   const clamped = useMemo(() => Math.max(min, Math.min(amount, ceiling)), [amount, min, ceiling]);
 
+  if (shortfall) {
+    return (
+      <TipsDialog
+        open={open}
+        title={t('tips.title')}
+        message={t('tips.notEnough')}
+        cancelLabel={t('common.cancel')}
+        actionLabel={t('tips.purchase')}
+        onCancel={onClose}
+        onAction={() => {
+          onClose();
+          navigate('/wallet');
+        }}
+      />
+    );
+  }
+
   return (
-    <Sheet open={open} onClose={onClose} title={seatIndex === null ? 'Add chips' : `Take seat ${seatIndex + 1}`}>
-      <div className="space-y-5 px-4 pt-4">
-        {shortfall ? (
-          <div className="rounded-(--radius-app) border border-border bg-surface p-4 text-center text-sm text-dim">
-            You need at least <span className="font-bold text-text">${min.toLocaleString()}</span> to
-            sit at this table, and you have ${available.toLocaleString()}.
+    <Modal open={open} onClose={onClose} title={tableName}>
+      <div className="space-y-5 px-2 pt-2">
+        {/* The two gold figures: stakes, and what this player sits with. */}
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="text-[0.66rem] text-dim">{t('buyInSheet.blinds')}</div>
+            <div className="mt-1 text-3xl font-black tabular-nums text-gold">
+              {smallBlind}/{bigBlind}
+            </div>
           </div>
-        ) : (
-          <>
-            <div className="text-center">
-              <div className="text-3xl font-black tabular-nums">${clamped.toLocaleString()}</div>
-              <div className="mt-1 text-[0.7rem] text-dim">
-                {Math.floor(clamped / bigBlind)} big blinds · you have ${available.toLocaleString()}
-              </div>
+          <div className="text-right">
+            <div className="text-[0.66rem] text-dim">{t('buyInSheet.buyIn')}</div>
+            <div className="mt-1 text-3xl font-black tabular-nums text-gold">
+              {clamped.toLocaleString()}
             </div>
+          </div>
+        </div>
 
-            <input
-              type="range"
-              min={min}
-              max={ceiling}
-              step={bigBlind}
-              value={clamped}
-              onChange={(e) => setAmount(Number(e.target.value))}
-              className="w-full accent-[var(--brand)]"
-            />
+        <div>
+          <div className="mb-1 flex justify-between text-[0.66rem] text-dim">
+            <span>{t('buyInSheet.min')}</span>
+            <span>{t('buyInSheet.max')}</span>
+          </div>
+          <input
+            type="range"
+            min={min}
+            max={ceiling}
+            step={bigBlind}
+            value={clamped}
+            onChange={(e) => setAmount(Number(e.target.value))}
+            aria-label={t('buyInSheet.buyIn')}
+            className="w-full accent-[var(--gold)]"
+          />
+        </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { label: 'Min', value: min },
-                { label: '½ Max', value: Math.max(min, Math.floor(ceiling / 2)) },
-                { label: 'Max', value: ceiling },
-              ].map((preset) => (
-                <button
-                  key={preset.label}
-                  onClick={() => setAmount(preset.value)}
-                  className="rounded-full border border-border bg-surface px-3 py-1.5 text-[0.72rem] font-semibold text-dim active:bg-surface-2"
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
+        <div className="space-y-1 border-t border-border pt-3 text-[0.72rem]">
+          <div className="flex justify-between text-dim">
+            <span>{t('buyInSheet.totalCoins')}</span>
+            <span className="tabular-nums text-text">{chips(available)}</span>
+          </div>
+          <div className="flex justify-between text-dim">
+            <span>{t('buyInSheet.bigBlinds')}</span>
+            <span className="tabular-nums text-text">{Math.floor(clamped / bigBlind)}</span>
+          </div>
+        </div>
 
-            <Button full onClick={() => onConfirm(clamped)}>
-              {seatIndex === null ? 'Add chips' : 'Sit down'}
-            </Button>
-          </>
-        )}
+        <button
+          type="button"
+          onClick={() => onConfirm(clamped)}
+          className="w-full rounded-(--radius-app) bg-gold py-3 text-sm font-bold text-bg transition active:scale-[0.98]"
+        >
+          {seatIndex === null ? t('buyInSheet.addChips') : t('buyInSheet.joinGame')}
+        </button>
       </div>
-    </Sheet>
+    </Modal>
   );
 }

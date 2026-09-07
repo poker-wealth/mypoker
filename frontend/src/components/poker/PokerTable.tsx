@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'motion/react';
 import { PlayerSeat } from './PlayerSeat';
 import { PlayingCard } from './PlayingCard';
@@ -23,9 +24,16 @@ interface PokerTableProps {
   onChallenge?: (playerId: string) => void;
   /** Override the player's chosen design — used by the design picker's previews. */
   design?: TableDesign;
+  /**
+   * The table's identity, printed faintly across the felt like the reference
+   * app does — name, invitation code (the shareable id), blinds. Shown while
+   * the felt is empty; the board covers that spot once cards are out.
+   */
+  info?: { name: string; tableId: string; smallBlind: number; bigBlind: number };
 }
 
-export function PokerTable({ state, onSit, onChallenge, design: override }: PokerTableProps) {
+export function PokerTable({ state, onSit, onChallenge, design: override, info }: PokerTableProps) {
+  const { t } = useTranslation();
   const chosen = useTableDesign((s) => s.design);
   const design = override ?? chosen;
   const positions = ringFor(design, Math.max(2, state.seats.length));
@@ -93,6 +101,41 @@ export function PokerTable({ state, onSit, onChallenge, design: override }: Poke
         ) : (
           <CssTable design={design} />
         )}
+
+        {/* The brand across the felt, as on the reference table. Always there,
+            faint, under the board — a watermark, not a message. */}
+        <div className="pointer-events-none absolute inset-0 z-[5] flex flex-col items-center justify-center">
+          {info && state.board.length === 0 && (
+            <div className="mb-[2cqmin] text-center text-[3.2cqmin] leading-relaxed text-black/35">
+              {/* The reference's centre block, ours: the name between asterisks,
+                  the table number (which IS the invitation code here — the
+                  share link is /table/<id>), the blinds, and OUR host — read
+                  from the page, never hardcoded, so it is always the domain
+                  the app is actually served on. */}
+              <div className="font-semibold">* {info.name} *</div>
+              <div>#{info.tableId}</div>
+              <div>
+                {t('tableEntry.stakesBlurb', {
+                  stakes: `${info.smallBlind}/${info.bigBlind}`,
+                })}
+              </div>
+              <div>{window.location.host}</div>
+            </div>
+          )}
+          <div className="select-none text-[10cqmin] font-black tracking-[0.06em] text-black/25">
+            MYPOKER
+          </div>
+        </div>
+
+        {/* MYPY in the corner, as the reference table keeps its mascot.
+            Decoration only — it takes no taps and promises nothing. */}
+        <img
+          src="/brand/logo-icon.png"
+          alt=""
+          aria-hidden
+          draggable={false}
+          className="pointer-events-none absolute bottom-[2cqmin] left-[2.5cqmin] z-[6] w-[11cqmin] select-none opacity-90 drop-shadow-lg"
+        />
 
         {/* Board + pot, across the middle of the felt */}
         <div
