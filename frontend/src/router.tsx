@@ -14,6 +14,7 @@ import { Notifications } from '@/pages/Notifications';
 import { AgentCenter } from '@/pages/AgentCenter';
 import { Table } from '@/pages/Table';
 import { Login } from '@/pages/Login';
+import { Download } from '@/pages/Download';
 import { AdminShell } from '@/components/AdminShell';
 import { AdminOverview } from '@/pages/admin/Overview';
 import { AdminPlayers } from '@/pages/admin/Players';
@@ -92,4 +93,8 @@ export const router = isAdminHost()
         children: adminChildren,
       },
       { path: '/table/:id', element: <Table /> },
+      // The public landing/download page. Outside AppShell on purpose: it is
+      // the marketing front door (navbar, hero, store buttons), not an app
+      // tab, and it must render for people who have never signed in.
+      { path: '/download', element: <Download /> },
     ]);

@@ -731,5 +731,24 @@
     "title": "안내",
     "notEnough": "코인이 부족합니다. 지갑에서 충전해 주세요.",
     "purchase": "구매"
+  },
+  "download": {
+    "navHome": "홈",
+    "navDownload": "다운로드",
+    "language": "언어",
+    "rememberDomain": "MYPOKER 공식 영구 도메인을 기억하세요:",
+    "backupBlurb": "모든 백업 링크는 그곳에 게시됩니다. 로그인 전 URL을 확인하세요.",
+    "altDomains": "백업 도메인:",
+    "tagline": "공정하게. 온체인으로. 언제나.",
+    "comingSoon": "출시 예정",
+    "telegramApp": "Telegram 미니앱",
+    "telegramHint": "설치 없이 Telegram 안에서 바로 플레이하세요.",
+    "videosTitle": "웰컴 영상",
+    "videosBlurb": "다운로드부터 첫 핸드까지 안내하는 짧은 영상 4편.",
+    "videoTitle": "웰컴 영상 {{n}}",
+    "videoMissing": "영상 준비 중",
+    "videoDownload": "다운로드",
+    "prevSlide": "이전",
+    "nextSlide": "다음"
   }
 }

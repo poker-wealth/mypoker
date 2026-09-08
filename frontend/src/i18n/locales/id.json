@@ -731,5 +731,24 @@
     "title": "Info",
     "notEnough": "Koin tidak cukup. Silakan isi ulang di dompet.",
     "purchase": "Beli"
+  },
+  "download": {
+    "navHome": "Beranda",
+    "navDownload": "Unduh",
+    "language": "Bahasa",
+    "rememberDomain": "Ingat domain permanen resmi MYPOKER:",
+    "backupBlurb": "Semua tautan cadangan dipasang di sana — periksa URL sebelum masuk.",
+    "altDomains": "Domain cadangan:",
+    "tagline": "Adil. On-chain. Selalu.",
+    "comingSoon": "Segera",
+    "telegramApp": "Mini App Telegram",
+    "telegramHint": "Main langsung di Telegram tanpa instal.",
+    "videosTitle": "Video sambutan",
+    "videosBlurb": "Empat video singkat dari unduh hingga hand pertama.",
+    "videoTitle": "Video sambutan {{n}}",
+    "videoMissing": "Video segera hadir",
+    "videoDownload": "Unduh",
+    "prevSlide": "Sebelumnya",
+    "nextSlide": "Berikutnya"
   }
 }

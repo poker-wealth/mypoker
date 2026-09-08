@@ -731,5 +731,24 @@
     "title": "ヒント",
     "notEnough": "コインが足りません。ウォレットでチャージしてください。",
     "purchase": "購入"
+  },
+  "download": {
+    "navHome": "ホーム",
+    "navDownload": "ダウンロード",
+    "language": "言語",
+    "rememberDomain": "MYPOKER の公式恒久ドメインをお忘れなく：",
+    "backupBlurb": "バックアップリンクはすべてそこに掲載されます。ログイン前に URL をご確認ください。",
+    "altDomains": "予備ドメイン：",
+    "tagline": "フェア・オンチェーン・いつでも",
+    "comingSoon": "近日公開",
+    "telegramApp": "Telegram ミニアプリ",
+    "telegramHint": "インストール不要、Telegram 内ですぐ遊べます。",
+    "videosTitle": "ウェルカム動画",
+    "videosBlurb": "ダウンロードから最初のハンドまでを案内する 4 本の短い動画。",
+    "videoTitle": "ウェルカム動画 {{n}}",
+    "videoMissing": "動画は近日公開",
+    "videoDownload": "ダウンロード",
+    "prevSlide": "前へ",
+    "nextSlide": "次へ"
   }
 }

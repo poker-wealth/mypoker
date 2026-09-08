@@ -731,5 +731,24 @@
     "title": "सूचना",
     "notEnough": "कॉइन पर्याप्त नहीं हैं। कृपया वॉलेट में टॉप-अप करें।",
     "purchase": "खरीदें"
+  },
+  "download": {
+    "navHome": "होम",
+    "navDownload": "डाउनलोड",
+    "language": "भाषा",
+    "rememberDomain": "MYPOKER का स्थायी आधिकारिक डोमेन याद रखें:",
+    "backupBlurb": "सभी बैकअप लिंक वहीं पोस्ट होते हैं — साइन इन से पहले URL जाँच लें।",
+    "altDomains": "बैकअप डोमेन:",
+    "tagline": "निष्पक्ष। ऑन-चेन। हमेशा।",
+    "comingSoon": "जल्द आ रहा है",
+    "telegramApp": "Telegram मिनी ऐप",
+    "telegramHint": "बिना इंस्टॉल Telegram में तुरंत खेलें।",
+    "videosTitle": "स्वागत वीडियो",
+    "videosBlurb": "डाउनलोड से पहले हाथ तक ले जाने वाले चार छोटे वीडियो।",
+    "videoTitle": "स्वागत वीडियो {{n}}",
+    "videoMissing": "वीडियो जल्द आएगा",
+    "videoDownload": "डाउनलोड",
+    "prevSlide": "पिछला",
+    "nextSlide": "अगला"
   }
 }

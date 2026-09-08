@@ -731,5 +731,24 @@
     "title": "提示",
     "notEnough": "金币不足，请前往钱包充值。",
     "purchase": "去充值"
+  },
+  "download": {
+    "navHome": "首页",
+    "navDownload": "下载",
+    "language": "语言",
+    "rememberDomain": "请牢记 MYPOKER 官方永久域名：",
+    "backupBlurb": "所有备用链接都会发布在该域名，登录前请核对网址。",
+    "altDomains": "备用域名：",
+    "tagline": "公平 · 链上 · 始终如一",
+    "comingSoon": "即将上线",
+    "telegramApp": "Telegram 小程序",
+    "telegramHint": "无需安装，在 Telegram 内即刻畅玩。",
+    "videosTitle": "欢迎视频",
+    "videosBlurb": "四个短视频，带你从下载到上手第一局。",
+    "videoTitle": "欢迎视频 {{n}}",
+    "videoMissing": "视频即将上线",
+    "videoDownload": "下载",
+    "prevSlide": "上一张",
+    "nextSlide": "下一张"
   }
 }

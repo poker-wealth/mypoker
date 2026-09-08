@@ -731,5 +731,24 @@
     "title": "Tips",
     "notEnough": "Not enough coins. Please top up in your wallet.",
     "purchase": "Purchase"
+  },
+  "download": {
+    "navHome": "Home",
+    "navDownload": "Download",
+    "language": "Language",
+    "rememberDomain": "Remember MYPOKER's permanent domain:",
+    "backupBlurb": "All backup links are posted there — verify your URL before signing in.",
+    "altDomains": "Backup domains:",
+    "tagline": "Fair. On-chain. Always.",
+    "comingSoon": "Soon",
+    "telegramApp": "Telegram Mini App",
+    "telegramHint": "Play instantly inside Telegram — no install needed.",
+    "videosTitle": "Welcome videos",
+    "videosBlurb": "Four short videos to take you from download to your first hand.",
+    "videoTitle": "Welcome video {{n}}",
+    "videoMissing": "Video coming soon",
+    "videoDownload": "Download",
+    "prevSlide": "Previous",
+    "nextSlide": "Next"
   }
 }

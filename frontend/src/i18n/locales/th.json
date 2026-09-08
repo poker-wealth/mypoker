@@ -731,5 +731,24 @@
     "title": "แจ้งเตือน",
     "notEnough": "เหรียญไม่พอ กรุณาเติมเงินในกระเป๋า",
     "purchase": "ซื้อ"
+  },
+  "download": {
+    "navHome": "หน้าแรก",
+    "navDownload": "ดาวน์โหลด",
+    "language": "ภาษา",
+    "rememberDomain": "จดจำโดเมนถาวรของ MYPOKER:",
+    "backupBlurb": "ลิงก์สำรองทั้งหมดจะประกาศที่นั่น โปรดตรวจสอบ URL ก่อนเข้าสู่ระบบ",
+    "altDomains": "โดเมนสำรอง:",
+    "tagline": "ยุติธรรม ออนเชน เสมอ",
+    "comingSoon": "เร็ว ๆ นี้",
+    "telegramApp": "มินิแอป Telegram",
+    "telegramHint": "เล่นได้ทันทีใน Telegram ไม่ต้องติดตั้ง",
+    "videosTitle": "วิดีโอต้อนรับ",
+    "videosBlurb": "วิดีโอสั้น 4 ตอน พาคุณจากดาวน์โหลดถึงมือแรก",
+    "videoTitle": "วิดีโอต้อนรับ {{n}}",
+    "videoMissing": "วิดีโอเร็ว ๆ นี้",
+    "videoDownload": "ดาวน์โหลด",
+    "prevSlide": "ก่อนหน้า",
+    "nextSlide": "ถัดไป"
   }
 }

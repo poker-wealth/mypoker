@@ -731,5 +731,24 @@
     "title": "Lưu ý",
     "notEnough": "Không đủ xu. Vui lòng nạp thêm trong ví.",
     "purchase": "Mua"
+  },
+  "download": {
+    "navHome": "Trang chủ",
+    "navDownload": "Tải về",
+    "language": "Ngôn ngữ",
+    "rememberDomain": "Ghi nhớ tên miền chính thức của MYPOKER:",
+    "backupBlurb": "Mọi liên kết dự phòng đều đăng tại đó — kiểm tra URL trước khi đăng nhập.",
+    "altDomains": "Tên miền dự phòng:",
+    "tagline": "Công bằng. On-chain. Luôn luôn.",
+    "comingSoon": "Sắp ra mắt",
+    "telegramApp": "Mini App Telegram",
+    "telegramHint": "Chơi ngay trong Telegram, không cần cài đặt.",
+    "videosTitle": "Video chào mừng",
+    "videosBlurb": "Bốn video ngắn đưa bạn từ tải về đến ván bài đầu tiên.",
+    "videoTitle": "Video chào mừng {{n}}",
+    "videoMissing": "Video sắp có",
+    "videoDownload": "Tải về",
+    "prevSlide": "Trước",
+    "nextSlide": "Sau"
   }
 }
