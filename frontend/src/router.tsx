@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
+import { HomeIndex } from '@/components/HomeIndex';
 import { Alliance } from '@/pages/Alliance';
 import { Lobby } from '@/pages/Lobby';
 import { Games } from '@/pages/Games';
@@ -64,8 +65,13 @@ export const router = isAdminHost()
         path: '/',
         element: <AppShell />,
         children: [
-          // Lobby stays the landing route; Alliance is tab 1 but not the entry screen.
-          { index: true, element: <Lobby /> },
+          // The root is the first thing a visitor sees, so it depends on who is
+          // visiting: inside Telegram (the Mini App opens here) and for anyone
+          // already signed in, it is the Lobby, exactly as before. A plain
+          // browser with no session gets the public landing page instead —
+          // a website's front door is marketing, not an empty lobby asking
+          // for a login.
+          { index: true, element: <HomeIndex /> },
           { path: 'alliance', element: <Alliance /> },
           { path: 'games', element: <Games /> },
           { path: 'data', element: <Data /> },
