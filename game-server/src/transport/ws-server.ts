@@ -31,6 +31,22 @@ export interface ClientContext {
 export interface GameSocketServerConfig {
   /** Verify a player's auth token; return their id or throw. */
   verifyToken: (token: string) => { playerId: string };
+  /**
+   * Whether this player may hold a socket AT ALL — asked after the token
+   * proves who they are, before a session exists.
+   *
+   * Separate from `verifyToken` on purpose. That one is pure crypto: signature
+   * and expiry, no I/O, and the standalone table server runs it with no
+   * database behind it. This is POLICY, it needs a read, and it is optional so
+   * a DB-less deployment is not forced to invent one.
+   *
+   * It exists because a JWT is a snapshot. Suspension happens after the token
+   * is minted, and the felt only ever checked the signature — so a banned
+   * player kept playing until their token expired and could open a fresh
+   * socket the entire time. Every suspension test mounts an HTTP route and
+   * never opens a socket, which is why the suite stayed green over it.
+   */
+  authorizeSession?: (playerId: string) => Promise<{ ok: true } | { ok: false; reason: string }>;
   /** Handle a validated inbound message from an established client. */
   onInbound: (ctx: ClientContext, msg: Inbound) => void | Promise<void>;
   /** Called when a client disconnects (cleanup rooms, etc.). */
@@ -110,6 +126,29 @@ export class GameSocketServer {
       if (!session) close('handshake_timeout');
     }, this.config.handshakeTimeoutMs ?? 5000);
 
+    /**
+     * Everything after the two checks: derive the shared key, open the session.
+     *
+     * Split out so the authorized and unauthorized-but-permitted paths cannot
+     * drift — `authorizeSession` resolves asynchronously, and duplicating this
+     * body into the callback is how one of the two copies eventually forgets to
+     * clear the handshake timer or start the rate limiter.
+     */
+    const finishHandshake = (playerId: string, clientPublicKey: string): void => {
+      if (ws.readyState !== WebSocket.OPEN) return;
+      const key = deriveSessionKey(privateKey, clientPublicKey);
+      session = new Session(playerId, key);
+      limiter = new RateLimiter();
+      clearTimeout(handshakeTimer);
+      ctx = {
+        session,
+        send: (msg): void => sendRaw(session!.signOutbound(JSON.stringify(msg))),
+        close,
+      };
+      report?.({ type: 'ready', playerId });
+      sendRaw({ t: 'ready' });
+    };
+
     ws.on('message', (data: Buffer): void => {
       if (data.length > MAX_MESSAGE_BYTES) return close('message_too_large');
 
@@ -129,17 +168,29 @@ export class GameSocketServer {
         } catch {
           return close('unauthorized');
         }
-        const key = deriveSessionKey(privateKey, hello.data.clientPublicKey);
-        session = new Session(playerId, key);
-        limiter = new RateLimiter();
-        clearTimeout(handshakeTimer);
-        ctx = {
-          session,
-          send: (msg): void => sendRaw(session!.signOutbound(JSON.stringify(msg))),
-          close,
-        };
-        report?.({ type: 'ready', playerId });
-        sendRaw({ t: 'ready' });
+        // Policy, after identity. `void`-ed because `ws.on('message')` cannot
+        // await; the handshake is simply not finished until it resolves. That
+        // is safe: `session` stays undefined in the gap, so any frame arriving
+        // meanwhile re-enters THIS branch and is rejected as a bad handshake
+        // rather than processed unauthorized.
+        const authorize = this.config.authorizeSession;
+        if (authorize) {
+          const clientPublicKey = hello.data.clientPublicKey;
+          void authorize(playerId)
+            .then((verdict) => {
+              if (!verdict.ok) return close(verdict.reason);
+              finishHandshake(playerId, clientPublicKey);
+            })
+            .catch(() => {
+              // A failed lookup must not open the door. Refusing a legitimate
+              // player on a database blip is recoverable — they reconnect.
+              // Seating a banned one is not.
+              close('unauthorized');
+            });
+          return;
+        }
+
+        finishHandshake(playerId, hello.data.clientPublicKey);
         return;
       }
 

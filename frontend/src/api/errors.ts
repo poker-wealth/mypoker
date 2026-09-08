@@ -29,6 +29,31 @@ export function errorKey(error: unknown): string {
 }
 
 /**
+ * The same job, for the ADMIN panel, where the rule is inverted.
+ *
+ * `errorKey` deliberately discards a server message, because on a player screen
+ * the raw text is a diagnostic and the reader is not an engineer. In the admin
+ * API the opposite is true: a 4xx there carries a sentence written FOR an
+ * administrator and naming the exact thing they did — "you cannot suspend your
+ * own account", "that address belongs to another account", "Password must be at
+ * least 8 characters". Replacing those with "Something went wrong" strips the
+ * only part that says what to do next, which is what happened to a real
+ * self-suspend attempt: the guard worked perfectly and the screen made it look
+ * like a fault.
+ *
+ * Only 4xx. A 500 message is a stack-shaped diagnostic and an admin can act on
+ * it no better than a player; those still get the translated line, and the
+ * caller passes `fallback` for them.
+ */
+export function adminErrorMessage(error: unknown, fallback: string): string {
+  if (!(error instanceof ApiError)) return fallback;
+  if (error.status >= 400 && error.status < 500 && error.status !== 401 && error.status !== 403) {
+    return error.message || fallback;
+  }
+  return fallback;
+}
+
+/**
  * Log the technical detail where an engineer will find it.
  *
  * Called alongside errorKey so the diagnostic isn't simply discarded when the

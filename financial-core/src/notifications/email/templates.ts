@@ -57,14 +57,29 @@ const esc = (value: string): string =>
  * Every event fills the middle and nothing else, so a deposit receipt and a
  * withdrawal receipt are recognisably the same family of message.
  */
-function layout(input: {
+interface LayoutInput {
   heading: string;
+  /** The one big line. An amount for money mail; the code for a confirmation. */
   amount: string;
   amountNote: string;
   rows: DetailRow[];
   supportUrl: string;
   footer: EmailMessages['footer'];
-}): string {
+  /**
+   * Overrides `footer.why` for a mail where that sentence is untrue.
+   *
+   * Every money email goes to an address with wallet activity, which is what
+   * the localised line says. A confirmation code does not: its recipient may
+   * have no account at all, and may be someone whose address was typed in by
+   * mistake. Telling them they have wallet activity would be a false statement
+   * to exactly the person most alarmed by it.
+   */
+  footerNote?: string;
+  /** Renders the big line as spaced monospace. For codes, not amounts. */
+  mono?: boolean;
+}
+
+function layout(input: LayoutInput): string {
   const rows = input.rows
     .map(
       (r) => `
@@ -93,7 +108,11 @@ function layout(input: {
           <tr>
             <td style="padding:18px 24px 0 24px;">
               <div style="font-size:15px;color:${C.text};">${esc(input.heading)}</div>
-              <div style="font-size:34px;font-weight:800;color:${C.text};padding-top:6px;">${esc(input.amount)}</div>
+              <div style="font-size:34px;font-weight:800;color:${C.text};padding-top:6px;${
+                input.mono
+                  ? `font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;letter-spacing:6px;`
+                  : ''
+              }">${esc(input.amount)}</div>
               <div style="font-size:12px;color:${C.dim};padding-top:4px;">${esc(input.amountNote)}</div>
             </td>
           </tr>
@@ -109,7 +128,7 @@ function layout(input: {
             <td style="padding:22px 24px 24px 24px;">
               <div style="font-size:11px;color:${C.dim};line-height:1.6;">
                 ${esc(input.footer.questions)} <a href="${esc(input.supportUrl)}" style="color:${C.accent};text-decoration:none;">${esc(input.footer.contactSupport)}</a><br>
-                ${esc(input.footer.why)}
+                ${esc(input.footerNote ?? input.footer.why)}
               </div>
               <div style="font-size:10px;color:${C.dim};padding-top:14px;letter-spacing:1px;">
                 Fair. On-Chain. Always.
@@ -125,14 +144,7 @@ function layout(input: {
 }
 
 /** The text half, built from the same inputs so the two cannot drift. */
-function plain(input: {
-  heading: string;
-  amount: string;
-  amountNote: string;
-  rows: DetailRow[];
-  supportUrl: string;
-  footer: EmailMessages['footer'];
-}): string {
+function plain(input: LayoutInput): string {
   const rows = input.rows.map((r) => `${r.label}: ${r.value}`).join('\n');
   return [
     'MYPOKER',
@@ -144,7 +156,7 @@ function plain(input: {
     rows,
     '',
     `${input.footer.questions} ${input.supportUrl}`,
-    input.footer.why,
+    input.footerNote ?? input.footer.why,
     '',
     // The tagline stays English in every locale: it is the brand wordmark's
     // companion, not copy. Translating it would give the brand eight names.
@@ -366,6 +378,60 @@ export function withdrawalReturned(input: {
   };
   return {
     subject: fill(m.withdrawalReturned.subject, { amount }),
+    html: layout(body),
+    text: plain(body),
+  };
+}
+
+// ── identity ─────────────────────────────────────────────────────────────────
+
+/**
+ * The email-confirmation code.
+ *
+ * Not a money email, but the same shell on purpose: someone who has seen a
+ * MYPOKER deposit receipt should recognise this one as coming from the same
+ * place, and a confirmation mail that looks unlike the rest of the brand is
+ * indistinguishable from a phishing attempt.
+ *
+ * A CODE, NOT A LINK. Corporate mail scanners and some clients pre-fetch every
+ * URL in a message, which would silently consume a one-click confirmation link
+ * before the recipient ever saw it. A code cannot be spent by a scanner.
+ *
+ * Says plainly what to do if it was not you. That sentence is the only
+ * protection the person whose address was typed in by mistake — or on purpose —
+ * actually has.
+ */
+export function emailConfirmationCode(input: {
+  code: string;
+  expiresInMinutes: number;
+}): EmailTemplate {
+  const body = {
+    heading: 'Confirm your email address',
+    amount: input.code,
+    amountNote: `This code expires in ${input.expiresInMinutes} minutes.`,
+    mono: true,
+    rows: [
+      { label: 'Code', value: input.code },
+      { label: 'Valid for', value: `${input.expiresInMinutes} minutes` },
+    ],
+    supportUrl: SUPPORT,
+    // English, and deliberately so for now: a confirmation code is sent BEFORE
+    // the account exists in any settled form, so there is no stored language
+    // preference to read. Every money mail resolves the recipient's locale;
+    // this one has nobody to ask yet. Taking the default locale's footer keeps
+    // "Questions?" and "Contact support" from being hardcoded twice.
+    footer: MESSAGES[DEFAULT_LOCALE].footer,
+    // "nobody can sign in without it", NOT "no account is created without it".
+    // The account row IS written before this email is sent — it just cannot
+    // hold a session and is reclaimed by the next sign-up for the address. The
+    // shorter sentence read better and was false, which is docs/TRAPS.md #7 in
+    // a place a player actually reads.
+    footerNote:
+      'You are receiving this because someone entered this address when signing up for MYPOKER. ' +
+      'If that was not you, ignore this email — the code expires on its own and nobody can sign in without it.',
+  };
+  return {
+    subject: `${input.code} is your MYPOKER confirmation code`,
     html: layout(body),
     text: plain(body),
   };

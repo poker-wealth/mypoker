@@ -1,5 +1,6 @@
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchSettings, patchSettings, type PlayerSettings, type SettingsPatch } from './settings';
+import { uploadAvatar } from './avatar';
 import { fetchReputation } from './reputation';
 import { fetchJackpot, fetchJackpotHistory } from './jackpot';
 import {
@@ -22,6 +23,13 @@ import {
   createAdmin,
   fetchUsers,
   fetchLeagueDetail,
+  fetchUserRecord,
+  fetchUserAudit,
+  updateUser,
+  setUserSuspension,
+  setUserPassword,
+  setPlayerOverride,
+  type AdminUserPatch,
 } from './admin';
 import { fetchVip } from './vip';
 import {
@@ -62,6 +70,13 @@ import {
   saveWithdrawalAddress,
 } from './wallet';
 import { fetchLobbyGames, fetchTables, type TableFilter } from './lobby';
+import {
+  changeDisplayName,
+  changePassword,
+  forgotPassword,
+  resetPassword,
+  fetchMe,
+} from './auth';
 import { useSession } from '@/store/session';
 import { useContextStore } from '@/store/context';
 
@@ -191,6 +206,35 @@ export function useUpdateSettings() {
 }
 
 /**
+ * Avatar upload. Deliberately its own mutation rather than folded into
+ * `useUpdateSettings`: the payload is raw image bytes, not a settings patch,
+ * and the server route (`POST /me/avatar`) is a different endpoint entirely
+ * (see api/avatar.ts). No optimistic update — unlike a toggle, there's
+ * nothing honest to show before the server has actually processed the image.
+ *
+ * On success the settings cache is replaced with the settled state the
+ * upload itself returned, same as `useUpdateSettings` — one fewer round trip
+ * than invalidating and refetching. If the upload stored the image but the
+ * settings read-back failed (`settings: null` — see api/avatar.ts), the
+ * cache is invalidated instead so the next read gets the truth rather than
+ * being left showing a stale `avatarId`.
+ */
+export function useUploadAvatar() {
+  const playerId = useSession((s) => s.player?.playerId);
+  const queryClient = useQueryClient();
+  const key = ['settings', playerId];
+
+  return useMutation({
+    mutationFn: ({ file, contentType }: { file: Blob; contentType: string }) =>
+      uploadAvatar(file, contentType),
+    onSuccess: ({ settings }) => {
+      if (settings) queryClient.setQueryData(key, settings);
+      else void queryClient.invalidateQueries({ queryKey: key });
+    },
+  });
+}
+
+/**
  * Tables for the lobby list.
  *
  * Public, like the game rail, so no session is needed. Polled on an interval
@@ -257,6 +301,67 @@ export function useVip() {
     queryFn: fetchVip,
     enabled: Boolean(playerId),
     staleTime: 60_000,
+  });
+}
+
+// ── Personal info / password self-service ────────────────────────────────────
+
+/**
+ * Change the signed-in player's display name.
+ *
+ * The response carries the settled profile, so `updatePlayer` writes it
+ * straight into the session cache on success — otherwise every other screen
+ * reading `player.displayName` would keep showing the old one until the next
+ * full sign-in.
+ */
+export function useChangeDisplayName() {
+  return useMutation({
+    mutationFn: (displayName: string) => changeDisplayName(displayName),
+    onSuccess: ({ player }) => useSession.getState().updatePlayer(player),
+  });
+}
+
+/**
+ * The signed-in player's own email and password status — the two fields only
+ * `/auth/me` reports (see `SelfProfile` in api/auth.ts). Personal Info is the
+ * only screen that needs either, so this stays its own query rather than
+ * something folded into the session player object everywhere else reads.
+ *
+ * Cached like settings: this changes only when the player themselves changes
+ * their password (email is not editable at all yet), so a long staleTime
+ * avoids re-fetching it on every visit to the screen.
+ */
+export function useSelfProfile() {
+  const playerId = useSession((s) => s.player?.playerId);
+  return useQuery({
+    queryKey: ['auth', 'me', playerId],
+    queryFn: fetchMe,
+    enabled: Boolean(playerId),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/**
+ * Change the signed-in player's password. No cache to update — a password
+ * is never held client-side, only asked for.
+ */
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: ({ currentPassword, newPassword }: { currentPassword: string; newPassword: string }) =>
+      changePassword(currentPassword, newPassword),
+  });
+}
+
+/** Forgot-password step 1: request a code by email. Unauthenticated. */
+export function useForgotPassword() {
+  return useMutation({ mutationFn: (email: string) => forgotPassword(email) });
+}
+
+/** Forgot-password step 2: email + code + new password. Unauthenticated. */
+export function useResetPassword() {
+  return useMutation({
+    mutationFn: ({ email, code, newPassword }: { email: string; code: string; newPassword: string }) =>
+      resetPassword(email, code, newPassword),
   });
 }
 
@@ -644,6 +749,78 @@ export function usePlayerDetail(playerId: string | null) {
     staleTime: 10_000,
     retry: false,
   });
+}
+
+/**
+ * The editable account record behind the admin player drawer.
+ *
+ * `retry: false` because the two failures here are both permanent answers: 404
+ * means this player has no web identity (a Telegram account), and a role
+ * rejection does not change on repetition. Retrying either just delays the
+ * message.
+ */
+export function useAdminUserRecord(playerId: string | null) {
+  return useQuery({
+    queryKey: ['admin', 'user', playerId],
+    queryFn: () => fetchUserRecord(playerId!),
+    enabled: Boolean(playerId),
+    retry: false,
+  });
+}
+
+/** The audit trail for one account. */
+export function useAdminUserAudit(playerId: string | null) {
+  return useQuery({
+    queryKey: ['admin', 'audit', playerId],
+    queryFn: () => fetchUserAudit(playerId!),
+    enabled: Boolean(playerId),
+    retry: false,
+  });
+}
+
+/**
+ * The three admin writes, sharing one invalidation.
+ *
+ * EVERY MUTATION INVALIDATES THE AUDIT QUERY as well as the record. The audit
+ * entry is written by the same request that made the change, so a panel showing
+ * a fresh record beside a stale trail would show an edit that apparently nobody
+ * made — which is precisely the impression the audit log exists to prevent.
+ *
+ * The search results are invalidated too: a changed display name or email must
+ * not leave the list behind it reading the old value.
+ */
+export function useAdminUserMutations(playerId: string | null) {
+  const qc = useQueryClient();
+  const after = async (): Promise<void> => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ['admin', 'user', playerId] }),
+      qc.invalidateQueries({ queryKey: ['admin', 'audit', playerId] }),
+      qc.invalidateQueries({ queryKey: ['admin', 'player', playerId] }),
+      qc.invalidateQueries({ queryKey: ['admin', 'players'] }),
+    ]);
+  };
+
+  return {
+    update: useMutation({
+      mutationFn: (patch: AdminUserPatch) => updateUser(playerId!, patch),
+      onSuccess: after,
+    }),
+    suspension: useMutation({
+      mutationFn: (v: { suspended: boolean; reason?: string }) =>
+        setUserSuspension(playerId!, v.suspended, v.reason),
+      onSuccess: after,
+    }),
+    password: useMutation({
+      mutationFn: (v: { newPassword: string; reason?: string }) =>
+        setUserPassword(playerId!, v.newPassword, v.reason),
+      onSuccess: after,
+    }),
+    override: useMutation({
+      mutationFn: (v: { reputationScore?: number | null; vipTier?: string | null; reason: string }) =>
+        setPlayerOverride(playerId!, v),
+      onSuccess: after,
+    }),
+  };
 }
 
 /**

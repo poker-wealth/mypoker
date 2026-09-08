@@ -287,6 +287,10 @@ export function buildLeagueTableRouter(
           id: plan.tableId,
           gameId: plan.variantId,
           stakes: plan.bigBlind,
+          // Sent, not derived. Both clients used to render `stakes / 2`, which
+          // is right only while every table is half-and-half — and a league
+          // admin chooses these two figures independently.
+          smallBlind: plan.smallBlind,
           players: 0,
           jackpot: 0,
           buyInBB: Math.max(1, Math.floor(plan.minBuyIn / plan.bigBlind)),

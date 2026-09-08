@@ -6,6 +6,7 @@ import { Games } from '@/pages/Games';
 import { Data } from '@/pages/Data';
 import { Wallet } from '@/pages/Wallet';
 import { Profile } from '@/pages/Profile';
+import { PersonalInfo } from '@/pages/PersonalInfo';
 import { Settings } from '@/pages/Settings';
 import { Fairness } from '@/pages/Fairness';
 import { Jackpot } from '@/pages/Jackpot';
@@ -72,6 +73,8 @@ export const router = isAdminHost()
           // Not a tab — reached from My Account's deposit/withdraw.
           { path: 'wallet', element: <Wallet /> },
           { path: 'settings', element: <Settings /> },
+          // Not a tab — reached from Profile's "Personal Info" row.
+          { path: 'personal', element: <PersonalInfo /> },
           // Browser sign-in (email/password + Google); inside Telegram the Mini App
           // signs in automatically and this screen is never routed to.
           { path: 'login', element: <Login /> },

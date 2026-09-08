@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { Decimal128 } from 'bson';
 import {
   createAgent,
   createReferralLink,
@@ -16,7 +17,27 @@ import {
   AgentCommissionModel,
   ReferralBindingModel,
 } from '../../src/agent/agent-store';
+import { LedgerModel } from '../../src/wallet/ledger.model';
+import { getOrCreatePlayerAccount } from '../../src/wallet/system-accounts';
+import { LedgerType, LedgerDirection } from '../../src/domain/account-types';
 import { startTestDb, stopTestDb, clearCollections } from '../db-helper';
+
+/** Give a player `n` settled rounds, the same way player-reputation.test.ts does. */
+async function playRounds(playerId: string, n: number): Promise<void> {
+  const accountId = (await getOrCreatePlayerAccount(playerId))._id;
+  const docs = Array.from({ length: n }, (_, i) => ({
+    _id: `${playerId}-r${i}`,
+    idempotencyKey: `${playerId}-r${i}`,
+    businessId: `${playerId}-round-${i}`,
+    accountId,
+    counterpartyAccountId: 'house',
+    direction: LedgerDirection.DEBIT,
+    amount: Decimal128.fromString('1'),
+    type: LedgerType.BET,
+    createdAt: new Date(),
+  }));
+  await LedgerModel.insertMany(docs);
+}
 
 /**
  * The binding rules and the balance-visibility block are the two that matter.
@@ -160,6 +181,24 @@ describe('referral bindings — permanent, set once', () => {
 
   it('leaves an unreferred player with no binding', async () => {
     expect(await referralFor('tg-organic')).toBeNull();
+  });
+
+  it('binds a brand-new player — zero rounds played', async () => {
+    // No ledger activity at all for PLAYER: playRounds is never called.
+    await bindReferral(PLAYER, linkA);
+    expect(await referralFor(PLAYER)).toEqual({ directAgentId: AGENT_A, parentAgentId: null });
+  });
+
+  it('refuses to bind a player who has already played a hand', async () => {
+    // "Agents earn a share of the rake from players they bring in" — a player
+    // with rounds on the books was not brought in by this link.
+    await playRounds(PLAYER, 1);
+
+    await expect(bindReferral(PLAYER, linkA)).rejects.toThrow(/not eligible for referral attribution/);
+
+    // The rejection must be real: no row written for them anywhere.
+    expect(await referralFor(PLAYER)).toBeNull();
+    expect(await ReferralBindingModel.countDocuments({ _id: PLAYER })).toBe(0);
   });
 });
 

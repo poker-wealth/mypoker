@@ -19,10 +19,27 @@ export function AppShell() {
   const status = useSession((s) => s.status);
   const token = useSession((s) => s.token);
   const signIn = useSession((s) => s.signIn);
+  const refreshPlayer = useSession((s) => s.refreshPlayer);
 
   useEffect(() => {
     if (status === 'idle') void signIn();
   }, [status, signIn]);
+
+  // Reconcile the cached player with the server, once, on a restored session.
+  //
+  // The player object is persisted at sign-in and never rewritten, so a change
+  // made by an ADMINISTRATOR — a renamed account, a granted role — stayed
+  // invisible on that player's own device indefinitely. A reload did not fix
+  // it; a reload rehydrates the same cached object from localStorage.
+  //
+  // Only on a RESTORED session: a fresh sign-in has just written the truth, and
+  // asking again immediately would be a wasted request on the slowest screen.
+  useEffect(() => {
+    if (status === 'authenticated') void refreshPlayer();
+    // Deliberately not re-run on every status change — this fires once per
+    // mount for a session that was already established.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useAccountLanguage();
 
