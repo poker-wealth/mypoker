@@ -272,6 +272,23 @@ function FeatureCard({
 }) {
   const [hasPhone, setHasPhone] = useState(true);
   const [hasScene, setHasScene] = useState(true);
+  const [fullPanel, setFullPanel] = useState(true);
+
+  // The owner's art arrives as COMPLETE panels — scene, phone, icon and copy
+  // in one image. When that file exists it IS the card; the composed version
+  // below only renders while the art is missing.
+  if (fullPanel) {
+    return (
+      <img
+        src={`/brand/feature-${n}.png`}
+        alt={title}
+        onError={() => setFullPanel(false)}
+        className="w-full select-none rounded-2xl"
+        draggable={false}
+      />
+    );
+  }
+
   return (
     <div className="relative flex min-h-[280px] items-center overflow-hidden rounded-2xl bg-surface md:min-h-[320px]">
       {hasScene && (
