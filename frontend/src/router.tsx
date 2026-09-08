@@ -2,7 +2,6 @@ import { createBrowserRouter } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
 import { HomeIndex } from '@/components/HomeIndex';
 import { Alliance } from '@/pages/Alliance';
-import { Lobby } from '@/pages/Lobby';
 import { Games } from '@/pages/Games';
 import { Data } from '@/pages/Data';
 import { Wallet } from '@/pages/Wallet';
