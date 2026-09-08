@@ -1,7 +1,7 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
-import { HomeIndex } from '@/components/HomeIndex';
 import { Alliance } from '@/pages/Alliance';
+import { Lobby } from '@/pages/Lobby';
 import { Games } from '@/pages/Games';
 import { Data } from '@/pages/Data';
 import { Wallet } from '@/pages/Wallet';
@@ -14,7 +14,7 @@ import { Notifications } from '@/pages/Notifications';
 import { AgentCenter } from '@/pages/AgentCenter';
 import { Table } from '@/pages/Table';
 import { Login } from '@/pages/Login';
-import { Download } from '@/pages/Download';
+import { Landing } from '@/pages/Landing';
 import { AdminShell } from '@/components/AdminShell';
 import { AdminOverview } from '@/pages/admin/Overview';
 import { AdminPlayers } from '@/pages/admin/Players';
@@ -64,13 +64,11 @@ export const router = isAdminHost()
         path: '/',
         element: <AppShell />,
         children: [
-          // The root is the first thing a visitor sees, so it depends on who is
-          // visiting: inside Telegram (the Mini App opens here) and for anyone
-          // already signed in, it is the Lobby, exactly as before. A plain
-          // browser with no session gets the public landing page instead —
-          // a website's front door is marketing, not an empty lobby asking
-          // for a login.
-          { index: true, element: <HomeIndex /> },
+          // Lobby is the landing route for Telegram and signed-in players.
+          // A signed-out browser never reaches it: AppShell's gate sends a
+          // stranger at the root to /download (the public landing) — ONE place
+          // decides who sees what at the front door, and it is the shell.
+          { index: true, element: <Lobby /> },
           { path: 'alliance', element: <Alliance /> },
           { path: 'games', element: <Games /> },
           { path: 'data', element: <Data /> },
@@ -101,5 +99,5 @@ export const router = isAdminHost()
       // The public landing/download page. Outside AppShell on purpose: it is
       // the marketing front door (navbar, hero, store buttons), not an app
       // tab, and it must render for people who have never signed in.
-      { path: '/download', element: <Download /> },
+      { path: '/download', element: <Landing /> },
     ]);

@@ -11,6 +11,7 @@ import { useSettings } from '@/api/hooks';
 import { setLanguage } from '@/i18n';
 import { initData } from '@/lib/telegram';
 import { Login } from '@/pages/Login';
+import { Landing } from '@/pages/Landing';
 
 export function AppShell() {
   const location = useLocation();
@@ -26,9 +27,17 @@ export function AppShell() {
 
   useAccountLanguage();
 
-  // Outside Telegram (on the web), enforce web sign up / sign in gate before opening the app
+  // Outside Telegram (on the web), enforce web sign up / sign in gate before opening the app.
+  // EXCEPT at the root: a website's first screen is its front door, and for a
+  // stranger that is the landing page — rendered HERE, at `/` itself, so the
+  // address bar never flicks to /download. Sign-in appears when they choose
+  // Play, never as the opening screen. Deeper links (/wallet, /profile…) keep
+  // the gate: those are app destinations, and a session is genuinely required.
+  // The early return also skips the shell's chrome, so the landing renders
+  // without the app's header and tab bar around it.
   const isTelegram = Boolean(initData());
   if (!isTelegram && !token) {
+    if (location.pathname === '/') return <Landing />;
     return <Login />;
   }
 
