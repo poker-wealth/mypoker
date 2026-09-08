@@ -669,5 +669,40 @@
     "seatsBlurb": "{{count}} kursi. Dua pemain sudah cukup untuk mulai.",
     "codeLabel": "Kode undangan",
     "shareBlurbPrivate": "Kirim tautan ini untuk mengundang teman — kodenya sudah termasuk."
+  },
+  "download": {
+    "title": "Dapatkan MYPOKER",
+    "blurb": "Main langsung di Telegram, atau pasang aplikasinya di ponsel Anda.",
+    "howTo": "Cara memasang",
+    "unavailable": "Belum tersedia",
+    "unavailableHint": "Platform ini belum siap. Telegram sudah bisa dipakai sekarang — pindah ke tab tersebut dan mulai main.",
+    "iosNote": "Versi iPhone dibagikan lewat TestFlight selama listing App Store masih ditinjau. Build kedaluwarsa setelah 90 hari dan TestFlight akan meminta Anda memperbarui.",
+    "fairness": "Setiap tangan dibagikan dari pengocokan yang bisa Anda periksa sendiri, dan aturannya dipublikasikan sehingga tidak bisa diubah diam-diam.",
+    "ageGate": "Khusus 18+",
+    "responsible": "Mainkan untuk hiburan, dan hanya dengan uang yang sanggup Anda relakan.",
+    "support": "Hubungi dukungan",
+    "tab": {
+      "telegram": "Telegram",
+      "android": "Android",
+      "ios": "iPhone"
+    },
+    "cta": {
+      "telegram": "Buka di Telegram",
+      "android": "Unduh untuk Android",
+      "ios": "Dapatkan lewat TestFlight"
+    },
+    "step": {
+      "tg1": "Ketuk tombol di atas untuk membuka bot Telegram kami.",
+      "tg2": "Tekan Start, lalu buka aplikasinya dari menu.",
+      "tg3": "Masuk dengan email Anda. Tidak ada yang perlu dipasang.",
+      "and1": "Ketuk tombol di atas untuk mengunduh pemasangnya.",
+      "and2": "Buka berkas yang terunduh. Android akan menanyakan apakah pemasangan dari sumber ini diizinkan — izinkan.",
+      "and3": "Ketuk Pasang, lalu Buka.",
+      "and4": "Masuk dengan email Anda.",
+      "ios1": "Ketuk tombol di atas. Ini membuka TestFlight, aplikasi Apple untuk mencoba aplikasi baru.",
+      "ios2": "Pasang TestFlight dulu jika belum punya, lalu kembali dan ketuk lagi.",
+      "ios3": "Di TestFlight, ketuk Accept, lalu Install.",
+      "ios4": "Buka MYPOKER dan masuk dengan email Anda."
+    }
   }
 }

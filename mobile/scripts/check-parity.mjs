@@ -59,6 +59,14 @@ const ACCEPTED_WEB_ONLY = [
       'Desktop-only ops panel, deliberately outside AppShell/BottomNav on the web too. ' +
       'The real gate is server-side (every /admin API 404s to non-ops); there is no case for a mobile admin UI.',
   },
+  {
+    path: '/download',
+    reason:
+      'The public download page — the surface that HANDS OUT the native app, so it cannot live ' +
+      'inside it. Operating Guide v3.0 cut the website to two jobs, and this is the second one. ' +
+      'It is outside AppShell on the web too, because its visitor has no session and may never ' +
+      'have heard of us. A mobile counterpart would be an app telling you to install the app.',
+  },
 ];
 
 /** Mobile screens/tabs with no web counterpart, and why that's correct. Matched by component base name. */

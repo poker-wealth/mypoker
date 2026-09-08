@@ -669,5 +669,40 @@
     "seatsBlurb": "{{count}} chỗ. Hai người là đủ để bắt đầu.",
     "codeLabel": "Mã mời",
     "shareBlurbPrivate": "Gửi liên kết này để mời bạn bè — liên kết đã kèm mã."
+  },
+  "download": {
+    "title": "Tải MYPOKER",
+    "blurb": "Chơi ngay trong Telegram, hoặc cài ứng dụng lên điện thoại của bạn.",
+    "howTo": "Cách cài đặt",
+    "unavailable": "Chưa khả dụng",
+    "unavailableHint": "Nền tảng này chưa sẵn sàng. Telegram đã dùng được hôm nay — chuyển sang thẻ đó và chơi ngay.",
+    "iosNote": "Bản iPhone được phát qua TestFlight trong lúc hồ sơ App Store đang được duyệt. Mỗi bản hết hạn sau 90 ngày và TestFlight sẽ nhắc bạn cập nhật.",
+    "fairness": "Mỗi ván bài được chia từ một lần xáo mà bạn có thể tự kiểm chứng, và luật được công bố nên không thể bị sửa lén.",
+    "ageGate": "Chỉ dành cho 18+",
+    "responsible": "Hãy chơi để giải trí, và chỉ với số tiền bạn có thể chấp nhận mất.",
+    "support": "Liên hệ hỗ trợ",
+    "tab": {
+      "telegram": "Telegram",
+      "android": "Android",
+      "ios": "iPhone"
+    },
+    "cta": {
+      "telegram": "Mở trong Telegram",
+      "android": "Tải cho Android",
+      "ios": "Nhận qua TestFlight"
+    },
+    "step": {
+      "tg1": "Chạm nút phía trên để mở bot Telegram của chúng tôi.",
+      "tg2": "Nhấn Start, rồi mở ứng dụng từ menu.",
+      "tg3": "Đăng nhập bằng email của bạn. Không cần cài gì cả.",
+      "and1": "Chạm nút phía trên để tải tệp cài đặt.",
+      "and2": "Mở tệp vừa tải. Android sẽ hỏi có cho phép cài từ nguồn này không — hãy cho phép.",
+      "and3": "Chạm Cài đặt, rồi chạm Mở.",
+      "and4": "Đăng nhập bằng email của bạn.",
+      "ios1": "Chạm nút phía trên. Thao tác này mở TestFlight, ứng dụng của Apple để dùng thử ứng dụng mới.",
+      "ios2": "Nếu chưa có TestFlight, hãy cài trước, rồi quay lại và chạm lần nữa.",
+      "ios3": "Trong TestFlight, chạm Accept, rồi chạm Install.",
+      "ios4": "Mở MYPOKER và đăng nhập bằng email của bạn."
+    }
   }
 }

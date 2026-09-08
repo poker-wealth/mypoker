@@ -669,5 +669,40 @@
     "seatsBlurb": "{{count}} 个座位。两人即可开局。",
     "codeLabel": "邀请码",
     "shareBlurbPrivate": "把链接发给朋友，链接里已带邀请码。"
+  },
+  "download": {
+    "title": "下载 MYPOKER",
+    "blurb": "在 Telegram 中直接玩，或把应用装到手机上。",
+    "howTo": "安装步骤",
+    "unavailable": "暂未开放",
+    "unavailableHint": "该平台还未上线。Telegram 现已可用 — 切换到该标签即可开始游戏。",
+    "iosNote": "App Store 上架审核期间，iPhone 版本通过 TestFlight 分发。每个版本 90 天后过期，TestFlight 会提示您更新。",
+    "fairness": "每一手牌都来自您可以自行验证的洗牌，规则已公开，无法被悄悄更改。",
+    "ageGate": "仅限 18 岁以上",
+    "responsible": "请以娱乐为目的，仅使用您可以承受损失的资金。",
+    "support": "联系客服",
+    "tab": {
+      "telegram": "Telegram 版",
+      "android": "安卓",
+      "ios": "iPhone 版"
+    },
+    "cta": {
+      "telegram": "在 Telegram 中打开",
+      "android": "下载安卓版",
+      "ios": "通过 TestFlight 获取"
+    },
+    "step": {
+      "tg1": "点击上方按钮，打开我们的 Telegram 机器人。",
+      "tg2": "点击“开始”，然后从菜单中打开应用。",
+      "tg3": "用邮箱登录。无需安装任何东西。",
+      "and1": "点击上方按钮下载安装包。",
+      "and2": "打开下载的文件。安卓会询问是否允许来自此来源的安装 — 请允许。",
+      "and3": "点击“安装”，然后点击“打开”。",
+      "and4": "用邮箱登录。",
+      "ios1": "点击上方按钮。将打开 TestFlight，这是苹果用于试用新应用的官方工具。",
+      "ios2": "如果没有 TestFlight，请先安装，然后返回并再次点击。",
+      "ios3": "在 TestFlight 中点击“接受”，然后点击“安装”。",
+      "ios4": "打开 MYPOKER 并用邮箱登录。"
+    }
   }
 }

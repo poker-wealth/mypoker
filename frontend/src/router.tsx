@@ -24,6 +24,7 @@ import { AdminAdmins } from '@/pages/admin/Admins';
 // The styled admin dead-end (the "crash tab" fix) lives in route-fallbacks now; the withdrawals
 // stub that file also carries is unused here — the real review queue landed with league-funding.
 import { AdminRouteError } from '@/pages/admin/route-fallbacks';
+import { Download } from '@/pages/Download';
 import { isAdminHost } from '@/lib/adminHost';
 
 // The panel's sections, mounted at whatever base the host uses (root on the admin
@@ -92,4 +93,12 @@ export const router = isAdminHost()
         children: adminChildren,
       },
       { path: '/table/:id', element: <Table /> },
+      /*
+        PUBLIC, and deliberately outside AppShell.
+        Someone arriving here has no session and may never have heard of us —
+        the shell's bottom nav, context banner and auth-dependent chrome would
+        all be wrong, and several of them read the session on mount. It is the
+        only route on the player host that expects a stranger.
+      */
+      { path: '/download', element: <Download /> },
     ]);

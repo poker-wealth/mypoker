@@ -669,5 +669,40 @@
     "seatsBlurb": "{{count}} chairs. Two players is enough to start.",
     "codeLabel": "Invite code",
     "shareBlurbPrivate": "Send this link to invite a friend — the code travels with it."
+  },
+  "download": {
+    "title": "Get MYPOKER",
+    "blurb": "Play in Telegram, or install the app on your phone.",
+    "howTo": "How to install",
+    "unavailable": "Not available yet",
+    "unavailableHint": "We are not ready on this platform. Telegram works today — switch to that tab and play now.",
+    "iosNote": "iPhone builds go out through TestFlight while the App Store listing is in review. A build expires after 90 days and TestFlight will prompt you to update.",
+    "fairness": "Every hand is dealt from a shuffle you can check yourself, and the rules are published so they cannot be changed quietly.",
+    "ageGate": "18+ only",
+    "responsible": "Play for entertainment, and only with money you can afford to lose.",
+    "support": "Contact support",
+    "tab": {
+      "telegram": "Telegram",
+      "android": "Android",
+      "ios": "iPhone"
+    },
+    "cta": {
+      "telegram": "Open in Telegram",
+      "android": "Download for Android",
+      "ios": "Get it on TestFlight"
+    },
+    "step": {
+      "tg1": "Tap the button above to open our Telegram bot.",
+      "tg2": "Press Start, then open the app from the menu.",
+      "tg3": "Sign in with your email. There is nothing to install.",
+      "and1": "Tap the button above to download the installer.",
+      "and2": "Open the downloaded file. Android will ask whether to allow installs from this source — allow it.",
+      "and3": "Tap Install, then Open.",
+      "and4": "Sign in with your email.",
+      "ios1": "Tap the button above. It opens TestFlight, Apple's app for trying out new apps.",
+      "ios2": "Install TestFlight first if you do not have it, then come back and tap again.",
+      "ios3": "In TestFlight, tap Accept, then Install.",
+      "ios4": "Open MYPOKER and sign in with your email."
+    }
   }
 }

@@ -48,6 +48,25 @@ export const TELEGRAM_BOT_NAME = import.meta.env.VITE_TELEGRAM_BOT_NAME ?? '';
 export const SUPPORT_URL =
   import.meta.env.VITE_SUPPORT_URL ?? (TELEGRAM_BOT_NAME ? `https://t.me/${TELEGRAM_BOT_NAME}` : '');
 
+/**
+ * Where the download page sends people, per platform.
+ *
+ * EMPTY MEANS NOT AVAILABLE YET, and the page says so rather than offering a
+ * button that goes nowhere. Neither of these is configured today: Android has
+ * no APK host and no Play listing, and iOS has no TestFlight because the Apple
+ * Developer account is still an owner dependency. A download page whose buttons
+ * do nothing is worse than one that admits the app is not out yet on that
+ * platform — same rule as never rendering an invented figure.
+ *
+ * Telegram is not here because it needs no URL of its own: it is derived from
+ * TELEGRAM_BOT_NAME above, and it is the one route that works today.
+ */
+export const ANDROID_APK_URL = import.meta.env.VITE_ANDROID_APK_URL ?? '';
+export const IOS_TESTFLIGHT_URL = import.meta.env.VITE_IOS_TESTFLIGHT_URL ?? '';
+
+/** The Mini App, for the Telegram card. Empty when no bot is configured. */
+export const TELEGRAM_APP_URL = TELEGRAM_BOT_NAME ? `https://t.me/${TELEGRAM_BOT_NAME}` : '';
+
 /** The table opened when a game id isn't itself a table id (see the table server's room list). */
 export const DEFAULT_TABLE_ID = 'texas';
 /**
