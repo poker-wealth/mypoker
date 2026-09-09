@@ -869,3 +869,63 @@ matching them by leaving it out. Their CSS says `.mask { background: #0c0e0f;
 opacity: .5 }`. It was §7 — a comment asserting a fact about someone else's
 code that nobody had checked. When a comment justifies a choice by citing a
 reference, cite the line.
+
+---
+
+## 32. Code-splitting the routes blinded the parity checker
+
+`check-parity.mjs` is the only thing standing between us and the web and the
+app quietly growing different screens. It reads `router.tsx` and `App.tsx` and
+compares them. It reads them **as text**, with regexes anchored on the shape
+the router happened to have:
+
+```js
+childrenBlock(routerSrc, 'element: <AppShell />')
+const ROUTE_ENTRY_RE = /\{\s*(index:\s*true|path:\s*'[^']+')\s*,\s*element:\s*<(\w+)/g;
+```
+
+§29's fix split the routes for page weight, turning every one of them from
+
+```js
+{ path: 'games', element: <Games /> }
+```
+
+into
+
+```js
+{ path: 'games', lazy: async () => ({ Component: (await import('@/pages/Games')).Games }) }
+```
+
+Both are correct routers. Only one is a router this checker can read. Every
+anchor and both capture groups stopped matching at once.
+
+**What saved it was that the checker fails loudly.** It has an explicit guard —
+"extracted zero routes … treat this as broken, not clean" — so it died at
+PARSE FAILURE instead of comparing an empty list to an empty list and printing
+`parity ok`. A checker written the obvious way, returning `[]` and finding no
+mismatches in it, would have gone green on the same commit and stayed green
+while the two platforms drifted for a release. That guard is the entire reason
+this is a §32 and not an incident.
+
+Two smaller versions of the same thing came out with it, both mine:
+
+- `PARAM_KEY_RE` matched `undefined` and `{…}` but not
+  `NavigatorScreenParams<TabParamList>`, so a key plainly declared in
+  `navigation.ts` was reported missing from it. Changing a type to the correct
+  one broke a checker that was pattern-matching the old one.
+- `/download` had no `ACCEPTED_WEB_ONLY` entry. It landed in PR #65 while the
+  checker was already dead, so nothing asked for one.
+
+**The rule.** A checker that parses source is coupled to that source's shape,
+and nothing tells you when the shape moves — the commit that breaks it is
+never the commit that touches it. So:
+
+1. When a check goes PARSE FAILURE, find out whether you caused it before
+   filing it under "pre-existing". §25 recorded parity as red on `main` for a
+   different reason that had since been fixed; this looked identical from the
+   outside and was a fresh regression in the branch's own diff.
+2. Fixing it means teaching it the new shape, never loosening it until it
+   passes. The difference is testable, so test it: feed the regex both forms
+   and confirm it extracts the right name from each, **and** feed it three
+   things that are not routes and confirm it returns null. A pattern that
+   accepts everything reports no mismatches either.
