@@ -395,17 +395,18 @@ export function LoginScreen() {
 
             {error !== null && <ErrorState message={error} retryLabel={t('common.retry')} />}
 
-            <Button disabled={code.length !== CODE_LENGTH || busy} onPress={submitCode}>
+            <Button style={{ borderRadius: 6 }} disabled={code.length !== CODE_LENGTH || busy} onPress={submitCode}>
               {busy ? t('auth.confirming') : t('auth.confirmButton')}
             </Button>
 
-            <Button variant="ghost" disabled={resendSeconds > 0} onPress={requestNewCode}>
+            <Button style={{ borderRadius: 6 }} variant="ghost" disabled={resendSeconds > 0} onPress={requestNewCode}>
               {resendSeconds > 0
                 ? t('auth.confirmResendIn', { seconds: resendSeconds })
                 : t('auth.confirmResend')}
             </Button>
 
             <Button
+              style={{ borderRadius: 6 }}
               variant="ghost"
               onPress={() => {
                 setMode('signIn');
@@ -449,6 +450,7 @@ export function LoginScreen() {
             </Pressable>
 
             <Button
+              style={{ borderRadius: 6 }}
               variant="ghost"
               onPress={() => {
                 setResetError(null);
@@ -509,6 +511,7 @@ export function LoginScreen() {
             </Pressable>
 
             <Button
+              style={{ borderRadius: 6 }}
               variant="ghost"
               onPress={() => {
                 setResetError(null);
@@ -743,7 +746,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     paddingBottom: 6,
   },
-  inputFlat: { flex: 1, color: theme.text, fontSize: 15, fontFamily: weight('400'), paddingVertical: 6 },
+  inputFlat: { flex: 1, color: theme.text, fontSize: 15, fontFamily: weight('400'), paddingVertical: 6, letterSpacing: 0 },
   invalid: { color: theme.danger, fontSize: 11, fontFamily: weight('400') },
 
   codeBox: {

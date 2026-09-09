@@ -44,6 +44,7 @@ function trim(list: ChatMessage[]): ChatMessage[] {
 export function useTableChat(socket: TableSocket | null): {
   messages: ChatMessage[];
   sendChat: (text: string) => void;
+  sendVoice: (clip: string, durationMs: number, mime: string) => void;
 } {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
@@ -100,5 +101,13 @@ export function useTableChat(socket: TableSocket | null): {
     [socket],
   );
 
-  return { messages, sendChat };
+  const sendVoice = useCallback(
+    (clip: string, durationMs: number, mime: string): void => {
+      if (!socket) return;
+      socket.send({ kind: 'voice', clip, durationMs, mime });
+    },
+    [socket],
+  );
+
+  return { messages, sendChat, sendVoice };
 }

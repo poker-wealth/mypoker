@@ -1,8 +1,10 @@
+import * as React from 'react';
 import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -58,21 +60,29 @@ export function Card({ children, style }: { children: ReactNode; style?: ViewSty
 /** A tappable row. `onPress` absent renders it inert rather than fake-tappable. */
 export function ListRow({
   label,
+  labelRight,
   value,
   hint,
+  left,
   right,
   onPress,
 }: {
   label: string;
+  labelRight?: ReactNode;
   value?: string;
   hint?: string;
+  left?: ReactNode;
   right?: ReactNode;
   onPress?: () => void;
 }) {
   const body = (
     <View style={styles.row}>
+      {left}
       <View style={styles.rowMain}>
-        <Text style={styles.rowLabel}>{label}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={[styles.rowLabel, label === 'Dragon' && { fontFamily: weight('700'), fontSize: 16 }]}>{label}</Text>
+          {labelRight}
+        </View>
         {hint !== undefined && <Text style={styles.rowHint}>{hint}</Text>}
       </View>
       {value !== undefined && (
@@ -144,10 +154,12 @@ export function Segmented<T extends string>({
   options,
   value,
   onChange,
+  activeColor = theme.brand,
 }: {
   options: readonly { value: T; label: string }[];
   value: T;
   onChange: (next: T) => void;
+  activeColor?: string;
 }) {
   return (
     <View style={styles.segmented}>
@@ -157,7 +169,7 @@ export function Segmented<T extends string>({
           <Pressable
             key={o.value}
             onPress={() => onChange(o.value)}
-            style={[styles.segment, active && styles.segmentActive]}
+            style={[styles.segment, active && { backgroundColor: activeColor }]}
           >
             <Text style={[styles.segmentText, active && styles.segmentTextActive]} numberOfLines={1}>
               {o.label}
@@ -222,14 +234,54 @@ export function Sheet({
   );
 }
 
-/**
- * An on/off control.
- *
- * RN ships its own `Switch`; this wraps it only to pin the brand colours in one
- * place, so a screen never hand-picks them. `value` is required — a switch that
- * renders before its state is known would show a confident OFF for something
- * that may be ON, which on a settings screen is a lie the user acts on.
- */
+import Svg, { Circle, Path } from 'react-native-svg';
+
+export function PokerChip({ disabled, size = 26 }: { disabled?: boolean; size?: number }) {
+  const stripe = disabled ? theme.dim : '#d8453c';
+  const pale = '#f5f2ea';
+  const center = theme.surface2;
+  const radius = size / 2;
+  const cx = size / 2;
+  const cy = size / 2;
+
+  const wedges = [];
+  for (let i = 0; i < 6; i++) {
+    const angle = i * 60;
+    const startAngle = (angle - 90) * (Math.PI / 180);
+    const endAngle = (angle + 24 - 90) * (Math.PI / 180);
+    const x1 = cx + radius * Math.cos(startAngle);
+    const y1 = cy + radius * Math.sin(startAngle);
+    const x2 = cx + radius * Math.cos(endAngle);
+    const y2 = cy + radius * Math.sin(endAngle);
+    wedges.push(`M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 0 1 ${x2} ${y2} Z`);
+  }
+
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        borderRadius: size / 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.45,
+        shadowRadius: 3,
+        elevation: 2,
+        opacity: disabled ? 0.55 : 1,
+      }}
+    >
+      <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <Circle cx={cx} cy={cy} r={radius} fill={pale} />
+        {wedges.map((d, i) => (
+          <Path key={i} d={d} fill={stripe} />
+        ))}
+        <Circle cx={cx} cy={cy} r={radius * 0.64} fill={pale} stroke={stripe} strokeWidth={1.5} />
+        <Circle cx={cx} cy={cy} r={radius * 0.24} fill={center} />
+      </Svg>
+    </View>
+  );
+}
+
 export function Toggle({
   value,
   onChange,
@@ -240,13 +292,22 @@ export function Toggle({
   disabled?: boolean;
 }) {
   return (
-    <RNSwitch
-      value={value}
-      onValueChange={onChange}
-      disabled={disabled}
-      trackColor={{ false: theme.surface2, true: theme.brand }}
-      thumbColor={theme.text}
-    />
+    <Pressable
+      onPress={() => !disabled && onChange(!value)}
+      style={{
+        width: 50,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        padding: 2,
+        justifyContent: 'center',
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <View style={{ alignSelf: value ? 'flex-end' : 'flex-start' }}>
+        <PokerChip disabled={!value} size={24} />
+      </View>
+    </Pressable>
   );
 }
 
@@ -255,10 +316,11 @@ export function Skeleton({ width = 80 }: { width?: number }) {
   return <View style={[styles.skeleton, { width }]} />;
 }
 
-export function EmptyState({ title, body }: { title: string; body?: string }) {
+export function EmptyState({ title, body, icon }: { title: string; body?: string; icon?: ReactNode }) {
   return (
     <View style={styles.state}>
-      <Text style={styles.stateTitle}>{title}</Text>
+      {icon && <View style={{ marginBottom: 8 }}>{icon}</View>}
+      <Text style={[styles.stateTitle, { fontSize: 16 }]}>{title}</Text>
       {body !== undefined && <Text style={styles.stateBody}>{body}</Text>}
     </View>
   );
@@ -371,9 +433,9 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   segment: { flex: 1, alignItems: 'center', borderRadius: radius.pill, paddingVertical: space.sm },
-  segmentActive: { backgroundColor: theme.surface2 },
+  segmentActive: { backgroundColor: theme.brand },
   segmentText: { color: theme.dim, fontSize: 12, fontFamily: weight('700') },
-  segmentTextActive: { color: theme.text },
+  segmentTextActive: { color: theme.bg },
   backdropWrap: { flex: 1 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
   sheet: {
@@ -407,4 +469,398 @@ const styles = StyleSheet.create({
   // than always stretching to fill it.
   sheetBody: { flexShrink: 1 },
   sheetBodyContent: { padding: space.lg, gap: space.md },
+  dialogCenter: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: space.lg,
+    pointerEvents: 'box-none',
+  },
+  dialog: {
+    backgroundColor: theme.surface,
+    borderColor: theme.border,
+    borderWidth: 1,
+    borderRadius: radius.card,
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '85%',
+  },
+  dialogHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: space.md,
+    borderBottomColor: theme.border,
+    borderBottomWidth: 1,
+  },
+  dialogTitle: {
+    color: theme.text,
+    fontSize: 16,
+    fontFamily: weight('700'),
+  },
+  dialogClose: {
+    padding: space.xs,
+  },
+  dialogBody: { flexShrink: 1 },
+  dialogBodyContent: { padding: space.lg, gap: space.md },
 });
+
+export function Dialog({
+  open,
+  onClose,
+  title,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
+      <KeyboardAvoidingView
+        style={styles.backdropWrap}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <Pressable style={styles.backdrop} onPress={onClose} />
+        <View style={styles.dialogCenter}>
+          <View style={styles.dialog}>
+            <View style={styles.dialogHeader}>
+              {title !== undefined && <Text style={styles.dialogTitle}>{title}</Text>}
+              <Pressable onPress={onClose} style={styles.dialogClose}>
+                <Text style={{ color: theme.dim, fontSize: 16, fontFamily: weight('600') }}>✕</Text>
+              </Pressable>
+            </View>
+            <ScrollView
+              style={styles.dialogBody}
+              contentContainerStyle={styles.dialogBodyContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              {children}
+            </ScrollView>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+
+
+export function DiscreteSlider<T extends string | number>({
+  options,
+  value,
+  onChange,
+  disabled,
+}: {
+  options: { value: T; label: string }[];
+  value: T;
+  onChange: (val: T) => void;
+  disabled?: boolean;
+}) {
+  const [width, setWidth] = React.useState(1);
+  const valRef = React.useRef(value);
+  valRef.current = value;
+
+  const panResponder = React.useMemo(() => {
+    const handleTouch = (x: number, w: number) => {
+      if (disabled || w <= 1) return;
+      const padding = 24; // 8 padding + 16 half node
+      const usableWidth = w - padding * 2;
+      const pct = (x - padding) / usableWidth;
+      let idx = Math.round(pct * (options.length - 1));
+      idx = Math.max(0, Math.min(idx, options.length - 1));
+      const nextVal = options[idx].value;
+      if (nextVal !== valRef.current) {
+        valRef.current = nextVal;
+        onChange(nextVal);
+      }
+    };
+
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => handleTouch(evt.nativeEvent.locationX, width),
+      onPanResponderMove: (evt) => handleTouch(evt.nativeEvent.locationX, width),
+    });
+  }, [disabled, width, options, onChange]);
+
+  return (
+    <View 
+      style={sliderStyles.container} 
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      {...panResponder.panHandlers}
+    >
+      <View style={sliderStyles.line} />
+      {options.map((opt, i) => {
+        const isActive = opt.value === value;
+        return (
+          <View
+            key={String(opt.value)}
+            style={sliderStyles.nodeContainer}
+          >
+            <Text
+              style={[
+                sliderStyles.label,
+                isActive && sliderStyles.labelActive,
+                disabled && sliderStyles.labelDisabled,
+              ]}
+              numberOfLines={1}
+            >
+              {opt.label}
+            </Text>
+            <View style={sliderStyles.nodeWrapper}>
+              {isActive ? (
+                <PokerChip disabled={disabled} size={24} />
+              ) : (
+                <View style={[sliderStyles.dot, disabled && sliderStyles.dotDisabled]} />
+              )}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+const sliderStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: 48,
+    position: 'relative',
+    paddingHorizontal: 8,
+  },
+  line: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 11,
+    height: 2,
+    backgroundColor: theme.surface2,
+  },
+  nodeContainer: {
+    alignItems: 'center',
+    gap: 8,
+    width: 32,
+    pointerEvents: 'none', // let panresponder handle taps
+  },
+  label: {
+    color: theme.dim,
+    fontSize: 10,
+    fontFamily: weight('600'),
+    textAlign: 'center',
+  },
+  labelActive: {
+    color: 'white',
+    fontFamily: weight('800'),
+  },
+  labelDisabled: {
+    opacity: 0.5,
+  },
+  nodeWrapper: {
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.dim,
+  },
+  dotDisabled: {
+    opacity: 0.3,
+  },
+});
+
+export function ToggleRow({
+  label,
+  hint,
+  caption,
+  checked,
+  onChange,
+  soonLabel,
+}: {
+  label: string;
+  hint?: string;
+  caption?: string;
+  checked: boolean;
+  onChange: (val: boolean) => void;
+  soonLabel?: string;
+}) {
+  const disabled = soonLabel !== undefined;
+  return (
+    <View style={toggleRowStyles.container}>
+      <View style={toggleRowStyles.textContainer}>
+        <View style={toggleRowStyles.labelRow}>
+          <Text style={[toggleRowStyles.label, disabled && { opacity: 0.5 }]}>{label}</Text>
+          {soonLabel && <Badge tone="neutral">{soonLabel}</Badge>}
+        </View>
+        {hint !== undefined && <Text style={toggleRowStyles.hint}>{hint}</Text>}
+        {caption !== undefined && <Text style={toggleRowStyles.caption}>{caption}</Text>}
+      </View>
+      <Toggle value={checked} onChange={onChange} disabled={disabled} />
+    </View>
+  );
+}
+
+const toggleRowStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.05)',
+  },
+  textContainer: {
+    flex: 1,
+    paddingRight: 16,
+    gap: 4,
+  },
+  labelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  label: {
+    color: theme.text,
+    fontSize: 14,
+    fontFamily: weight('600'),
+  },
+  hint: {
+    color: theme.dim,
+    fontSize: 11,
+    fontFamily: weight('400'),
+  },
+  caption: {
+    color: theme.brand,
+    fontSize: 11,
+    fontFamily: weight('400'),
+  },
+});
+
+export function DiscreteRangeSlider<T extends string | number>({
+  options,
+  low,
+  high,
+  onChange,
+  disabled,
+}: {
+  options: { value: T; label: string }[];
+  low: T;
+  high: T;
+  onChange: (lo: T, hi: T) => void;
+  disabled?: boolean;
+}) {
+  const [width, setWidth] = React.useState(1);
+  const lowIdx = Math.max(0, options.findIndex((o) => o.value === low));
+  const highIdx = Math.max(0, options.findIndex((o) => o.value === high));
+  const n = Math.max(1, options.length - 1);
+
+  const lowRef = React.useRef(lowIdx);
+  const highRef = React.useRef(highIdx);
+  lowRef.current = lowIdx;
+  highRef.current = highIdx;
+  const activeThumb = React.useRef<'low' | 'high' | null>(null);
+
+  const panResponder = React.useMemo(() => {
+    const handleTouch = (x: number, w: number, isGrant: boolean) => {
+      if (disabled || w <= 1) return;
+      const padding = 24;
+      const usableWidth = w - padding * 2;
+      const pct = (x - padding) / usableWidth;
+      let idx = Math.round(pct * (options.length - 1));
+      idx = Math.max(0, Math.min(idx, options.length - 1));
+
+      if (isGrant) {
+        if (Math.abs(idx - lowRef.current) < Math.abs(idx - highRef.current)) {
+          activeThumb.current = 'low';
+        } else {
+          activeThumb.current = 'high';
+        }
+      }
+
+      let nextLow = lowRef.current;
+      let nextHigh = highRef.current;
+      if (activeThumb.current === 'low') {
+        nextLow = Math.min(idx, nextHigh); // don't cross thumbs
+      } else {
+        nextHigh = Math.max(idx, nextLow);
+      }
+
+      if (nextLow !== lowRef.current || nextHigh !== highRef.current) {
+        lowRef.current = nextLow;
+        highRef.current = nextHigh;
+        onChange(options[nextLow].value, options[nextHigh].value);
+      }
+    };
+
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => handleTouch(evt.nativeEvent.locationX, width, true),
+      onPanResponderMove: (evt) => handleTouch(evt.nativeEvent.locationX, width, false),
+    });
+  }, [disabled, width, options, onChange]);
+
+  return (
+    <View 
+      style={sliderStyles.container}
+      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      {...panResponder.panHandlers}
+    >
+      <View style={sliderStyles.line} />
+      <View 
+        style={[
+          sliderStyles.line,
+          { 
+            backgroundColor: '#D4AF37', 
+            left: `${(lowIdx / n) * 90 + 5}%`,
+            right: `${100 - ((highIdx / n) * 90 + 5)}%`,
+          }
+        ]} 
+      />
+      {options.map((opt, i) => {
+        const isLow = i === lowIdx;
+        const isHigh = i === highIdx;
+        const isActive = isLow || isHigh;
+        const inRange = i >= lowIdx && i <= highIdx;
+
+        return (
+          <View key={String(opt.value)} style={sliderStyles.nodeContainer}>
+            <Text
+              style={[
+                sliderStyles.label,
+                inRange && sliderStyles.labelActive,
+                disabled && sliderStyles.labelDisabled,
+              ]}
+              numberOfLines={1}
+            >
+              {opt.label}
+            </Text>
+            <View style={sliderStyles.nodeWrapper}>
+              {isActive ? (
+                <PokerChip disabled={disabled} size={24} />
+              ) : (
+                <View
+                  style={[
+                    sliderStyles.dot,
+                    inRange && { backgroundColor: '#D4AF37' },
+                    disabled && sliderStyles.dotDisabled,
+                  ]}
+                />
+              )}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
