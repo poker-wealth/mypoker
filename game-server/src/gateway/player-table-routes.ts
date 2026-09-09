@@ -7,6 +7,7 @@ import type { TableHub } from '../live/table-hub';
 import type { LobbyService } from '../lobby';
 import { DEFAULT_ROOM } from '../live/poker-room';
 import { registerPublicTable } from '../live/runtime-tables';
+import { tableAccess } from './table-access';
 
 /**
  * Player-created tables (owner-approved, not in the FairPlay doc).
@@ -19,6 +20,13 @@ import { registerPublicTable } from '../live/runtime-tables';
  * v1 is Hold'em only, on the same config as the default cash table. The share
  * link the client builds is just `/table/<tableId>`, which `isOpenableTableId`
  * on the frontend now recognises via the `t-` shape minted here.
+ *
+ * PRIVATE MEANS PRIVATE NOW. It used to mean "unlisted": `visibility` was
+ * written here and read nowhere, so the table id was the only thing standing
+ * between a stranger and a seat. A private table now mints a join code, and
+ * `table-access.ts` is consulted on every inbound socket message before the
+ * hub will act on it. Both references work this way — see
+ * docs/REFERENCE-STUDY-HH.md §3.
  */
 export function buildPlayerTableRouter(
   config: GatewayConfig,
@@ -42,6 +50,9 @@ export function buildPlayerTableRouter(
      */
     seats: z.number().int().min(2).max(6).default(6),
   });
+
+  /** Digits only, and exactly as long as `table-access.ts` mints. */
+  const unlockBody = z.object({ code: z.string().regex(/^\d{6}$/) });
 
   r.post('/', requireAuth(config), (req: Request, res: Response): void => {
     const playerId = req.player?.playerId;
@@ -95,7 +106,49 @@ export function buildPlayerTableRouter(
       }
     }
 
-    res.status(201).json({ tableId, visibility: input.visibility });
+    // Mint the code (private) or record the table as public. Done AFTER the room
+    // exists so a failure to open leaves nothing registered behind it.
+    const joinCode = tableAccess.register(tableId, input.visibility, playerId);
+
+    res.status(201).json({ tableId, visibility: input.visibility, joinCode });
+  });
+
+  /**
+   * Prove you hold a private table's code.
+   *
+   * Success is remembered for this player, so the code is typed once rather than
+   * on every reconnect. The refusals are deliberately not distinguished for the
+   * caller beyond what they need: a wrong code and a code for a table that does
+   * not exist both read as a failure to get in, because telling them apart
+   * would turn this into an oracle for which table ids are real.
+   */
+  r.post('/:tableId/unlock', requireAuth(config), (req: Request, res: Response): void => {
+    const playerId = req.player?.playerId;
+    if (!playerId) {
+      res.status(401).json({ error: 'unauthorized' });
+      return;
+    }
+    // Express types this as string | string[]. An array is not a table id, and
+    // String()-ing one would join it to "a,b" and quietly become a lookup key,
+    // so it is rejected rather than coerced.
+    const raw = req.params.tableId;
+    const tableId = typeof raw === 'string' ? raw : '';
+    const parsed = unlockBody.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: 'invalid code' });
+      return;
+    }
+
+    const result = tableAccess.unlock(tableId, playerId, parsed.data.code);
+    if (result === 'too-many-attempts') {
+      res.status(429).json({ error: 'too many attempts — ask for the code again' });
+      return;
+    }
+    if (result !== 'ok') {
+      res.status(403).json({ error: 'wrong code' });
+      return;
+    }
+    res.status(200).json({ tableId, unlocked: true });
   });
 
   return r;

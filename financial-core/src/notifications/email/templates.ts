@@ -18,15 +18,32 @@ import { MESSAGES, fill, DEFAULT_LOCALE, type Locale, type EmailMessages } from 
  * balance it is reporting, and the receipt is the thing a player keeps.
  */
 
-/** Brand palette, from SAMUEL.md. Hex only — no CSS variables survive email. */
+/**
+ * Brand palette. Hex only — no CSS variables survive email.
+ *
+ * A FIFTH copy of the brand, and the one that reaches people who are not
+ * looking at the app: every confirmation code and every money receipt. It sat
+ * on the previous violet identity for two days after the v3 repalette, because
+ * the audit that moved the others grepped `frontend/src` and `mobile/src` and
+ * this file is in neither (docs/TRAPS.md §26).
+ *
+ * Kept in step with `frontend/src/index.css` BY HAND — an email client will not
+ * read a token, and financial-core does not import from the frontend. If the
+ * brand moves again, this moves with it.
+ *
+ * `check:splash` does not cover this file: it guards the boot screens, which
+ * are the copies that flash. Extending it here would mean the frontend's build
+ * failing over a mail template in another package, which is a worse trade than
+ * this comment. Grep the whole repo for the old hexes when repainting.
+ */
 const C = {
-  page: '#0d0d1a',
-  card: '#171728',
-  border: '#252540',
-  brand: '#bb5cf6',
-  accent: '#00d4ff',
-  text: '#ffffff',
-  dim: '#9aa0b4',
+  page: '#0c0c0c',
+  card: '#1a1a1a',
+  border: '#33302b',
+  brand: '#d9b87c',
+  accent: '#c87a3a',
+  text: '#f5efe3',
+  dim: '#9a9182',
 } as const;
 
 export interface EmailTemplate {

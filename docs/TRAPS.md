@@ -22,7 +22,9 @@ ever noticed. → `mobile/scripts/check-assets.mjs` now reads magic bytes.
 **24 gateway tests passed with a security guard disabled.** The tests mock
 `userStore.oauth`, so they prove the flag is *passed* but never that the store
 *acts* on it. The suite would have certified the fix while the account-takeover
-vulnerability was live. Only `test/auth/user-store.test.ts` catches it.
+vulnerability was live. It was written that only `test/auth/user-store.test.ts`
+catches it — **that file does not exist in the repo, and `game-server` has no
+Mongo dependency to have run it with. Nothing exercises this today. See §24.**
 
 **A ledger checker false-failed on any settled hand.** It held `settleTableHand`'s
 single-leg entries to the paired double-entry rule. One settled hand produced
@@ -207,8 +209,11 @@ is exactly when to look.
   `C:/Users/MTECH COMPUTERS/` this surfaces as ~80 undefined C++ symbols,
   pointing nowhere near the cause. Junction the SDK to `C:\AndroidSdk`.
   `npm run android` preflights this.
-- **Git Bash and node disagree about `/tmp`.** Use Windows-native paths in
-  anything node reads.
+- **Git Bash and node disagree about `/tmp`** — and so does Python. A heredoc
+  written to `/tmp/x` from Bash is at a Git-Bash-internal path that a
+  `python -c` in the same command cannot open, and the error is a bare
+  `FileNotFoundError` on a path that Bash will happily `cat`. Use
+  Windows-native paths (`C:/Users/...`) in anything not-Bash reads.
 - **`npm test`, not `npx jest`** — both backend packages pin `--runInBand`, and
   parallel in-memory Mongo instances fail whole suites at setup.
 - **A crashed test run leaves `mongo-mem-*` dirs**; the next start dies in
@@ -361,3 +366,169 @@ When adding any input, ask what the keyboard covers, and put
 `keyboardShouldPersistTaps="handled"` on the scroller — without it the first
 tap on a button only dismisses the keyboard.
 
+
+## 24. The document that cites a guard which does not exist
+
+**§1 of this file names `test/auth/user-store.test.ts` as the only thing that
+catches the reclaim/account-takeover class. That file is not in the repo.**
+
+Verified 5 Sep 2026: `find . -iname "user-store.test.ts"` returns nothing but
+compiled `dist/` artefacts of the *source* file. `game-server` has no
+`mongodb-memory-server` in `dependencies` or `devDependencies`, is not hoisted
+one from the workspace, and its `jest.config.js` has no `setupFilesAfterEnv`,
+no `globalSetup` and no database bootstrapping at all — so that test could not
+have run against real Mongo even if it existed.
+
+`game-server/test/auth/email-confirmation.test.ts:27` points at the same
+missing file, and its own docstring says it deliberately does NOT cover that
+ground because "that runs against real Mongo in `user-store.test.ts`".
+
+So **nothing currently exercises `userStore`'s real persistence**, and two
+documents say otherwise. This entry is §7 ("comments that describe intentions,
+not code") happening to TRAPS.md itself — the file that exists to stop the
+pattern acquired it.
+
+For contrast, the claim is only half true across the repo: `financial-core`
+*does* have a real harness — `mongodb-memory-server` ^10.1.3, a
+`MongoMemoryReplSet` per file via `test/db-helper.ts` (a replica set, because
+`transfer()` needs transactions), and 34 of its 46 suites use it. The gap is
+`game-server`-only, where all 137 suites use hand-written fakes.
+
+**What to do:** before citing a test as the thing that proves a rule, open it.
+And when writing "only X catches this", make X a path someone can click.
+
+## 25. A check that always fails is a check nobody runs
+
+Two of this project's own gates are red on `main`, which means the discipline
+they encode is not actually running.
+
+- **`npm run verify` (root) never reaches the tests.** It dies at lint with 12
+  errors — `no-explicit-any` in `slots-room.ts` and `dou-di-zhu-game.test.ts`,
+  `no-require-imports` in `rule-stamp-propagation.test.ts`. Lint runs before
+  test, so a green suite is invisible behind a red linter. Anyone following
+  the root `CLAUDE.md` runs this, sees red, and cannot tell whether they broke
+  it.
+- **`mobile npm run verify` dies at `check:parity`** with
+  `PARSE FAILURE: could not find the AdminShell ("path: '/admin',") children
+  block in router.tsx`. The cause is a refactor: `router.tsx` now builds the
+  admin routes as `const adminChildren = [...]` (line 31) and the checker still
+  expects them inline.
+
+  **Correction, same day: this is already fixed — on a branch that has not
+  merged.** `432007f` ("fix(lobby): stop advertising blinds of 0/0, and repair
+  the parity check") on `feat/email-otp-confirmation--samuel` teaches the
+  checker the hoisted-array shape. It is pushed. It is not on `origin/main`, so
+  `main` is still red. Which makes this §6 again — and makes the paragraph
+  above an example of the thing §6's own update warns about, a note that
+  outlives the bug. Both halves of that mistake are now on record in the same
+  entry, deliberately.
+
+The second one is the sharper lesson. `check:parity` was written **because**
+parity had been claimed wrongly three times (§9), and it fails loudly by
+design — its own header says the discipline is "to fail loudly rather than
+quietly". It did exactly that. But a gate that fails for an unrelated reason
+gets stepped around, and parity has therefore gone unverified since the router
+was refactored.
+
+**What to do:** a check that has been red for a while is not a check. Either
+fix it the day it goes red, or delete it — leaving it is how a suite teaches
+people to ignore failures. And when refactoring a file, grep for scripts that
+*parse* it; `router.tsx` and `BottomNav.tsx` are read by a checker that no
+compiler will tell you about.
+
+## 26. A token cannot be repainted alone if its siblings are hardcoded
+
+Found while repaletting to the HHPoker reference (v3).
+
+`--felt` looks like an ordinary design token, so changing its value looks like
+a one-line change. It is consumed in exactly two places, both of this shape:
+
+```css
+radial-gradient(ellipse at 50% 42%, #1e3f74 0%, var(--felt) 45%, #0a162c 78%, #060d1c 100%)
+```
+
+Three of the four stops are hardcoded blues. Repainting `--felt` maroon
+produces a blue-to-maroon-to-blue gradient — visibly broken, and invisible to
+`tsc`, to eslint and to the build, all of which passed. Only opening the screen
+would show it.
+
+`PokerCanvas.tsx` has the same shape independently: it hardcodes `#12233f` (the
+literal value of `--felt`) plus two more stops, so it would not have moved at
+all.
+
+**What to do:** before changing a token's value, grep for its consumers and
+check what it is being *mixed with*. A token surrounded by literals is not a
+token; it is one stop in a hardcoded palette. And a value duplicated as a
+literal somewhere else (`#12233f` in a canvas) will silently disagree the
+moment the token moves.
+
+### §25 postscript — the same commit is holding a live bug off `main`
+
+`432007f` also fixes something worse than a red gate. On `origin/main`,
+`Lobby.tsx` renders blinds as:
+
+```ts
+blinds: `${formatMicros(t.stakes / 2, 0)}/${formatMicros(t.stakes, 0)}`
+```
+
+`formatMicros` divides by 1,000,000 and `stakes` is **table chips** — a big
+blind of 20. So every real table in the lobby on `main` advertises
+**`Blinds 0/0`**, which is the exact incident §2 of this file describes in the
+past tense, as though it had been dealt with. It was dealt with. On a branch.
+
+The fix threads `smallBlind` through `room-state.ts`, `lobby-service.ts`,
+`live-sync.ts` and `api/lobby.ts` and replaces the arithmetic with a
+`formatBlinds` helper that refuses to guess. It has been pushed and unmerged
+long enough for a later session to rediscover the bug from scratch.
+
+**The compounding cost:** a second developer planning lobby work off `main`
+sees a bug that is already fixed, and either rebuilds the fix — conflicting
+with the branch — or records it as new, which is how this entry came to exist.
+`git log origin/main --oneline -- <file>` before writing anything is cheaper
+than either.
+### §26, continued — and the copies I did not find were the ones outside `src/`
+
+Two days after writing the above I found the rest of them, and the way I found
+them says more than the bug did.
+
+The v3 repalette moved `--bg` and `--brand`. I audited the change by grepping
+`frontend/src` and `mobile/src` for the old hexes, found the hits were all in
+felts and per-game art, reasoned correctly that those were someone else's, and
+called the audit clean. Four copies were sitting outside both directories:
+
+```
+frontend/index.html   <meta name="theme-color">      #0d0d1a
+frontend/index.html   #splash { background }         #0d0d1a
+frontend/index.html   #splash-mark drop-shadow       rgb(187 92 246)
+mobile/app.json       expo-splash-screen background  #0d0d1a
+mobile/app.json       android adaptiveIcon background #0d0d1a
+```
+
+So every cold start painted the OLD brand, held it for the length of the boot,
+and then snapped to the new one — on both platforms, on the first screen a
+player sees. `tsc`, `eslint`, `vite build`, `check:locales`, `check:parity`,
+1312 backend tests and a full hand-written audit were all green throughout.
+None of them compares two files.
+
+**Three things worth keeping from this.**
+
+*The warning was already there and already correct.* `index.html` carried the
+sentence "If the brand colours change, this block changes too", in a comment
+block explaining exactly why the duplication was necessary. I read that file,
+changed the brand, and did not act on it. A comment addressed to a future
+reader is not a control — §7 again, from the other side: not a comment that
+lies, a comment that tells the truth to someone not looking for it.
+
+*The audit's scope was the bug.* `src/` is where components live, so `src/` is
+where a colour audit goes looking. But the boot screens exist precisely BECAUSE
+they run before the app does, which is the same reason they cannot be in `src/`.
+The files most likely to hold a duplicate were the files structurally guaranteed
+to be outside the search. When auditing a token, search the repo, not the source
+directory.
+
+*It is a check now.* `frontend/scripts/check-splash.mjs` reads `--bg` and
+`--brand` out of `index.css` and fails if any of the five copies disagrees; it
+runs in `frontend npm run build` and in `mobile npm run verify`. Mutation-tested
+in both directions — each of the five drifts is caught, and renaming the CSS
+rule produces a loud PARSE FAILURE rather than a silent pass, which is the
+mistake `check-parity` made (§25).

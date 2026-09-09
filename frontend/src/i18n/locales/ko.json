@@ -309,7 +309,8 @@
     },
     "timeBank": "타임뱅크: {{seconds}}초",
     "timeBankRunning": "타임뱅크 사용 중",
-    "timeBankAuto": "자동"
+    "timeBankAuto": "자동",
+    "unlocking": "초대를 확인하는 중…"
   },
   "a11y": {
     "toggleTheme": "테마 전환",
@@ -656,7 +657,7 @@
     "public": "공개",
     "publicBlurb": "로비에 표시되며 누구나 참가할 수 있습니다.",
     "private": "비공개",
-    "privateBlurb": "초대 전용 — 공유한 링크로만 참가할 수 있습니다.",
+    "privateBlurb": "초대 전용 — 자리에 앉으려면 링크나 초대 코드가 필요합니다.",
     "createCta": "테이블 만들기",
     "ready": "테이블이 준비되었습니다",
     "shareBlurb": "이 링크를 보내 친구를 이 테이블로 초대하세요.",
@@ -665,6 +666,8 @@
     "enter": "테이블 입장",
     "error": "테이블을 만들 수 없습니다. 다시 시도해 주세요.",
     "seats": "좌석",
-    "seatsBlurb": "좌석 {{count}}개. 2명이면 시작할 수 있습니다."
+    "seatsBlurb": "좌석 {{count}}개. 2명이면 시작할 수 있습니다.",
+    "codeLabel": "초대 코드",
+    "shareBlurbPrivate": "이 링크를 친구에게 보내세요. 코드가 포함되어 있습니다."
   }
 }

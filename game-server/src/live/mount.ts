@@ -11,6 +11,7 @@ import type { LiveRoom } from './live-room';
 import { ensureRuleCommitment, ensureGameRuleCommitment } from '../fairness/rule-commitment';
 import { MongoMerkleStore, getRoundFairness } from '../fairness/round-store';
 import { verifyToken } from '../gateway/tokens';
+import { tableAccess } from '../gateway/table-access';
 import type { LiveTableConfig } from './live-room';
 
 /**
@@ -114,6 +115,11 @@ export function mountLiveTables(app: Express, opts: MountLiveOptions): MountedLi
           const why = event.reason ? ` (${event.reason})` : '';
           console.log(`  [socket] ${event.type}${who}${why}`);
         },
+    // Private tables refuse a stranger on the socket for the same reason the
+    // REST API does — one registry, both surfaces. Tables this registry has
+    // never heard of (the fixed lobby tables, league tables) are allowed
+    // through; see gateway/table-access.ts on why that is scope, not fail-open.
+    (tableId, playerId): boolean => tableAccess.mayJoin(tableId, playerId),
   );
   for (const table of opts.tables) anchorTableRules(hub.addTable(table));
 
