@@ -67,6 +67,30 @@ export const IOS_TESTFLIGHT_URL = import.meta.env.VITE_IOS_TESTFLIGHT_URL ?? '';
 /** The Mini App, for the Telegram card. Empty when no bot is configured. */
 export const TELEGRAM_APP_URL = TELEGRAM_BOT_NAME ? `https://t.me/${TELEGRAM_BOT_NAME}` : '';
 
+/**
+ * The canonical domain, and the mirrors the download page lists beside it.
+ *
+ * The reference site this page is ported from carries a bar naming its
+ * permanent domain and every backup link, because its domains get blocked and
+ * players need somewhere trustworthy to check the URL against. We have no
+ * mirrors today, so BOTH ARE EMPTY AND THE BAR DOES NOT RENDER — putting an
+ * invented domain on a gambling site's landing page is exactly the thing that
+ * bar exists to protect people from.
+ *
+ * `VITE_MIRROR_DOMAINS` is comma-separated, bare hosts or full URLs.
+ */
+/**
+ * The address the public site's "Contact us" row shows, beside the chat link.
+ * Empty means the row is left out rather than printing an address nobody reads.
+ */
+export const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL ?? '';
+
+export const SITE_DOMAIN = import.meta.env.VITE_SITE_DOMAIN ?? '';
+export const MIRROR_DOMAINS: string[] = String(import.meta.env.VITE_MIRROR_DOMAINS ?? '')
+  .split(',')
+  .map((d) => d.trim())
+  .filter(Boolean);
+
 /** The table opened when a game id isn't itself a table id (see the table server's room list). */
 export const DEFAULT_TABLE_ID = 'texas';
 /**

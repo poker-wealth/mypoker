@@ -1,5 +1,7 @@
 {
   "nav": {
+    "home": "Beranda",
+    "download": "Unduh",
     "wallet": "Dompet",
     "alliance": "Aliansi",
     "games": "Game",
@@ -670,31 +672,49 @@
     "codeLabel": "Kode undangan",
     "shareBlurbPrivate": "Kirim tautan ini untuk mengundang teman — kodenya sudah termasuk."
   },
+  "home": {
+    "gameplay": "Cara permainan berjalan",
+    "contactUs": "Hubungi kami",
+    "playVideo": "Putar video {{name}}",
+    "closeVideo": "Tutup video",
+    "feature1": "Semua permainan kami dalam satu aplikasi — Hold’em, Short Deck, Omaha, dan lainnya.",
+    "feature2": "Buat klub atau bergabung dengan satu klub, lalu main di meja privat bersama orang pilihan Anda.",
+    "feature3": "Putar ulang setiap ronde yang pernah Anda mainkan, dan periksa kocokan kartu di baliknya."
+  },
   "download": {
+    "guide": {
+      "android": "Panduan Android",
+      "ios": "Panduan iPhone",
+      "telegram": "Panduan Telegram"
+    },
+    "scanToDownload": "Pindai untuk mengunduh",
+    "faqTitle": "Pertanyaan yang sering diajukan",
+    "faqQ1": "Versi mana yang sebaiknya saya pasang?",
+    "faqA1": "Versi Android dipasang langsung dari halaman ini. Versi iPhone dibagikan lewat TestFlight selama pengajuan App Store masih ditinjau. Keduanya masuk dengan akun email yang sama, jadi Anda bisa berpindah perangkat kapan pun.",
+    "faqQ2": "Aplikasi tidak mau terbuka atau langsung tertutup. Apa yang harus saya lakukan?",
+    "faqA2": "Hapus aplikasinya lalu pasang ulang dari halaman ini. Di iPhone, buka TestFlight dulu dan periksa apakah ada versi baru — setiap versi berhenti berfungsi 90 hari setelah dirilis.",
+    "domainRemember": "Alamat permanen kami adalah",
+    "domainVerify": "Semua tautan cadangan diumumkan di sana. Periksa alamatnya sebelum masuk.",
+    "domainAlt": "Tautan cadangan:",
+    "copyright": "© MYPOKER. Seluruh hak cipta dilindungi.",
+    "prevSlide": "Slide sebelumnya",
+    "nextSlide": "Slide berikutnya",
+    "slide": "Gambar {{n}}",
     "title": "Dapatkan MYPOKER",
-    "blurb": "Main langsung di Telegram, atau pasang aplikasinya di ponsel Anda.",
+    "blurb": "Pasang MYPOKER di ponsel Anda — Android atau iPhone.",
     "howTo": "Cara memasang",
     "unavailable": "Belum tersedia",
-    "unavailableHint": "Platform ini belum siap. Telegram sudah bisa dipakai sekarang — pindah ke tab tersebut dan mulai main.",
     "iosNote": "Versi iPhone dibagikan lewat TestFlight selama listing App Store masih ditinjau. Build kedaluwarsa setelah 90 hari dan TestFlight akan meminta Anda memperbarui.",
     "fairness": "Setiap tangan dibagikan dari pengocokan yang bisa Anda periksa sendiri, dan aturannya dipublikasikan sehingga tidak bisa diubah diam-diam.",
     "ageGate": "Khusus 18+",
     "responsible": "Mainkan untuk hiburan, dan hanya dengan uang yang sanggup Anda relakan.",
     "support": "Hubungi dukungan",
     "tab": {
-      "telegram": "Telegram",
       "android": "Android",
-      "ios": "iPhone"
-    },
-    "cta": {
-      "telegram": "Buka di Telegram",
-      "android": "Unduh untuk Android",
-      "ios": "Dapatkan lewat TestFlight"
+      "ios": "iPhone",
+      "telegram": "Telegram"
     },
     "step": {
-      "tg1": "Ketuk tombol di atas untuk membuka bot Telegram kami.",
-      "tg2": "Tekan Start, lalu buka aplikasinya dari menu.",
-      "tg3": "Masuk dengan email Anda. Tidak ada yang perlu dipasang.",
       "and1": "Ketuk tombol di atas untuk mengunduh pemasangnya.",
       "and2": "Buka berkas yang terunduh. Android akan menanyakan apakah pemasangan dari sumber ini diizinkan — izinkan.",
       "and3": "Ketuk Pasang, lalu Buka.",
@@ -702,7 +722,14 @@
       "ios1": "Ketuk tombol di atas. Ini membuka TestFlight, aplikasi Apple untuk mencoba aplikasi baru.",
       "ios2": "Pasang TestFlight dulu jika belum punya, lalu kembali dan ketuk lagi.",
       "ios3": "Di TestFlight, ketuk Accept, lalu Install.",
-      "ios4": "Buka MYPOKER dan masuk dengan email Anda."
+      "ios4": "Buka MYPOKER dan masuk dengan email Anda.",
+      "tg1": "Ketuk tombol di atas untuk membuka bot Telegram kami.",
+      "tg2": "Tekan Start, lalu buka aplikasinya dari menu.",
+      "tg3": "Masuk dengan email Anda. Tidak ada yang perlu dipasang."
+    },
+    "slot": {
+      "hero": "Pratinjau aplikasi",
+      "step": "Tangkapan layar langkah {{n}}"
     }
   }
 }

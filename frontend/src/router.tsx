@@ -25,6 +25,7 @@ import { AdminAdmins } from '@/pages/admin/Admins';
 // stub that file also carries is unused here — the real review queue landed with league-funding.
 import { AdminRouteError } from '@/pages/admin/route-fallbacks';
 import { Download } from '@/pages/Download';
+import { Home } from '@/pages/Home';
 import { isAdminHost } from '@/lib/adminHost';
 
 // The panel's sections, mounted at whatever base the host uses (root on the admin
@@ -100,5 +101,6 @@ export const router = isAdminHost()
         all be wrong, and several of them read the session on mount. It is the
         only route on the player host that expects a stranger.
       */
+      { path: '/home', element: <Home /> },
       { path: '/download', element: <Download /> },
     ]);

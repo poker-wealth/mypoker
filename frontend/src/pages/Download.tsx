@@ -1,65 +1,84 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Smartphone, Send, Apple, ShieldCheck, CircleAlert } from 'lucide-react';
-import { ANDROID_APK_URL, IOS_TESTFLIGHT_URL, TELEGRAM_APP_URL, SUPPORT_URL } from '@/config';
+import { Info } from 'lucide-react';
+import { PublicLayout } from '@/components/public/PublicLayout';
+import { PLATFORM_ICON, guessPlatform } from '@/components/public/platform';
+import type { Platform } from '@/components/public/platform';
 
 /**
- * The download page.
+ * The public download page — a port of the reference site's `/download` route.
  *
- * Operating Guide v3.0 cut the website down to two jobs: say what the platform
- * is, and hand people the app. This is the second one, and it is PUBLIC — no
- * session, no AppShell, no bottom nav. Someone arriving here has not signed up
- * and may never have heard of us.
+ * The chrome (header, domain bar, hero with the platform buttons, footer) is
+ * `PublicLayout`, matching their Vue Layout. What follows is the part their
+ * `<router-view>` renders here, section for section:
  *
- * ── Two decisions worth knowing about ───────────────────────────────────────
+ *   qr-box                        → scan-to-download, desktop only, as theirs is
+ *   dowmload-title                → the gold icon and one line of caution
+ *   tabs-container + tuorials     → the tabbed install guide, 4-up grid
+ *   question-container            → the FAQ
  *
- * TEXT IS TEXT, NOT PICTURES. The reference bakes every word of its install
- * guide into PNGs — eleven of them, `-zh` suffixed, Chinese only. We ship eight
- * languages, so copying that shape would mean eighty-eight images and a build
- * gate (`check:locales`) that cannot see inside any of them. Every step here is
- * a translated string. Screenshots can be added later as illustration beside
- * the words, never instead of them.
+ * ── Where it deliberately differs, and why ──────────────────────────────────
  *
- * A PLATFORM WITH NO LINK SAYS SO. `ANDROID_APK_URL` and `IOS_TESTFLIGHT_URL`
- * are both unset today, and the card renders as "not yet" rather than as a
- * button that goes nowhere. A dead download button on a gambling site reads as
- * a scam, and the honest version costs us nothing but a sentence.
+ * CAPTIONS ARE TEXT, THE PICTURES ARE PICTURES. Their eleven guide images have
+ * the words baked in, Chinese only. We ship eight languages, so the caption
+ * above each frame is a translated string and the art beside it takes `alt=""`.
+ * `check:locales` can see a string; it cannot see inside a PNG, and the install
+ * guide is the last place that gate should go blind.
+ *
+ * MOBILE IS BUILT RATHER THAN HIDDEN — see the note in `publicSite.css`.
  */
-
-type Platform = 'telegram' | 'android' | 'ios';
 
 /**
- * Which platform to open on.
+ * Stand-in art — REPLACE BEFORE LAUNCH.
+ * See `public/download/placeholder/README.md`.
  *
- * A guess, and only ever used to pick the DEFAULT tab — every platform stays
- * one tap away, because user-agent sniffing is wrong often enough (desktop
- * users sending themselves a link, in-app browsers, spoofed strings) that
- * hiding the others would strand people.
+ * The reference's own tutorial screenshots, borrowed so the layout can be
+ * judged at the right proportions. They carry someone else's logo and
+ * Chinese-only baked-in text. (The hero art above is ours and lives in
+ * `PublicLayout`.)
+ *
+ * The pairing of shot to step is arbitrary: there are more Android frames than
+ * we have Android steps and fewer iPhone ones than iPhone steps, so the list
+ * wraps. Do not
+ * read meaning into which picture sits under which caption — there isn't any
+ * yet, and the caption carries the instruction.
  */
-function guessPlatform(): Platform {
-  if (typeof navigator === 'undefined') return 'telegram';
-  const ua = navigator.userAgent;
-  if (/iPhone|iPad|iPod/i.test(ua)) return 'ios';
-  if (/Android/i.test(ua)) return 'android';
-  return 'telegram';
+const SHOTS: Record<Platform, string[]> = {
+  // Deliberately empty: there is nothing to screenshot. Telegram is a link you
+  // open, not an install you walk through, so its steps carry captions and no
+  // frames rather than borrowing pictures of a different platform's dialogs.
+  telegram: [],
+  android: [1, 2, 3, 4].map((n) => `/download/placeholder/shot-android-${n}.png`),
+  ios: [1, 2, 3].map((n) => `/download/placeholder/shot-ios-${n}.png`),
+};
+
+const shotFor = (platform: Platform, i: number): string | undefined => {
+  const shots = SHOTS[platform];
+  return shots.length > 0 ? shots[i % shots.length] : undefined;
+};
+
+/** Their `.dowmload-title` — gold icon, one line of caution beside it. */
+function TipTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="hp-tip-title">
+      <Info className="hp-tip-icon" />
+      <p className="title">{children}</p>
+    </div>
+  );
 }
 
 export function Download() {
   const { t } = useTranslation();
   const [tab, setTab] = useState<Platform>(() => guessPlatform());
 
-  const targets: Record<Platform, string> = useMemo(
-    () => ({ telegram: TELEGRAM_APP_URL, android: ANDROID_APK_URL, ios: IOS_TESTFLIGHT_URL }),
-    [],
-  );
-
-  const TABS: { id: Platform; label: string; icon: typeof Send }[] = [
-    { id: 'telegram', label: t('download.tab.telegram'), icon: Send },
-    { id: 'android', label: t('download.tab.android'), icon: Smartphone },
-    { id: 'ios', label: t('download.tab.ios'), icon: Apple },
+  /* Telegram leads: it is the only route that works today. See PLATFORMS in
+     components/public/platform.ts, which this deliberately mirrors. */
+  const TABS: { id: Platform; guide: string }[] = [
+    { id: 'telegram', guide: t('download.guide.telegram') },
+    { id: 'android', guide: t('download.guide.android') },
+    { id: 'ios', guide: t('download.guide.ios') },
   ];
 
-  /** The install steps per platform. Numbered in the locale files, not here. */
   const steps: Record<Platform, string[]> = {
     telegram: [t('download.step.tg1'), t('download.step.tg2'), t('download.step.tg3')],
     android: [
@@ -68,117 +87,92 @@ export function Download() {
       t('download.step.and3'),
       t('download.step.and4'),
     ],
-    ios: [t('download.step.ios1'), t('download.step.ios2'), t('download.step.ios3'), t('download.step.ios4')],
+    ios: [
+      t('download.step.ios1'),
+      t('download.step.ios2'),
+      t('download.step.ios3'),
+      t('download.step.ios4'),
+    ],
   };
 
-  const href = targets[tab];
-
   return (
-    <div className="min-h-screen bg-bg text-text">
-      <div className="mx-auto w-full max-w-md px-5 pb-16 pt-10">
-        <header className="mb-8 text-center">
-          <img src="/brand/logo-mark.png" alt="" className="mx-auto mb-4 h-14 w-auto" />
-          <h1 className="text-2xl font-extrabold tracking-tight">{t('download.title')}</h1>
-          <p className="mx-auto mt-2 max-w-sm text-[0.82rem] leading-relaxed text-dim">
-            {t('download.blurb')}
-          </p>
-        </header>
+    <PublicLayout>
+      {/* The hero's words live in the art, so the real heading is here, for
+          search engines and for anyone who cannot see the picture. */}
+      <h1 className="sr-only">{t('download.title')}</h1>
 
+      <div className="hp-wrap">
         {/*
-          Esther owns the screenshot carousel as a shared component. Until it
-          lands this section is absent rather than faked — a placeholder box
-          that says "carousel here" would ship to production the first time
-          someone forgot, which is how the lobby's dev-seed got out.
+          Scan-to-download, desktop-only exactly as the reference has it — the
+          block exists to move someone from a big screen to their phone, which
+          is not a thing a phone visitor needs.
 
-          Expected contract when it exists:
-            import { ScreenshotCarousel } from '@/components/ScreenshotCarousel';
-            <ScreenshotCarousel images={string[]} alt={string} />
+          TODO: this frame holds the logo mark, not a QR code. Encoding one
+          needs a QR library and, more to the point, a URL to encode: every
+          download link is unset today. Wire both together.
         */}
+        <div className="hp-qr">
+          <div className="hp-qr-frame">
+            <img src="/brand/logo-mark.png" alt="" />
+          </div>
+          <div className="hp-qr-text">{t('download.scanToDownload')}</div>
+        </div>
 
-        <nav className="mb-5 grid grid-cols-3 gap-1.5 rounded-(--radius-app) border border-border bg-surface p-1.5">
-          {TABS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              aria-current={tab === id}
-              className={
-                tab === id
-                  ? 'flex flex-col items-center gap-1 rounded-(--radius-app) bg-surface-2 px-2 py-2.5 text-brand'
-                  : 'flex flex-col items-center gap-1 rounded-(--radius-app) px-2 py-2.5 text-dim transition-colors active:text-text'
-              }
-            >
-              <Icon size={18} />
-              <span className="text-[0.7rem] font-semibold">{label}</span>
-            </button>
-          ))}
-        </nav>
+        <TipTitle>{t('download.iosNote')}</TipTitle>
 
-        <section className="rounded-(--radius-app) border border-border bg-surface p-5">
-          {href ? (
-            <a
-              href={href}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="block w-full rounded-(--radius-app) bg-brand px-4 py-3.5 text-center text-[0.9rem] font-bold text-bg transition active:scale-[0.99]"
-            >
-              {t(`download.cta.${tab}`)}
-            </a>
-          ) : (
-            /*
-              No link configured. Say it plainly and point at the one route that
-              does work, rather than rendering a button that cannot do anything.
-            */
-            <div className="rounded-(--radius-app) border border-border bg-surface-2 p-4 text-center">
-              <CircleAlert size={18} className="mx-auto mb-2 text-dim" />
-              <p className="text-[0.8rem] font-semibold">{t('download.unavailable')}</p>
-              <p className="mt-1 text-[0.72rem] leading-relaxed text-dim">
-                {t('download.unavailableHint')}
-              </p>
-            </div>
-          )}
+        <div className="hp-tabs">
+          <div className="hp-tabs-nav" role="tablist">
+            {TABS.map(({ id, guide }) => {
+              const Icon = PLATFORM_ICON[id];
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  id={`hp-tab-${id}`}
+                  aria-selected={tab === id}
+                  aria-controls={`hp-panel-${id}`}
+                  className="hp-tab"
+                  onClick={() => setTab(id)}
+                >
+                  <Icon />
+                  <span className="hp-tab-text">{guide}</span>
+                </button>
+              );
+            })}
+          </div>
 
-          <h2 className="mt-6 mb-3 text-[0.78rem] font-bold uppercase tracking-wide text-dim">
-            {t('download.howTo')}
-          </h2>
-          <ol className="space-y-3">
-            {steps[tab].map((step, i) => (
-              <li key={step} className="flex gap-3">
-                <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-surface-2 text-[0.66rem] font-bold text-brand">
-                  {i + 1}
-                </span>
-                <span className="text-[0.8rem] leading-relaxed text-text">{step}</span>
-              </li>
-            ))}
-          </ol>
+          {/* The panel wraps the list rather than being it: `role="tabpanel"` on
+              the <ol> would replace its list semantics. */}
+          <div role="tabpanel" id={`hp-panel-${tab}`} aria-labelledby={`hp-tab-${tab}`}>
+            <ol className="hp-guide">
+              {steps[tab].map((step, i) => {
+                const shot = shotFor(tab, i);
+                return (
+                  <li key={step} className="hp-guide-item">
+                    <h3 className="hp-guide-step">{step}</h3>
+                    {shot ? (
+                      <img src={shot} alt="" loading="lazy" className="hp-guide-shot" />
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        </div>
 
-          {tab === 'ios' ? (
-            <p className="mt-4 rounded-(--radius-app) border border-border bg-surface-2 p-3 text-[0.72rem] leading-relaxed text-dim">
-              {t('download.iosNote')}
-            </p>
-          ) : null}
+        <section className="hp-faq">
+          <TipTitle>{t('download.faqTitle')}</TipTitle>
+          <div className="hp-faq-item">
+            <h3>{t('download.faqQ1')}</h3>
+            <p>{t('download.faqA1')}</p>
+          </div>
+          <div className="hp-faq-item">
+            <h3>{t('download.faqQ2')}</h3>
+            <p>{t('download.faqA2')}</p>
+          </div>
         </section>
-
-        <section className="mt-5 flex items-start gap-2.5 rounded-(--radius-app) border border-border bg-surface p-4">
-          <ShieldCheck size={16} className="mt-0.5 shrink-0 text-brand" />
-          <p className="text-[0.72rem] leading-relaxed text-dim">{t('download.fairness')}</p>
-        </section>
-
-        <footer className="mt-8 space-y-3 text-center">
-          <p className="text-[0.72rem] font-semibold text-text">{t('download.ageGate')}</p>
-          <p className="text-[0.68rem] leading-relaxed text-dim">{t('download.responsible')}</p>
-          {SUPPORT_URL ? (
-            <a
-              href={SUPPORT_URL}
-              target="_blank"
-              rel="noreferrer noopener"
-              className="inline-block text-[0.72rem] font-semibold text-brand underline underline-offset-2"
-            >
-              {t('download.support')}
-            </a>
-          ) : null}
-        </footer>
       </div>
-    </div>
+    </PublicLayout>
   );
 }

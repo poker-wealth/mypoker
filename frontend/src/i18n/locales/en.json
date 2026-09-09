@@ -1,5 +1,7 @@
 {
   "nav": {
+    "home": "Home",
+    "download": "Download",
     "wallet": "Wallet",
     "alliance": "Alliance",
     "games": "Games",
@@ -670,31 +672,49 @@
     "codeLabel": "Invite code",
     "shareBlurbPrivate": "Send this link to invite a friend — the code travels with it."
   },
+  "home": {
+    "gameplay": "How the games play",
+    "contactUs": "Contact us",
+    "playVideo": "Play the {{name}} video",
+    "closeVideo": "Close video",
+    "feature1": "Every game we run, in one app — Hold’em, Short Deck, Omaha and more.",
+    "feature2": "Start a club or join one, and play private tables with people you choose.",
+    "feature3": "Replay any hand you have played, and check the shuffle it was dealt from."
+  },
   "download": {
+    "guide": {
+      "android": "Android Guide",
+      "ios": "iPhone Guide",
+      "telegram": "Telegram Guide"
+    },
+    "scanToDownload": "Scan to download",
+    "faqTitle": "Frequently asked questions",
+    "faqQ1": "Which version should I install?",
+    "faqA1": "Android installs from this page. iPhone goes through TestFlight while the App Store listing is in review. Both sign in with the same email account, so you can move between devices whenever you like.",
+    "faqQ2": "The app will not open, or it closes straight away. What now?",
+    "faqA2": "Delete it and install it again from this page. On iPhone, open TestFlight first and check for a newer build — a build stops working 90 days after it is released.",
+    "domainRemember": "Our permanent address is",
+    "domainVerify": "Every backup link is posted there. Check the address before you sign in.",
+    "domainAlt": "Backup links:",
+    "copyright": "© MYPOKER. All rights reserved.",
+    "prevSlide": "Previous slide",
+    "nextSlide": "Next slide",
+    "slide": "Slide {{n}}",
     "title": "Get MYPOKER",
-    "blurb": "Play in Telegram, or install the app on your phone.",
+    "blurb": "Install MYPOKER on your phone — Android or iPhone.",
     "howTo": "How to install",
     "unavailable": "Not available yet",
-    "unavailableHint": "We are not ready on this platform. Telegram works today — switch to that tab and play now.",
     "iosNote": "iPhone builds go out through TestFlight while the App Store listing is in review. A build expires after 90 days and TestFlight will prompt you to update.",
     "fairness": "Every hand is dealt from a shuffle you can check yourself, and the rules are published so they cannot be changed quietly.",
     "ageGate": "18+ only",
     "responsible": "Play for entertainment, and only with money you can afford to lose.",
     "support": "Contact support",
     "tab": {
-      "telegram": "Telegram",
       "android": "Android",
-      "ios": "iPhone"
-    },
-    "cta": {
-      "telegram": "Open in Telegram",
-      "android": "Download for Android",
-      "ios": "Get it on TestFlight"
+      "ios": "iPhone",
+      "telegram": "Telegram"
     },
     "step": {
-      "tg1": "Tap the button above to open our Telegram bot.",
-      "tg2": "Press Start, then open the app from the menu.",
-      "tg3": "Sign in with your email. There is nothing to install.",
       "and1": "Tap the button above to download the installer.",
       "and2": "Open the downloaded file. Android will ask whether to allow installs from this source — allow it.",
       "and3": "Tap Install, then Open.",
@@ -702,7 +722,14 @@
       "ios1": "Tap the button above. It opens TestFlight, Apple's app for trying out new apps.",
       "ios2": "Install TestFlight first if you do not have it, then come back and tap again.",
       "ios3": "In TestFlight, tap Accept, then Install.",
-      "ios4": "Open MYPOKER and sign in with your email."
+      "ios4": "Open MYPOKER and sign in with your email.",
+      "tg1": "Tap the button above to open our Telegram bot.",
+      "tg2": "Press Start, then open the app from the menu.",
+      "tg3": "Sign in with your email. There is nothing to install."
+    },
+    "slot": {
+      "hero": "App preview",
+      "step": "Step {{n}} screenshot"
     }
   }
 }

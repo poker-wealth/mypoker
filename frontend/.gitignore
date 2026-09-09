@@ -6,3 +6,15 @@ dist-ssr
 .env.*
 !.env.example
 .DS_Store
+
+# Borrowed reference art for the public pages — NOT OURS, and deliberately not
+# in git history. These are HHPoker's banners, install screenshots and welcome
+# videos, on loan so the layout can be judged at real proportions (~32 MB).
+#
+# They are stand-ins. Committing them would put a competitor's produced
+# marketing material permanently in our history, where removing it later means
+# rewriting history. The READMEs that say what belongs in each slot ARE tracked,
+# so the shape of what Olivia owes us survives without the borrowed files.
+public/download/placeholder/
+public/download/hero-*.png
+public/home/placeholder/

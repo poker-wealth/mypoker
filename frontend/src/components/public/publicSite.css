@@ -1,0 +1,925 @@
+/*
+ * The download page's own stylesheet — a port of the reference site's design.
+ *
+ * ── Why this is CSS and not Tailwind ────────────────────────────────────────
+ *
+ * The reference is a Vue app with scoped stylesheets, and its design rests on
+ * one idea Tailwind has no vocabulary for: EVERY LENGTH ON THE PAGE IS A
+ * MULTIPLE OF THE VIEWPORT WIDTH. It sets `html { font-size: .4vw }` and then
+ * writes every size in `rem`, so the whole layout — type, gaps, image heights,
+ * the content column — scales as one with the window instead of stepping at
+ * breakpoints. Reproducing that in utility classes would mean an arbitrary
+ * `calc()` on every single class; keeping it as a stylesheet means each rule
+ * below sits next to its counterpart in the original and can be checked
+ * against it.
+ *
+ * `rem` is root-relative and cannot be scoped, so the unit is a variable:
+ * every `Nrem` in the reference is `calc(var(--hp) * N)` here. The numbers are
+ * otherwise unchanged, which is what makes this auditable — `--hp` times the
+ * number in this file should equal the number in theirs.
+ *
+ * ── Where it deliberately differs ───────────────────────────────────────────
+ *
+ * MOBILE IS BUILT, NOT HIDDEN. The reference renders the entire install guide
+ * only on desktop — on a phone its download page is blank below the carousel
+ * (`$device.ios || $device.android ? _e() : ...`). Our visitors are
+ * overwhelmingly on phones, so the same design is carried down instead: four columns become two, the fixed content column
+ * becomes fluid, and the unit grows the way their own `.mobile` class grows it.
+ *
+ * COLOURS ARE THEIRS, NOT OURS. This page does not use the app's design tokens.
+ * It is a faithful port, so the palette below is lifted from the reference —
+ * that is the point of the exercise, and it is also why this file is the only
+ * place in the frontend those hexes appear.
+ */
+
+.hp {
+  /*
+   * The unit. `.4vw` is the reference's own `html { font-size: .4vw }`, so on a
+   * 1920px window one unit is 7.68px and every number below matches theirs
+   * exactly. The floor stops the page becoming unreadable on a small laptop:
+   * their design assumes a big screen and simply shrinks forever without it.
+   */
+  --hp: max(0.4vw, 4.6px);
+
+  --hp-bg: #0c0e0f;
+  --hp-panel: #101314;
+  --hp-text: #e1e1e0;
+  --hp-gold: #d9af6d;
+  --hp-muted: #a2a29f;
+  --hp-dim: #999;
+  --hp-faint: #494946;
+  --hp-line: #151514;
+  --hp-teal: #376b7a;
+  --hp-teal-light: #83b8c7;
+
+  background: var(--hp-bg);
+  color: var(--hp-text);
+  font-size: calc(var(--hp) * 2.4);
+  line-height: 1.5;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', STHeiti,
+    'Microsoft Yahei', Tahoma, Simsun, sans-serif;
+  min-height: 100vh;
+}
+
+/*
+ * Their `.mobile` class swaps the unit from .4vw to .75vw — nearly double — and
+ * then restates the handful of sizes that need to change. Same idea here.
+ */
+@media (max-width: 767px) {
+  .hp {
+    --hp: max(0.75vw, 3.4px);
+  }
+
+  /* Their wrap is a fixed column inside a much wider window and never needs a
+     gutter. Here it IS the window, so it gets one. */
+  .hp .hp-wrap {
+    padding: 0 calc(var(--hp) * 4);
+  }
+}
+
+.hp .hp-wrap {
+  max-width: calc(var(--hp) * 128);
+  margin: 0 auto;
+}
+
+/* A landing page that scrolls sideways looks broken before it is read. */
+.hp {
+  overflow-x: hidden;
+}
+
+.hp .hp-eye-catching {
+  color: var(--hp-gold);
+}
+
+/* ── Site header ─────────────────────────────────────────────────────────── */
+
+.hp .hp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: calc(var(--hp) * 8);
+  padding: 0 calc(var(--hp) * 4);
+  background: var(--hp-bg);
+}
+
+.hp .hp-header-logo {
+  height: calc(var(--hp) * 2.8);
+  width: auto;
+  object-fit: contain;
+}
+
+.hp .hp-nav a {
+  cursor: pointer;
+  color: var(--hp-text);
+  padding: 0 calc(var(--hp) * 4);
+  font-size: calc(var(--hp) * 3.2);
+}
+
+.hp .hp-nav a:hover {
+  color: #828282;
+}
+
+@media (max-width: 767px) {
+  .hp .hp-header {
+    height: calc(var(--hp) * 20);
+  }
+  .hp .hp-header-logo {
+    height: calc(var(--hp) * 6);
+  }
+  .hp .hp-nav a {
+    font-size: calc(var(--hp) * 4.2);
+    padding: 0 calc(var(--hp) * 2);
+  }
+  .hp .hp-nav .hp-nav-support {
+    display: none;
+  }
+}
+
+/* ── Domain bar ──────────────────────────────────────────────────────────── */
+
+.hp .hp-domain-top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: calc(var(--hp) * 10);
+  padding: 0 calc(var(--hp) * 4);
+  background-image: url('/download/placeholder/domain-bg-top.png');
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: 50%;
+}
+
+.hp .hp-domain-top h3 {
+  font-size: calc(var(--hp) * 3.2);
+  line-height: calc(var(--hp) * 10);
+}
+
+.hp .hp-domain-top h4 {
+  color: var(--hp-teal);
+  flex: 1;
+  text-align: right;
+}
+
+.hp .hp-domain-bottom {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  min-height: calc(var(--hp) * 5);
+  padding: calc(var(--hp) * 1) calc(var(--hp) * 4);
+  background-image: url('/download/placeholder/domain-bg-bottom.png');
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: 50%;
+}
+
+.hp .hp-domain-bottom p {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.hp .hp-domain-bottom p a {
+  cursor: pointer;
+  color: var(--hp-teal-light);
+  padding: 0 calc(var(--hp) * 0.8);
+}
+
+@media (max-width: 767px) {
+  .hp .hp-domain-top {
+    justify-content: center;
+  }
+  /* Their mobile drops the right-hand sentence rather than wrap the bar. */
+  .hp .hp-domain-top h4 {
+    display: none;
+  }
+  .hp .hp-domain-bottom p a {
+    width: 33.3%;
+  }
+}
+
+/* ── Hero carousel ───────────────────────────────────────────────────────── */
+
+.hp .hp-hero {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+/*
+ * A scrim under the buttons.
+ *
+ * The reference can lay its download buttons straight onto the banner because
+ * its art is drawn for the slot — 2048x820, with the lower third left quiet.
+ * Ours is commissioned separately and arrives at whatever ratio the designer
+ * hands over, so `object-fit: cover` can slide the busy part of the picture
+ * right under the labels. This keeps them readable on any art, and is invisible
+ * on art that already leaves the room.
+ */
+.hp .hp-hero::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 45%;
+  background: linear-gradient(to top, rgba(12, 14, 15, 0.82), rgba(12, 14, 15, 0));
+  pointer-events: none;
+  z-index: 1;
+}
+
+.hp .hp-hero-track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.hp .hp-hero-track::-webkit-scrollbar {
+  display: none;
+}
+
+.hp .hp-hero-slide {
+  flex-shrink: 0;
+  width: 100%;
+  scroll-snap-align: center;
+  text-align: center;
+}
+
+.hp .hp-hero-slide img {
+  width: 100%;
+  height: calc(var(--hp) * 95);
+  object-fit: cover;
+  display: block;
+}
+
+/* Their bullets: 8px, black at 20%, active white at 30%. Ours get a tap
+   target around them — 8px is not a touch target — but read identically. */
+.hp .hp-hero-dots {
+  position: absolute;
+  bottom: 10px;
+  left: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.hp .hp-hero-dot {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.hp .hp-hero-dot span {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 100%;
+  background: #000;
+  opacity: 0.2;
+}
+
+.hp .hp-hero-dot[aria-current='true'] span {
+  background: hsla(0, 0%, 100%, 0.3);
+  opacity: 1;
+}
+
+/* --swiper-navigation-size: 3rem, white, width = size/44*27. */
+.hp .hp-hero-arrow {
+  position: absolute;
+  top: 50%;
+  height: calc(var(--hp) * 3);
+  width: calc(var(--hp) * 3 / 44 * 27);
+  margin-top: calc(var(--hp) * 3 / -2);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.hp .hp-hero-arrow svg {
+  width: 100%;
+  height: 100%;
+}
+
+.hp .hp-hero-arrow-prev {
+  left: 10px;
+}
+
+.hp .hp-hero-arrow-next {
+  right: 10px;
+}
+
+@media (max-width: 767px) {
+  /*
+   * Their mobile banner is separate art cut for a phone, so they can pin it to
+   * 72rem and crop. Ours is one image for both, and cropping a 2.05 picture
+   * into a 1.68 slot cut the wordmark straight off the left. Natural height
+   * instead: the slide becomes exactly the art's own ratio and nothing is lost.
+   */
+  .hp .hp-hero-slide img {
+    height: auto;
+  }
+}
+
+/* ── Download buttons, laid over the carousel ────────────────────────────── */
+
+.hp .hp-cta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  flex-wrap: wrap;
+  position: absolute;
+  left: 0;
+  bottom: calc(var(--hp) * 7.2);
+  width: 100%;
+  text-align: center;
+  z-index: 2;
+  font-size: calc(var(--hp) * 2);
+  color: var(--hp-muted);
+}
+
+.hp .hp-cta-btn {
+  margin: 0 calc(var(--hp) * 2);
+  cursor: pointer;
+}
+
+.hp .hp-cta-btn:hover {
+  opacity: 0.8;
+}
+
+/*
+ * The reference ships these as flat PNGs — a grey pill, a platform glyph, a
+ * word — one image per language. Ours is drawn in CSS at the same 23.5 x 6.8
+ * so the label can be a translated string: eight languages would otherwise be
+ * eight more images nobody can grep.
+ */
+.hp .hp-cta-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--hp) * 1);
+  width: calc(var(--hp) * 23.5);
+  height: calc(var(--hp) * 6.8);
+  border-radius: calc(var(--hp) * 3.4);
+  background: rgba(77, 77, 77, 0.92);
+  border: 1px solid hsla(0, 0%, 100%, 0.45);
+  color: #fff;
+  font-size: calc(var(--hp) * 2.6);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.hp .hp-cta-pill svg {
+  width: calc(var(--hp) * 3);
+  height: calc(var(--hp) * 3);
+}
+
+.hp .hp-cta-meta {
+  margin-top: calc(var(--hp) * 0.8);
+}
+
+.hp .hp-cta-tip {
+  /* flex-basis, not width+margin: `width:100%` plus horizontal margins is
+     wider than the row it sits in, and on a phone that pushed the whole page
+     into horizontal scroll. Desktop only ever hid it behind the hero's
+     `overflow: hidden`. */
+  flex: 0 0 100%;
+  padding: 0 calc(var(--hp) * 6);
+  margin: calc(var(--hp) * 2) 0 0;
+  text-align: center;
+  font-size: calc(var(--hp) * 3.2);
+  color: #9b8452;
+}
+
+@media (max-width: 767px) {
+  /* The pills would collide at three across on a phone; the row wraps and the
+     hit areas grow. Everything else about them is unchanged. */
+  .hp .hp-cta {
+    position: static;
+    padding: calc(var(--hp) * 4) 0 0;
+    font-size: calc(var(--hp) * 3.4);
+  }
+  .hp .hp-cta-pill {
+    width: calc(var(--hp) * 40);
+    height: calc(var(--hp) * 11);
+    border-radius: calc(var(--hp) * 5.5);
+    font-size: calc(var(--hp) * 4.4);
+  }
+  .hp .hp-cta-pill svg {
+    width: calc(var(--hp) * 5);
+    height: calc(var(--hp) * 5);
+  }
+  .hp .hp-cta-tip {
+    font-size: calc(var(--hp) * 4);
+  }
+}
+
+/* ── QR block ────────────────────────────────────────────────────────────── */
+
+.hp .hp-qr {
+  margin: calc(var(--hp) * 8) 0;
+  font-size: calc(var(--hp) * 3.2);
+  text-align: center;
+}
+
+.hp .hp-qr-frame {
+  display: grid;
+  place-items: center;
+  width: calc(var(--hp) * 40);
+  height: calc(var(--hp) * 40);
+  margin: 0 auto;
+  background: var(--hp-panel);
+  border: 1px solid var(--hp-line);
+}
+
+.hp .hp-qr-frame img {
+  width: 55%;
+  height: auto;
+  opacity: 0.55;
+}
+
+.hp .hp-qr-text {
+  margin-top: calc(var(--hp) * 2);
+}
+
+/* ── Section heading with the tip icon ───────────────────────────────────── */
+
+.hp .hp-tip-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(var(--hp) * 3.2);
+  padding: calc(var(--hp) * 8) 0;
+}
+
+.hp .hp-tip-title .hp-tip-icon {
+  width: calc(var(--hp) * 6.4);
+  height: calc(var(--hp) * 6.4);
+  flex-shrink: 0;
+  color: var(--hp-gold);
+}
+
+.hp .hp-tip-title p {
+  flex: 1;
+  margin-left: calc(var(--hp) * 2);
+}
+
+/* ── Tabs ────────────────────────────────────────────────────────────────── */
+
+.hp .hp-tabs-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: calc(var(--hp) * 3) calc(var(--hp) * 3) 0 0;
+  overflow: hidden;
+}
+
+.hp .hp-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  cursor: pointer;
+  color: var(--hp-dim);
+  height: calc(var(--hp) * 10);
+  background: linear-gradient(0deg, #0f171d, #121719 8%, #1c292d 45%, #2a4b56);
+  box-shadow: inset 0 2px 0 0 rgba(94, 104, 109, 0.61);
+  border-left: 1px solid #0e1214;
+  border-right: 1px solid #617379;
+  border-top: none;
+  border-bottom: none;
+  padding: 0 calc(var(--hp) * 0.5);
+  font: inherit;
+  min-width: 0;
+}
+
+.hp .hp-tab:first-of-type {
+  border-left: none;
+}
+
+.hp .hp-tab:last-of-type {
+  border-right: none;
+}
+
+.hp .hp-tab[aria-selected='true'] {
+  color: var(--hp-gold);
+  background: linear-gradient(0deg, #0c2731, #0b2129 73%, #14262c);
+  box-shadow: inset 0 2px 0 0 rgba(94, 104, 109, 0.61);
+}
+
+.hp .hp-tab svg {
+  width: calc(var(--hp) * 5);
+  height: calc(var(--hp) * 5);
+  flex-shrink: 0;
+}
+
+.hp .hp-tab .hp-tab-text {
+  margin-left: calc(var(--hp) * 1);
+  font-size: calc(var(--hp) * 3.2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 767px) {
+  .hp .hp-tab {
+    height: calc(var(--hp) * 14);
+  }
+  .hp .hp-tab .hp-tab-text {
+    font-size: calc(var(--hp) * 4.2);
+  }
+  .hp .hp-tab svg {
+    width: calc(var(--hp) * 6);
+    height: calc(var(--hp) * 6);
+  }
+}
+
+/* ── Install guide ───────────────────────────────────────────────────────── */
+
+.hp .hp-guide {
+  background: var(--hp-panel);
+  display: flex;
+  align-items: stretch;
+  justify-content: left;
+  padding: 0 calc(var(--hp) * 3);
+  overflow: hidden;
+  flex-wrap: wrap;
+  margin: 0;
+  list-style: none;
+}
+
+.hp .hp-guide-item {
+  width: calc(25% - var(--hp) * 7.5);
+  margin: calc(var(--hp) * 8) calc(var(--hp) * 4);
+  align-items: stretch;
+  display: flex;
+  flex-direction: column;
+}
+
+.hp .hp-guide-item:nth-of-type(4n) {
+  margin-right: 0;
+}
+
+.hp .hp-guide-item:nth-of-type(4n + 1) {
+  margin-left: 0;
+}
+
+.hp .hp-guide-step {
+  flex: 1;
+  font-size: calc(var(--hp) * 3.2);
+  text-align: center;
+  margin-bottom: calc(var(--hp) * 2);
+}
+
+.hp .hp-guide-shot {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+@media (max-width: 767px) {
+  /* Two across instead of four, and the nth-of-type resets follow suit. */
+  .hp .hp-guide-item {
+    width: calc(50% - var(--hp) * 4);
+    margin: calc(var(--hp) * 6) calc(var(--hp) * 2);
+  }
+  .hp .hp-guide-item:nth-of-type(4n),
+  .hp .hp-guide-item:nth-of-type(4n + 1) {
+    margin-left: calc(var(--hp) * 2);
+    margin-right: calc(var(--hp) * 2);
+  }
+  .hp .hp-guide-step {
+    font-size: calc(var(--hp) * 4);
+  }
+}
+
+/* ── FAQ ─────────────────────────────────────────────────────────────────── */
+
+.hp .hp-faq .hp-tip-title {
+  padding: calc(var(--hp) * 16) 0 calc(var(--hp) * 8);
+}
+
+.hp .hp-faq-item {
+  font-size: calc(var(--hp) * 3.2);
+  margin-bottom: calc(var(--hp) * 8);
+}
+
+.hp .hp-faq-item h3 {
+  color: var(--hp-gold);
+  margin-bottom: calc(var(--hp) * 4);
+}
+
+@media (max-width: 767px) {
+  .hp .hp-faq-item {
+    font-size: calc(var(--hp) * 4);
+  }
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+
+.hp .hp-foot {
+  text-align: center;
+  color: var(--hp-text);
+  margin-top: calc(var(--hp) * 8);
+  margin-bottom: calc(var(--hp) * 4);
+}
+
+.hp .hp-foot-logo {
+  height: calc(var(--hp) * 6.3);
+  width: auto;
+  margin: 0 auto;
+  object-fit: contain;
+  opacity: 0.7;
+}
+
+.hp .hp-foot p {
+  margin-top: calc(var(--hp) * 4);
+}
+
+/*
+ * The age gate and the responsible-play line are ours and have no counterpart
+ * in the reference. They are not decoration: this is a gambling product and
+ * they belong on the one page a stranger actually lands on.
+ */
+.hp .hp-foot-legal {
+  margin-top: calc(var(--hp) * 2);
+  font-size: calc(var(--hp) * 2);
+  color: var(--hp-muted);
+  max-width: calc(var(--hp) * 70);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.hp .hp-foot-support {
+  color: var(--hp-gold);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (max-width: 767px) {
+  .hp .hp-foot-legal {
+    font-size: calc(var(--hp) * 3.2);
+    max-width: 84%;
+  }
+}
+
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .hp .hp-hero-track {
+    scroll-behavior: auto;
+  }
+}
+
+/* ══ Home ═════════════════════════════════════════════════════════════════ */
+
+.hp .hp-home {
+  margin-top: calc(var(--hp) * 8);
+}
+
+.hp .hp-section-tit {
+  text-align: center;
+  font-size: calc(var(--hp) * 3.2);
+}
+
+/* Their `.container-box` uses a negative left margin against each tile's
+   `margin-left` so the row centres without a leading gap. Kept as-is. */
+.hp .hp-video-row {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: calc(var(--hp) * 4) 0 0 calc(var(--hp) * -4);
+}
+
+.hp .hp-video-item {
+  width: calc(var(--hp) * 29);
+  height: calc(var(--hp) * 29);
+  margin-left: calc(var(--hp) * 4);
+}
+
+.hp .hp-video-btn {
+  position: relative;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+.hp .hp-video-btn img {
+  width: 100%;
+  height: calc(var(--hp) * 29);
+  object-fit: cover;
+  display: block;
+  border-radius: calc(var(--hp) * 1);
+}
+
+.hp .hp-video-btn:hover img {
+  opacity: 0.85;
+}
+
+/* A play badge over the cover. The reference bakes one into every thumbnail;
+   ours is drawn so the replacement art does not have to carry it. */
+.hp .hp-video-play {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: calc(var(--hp) * 8);
+  height: calc(var(--hp) * 8);
+  border-radius: 50%;
+  background: rgba(12, 14, 15, 0.55);
+  border: 1px solid hsla(0, 0%, 100%, 0.5);
+  color: #fff;
+  pointer-events: none;
+}
+
+.hp .hp-video-play svg {
+  width: 55%;
+  height: 55%;
+}
+
+.hp .hp-video-label {
+  margin-top: calc(var(--hp) * 1.5);
+  text-align: center;
+  font-size: calc(var(--hp) * 2.2);
+  color: var(--hp-muted);
+}
+
+/* The lightbox: their fixed, vertically-centred video over a 50% scrim. */
+.hp-video-mask {
+  position: fixed;
+  inset: 0;
+  background: var(--hp-bg, #0c0e0f);
+  opacity: 0.5;
+  z-index: 60;
+  border: none;
+  padding: 0;
+  width: 100%;
+  cursor: pointer;
+}
+
+.hp-video-stage {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 61;
+  max-width: 92vw;
+  max-height: 88vh;
+}
+
+.hp-video-stage video {
+  display: block;
+  max-width: 92vw;
+  max-height: 88vh;
+  background: #000;
+}
+
+.hp-video-close {
+  position: absolute;
+  top: calc(var(--hp, 7.68px) * -6);
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: calc(var(--hp, 7.68px) * 5);
+  height: calc(var(--hp, 7.68px) * 5);
+  min-width: 34px;
+  min-height: 34px;
+  border-radius: 50%;
+  background: rgba(12, 14, 15, 0.7);
+  border: 1px solid hsla(0, 0%, 100%, 0.4);
+  color: #fff;
+  cursor: pointer;
+}
+
+.hp .hp-feature {
+  margin-top: calc(var(--hp) * 8);
+  font-size: 0;
+  border-radius: calc(var(--hp) * 2);
+  overflow: hidden;
+  display: block;
+}
+
+.hp .hp-feature:hover {
+  box-shadow: 0 calc(var(--hp) * 2) calc(var(--hp) * 4) rgba(0, 0, 0, 0.5);
+}
+
+/*
+ * Their banners are cut to one ratio, so they can pin the height to 52rem and
+ * crop with `cover`. Ours come in between 2.4:1 and 2.9:1, and cropping the
+ * widest of them to a 2.46 slot cut into the sentence down its right-hand side.
+ * Width drives the size instead: every banner shows whole, whatever ratio it
+ * arrives at, and the row grows to fit rather than eating the copy.
+ */
+.hp .hp-feature img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.hp .hp-contact {
+  margin-top: calc(var(--hp) * 8);
+}
+
+/* Their title rule: a hairline either side of the words. */
+.hp .hp-contact-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(var(--hp) * 3.2);
+  text-align: center;
+}
+
+.hp .hp-contact-title::before,
+.hp .hp-contact-title::after {
+  content: '';
+  display: block;
+  height: 1px;
+  flex: 1;
+  background: var(--hp-line);
+}
+
+.hp .hp-contact-title::before {
+  margin-right: calc(var(--hp) * 2);
+}
+
+.hp .hp-contact-title::after {
+  margin-left: calc(var(--hp) * 2);
+}
+
+.hp .hp-contact-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hp .hp-contact-item {
+  flex: 1;
+  text-align: center;
+  padding: calc(var(--hp) * 6) 0;
+}
+
+.hp .hp-contact-item a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--hp-text);
+}
+
+.hp .hp-contact-item a:hover {
+  color: var(--hp-gold);
+}
+
+.hp .hp-contact-item svg {
+  width: calc(var(--hp) * 4);
+  height: calc(var(--hp) * 4);
+  flex-shrink: 0;
+}
+
+.hp .hp-contact-item .hp-contact-text {
+  margin-left: calc(var(--hp) * 2);
+}
+
+@media (max-width: 767px) {
+  /* Their home hides the video row on a phone entirely. Ours keeps it, two up. */
+  .hp .hp-video-item {
+    width: calc(50% - var(--hp) * 4);
+    height: auto;
+  }
+  .hp .hp-video-btn img {
+    height: calc(var(--hp) * 40);
+  }
+  .hp .hp-video-play {
+    width: calc(var(--hp) * 12);
+    height: calc(var(--hp) * 12);
+  }
+  .hp .hp-video-label {
+    font-size: calc(var(--hp) * 3.4);
+  }
+  .hp .hp-contact-row {
+    flex-direction: column;
+  }
+  .hp .hp-contact-item {
+    padding: calc(var(--hp) * 3) 0;
+  }
+}
