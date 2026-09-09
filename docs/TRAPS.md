@@ -694,3 +694,123 @@ runs in `frontend npm run build` and in `mobile npm run verify`. Mutation-tested
 in both directions — each of the five drifts is caught, and renaming the CSS
 rule produces a loud PARSE FAILURE rather than a silent pass, which is the
 mistake `check-parity` made (§25).
+
+---
+
+## 27. An image with no height has whatever height the viewport gives it
+
+The owner opened the live site and could not see the bottom of his own banner
+without scrolling. The hero slides were:
+
+```tsx
+<img src={s} className="h-auto w-full shrink-0" />
+```
+
+No height. So the slot's height was viewport width ÷ the art's aspect ratio,
+and the art is 1024x569. On the 1920-wide screen he was using that is a 1067px
+banner sitting under a ~110px header — the bottom edge landed about 300px past
+the fold. On the 1280-wide laptop it was authored on it very nearly fitted, and
+looked fine.
+
+**`h-auto w-full` is not a layout, it is a ratio.** Anything sized that way is
+only ever "correct" at the width you happened to look at it. A slot that must
+relate to the fold needs a viewport-height term in it — ours is now
+`min(56vw, 58svh)`, where the `svh` half answers the complaint and the `vw`
+half stops it going letterbox-thin on a phone.
+
+Two related things this surfaced:
+
+*The obvious fix was the wrong one.* Capping height with `object-fit: cover`
+crops. Cropping this 1.80 image into the ~3.2 slot a wide desktop implies takes
+44% of its height off, and the tagline sits about 78% down — it would have gone.
+`publicSite.css` already carried a note about exactly this happening once
+before, a 2.05 banner cropped into a 1.68 box losing the wordmark off the left.
+The fix that keeps the whole picture is `contain`, with the same file blurred
+underneath to fill what is left over: no crop, no second request, no new art.
+
+*Two slides, two ratios.* hero-1 is 1.80 and hero-2 is 2.05, so the carousel
+changed height as it rotated and moved the page under the reader. Nobody had
+reported that, and it went away for free once the slot was fixed. Sibling art
+in one carousel needs one ratio, or one fixed slot.
+
+---
+
+## 28. A probe that opens a media pipeline is not a probe
+
+Each of the four welcome tiles carried this, to find out whether its file
+exists:
+
+```tsx
+<video src={src} preload="metadata" className="hidden" onError={...} />
+```
+
+`className="hidden"` is `display: none`, which does not stop a fetch. Four of
+these mount four media pipelines against four MP4s totalling **28 MB** on every
+page load, and because an MP4's `moov` atom sits at the end of the file,
+"metadata" can mean range-requesting deep into a 14 MB clip. The intent was
+good — a missing file should downgrade the tile, never show a dead player — and
+the cost was invisible in the source, because the element looks like markup and
+not like a download.
+
+**To ask whether a file exists, ask.** `fetch(src, { method: 'HEAD' })` answers
+the same question in a few hundred bytes and downloads no video. Same
+degradation, same UX, ~28 MB less traffic.
+
+The general form: `display: none`, `hidden`, `visibility: hidden` and
+zero-size all hide a thing from the reader and none of them hides it from the
+network. If it has a `src`, it is a request.
+
+---
+
+## 29. A deliberate delay does not show up in any performance measurement
+
+The same "page is slow" report had four causes. Three were the usual kind —
+3.2 MB of PNG, the video probes above, a 1.42 MB unsplit JS bundle. The largest
+was this, in `src/lib/splash.ts`:
+
+```ts
+const MINIMUM_VISIBLE_MS = 2200;
+```
+
+A hard floor. Plus a 320ms fade, so **nothing could appear in under ~2.5s**, no
+matter how fast the app was ready — and the faster you made it, the more of the
+2.5s was pure waiting. It was a considered decision with a correct rationale
+written above it (the coin-spin needs about two-thirds of a turn to read as
+intentional rather than as a flicker), and it is right *inside Telegram*, where
+you tapped an app and it is opening. It is wrong on the open web, where nobody
+following a link asked for a title card.
+
+**No bundle analyser, asset audit or lighthouse-style byte count can see a
+`setTimeout`.** When someone reports slowness, grep for the delays you wrote on
+purpose before optimising the ones you did not. The fix was not to delete the
+decision but to scope it: 2200ms under `isTelegram()`, 300ms in a browser.
+
+And a second-order note: `isTelegram()` is now called at dismissal rather than
+at module load. `splash.ts` is imported by `main.tsx` before `initTelegram()`
+runs and `window.Telegram.WebApp` is populated by a script tag, so evaluating it
+during module evaluation is §14 again — a guard a beat early — and it fails in
+the direction that silently costs the Mini App its launch screen.
+
+---
+
+## 30. Two correct changes, one bug between them
+
+Shortening the splash floor to 300ms is correct. Code-splitting the routes is
+correct. Together they are a white screen.
+
+The sequence: React commits an empty shell, the two rAFs pass, the splash fades
+at 300ms — and the matched route's lazy chunk is still in flight, so the
+visitor watches nothing until it lands. Neither change has this problem alone.
+The old 2200ms floor was accidentally covering the chunk fetch, and the unsplit
+bundle meant there was never a chunk to fetch.
+
+The fix is to dismiss on the real event rather than on a timer that used to
+correlate with it: wait for `router.state.initialized`, which flips only once
+the initial match *and its lazy module* have resolved. Already true when nothing
+had to be fetched, so warm loads are untouched. With an 8s ceiling, because a
+splash that never leaves is worse than one that leaves early.
+
+**This is the case the audit-between-tasks rule exists for.** Task B did not
+break task A; B and A were each fine and their seam was not. Neither diff
+reviewed on its own shows it — you only see it by asking what the page does
+between the two of them.
