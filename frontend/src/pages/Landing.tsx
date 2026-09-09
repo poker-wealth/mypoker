@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
@@ -549,8 +549,46 @@ function VideoSlot({ index }: { index: number }) {
   const { t } = useTranslation();
   const [missing, setMissing] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const [warm, setWarm] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const src = `/brand/video${index}.mp4`;
   const label = t(`download.video${index}Label`);
+
+  /*
+   * Start buffering when someone shows interest, not when they click.
+   *
+   * The reference keeps its <video> in the DOM from page load with the src
+   * already set — its `v-show` toggles `display`, it does not mount and
+   * unmount the element — so by the time you click, the clip is buffered and
+   * it simply appears, playing. Ours mounted the element on click, which meant
+   * every click created a fresh <video> and you sat watching the browser's own
+   * empty player fill up. That is the "video HTML tag loader".
+   *
+   * Copying them exactly would mean four <video> elements pulling on ~28 MB of
+   * MP4 at page load, which is the cost that made this page slow in the first
+   * place. So the element is permanent like theirs — never re-created, so it
+   * never re-buffers — but it holds `preload="none"` until a pointer touches
+   * the tile. Hover on a desktop and it is ready long before the click; on a
+   * phone, `pointerdown` fires before the tap completes, which buys a little.
+   * Nobody who scrolls past pays anything.
+   */
+  const warmUp = useCallback((): void => setWarm(true), []);
+
+  /* load() in an effect, not inside warmUp: it has to run AFTER the render
+     that sets preload="auto", because calling it while the attribute still
+     reads "none" is a request the browser is entitled to ignore. */
+  useEffect(() => {
+    if (warm) videoRef.current?.load();
+  }, [warm]);
+
+  /* The element is always mounted, so play/pause is what opening and closing
+     actually means — not mounting and unmounting. */
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    if (playing) void el.play().catch(() => undefined);
+    else el.pause();
+  }, [playing]);
 
   /*
    * Does the file exist? Ask, rather than open it.
@@ -602,7 +640,13 @@ function VideoSlot({ index }: { index: number }) {
           type="button"
           aria-label={title}
           disabled={missing}
-          onClick={() => setPlaying(true)}
+          onPointerEnter={warmUp}
+          onPointerDown={warmUp}
+          onFocus={warmUp}
+          onClick={() => {
+            warmUp();
+            setPlaying(true);
+          }}
           className="absolute inset-0 grid place-items-center"
         >
           {/* The reference's ring: an outlined circle, not a filled disc. */}
@@ -617,35 +661,49 @@ function VideoSlot({ index }: { index: number }) {
         )}
       </div>
 
-      {/* The reference's player: the video floats centered over the page as
-          it is — no dark wash behind it, just the clip and its shadow. Tap
-          outside (or the ×) to close. */}
-      {playing && !missing && (
-        <div
-          className="fixed inset-0 z-[90] grid place-items-center p-4"
+      {/*
+        The player. Hidden with CSS rather than unmounted — see warmUp above;
+        this is what makes it open already playing instead of starting a
+        download. `hidden` is Tailwind's `display: none`, which is exactly the
+        `v-show` the reference uses.
+
+        The dark wash IS the reference's: `.mask { background: #0c0e0f;
+        opacity: .5 }`, sitting under the clip at z-index 1. A comment here
+        used to say they had no wash and that we were matching them by leaving
+        it out. That was wrong — it is in their stylesheet — so it is back.
+
+        `autoPlay` is gone with it. The element now outlives the modal, so an
+        autoplay attribute would fire on a hidden video at page load; the
+        effect above calls play() on open, which is also the click-initiated
+        gesture browsers actually allow.
+      */}
+      <div
+        className={cn('fixed inset-0 z-[90] grid place-items-center p-4', !playing && 'hidden')}
+        onClick={() => setPlaying(false)}
+      >
+        <div className="absolute inset-0 bg-[#0c0e0f] opacity-50" aria-hidden />
+        <video
+          ref={videoRef}
+          controls
+          playsInline
+          preload={warm ? 'auto' : 'none'}
+          src={src}
+          className="relative max-h-[85vh] max-w-full rounded-lg shadow-[0_10px_60px_rgb(0_0_0/0.8)]"
+          onClick={(e) => e.stopPropagation()}
+          onError={() => {
+            setMissing(true);
+            setPlaying(false);
+          }}
+        />
+        <button
+          type="button"
+          aria-label={t('common.cancel')}
           onClick={() => setPlaying(false)}
+          className="absolute right-4 top-4 grid size-10 place-items-center rounded-full bg-white/15 text-white"
         >
-          <video
-            controls
-            autoPlay
-            src={src}
-            className="max-h-[85vh] max-w-full rounded-lg shadow-[0_10px_60px_rgb(0_0_0/0.8)]"
-            onClick={(e) => e.stopPropagation()}
-            onError={() => {
-              setMissing(true);
-              setPlaying(false);
-            }}
-          />
-          <button
-            type="button"
-            aria-label={t('common.cancel')}
-            onClick={() => setPlaying(false)}
-            className="absolute right-4 top-4 grid size-10 place-items-center rounded-full bg-white/15 text-white"
-          >
-            <X size={20} />
-          </button>
-        </div>
-      )}
+          <X size={20} />
+        </button>
+      </div>
     </>
   );
 }

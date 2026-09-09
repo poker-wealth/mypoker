@@ -814,3 +814,58 @@ splash that never leaves is worse than one that leaves early.
 break task A; B and A were each fine and their seam was not. Neither diff
 reviewed on its own shows it — you only see it by asking what the page does
 between the two of them.
+
+---
+
+## 31. §28 has a mirror image: don't unmount the media you do need
+
+§28 removed four `<video>` elements that were mounted at page load and cost
+28 MB. The obvious next move — mount the player only when someone clicks it —
+is the same mistake pointing the other way, and the owner caught it in a day:
+
+> "When I click the video to view the video, it shouldn't start with video HTML
+> tag loader, it should open the video as it is on the reference site."
+
+Our modal was `{playing && <video src autoPlay />}`. Conditional render means
+every click **creates a brand-new element**, which starts fetching a multi-MB
+MP4 from zero, so what you get is the browser's empty player: a black
+rectangle, a spinner, a scrub bar sitting at 0:00. The reference does not:
+
+```js
+i("video", { directives: [{ name: "show", value: t.videoState }],
+             attrs: { src: ..., controls: "controls" } })
+```
+
+`v-show`, not `v-if` — it toggles `display`, the element is in the DOM from
+page load with `src` set, and by click time the clip is buffered. It opens
+already playing.
+
+**The two failures share one root: `preload` was never the thing being
+controlled — mounting was.** Mounting is a blunt instrument for it. The fix
+that satisfies both §28 and this one is to make the element permanent, like
+theirs, and control the bytes with the attribute that exists for it:
+
+- `preload="none"` while nobody has shown interest — zero bytes, so scrolling
+  past the section costs nothing, which is what §28 was protecting.
+- flip to `preload="auto"` on `pointerenter` / `pointerdown` / `focus` — a
+  desktop hover buys most of a second before the click; on a phone
+  `pointerdown` fires before the tap completes, which buys a little.
+- never unmount, so the buffer survives closing and reopening.
+
+Two details that bite:
+
+*`load()` must run after the render that sets the attribute.* Calling it while
+`preload` still reads `"none"` is a request the browser may ignore. It belongs
+in an effect keyed on the warm flag, not inside the handler that sets it.
+
+*`autoPlay` has to go with the change.* An element that outlives the modal
+would fire its autoplay attribute on a hidden video at page load. Call `play()`
+from the open handler instead — which is also the user gesture that autoplay
+policy actually accepts.
+
+And a smaller one found while reading their stylesheet: the comment in our
+player claimed the reference had "no dark wash behind it" and that we were
+matching them by leaving it out. Their CSS says `.mask { background: #0c0e0f;
+opacity: .5 }`. It was §7 — a comment asserting a fact about someone else's
+code that nobody had checked. When a comment justifies a choice by citing a
+reference, cite the line.
