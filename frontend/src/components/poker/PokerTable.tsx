@@ -11,6 +11,7 @@ import type { TableState } from '@/lib/table';
 import { ringFor, type TableDesign } from '@/lib/tableDesigns';
 import { useTableDesign } from '@/store/tableDesign';
 import { cn } from '@/lib/cn';
+import { PERMANENT_DOMAIN } from '@/config';
 
 /**
  * The table: the chosen design's artwork with the seats placed on its rail and the board across the
@@ -119,7 +120,7 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
                   stakes: `${info.smallBlind}/${info.bigBlind}`,
                 })}
               </div>
-              <div>{window.location.host}</div>
+              <div>www.{PERMANENT_DOMAIN}</div>
             </div>
           )}
           <div className="select-none text-[10cqmin] font-black tracking-[0.06em] text-black/25">

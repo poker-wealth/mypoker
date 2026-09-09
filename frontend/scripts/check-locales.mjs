@@ -50,6 +50,9 @@ const NON_LATIN_LOCALES = new Set(['zh', 'ja', 'ko', 'th', 'hi']);
  * surface as a warning (or a failure, in a non-Latin locale) instead.
  */
 const ALLOWED_IDENTICAL = {
+  'download.video3Label': {
+    reason: '"MTT" (Multi-Table Tournament) is a globally recognized poker acronym kept in Latin script; it is identical across ALL non-Latin locales, which is the evidence that it is a deliberate loanword rather than a per-locale miss.',
+  },
   'account.vip': {
     reason: 'VIP is a universal loanword; the value is just the brand term plus a placeholder — nothing else to translate.',
   },

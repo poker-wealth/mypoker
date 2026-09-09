@@ -38,7 +38,20 @@ export const TABLES_WS_URL =
   `${(TABLES_URL || window.location.origin).replace(/^http/, 'ws')}/ws`;
 
 /** Bot username (no @) — used only to derive the default Support chat link. */
-export const TELEGRAM_BOT_NAME = import.meta.env.VITE_TELEGRAM_BOT_NAME ?? '';
+export const TELEGRAM_BOT_NAME = import.meta.env.VITE_TELEGRAM_BOT_NAME ?? 'mypoker777_bot';
+
+/**
+ * The permanent public domain players are told to remember (the landing
+ * banner, the felt's centre print). Deliberately NOT window.location.host:
+ * the whole point of the line is to name the canonical home whatever host —
+ * a mirror, a preview deploy, localhost — the page happens to be served
+ * from. The default is the production domain from DEPLOY.md; override with
+ * VITE_PERMANENT_DOMAIN if it ever moves.
+ */
+export const PERMANENT_DOMAIN = import.meta.env.VITE_PERMANENT_DOMAIN ?? 'mypoker777.com';
+
+/** The support mailbox shown on the landing page (owner-supplied). */
+export const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL ?? 'wang@mypoker777.com';
 
 /**
  * Where "Support" links to — a Telegram chat, help desk, or mailto. Falls back

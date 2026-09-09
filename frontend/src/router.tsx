@@ -15,6 +15,7 @@ import { Notifications } from '@/pages/Notifications';
 import { AgentCenter } from '@/pages/AgentCenter';
 import { Table } from '@/pages/Table';
 import { Login } from '@/pages/Login';
+import { Landing } from '@/pages/Landing';
 import { AdminShell } from '@/components/AdminShell';
 import { AdminOverview } from '@/pages/admin/Overview';
 import { AdminPlayers } from '@/pages/admin/Players';
@@ -64,7 +65,10 @@ export const router = isAdminHost()
         path: '/',
         element: <AppShell />,
         children: [
-          // Lobby stays the landing route; Alliance is tab 1 but not the entry screen.
+          // Lobby is the landing route for Telegram and signed-in players.
+          // A signed-out browser never reaches it: AppShell's gate sends a
+          // stranger at the root to /download (the public landing) — ONE place
+          // decides who sees what at the front door, and it is the shell.
           { index: true, element: <Lobby /> },
           { path: 'alliance', element: <Alliance /> },
           { path: 'games', element: <Games /> },
@@ -95,4 +99,8 @@ export const router = isAdminHost()
         children: adminChildren,
       },
       { path: '/table/:id', element: <Table /> },
+      // The public landing/download page. Outside AppShell on purpose: it is
+      // the marketing front door (navbar, hero, store buttons), not an app
+      // tab, and it must render for people who have never signed in.
+      { path: '/download', element: <Landing /> },
     ]);
