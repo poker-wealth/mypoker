@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { useSettings } from '@/api/hooks';
 import { setLanguage } from '@/i18n';
 import { initData } from '@/lib/telegram';
+import { isAppHost } from '@/config';
 import { Login } from '@/pages/Login';
 import { Landing } from '@/pages/Landing';
 
@@ -37,7 +38,9 @@ export function AppShell() {
   // without the app's header and tab bar around it.
   const isTelegram = Boolean(initData());
   if (!isTelegram && !token) {
-    if (location.pathname === '/') return <Landing />;
+    // On the APP subdomain the app is the front door — sign-in, as always.
+    // Everywhere else (the marketing domain, dev) the root is the landing.
+    if (location.pathname === '/' && !isAppHost()) return <Landing />;
     return <Login />;
   }
 
