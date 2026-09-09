@@ -624,8 +624,6 @@
     "send": "チップを送る",
     "sent": "チップを送信しました",
     "confirmTitle": "このチップを送りますか？",
-    "telegramLogin": "Telegram でログイン",
-    "responsible": "節度あるプレイを。有害・偽造ゲームを拒み、詐欺にご注意ください。時間を管理し、健康的に楽しみましょう。",
     "confirmBody": "アライアンス在庫から {{player}} へ {{amount}} を送ります。",
     "noMembers": "配布できるメンバーがいません",
     "noMembersBlurb": "まずアライアンスにプレイヤーを招待してください。",
@@ -642,6 +640,11 @@
     "deviceModifiedBody": "Root化または脱獄ツールが検出されました。プレイは続けられますが、改造された端末は改ざんされやすいため、入出金にはご注意ください。"
   },
   "auth": {
+    "telegramLogin": "Telegram でログイン",
+    "emailLogin": "メールログイン",
+    "signUp": "新規登録",
+    "passwordHint": "8文字以上",
+    "responsible": "節度あるプレイを。有害・偽造ゲームを拒み、詐欺にご注意ください。時間を管理し、健康的に楽しみましょう。",
     "title": "ログイン",
     "subtitle": "ログインしてプレイするか、アカウントを作成してください。",
     "email": "メールアドレス",

@@ -624,8 +624,6 @@
     "send": "Kirim chip",
     "sent": "Chip terkirim",
     "confirmTitle": "Kirim chip ini?",
-    "telegramLogin": "Masuk dengan Telegram",
-    "responsible": "Bermainlah dengan bijak. Tolak permainan berbahaya dan palsu, waspadai penipuan, dan atur waktu untuk keseimbangan yang sehat.",
     "confirmBody": "Kirim {{amount}} ke {{player}} dari inventaris aliansi.",
     "noMembers": "Belum ada anggota untuk didanai",
     "noMembersBlurb": "Undang pemain ke aliansi terlebih dahulu.",
@@ -642,6 +640,11 @@
     "deviceModifiedBody": "Terdeteksi alat root atau jailbreak. Anda tetap bisa bermain, tetapi perangkat yang dimodifikasi lebih rentan dimanipulasi — berhati-hatilah saat menyetor dan menarik dana."
   },
   "auth": {
+    "telegramLogin": "Masuk dengan Telegram",
+    "emailLogin": "Masuk dengan email",
+    "signUp": "Daftar",
+    "passwordHint": "8+ karakter",
+    "responsible": "Bermainlah dengan bijak. Tolak permainan berbahaya dan palsu, waspadai penipuan, dan atur waktu untuk keseimbangan yang sehat.",
     "title": "Masuk",
     "subtitle": "Masuk untuk bermain, atau buat akun baru.",
     "email": "Email",

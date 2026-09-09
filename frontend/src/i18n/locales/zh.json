@@ -624,8 +624,6 @@
     "send": "发送筹码",
     "sent": "筹码已发送",
     "confirmTitle": "确认发送筹码？",
-    "telegramLogin": "使用 Telegram 登录",
-    "responsible": "理性游戏。拒绝有害与假冒游戏，谨防诈骗，合理安排时间，享受健康生活。",
     "confirmBody": "从联盟库存向 {{player}} 发送 {{amount}}。",
     "noMembers": "暂无可充值的成员",
     "noMembersBlurb": "请先邀请玩家加入联盟。",
@@ -642,6 +640,11 @@
     "deviceModifiedBody": "检测到 Root 或越狱工具。您仍可继续游戏，但已修改的设备更容易被篡改，请谨慎进行充值与提现。"
   },
   "auth": {
+    "telegramLogin": "使用 Telegram 登录",
+    "emailLogin": "邮箱登录",
+    "signUp": "注册",
+    "passwordHint": "8 位以上字符",
+    "responsible": "理性游戏。拒绝有害与假冒游戏，谨防诈骗，合理安排时间，享受健康生活。",
     "title": "登录",
     "subtitle": "登录即可开始游戏，或创建账户。",
     "email": "邮箱",
