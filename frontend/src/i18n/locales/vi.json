@@ -499,6 +499,12 @@
     "signInToSee": "Đăng nhập để xem thông báo",
     "empty": "Chưa có gì",
     "emptyBlurb": "Kết quả, nạp tiền và thông báo sẽ hiện ở đây.",
+    "tab": {
+      "system": "Hệ thống",
+      "results": "Kết quả",
+      "deposits": "Nạp tiền",
+      "promos": "Khuyến mãi"
+    },
     "handWon": "Bạn thắng ${{amount}}",
     "handLost": "Ván đã kết toán — ${{amount}}",
     "deposit": "Đã ghi có khoản nạp ${{amount}}",

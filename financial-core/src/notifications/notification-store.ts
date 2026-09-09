@@ -79,7 +79,22 @@ export interface NotificationPage {
   notifications: Notification[];
   unread: number;
   nextCursor: string | null;
+  /**
+   * Unread per kind, across the whole account — every kind is present, zeros
+   * included, so a caller can render a tab strip without knowing which kinds
+   * exist in the data.
+   *
+   * Separate from `unread` on purpose. `unread` answers "is there anything for
+   * me", which is the bell; this answers "which tab should wear a badge", and
+   * summing these is NOT guaranteed to give you the other if a kind is ever
+   * added to NotificationKind without being added here — the Record type makes
+   * that a compile error rather than a quietly wrong badge.
+   */
+  unreadByKind: Record<NotificationKind, number>;
 }
+
+/** Every kind, so callers can rely on the key being present rather than optional. */
+const ALL_KINDS: NotificationKind[] = ['RESULT', 'DEPOSIT', 'PROMO', 'JACKPOT', 'SYSTEM'];
 
 /**
  * Raise a notification, honouring the player's preferences.
@@ -121,9 +136,23 @@ export async function notify(input: {
   return true;
 }
 
+/**
+ * A page of a player's notifications, newest first.
+ *
+ * `kinds` filters server-side, and it has to be server-side: the client pages
+ * through this with a cursor, so a tab filtering whatever happened to be
+ * fetched would look empty purely because the reader had not scrolled far
+ * enough, and its badge would count the wrong thing. A screen that lies
+ * quietly is worse than one that admits it cannot filter.
+ *
+ * An empty `kinds` array means "no kinds", not "all kinds" — it returns
+ * nothing. Callers wanting everything omit the option. That distinction is
+ * deliberate: `[]` arriving from a caller that meant to build a filter and
+ * built an empty one should show an empty list, not silently show everything.
+ */
 export async function listNotifications(
   playerId: string,
-  options: { limit?: number; cursor?: string } = {},
+  options: { limit?: number; cursor?: string; kinds?: NotificationKind[] } = {},
 ): Promise<NotificationPage> {
   const limit = Math.min(Math.max(options.limit ?? 20, 1), 100);
 
@@ -134,6 +163,8 @@ export async function listNotifications(
 
   const query: Record<string, unknown> = { playerId };
   if (before) query.createdAt = { $lt: before };
+  // `undefined` means unfiltered; `[]` means none. See the note above.
+  if (options.kinds !== undefined) query.kind = { $in: options.kinds };
 
   // One extra row tells us whether another page exists, without a count query.
   const rows = await NotificationModel.find(query)
@@ -154,14 +185,41 @@ export async function listNotifications(
       createdAt: n.createdAt.toISOString(),
     })),
     // Counted across everything, not just this page — the badge is about the
-    // account, not about how far the player has scrolled.
+    // account, not about how far the player has scrolled. Note it also ignores
+    // `kinds`: the bell counts the account, not the open tab.
     unread: await NotificationModel.countDocuments({ playerId, readAt: null }),
+    unreadByKind: await unreadByKind(playerId),
     nextCursor: hasMore && page.length > 0 ? page[page.length - 1]!.createdAt.toISOString() : null,
   };
 }
 
 export async function unreadCount(playerId: string): Promise<number> {
   return NotificationModel.countDocuments({ playerId, readAt: null });
+}
+
+/**
+ * Unread counts per kind, in one aggregation rather than one query per kind.
+ *
+ * Kinds with nothing unread are absent from the aggregation's output, so the
+ * result is seeded with zeros first — otherwise a tab with no unread messages
+ * would read `undefined` and render an empty badge instead of no badge.
+ */
+export async function unreadByKind(playerId: string): Promise<Record<NotificationKind, number>> {
+  const rows = await NotificationModel.aggregate<{ _id: NotificationKind; n: number }>([
+    { $match: { playerId, readAt: null } },
+    { $group: { _id: '$kind', n: { $sum: 1 } } },
+  ]);
+
+  const counts = Object.fromEntries(ALL_KINDS.map((k) => [k, 0])) as Record<
+    NotificationKind,
+    number
+  >;
+  for (const row of rows) {
+    // A kind retired from the union but still present in old documents would
+    // otherwise add a key the type says cannot be there.
+    if (row._id in counts) counts[row._id] = row.n;
+  }
+  return counts;
 }
 
 /** Mark specific notifications read, or all of them when no ids are given. */

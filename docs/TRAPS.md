@@ -929,3 +929,42 @@ never the commit that touches it. So:
    and confirm it extracts the right name from each, **and** feed it three
    things that are not routes and confirm it returns null. A pattern that
    accepts everything reports no mismatches either.
+
+---
+
+## 33. A filter over a paged list belongs on the server, and its control belongs outside the result
+
+Two mistakes the Messages tabs would have made, both of which look fine on a
+screen with a dozen rows in it and are wrong on a real account.
+
+**The filter.** The notification list pages with a cursor. Tabs implemented as
+a client-side filter over the fetched pages would show a tab as empty because
+the reader had not scrolled far enough — and there is no way to tell that
+apart from genuinely empty. The badge would be worse: it would count what was
+loaded rather than what exists. So `kinds` became a real query parameter, and
+the load-bearing test is not "it filters" but **"it keeps filtering across
+pages"** — a filter applied to page one and forgotten on page two passes every
+obvious test and fails the first time anyone scrolls.
+
+The related distinction, written into the store: `kinds: undefined` means
+unfiltered, `kinds: []` means *none*. A caller that meant to build a filter and
+built an empty one should get an empty list, not silently get everything.
+
+**The control.** `Screen` renders its query's pending, error and empty state
+*instead of* its children. Put the tab strip inside those children and it
+disappears the moment you select a tab that is empty — the reader is now on a
+blank screen with no way back to the tabs. That is §12 with the affordance not
+missing but destroyed by the state it is meant to escape.
+
+Hence `Screen`'s `header` slot, which renders above all three states. **Any
+control that CHANGES a query has to live outside that query's own result** —
+tab strips, period switches, search boxes, sort orders. If selecting an option
+can empty the list, and the selector is inside the list, the selector is gone
+exactly when it is needed.
+
+**One more, smaller.** This screen previously marked everything read on open
+with a bodyless `POST /read`. Correct for one list; wrong the moment tabs
+exist, because it clears badges for tabs nobody opened — and the badges are the
+only reason to have tabs. It now marks the ids actually on screen. Whenever a
+screen gains a filter, re-read every write it performs: the writes were
+scoped to "the whole thing" when the whole thing was all you could see.

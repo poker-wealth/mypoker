@@ -195,3 +195,25 @@ export function EditIcon(p: IconProps) {
     </Frame>
   );
 }
+
+/** System notices — ruled lines in a frame, after the reference's tab glyph. */
+export function SystemIcon(p: IconProps) {
+  return (
+    <Frame {...p}>
+      <Rect x={4} y={4} width={16} height={16} rx={3} />
+      <Path d="M8 9.5h8M8 13h8M8 16.5h5" />
+    </Frame>
+  );
+}
+
+/** Promotions — a wrapped box with a bow. */
+export function GiftIcon(p: IconProps) {
+  return (
+    <Frame {...p}>
+      <Rect x={3.5} y={9.5} width={17} height={10.5} rx={2} />
+      <Path d="M2.5 9.5h19M12 9.5V20" />
+      <Path d="M12 9.5C10.6 6.6 8.8 5.2 7.4 6.1c-1.3.8-.4 3.4 4.6 3.4Z" />
+      <Path d="M12 9.5c1.4-2.9 3.2-4.3 4.6-3.4 1.3.8.4 3.4-4.6 3.4Z" />
+    </Frame>
+  );
+}

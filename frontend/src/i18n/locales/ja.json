@@ -499,6 +499,12 @@
     "signInToSee": "ログインすると通知が表示されます",
     "empty": "まだ通知はありません",
     "emptyBlurb": "ゲーム結果、入金、お知らせがここに表示されます。",
+    "tab": {
+      "system": "システム",
+      "results": "戦績",
+      "deposits": "入金",
+      "promos": "プロモ"
+    },
     "handWon": "${{amount}} を獲得しました",
     "handLost": "ハンド精算 — ${{amount}}",
     "deposit": "${{amount}} の入金が反映されました",

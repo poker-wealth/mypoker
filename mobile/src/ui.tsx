@@ -287,15 +287,29 @@ export function Screen<T>({
   query,
   empty,
   errorLabel,
+  header,
   children,
 }: {
   query: { data?: T; isPending: boolean; isError: boolean; error?: unknown; refetch: () => void };
   empty?: { when: (data: T) => boolean; title: string; body?: string };
   errorLabel: { retry: string; fallback: string };
+  /**
+   * Rendered above the query's own state, and therefore still there while it
+   * is pending, empty or errored.
+   *
+   * For controls that CHANGE the query — a tab strip, a period switch. Those
+   * live outside the result by necessity: put a tab strip inside `children`
+   * and switching to a tab that happens to be empty replaces the strip with
+   * the empty state, so the reader has no way back to the other tabs. A
+   * control that disappears exactly when you need it is TRAPS §12.
+   */
+  header?: ReactNode;
   children: (data: T) => ReactNode;
 }) {
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
+      {header}
+
       {query.isPending && <ActivityIndicator color={theme.brand} style={styles.pad} />}
 
       {query.isError && (
