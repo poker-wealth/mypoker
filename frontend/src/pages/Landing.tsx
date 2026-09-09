@@ -90,7 +90,7 @@ export function Landing() {
     <div className="min-h-full bg-bg text-text">
       {/* ── Navbar ── */}
       <header className="flex items-center justify-between gap-3 border-b border-border bg-surface/80 px-4 py-3 backdrop-blur md:px-8">
-        <img src="/brand/logo-wordmark.png" alt="MYPOKER" className="h-7 w-auto select-none" />
+        <img src="/brand/logo-wordmark.webp" alt="MYPOKER" className="h-7 w-auto select-none" />
         <nav className="flex items-center gap-4 text-sm font-semibold">
           <Link to="/" className="text-dim transition-colors hover:text-text">
             {t('download.navHome')}
@@ -241,7 +241,9 @@ export function Landing() {
              reference ghosts its logo, with the copyright line beneath ── */}
       <footer className="relative overflow-hidden border-t border-border px-4 pb-6 pt-12 text-center">
         <img
-          src="/brand/logo-wordmark.png"
+          src="/brand/logo-wordmark.webp"
+          loading="lazy"
+          decoding="async"
           alt=""
           aria-hidden
           className="mx-auto mb-6 h-16 w-auto select-none opacity-[0.13] md:h-20"
@@ -280,9 +282,11 @@ function FeatureCard({
   if (fullPanel) {
     return (
       <img
-        src={`/brand/feature-${n}.png`}
+        src={`/brand/feature-${n}.webp`}
         alt={title}
         onError={() => setFullPanel(false)}
+        loading="lazy"
+        decoding="async"
         className="w-full select-none rounded-2xl"
         draggable={false}
       />
@@ -306,7 +310,7 @@ function FeatureCard({
 
       {hasPhone && (
         <img
-          src={`/brand/feature-${n}.png`}
+          src={`/brand/feature-${n}.webp`}
           alt=""
           aria-hidden
           onError={() => setHasPhone(false)}
@@ -330,12 +334,33 @@ function FeatureCard({
 
 /**
  * The hero: a slide carousel over the owner's banner art at
- * `public/brand/hero-1.png`, `hero-2.png`, … (arrows + dots, auto-advance).
+ * `public/brand/hero-1.webp`, `hero-2.webp`, … (arrows + dots, auto-advance).
  * Slides that fail to load fall out of the rotation; with none present the
  * carousel is a single brand-gradient slide with the wordmark, so the page
  * never shows a broken image while the art is on its way into the repo.
  */
-const HERO_SLIDES = ['/brand/hero-1.png', '/brand/hero-2.png'];
+const HERO_SLIDES = ['/brand/hero-1.webp', '/brand/hero-2.webp'];
+
+/**
+ * How tall the banner slot is allowed to be.
+ *
+ * The art was previously rendered at its own natural size — `h-auto w-full` —
+ * so its height was whatever the viewport width divided by the art's ratio came
+ * to. hero-1 is 1024x569 (1.80), which on a 1920-wide screen is a 1067px tall
+ * banner sitting below a ~110px header: the bottom edge landed roughly 300px
+ * past the fold and the owner had to scroll to see the end of his own banner.
+ *
+ * `58svh` is the cap that fixes that — a little over half the viewport, so the
+ * banner always finishes on screen with the page's next section showing beneath
+ * it. `56vw` keeps it from going letterbox-thin on a phone, where the natural
+ * height already fits: at 390px wide, 56vw is 218px and the art's own height is
+ * 217px, so the cap is a no-op there and the picture is untouched.
+ *
+ * The pair of slides do not share a ratio (1.80 and 2.05), so before this the
+ * carousel also changed height mid-rotation and shunted the page around. A
+ * fixed slot removes that too.
+ */
+const HERO_HEIGHT = 'min(56vw, 58svh)';
 
 function HeroCarousel() {
   const { t } = useTranslation();
@@ -373,27 +398,40 @@ function HeroCarousel() {
 
   return (
     <section className="relative overflow-hidden bg-black">
-      {/* Probe every slide so a missing file drops out instead of flashing broken. */}
-      {HERO_SLIDES.map((s) => (
-        <img
-          key={`probe-${s}`}
-          src={s}
-          alt=""
-          aria-hidden
-          className="hidden"
-          onError={() => setDead((d) => new Set(d).add(s))}
-        />
-      ))}
       {/* The complete banners on a sliding track — the whole row shifts one
-          screen-width per slide, so a change is a glide, not a cut. Full
-          width at each art's own aspect; nothing is cropped to fit a box. */}
+          screen-width per slide, so a change is a glide, not a cut. Each sits
+          in a capped slot (see HERO_HEIGHT) and is fitted with `object-contain`,
+          so the whole banner stays on screen and nothing is cropped to fit.
+          A slide that fails to load drops out of the rotation. */}
       <div className="overflow-hidden">
         <div
-          className="flex items-start transition-transform duration-500 ease-out"
+          className="flex transition-transform duration-500 ease-out"
           style={{ transform: `translateX(-${Math.min(at, count - 1) * 100}%)` }}
         >
-          {live.map((s) => (
-            <img key={s} src={s} alt="" className="h-auto w-full shrink-0 select-none" draggable={false} />
+          {live.map((s, i) => (
+            <div
+              key={s}
+              className="relative w-full shrink-0 overflow-hidden"
+              style={{ height: HERO_HEIGHT }}
+            >
+              {/* Whatever `contain` leaves over at the sides is filled with the
+                  art's own edges, blurred — the same file, so no second
+                  request, and no new art needed from the designer. */}
+              <div
+                aria-hidden
+                className="absolute inset-0 scale-110 bg-cover bg-center blur-2xl"
+                style={{ backgroundImage: `url("${s}")` }}
+              />
+              <img
+                src={s}
+                alt=""
+                onError={() => setDead((d) => new Set(d).add(s))}
+                className="relative h-full w-full select-none object-contain"
+                draggable={false}
+                decoding="async"
+                fetchPriority={i === 0 ? 'high' : 'low'}
+              />
+            </div>
           ))}
         </div>
       </div>
@@ -508,6 +546,31 @@ function VideoSlot({ index }: { index: number }) {
   const [playing, setPlaying] = useState(false);
   const src = `/brand/video${index}.mp4`;
   const label = t(`download.video${index}Label`);
+
+  /*
+   * Does the file exist? Ask, rather than open it.
+   *
+   * This was a hidden `<video preload="metadata">` per tile. Four of those
+   * mount four media pipelines against four MP4s totalling ~28 MB on every
+   * single page load, just to learn whether the files are there — and because
+   * an MP4's moov atom sits at the end of the file, "metadata" can mean
+   * range-requesting deep into a 14 MB clip. A HEAD request answers the same
+   * question in a few hundred bytes and downloads no video at all.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    const fail = (): void => {
+      if (!cancelled) setMissing(true);
+    };
+    fetch(src, { method: 'HEAD' })
+      .then((r) => {
+        if (!r.ok) fail();
+      })
+      .catch(fail);
+    return () => {
+      cancelled = true;
+    };
+  }, [src]);
   const title = label.replace(/\n/g, ' ');
 
   return (
@@ -516,8 +579,7 @@ function VideoSlot({ index }: { index: number }) {
         className="relative aspect-square overflow-hidden rounded-2xl"
         style={{ background: TILE_ART[index - 1] }}
       >
-        {/* Probe so a missing file downgrades the tile instead of breaking it. */}
-        <video src={src} preload="metadata" className="hidden" onError={() => setMissing(true)} />
+
         {/* The game name, ghosted big and tilted across the cloth, in the
             cloth's own paler shade. */}
         <span
