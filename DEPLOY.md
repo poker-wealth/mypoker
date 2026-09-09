@@ -45,20 +45,23 @@ heroku config:set -a mypoker-gateway \
   FINANCIAL_CORE_URL='https://mypoker-fc.herokuapp.com' \
   GOOGLE_CLIENT_ID='<id>' GOOGLE_CLIENT_SECRET='<secret>' \
   TELEGRAM_BOT_TOKEN='<token>' \
-  CORS_ORIGINS='https://mypoker777.com,https://www.mypoker777.com'
+  CORS_ORIGINS='https://mypoker777.com,https://www.mypoker777.com,https://app.mypoker777.com'
 git subtree push --prefix game-server heroku-gw main
 ```
 Public API URL → `https://mypoker-gateway.herokuapp.com`.
 
-**Both hosts, and both with the scheme.** `CORS_ORIGINS` is an exact-match
+**All three hosts, each with the scheme.** `CORS_ORIGINS` is an exact-match
 allowlist with no wildcard (`game-server/src/gateway/app.ts`), compared against
 the browser's `Origin` header. `mypoker777.com` without `https://` matches
-nothing, and if Netlify serves `www` as well then the apex alone leaves half the
-visitors unable to reach the API — with no error beyond a CORS failure in the
-console.
+nothing; leaving out `www` or the `app` subdomain silently strands those
+visitors — no error beyond a CORS failure in the console.
 
 ## Frontend — Netlify
-The site is served at **https://mypoker777.com** (Hostinger domain).
+Two hosts, one build (the SPA decides by host — see `frontend/src/config.ts`):
+- **https://app.mypoker777.com** — the PLAYER APP. This is what the Telegram
+  Mini App points at; a signed-out browser here gets the sign-in card.
+- **https://mypoker777.com** (+ `www`) — the marketing landing; its "Play now"
+  hops to the app subdomain (Hostinger domain).
 
 Attach it in Netlify → Domain management → Add custom domain, then point the DNS
 at Netlify (either the four `dns1..4.p0X.nsone.net` nameservers in Hostinger, or
@@ -75,21 +78,23 @@ Set env, then redeploy (the build guard rejects localhost, so these must be the 
 - (`VITE_TABLES_URL` added when the table server deploys)
 
 Also update, or they will still point at the old host:
-- **BotFather** → the Mini App URL for the bot → `https://mypoker777.com`
-- **Google OAuth** → Authorised JavaScript origins and redirect URIs → the new
-  domain, or sign-in fails with `redirect_uri_mismatch`
+- **BotFather** → the Mini App URL for the bot → `https://app.mypoker777.com/`
+  (done 2026-09-09 — the bot opens the app subdomain, not the apex)
+- **Google OAuth** → Authorised JavaScript origins and redirect URIs → BOTH
+  `https://app.mypoker777.com` and the apex, or sign-in fails with
+  `redirect_uri_mismatch`
 
 ## After deploy — smoke check
 - `GET https://mypoker-fc.herokuapp.com/api/v1/health` → 200
 - `GET https://mypoker-gateway.herokuapp.com/...health` → 200
-- Open https://mypoker777.com, sign in with Google → confirms the frontend →
-  gateway → FC chain in production.
+- Open https://app.mypoker777.com, sign in with Google → confirms the frontend →
+  gateway → FC chain in production. Open https://mypoker777.com → the landing.
 - Open a player-scoped tab (Me / Stats). Retry cards there mean `VITE_API_URL`
   or `CORS_ORIGINS` is wrong — those screens are the honest signal that the
   frontend cannot reach the gateway.
 
 ## What the provider gets from this
-- **Frontend URL** = `https://mypoker777.com`.
+- **Frontend URL** = `https://app.mypoker777.com` (marketing at `https://mypoker777.com`).
 - **API URL** = `https://mypoker-gateway.herokuapp.com`.
 - **Backoffice URL** = the admin panel (in build by Samuel) — until then, the gateway URL stands in.
 - **IP to whitelist** = the outbound IP of the dyno calling them. Heroku dynos have dynamic IPs, so for a stable IP to give the provider you'll need an outbound-IP addon (e.g. QuotaGuard/Fixie) or a small proxy — flagged as a decision, because most providers require a *fixed* egress IP.
