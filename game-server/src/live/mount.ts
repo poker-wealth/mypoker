@@ -2,6 +2,7 @@ import type { Express, Request, Response } from 'express';
 import { ChipBank } from './chip-bank';
 import { DevPlayers, type PlayerDirectory } from './players';
 import { TableHub, type TokenVerifier } from './table-hub';
+import type { GameSocketServerConfig } from '../transport/ws-server';
 import { ChipDenominatedFc } from './fc-chip-adapter';
 import { FcPlayerDirectory } from './fc-directory';
 import { HttpFinancialCoreClient, type FinancialCoreClient } from '../core/financial-core-client';
@@ -11,6 +12,7 @@ import type { LiveRoom } from './live-room';
 import { ensureRuleCommitment, ensureGameRuleCommitment } from '../fairness/rule-commitment';
 import { MongoMerkleStore, getRoundFairness } from '../fairness/round-store';
 import { verifyToken } from '../gateway/tokens';
+import { tableAccess } from '../gateway/table-access';
 import type { LiveTableConfig } from './live-room';
 
 /**
@@ -34,6 +36,16 @@ export interface MountLiveOptions {
   /** Notarize settled rounds on-chain. Requires a connected DB to persist proofs — enable only where
    *  the process has one (the folded gateway), not the standalone table server. */
   notarize?: boolean;
+  /**
+   * Whether a player may open a socket at all — see
+   * `GameSocketServerConfig.authorizeSession`.
+   *
+   * Passed IN rather than built here for the same reason `notarize` is opt-in:
+   * this module is shared with the standalone table server, which has no user
+   * database to ask. The folded gateway supplies one; a DB-less deployment
+   * leaves it out and keeps today's behaviour.
+   */
+  authorizeSession?: GameSocketServerConfig['authorizeSession'];
 }
 
 export interface MountedLive {
@@ -114,6 +126,12 @@ export function mountLiveTables(app: Express, opts: MountLiveOptions): MountedLi
           const why = event.reason ? ` (${event.reason})` : '';
           console.log(`  [socket] ${event.type}${who}${why}`);
         },
+    opts.authorizeSession,
+    // Private tables refuse a stranger on the socket for the same reason the
+    // REST API does — one registry, both surfaces. Tables this registry has
+    // never heard of (the fixed lobby tables, league tables) are allowed
+    // through; see gateway/table-access.ts on why that is scope, not fail-open.
+    (tableId, playerId): boolean => tableAccess.mayJoin(tableId, playerId),
   );
   for (const table of opts.tables) anchorTableRules(hub.addTable(table));
 

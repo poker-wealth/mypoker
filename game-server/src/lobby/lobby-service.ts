@@ -14,8 +14,33 @@ export type TableStatus = 'UNAVAILABLE' | 'WAITING' | 'OPEN' | 'FULL';
 export interface LobbyTable {
   id: string;
   gameId: GameId;
-  /** Table stake level (e.g. big blind / base bet). */
-  stakes: number;
+  /**
+   * The table's OWN name, when it has one distinct from its game.
+   *
+   * Rows used to be labelled purely by game, so the two Hold'em tables both
+   * read "Texas Hold'em" and were indistinguishable — and the sit refusal,
+   * which names the table from the room, pointed at a string ("Hold'em ·
+   * $0.50/1") that appeared nowhere in the lobby. One name, from the room,
+   * fixes both. Optional: tables created by a league or a player have no name
+   * of their own and keep falling back to the game's.
+   */
+  name?: string;
+  /**
+   * Table stake level — the big blind for poker, a fixed base stake for a game
+   * that has one, or NULL for a game with neither.
+   *
+   * Nullable because nine of the thirteen live tables genuinely have no stake
+   * level: each player picks their own bet per round. They used to report 0,
+   * and the lobby printed "Blinds 0/0" for every one of them.
+   */
+  stakes: number | null;
+  /**
+   * The small blind, when there is one. Sent rather than derived.
+   *
+   * Both clients used to render `stakes / 2`, which is right only while every
+   * table is half-and-half. The server knows the real figure, so it says it.
+   */
+  smallBlind?: number | null;
   players: number;
   /** This table's accumulated jackpot. */
   jackpot: number;
@@ -26,7 +51,7 @@ export interface LobbyTable {
    * tables — 40BB is the same depth whether the blinds are 1/2 or 100/200, and a
    * cash figure would have to be re-read against the stakes column every time.
    */
-  buyInBB: number;
+  buyInBB: number | null;
   /**
    * Which system this table belongs to (§2, §3.10).
    *
@@ -112,7 +137,10 @@ export class LobbyService {
   }
 
   /** Keep the lobby in step with the live table (seat counts, jackpot growth). */
-  updateTable(tableId: string, patch: Partial<Pick<LobbyTable, 'players' | 'jackpot' | 'stakes'>>): void {
+  updateTable(
+    tableId: string,
+    patch: Partial<Pick<LobbyTable, 'players' | 'jackpot' | 'stakes' | 'smallBlind' | 'name'>>,
+  ): void {
     const t = this.tables.get(tableId);
     if (!t) throw new RangeError(`unknown table: ${tableId}`);
     Object.assign(t, patch);
@@ -142,7 +170,9 @@ export class LobbyService {
     const status = this.statusOf(t);
     return {
       ...t,
-      name: spec.name,
+      // The table's own name wins; the game's is the fallback for rows that
+      // have none. Same string the refusal message uses, deliberately.
+      name: t.name ?? spec.name,
       status,
       minPlayers: spec.minPlayers,
       maxPlayers: spec.maxPlayers,
@@ -199,8 +229,12 @@ export class LobbyService {
       .map((t) => this.viewOf(t))
       .filter((v) => {
         if (filter.gameId && v.gameId !== filter.gameId) return false;
-        if (filter.minStakes !== undefined && v.stakes < filter.minStakes) return false;
-        if (filter.maxStakes !== undefined && v.stakes > filter.maxStakes) return false;
+        // A table with no stake level cannot satisfy a stake filter. Excluded
+        // rather than treated as zero, which would have made every stakeless
+        // table match `maxStakes` and none match `minStakes` — a silent,
+        // asymmetric wrong answer.
+        if (filter.minStakes !== undefined && (v.stakes === null || v.stakes < filter.minStakes)) return false;
+        if (filter.maxStakes !== undefined && (v.stakes === null || v.stakes > filter.maxStakes)) return false;
         if (filter.hasSeats && v.seatsFree === 0) return false;
         if (filter.minJackpot !== undefined && v.jackpot < filter.minJackpot) return false;
         if (filter.readyOnly && v.status !== 'OPEN' && v.status !== 'FULL') return false;

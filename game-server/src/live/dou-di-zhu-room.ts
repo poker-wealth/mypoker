@@ -6,7 +6,7 @@ import { cardRank } from '../games/dou-di-zhu/ddz-deck';
 import { settleNet } from '../games/texas/settlement';
 import { BaseLiveRoom, RoomError, tableJackpotAccounts, type BaseRoomSeat } from './base-room';
 import type { LiveTableConfig, RoomDeps } from './live-room';
-import type { TableSnapshot } from './room-state';
+import type { TableSnapshot, TableSummary } from './room-state';
 
 export interface DouDiZhuRoomConfig extends LiveTableConfig {
   id: string;
@@ -217,6 +217,17 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
         await this.maybeStartRound();
       });
     }, this.config.showdownDelayMs ?? 5_000);
+  }
+
+  /**
+   * Dou Di Zhu has no blinds but does have a fixed per-round stake, so it is
+   * the one inheritor that overrides this. Reported as `baseStake`, NOT as a
+   * big blind — the lobby comment that claimed non-poker rooms "carry their
+   * base bet in the same field" was false for years, and it was false partly
+   * because there was no honest field to put it in.
+   */
+  protected override stakeLevel(): Pick<TableSummary, 'smallBlind' | 'bigBlind' | 'baseStake'> {
+    return { smallBlind: null, bigBlind: null, baseStake: this.config.baseStake };
   }
 
   snapshotFor(playerId: string): TableSnapshot {

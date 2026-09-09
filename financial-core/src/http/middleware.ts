@@ -87,6 +87,19 @@ export function errorHandler(
     res.status(err.status).json({ error: err.message });
     return;
   }
+  // body-parser's size-limit rejection (the app-wide express.json() 64kb
+  // limit, and the avatar routes' own scoped express.raw limit) throws an
+  // error with this shape. Without this branch it fell through to the
+  // generic 500 below — indistinguishable from a real server fault, and
+  // alerting ops for every oversized request a client happens to send.
+  if (
+    err &&
+    typeof err === 'object' &&
+    ('type' in err ? (err as { type?: unknown }).type === 'entity.too.large' : false)
+  ) {
+    res.status(413).json({ error: 'request body is too large' });
+    return;
+  }
   if (err instanceof ZodError) {
     res.status(400).json({ error: 'validation_failed', details: err.issues });
     return;

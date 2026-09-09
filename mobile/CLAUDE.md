@@ -60,7 +60,12 @@ These are product rules, not web rules — they apply here too:
 - **Never render an invented figure.** No sample data, no placeholder counts. An em dash beats a made-up number.
 - **Every user-facing string is translated in all 8 languages.** A missing key renders raw.
 - **Money through the API only.** The app never computes a balance.
-- Brand: near-black `#0d0d1a`, violet `#bb5cf6`, cyan `#00d4ff`. Gold is for jackpots and nothing else.
+- Brand (v3, Sep 2026 — repaletted to the HHPoker reference per Operating
+  Guide v3.0): near-black `#0c0c0c`, gold `#d9b87c`, copper `#c87a3a`.
+  **Gold is chrome now** — nav, icons, active states — so it no longer means
+  money. Money is cyan `#4fd1e0` (`theme.jackpot`), which is HH's diamond
+  balance. The rule survives in its new colour: whatever wears the money
+  token IS money, and nothing else may borrow it.
 
 ## Commands
 

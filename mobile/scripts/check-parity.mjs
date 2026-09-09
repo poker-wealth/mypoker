@@ -86,15 +86,49 @@ function matchingBracket(text, openIdx, open, close) {
   return -1;
 }
 
-/** The `children: [ ... ]` array belonging to the route object containing `pathLiteral` (e.g. "'/',"). */
-function childrenBlock(text, pathLiteral) {
-  const containerIdx = text.indexOf(`path: ${pathLiteral}`);
+/**
+ * The children array of the route object anchored at `anchor`.
+ *
+ * Handles BOTH shapes the router has used:
+ *
+ *   children: [ ... ]        an inline array
+ *   children: adminChildren  a reference to a hoisted `const x = [ ... ]`
+ *
+ * The second shape is why this check broke. It used to take the first `[` after
+ * the `children:` key, which for a reference is not that route's array at all —
+ * it is whatever array happens to come next in the file. That silently pointed
+ * the tab-shell lookup at the right block by luck, and left the admin lookup
+ * with no `[` ahead of it at all, so the whole check died at parse time.
+ *
+ * Anchoring on the ELEMENT (`element: <AppShell />`) rather than on a path
+ * literal, because the router now has two `path: '/'` routes — the admin
+ * subdomain mounts the panel at the root — and the first one is not the one
+ * this wants.
+ */
+function childrenBlock(text, anchor) {
+  const containerIdx = text.indexOf(anchor);
   if (containerIdx === -1) return null;
   const childrenKeyIdx = text.indexOf('children:', containerIdx);
   if (childrenKeyIdx === -1) return null;
-  const open = text.indexOf('[', childrenKeyIdx);
+
+  const after = text.slice(childrenKeyIdx + 'children:'.length);
+  const inline = after.match(/^\s*\[/);
+
+  if (inline) {
+    const open = childrenKeyIdx + 'children:'.length + inline[0].length - 1;
+    const close = matchingBracket(text, open, '[', ']');
+    if (close === -1) return null;
+    return { start: open, end: close + 1, text: text.slice(open, close + 1) };
+  }
+
+  // A reference: resolve the hoisted `const <name> = [ ... ]`.
+  const ref = after.match(/^\s*([A-Za-z_$][\w$]*)\s*,/);
+  if (!ref) return null;
+  const declIdx = text.search(new RegExp(`const\\s+${ref[1]}\\s*=\\s*\\[`));
+  if (declIdx === -1) return null;
+  const open = text.indexOf('[', declIdx);
   const close = matchingBracket(text, open, '[', ']');
-  if (open === -1 || close === -1) return null;
+  if (close === -1) return null;
   return { start: open, end: close + 1, text: text.slice(open, close + 1) };
 }
 
@@ -120,15 +154,15 @@ function extractRouteEntries(blockText) {
 
 // ─── 1 & 2. parse the web: router.tsx and BottomNav.tsx ────────────────────
 
-const tabShell = childrenBlock(routerSrc, "'/',");
-const adminShell = childrenBlock(routerSrc, "'/admin',");
+const tabShell = childrenBlock(routerSrc, 'element: <AppShell />');
+const adminShell = childrenBlock(routerSrc, 'element: <AdminShell />');
 
 if (!tabShell) {
-  fail('PARSE FAILURE: could not find the AppShell ("path: \'/\',") children block in router.tsx. ' +
+  fail('PARSE FAILURE: could not find the AppShell ("element: <AppShell />") children block in router.tsx. ' +
     'The route table shape changed — update check-parity.mjs, do not let this pass silently.');
 }
 if (!adminShell) {
-  fail('PARSE FAILURE: could not find the AdminShell ("path: \'/admin\',") children block in router.tsx.');
+  fail('PARSE FAILURE: could not find the AdminShell ("element: <AdminShell />") children block in router.tsx.');
 }
 
 // Every route entry carries a `fullPath` computed for its own category — the raw `path:` capture

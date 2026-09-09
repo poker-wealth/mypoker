@@ -77,6 +77,54 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   // the banner should come down. Only transport failures mean "no connection".
   onReachabilityChange?.(true);
 
+  return toResult<T>(res, path, anonymous);
+}
+
+interface UploadOptions {
+  /** The real content type of the bytes — best-effort; the server never trusts it (see avatar-processing.ts). */
+  contentType: string;
+  signal?: AbortSignal;
+}
+
+/**
+ * Raw-bytes POST — distinct from `request` because the body IS the payload
+ * and must reach the server byte-for-byte, not be `JSON.stringify`'d. Used by
+ * avatar upload, whose gateway route reads the exact posted bytes and sniffs
+ * their real format itself; wrapping them in JSON here would just hand the
+ * server a string to un-wrap for no benefit.
+ */
+async function requestUpload<T>(path: string, body: Blob, options: UploadOptions): Promise<T> {
+  const { contentType, signal } = options;
+  const headers: Record<string, string> = { 'content-type': contentType };
+  if (authToken) headers.authorization = `Bearer ${authToken}`;
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      method: 'POST',
+      headers,
+      body,
+      ...(signal ? { signal } : {}),
+    });
+  } catch (cause) {
+    onReachabilityChange?.(false);
+    throw new ApiError(0, `Cannot reach the server at ${API_URL}`, cause);
+  }
+
+  onReachabilityChange?.(true);
+  return toResult<T>(res, path);
+}
+
+/**
+ * Shared response handling for both `request` and `requestUpload`.
+ *
+ * `anonymous` has to be passed in rather than read from an outer scope: this
+ * function was extracted so uploads could share it, and the 401 rule below
+ * depends on whether the call carried a token. Defaulting to `false` keeps the
+ * authenticated behaviour — drop the session on a 401 — for `requestUpload`,
+ * which is never anonymous.
+ */
+async function toResult<T>(res: Response, path: string, anonymous = false): Promise<T> {
   let parsed = false;
   const payload: unknown = await res
     .json()
@@ -97,10 +145,6 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     throw new ApiError(res.status, message, payload);
   }
 
-  // A 2xx that isn't JSON is not a success. The SPA fallback answers any
-  // unrouted path with index.html and a 200, so an endpoint that doesn't exist
-  // would otherwise resolve to `null` typed as whatever the caller expected —
-  // and blow up later, far from the cause, on the first property access.
   if (!parsed) {
     throw new ApiError(res.status, `Expected JSON from ${path} but got ${res.headers.get('content-type') ?? 'no content-type'}`);
   }
@@ -115,4 +159,6 @@ export const api = {
     request<T>(path, { ...options, method: 'POST', body }),
   patch: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
     request<T>(path, { ...options, method: 'PATCH', body }),
+  /** Raw-bytes POST — see `requestUpload`. */
+  upload: <T>(path: string, body: Blob, options: UploadOptions) => requestUpload<T>(path, body, options),
 };

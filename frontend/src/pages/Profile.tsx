@@ -18,10 +18,11 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { Avatar } from '@/components/ui/Avatar';
 import { LanguageSheet } from '@/components/LanguageSheet';
 import { GoogleAuthButton } from '@/components/GoogleAuthButton';
 import { useSession } from '@/store/session';
-import { useBalance, useVip, useUnreadCount } from '@/api/hooks';
+import { useBalance, useVip, useUnreadCount, useSettings } from '@/api/hooks';
 import { moneyFromDecimal } from '@/lib/money';
 import { isTelegram, haptic } from '@/lib/telegram';
 import { SUPPORT_URL } from '@/config';
@@ -52,7 +53,6 @@ import { cn } from '@/lib/cn';
  *   you try to withdraw.
  */
 export function Profile() {
-  const navigate = useNavigate();
   const { t } = useTranslation();
   const { player, status, error, signIn, signOut } = useSession();
   const signedIn = status === 'authenticated' && player !== null;
@@ -60,7 +60,7 @@ export function Profile() {
 
   return (
     <div className="space-y-4 pb-2">
-      <Identity signedIn={signedIn} onSettings={() => navigate('/settings')} />
+      <Identity signedIn={signedIn} />
 
       {signedIn && <BalanceCard />}
 
@@ -101,23 +101,17 @@ export function Profile() {
 
 // ── Identity ─────────────────────────────────────────────────────────────────
 
-function Identity({ signedIn, onSettings }: { signedIn: boolean; onSettings: () => void }) {
+function Identity({ signedIn }: { signedIn: boolean }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const player = useSession((s) => s.player);
   const vip = useVip();
+  const settings = useSettings();
 
   return (
     <section>
-      <div className="flex items-center justify-between px-1 pb-3">
+      <div className="px-1 pb-3">
         <span className="text-sm font-bold">{t('nav.account')}</span>
-        <button
-          onClick={onSettings}
-          className="rounded-lg p-1.5 text-dim active:bg-surface-2"
-          aria-label={t('account.settings')}
-        >
-          <SettingsIcon size={18} />
-        </button>
       </div>
 
       <button
@@ -125,21 +119,15 @@ function Identity({ signedIn, onSettings }: { signedIn: boolean; onSettings: () 
         disabled={!signedIn}
         className="flex w-full items-center gap-3 text-left"
       >
-        {signedIn && player?.photoUrl ? (
-          <img
-            src={player.photoUrl}
-            alt=""
-            className="size-16 shrink-0 rounded-full object-cover"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <div
-            className="grid size-16 shrink-0 place-items-center rounded-full text-xl font-black text-white"
-            style={{ backgroundImage: 'var(--brand-gradient)' }}
-          >
-            {signedIn && player ? player.displayName.charAt(0).toUpperCase() : 'M'}
-          </div>
-        )}
+        <Avatar
+          avatarId={signedIn ? settings.data?.avatarId : null}
+          playerId={signedIn ? player?.playerId : null}
+          photoUrl={signedIn ? player?.photoUrl : null}
+          // 'M' (brand initial), not the translated "Guest" word's initial —
+          // matches Header.tsx's own untranslated 'MYPOKER' brand fallback.
+          name={signedIn && player ? player.displayName : 'M'}
+          size={64}
+        />
 
         <div className="min-w-0 flex-1">
           <div className="truncate text-base font-bold">
@@ -309,7 +297,7 @@ function Menu({
       <Row
         icon={<User size={17} className="text-dim" />}
         title={t('account.personalInfo')}
-        onClick={() => navigate('/settings')}
+        onClick={() => navigate('/personal')}
       />
       <Row
         icon={<Crown size={17} className="text-jackpot" />}

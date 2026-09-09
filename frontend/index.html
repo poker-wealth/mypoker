@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
-    <meta name="theme-color" content="#0d0d1a" />
+    <meta name="theme-color" content="#0c0c0c" />
     <link rel="icon" type="image/png" href="/brand/logo-icon.png" />
     <title>MYPOKER — Fair. On-Chain. Always.</title>
     <!-- Google Fonts: Nunito, Lora, Inter, Poppins -->
@@ -29,6 +29,15 @@
       request, and if it lands late the page would flash white before it applies.
       Everything below is therefore duplicated from index.css rather than shared.
       If the brand colours change, this block changes too.
+
+      That sentence was here, correct, and did not work: the v3 repalette moved
+      --bg and --brand and left this block on the old violet, so every cold
+      start flashed the previous brand before the app painted. The audit that
+      should have caught it grepped src/ — and this file is not in src/.
+
+      So it is a check now, not a request: `npm run check:splash` reads --bg out
+      of index.css and fails if this block or mobile/app.json disagrees. See
+      frontend/scripts/check-splash.mjs.
     -->
     <style>
       #splash {
@@ -40,7 +49,7 @@
         align-items: center;
         justify-content: center;
         gap: 1.75rem;
-        background: #0d0d1a;
+        background: #0c0c0c;
         opacity: 1;
         transition: opacity 320ms ease-out;
       }
@@ -58,7 +67,7 @@
       #splash-mark {
         width: min(50vw, 220px);
         height: auto;
-        filter: drop-shadow(0 0 28px rgb(187 92 246 / 0.45));
+        filter: drop-shadow(0 0 28px rgb(217 184 124 / 0.45));
         animation: splash-turn 3.4s linear infinite;
       }
       @keyframes splash-in {

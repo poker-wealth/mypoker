@@ -8,20 +8,37 @@
  * Dark only for now. The Mini App supports both themes; matching that here is
  * real work (every screen, both palettes) and belongs in its own change rather
  * than half-done in the shell.
+ *
+ * v3 (Sep 2026): repaletted to the HHPoker reference per Operating Guide v3.0.
+ * See docs/REFERENCE-STUDY-HH.md §1 and §14.1. Values are eyeballed from
+ * screenshots, not sampled.
+ *
+ * DELIBERATELY ABSENT, so the next person does not think they were forgotten:
+ * the web also defines --brand-strong, --brand-2, --info, --ground-config,
+ * --felt, --felt-casino, --coin-gold, --coin-green and --brand-gradient.
+ * Nothing in this app reads them yet — mobile draws its felt from
+ * `src/table/tableDesigns.ts`, not from a token — so adding them here would be
+ * dead values that drift from the web unnoticed. Add one WHEN a screen uses it.
  */
 export const theme = {
-  bg: '#0d0d1a',
-  surface: '#17172b',
-  surface2: '#21213a',
-  border: '#2c2c48',
-  text: '#f2f2fa',
-  dim: '#9797b8',
-  brand: '#bb5cf6',
-  accent: '#00d4ff',
+  bg: '#0c0c0c',
+  surface: '#1a1a1a',
+  surface2: '#242424',
+  border: '#33302b',
+  text: '#f5efe3',
+  dim: '#9a9182',
+  /** Gold. Chrome now — nav, icons, active states. It no longer means money. */
+  brand: '#d9b87c',
+  /** Copper. Button outlines and secondary emphasis. */
+  accent: '#c87a3a',
   success: '#3fd07a',
   danger: '#f85677',
-  /** Jackpots only. Never chrome, never admin. */
-  jackpot: '#f5b93b',
+  /**
+   * Pots and diamond balances. Cyan, not gold — HH makes gold its chrome
+   * colour, so money had to move or the signal would be spent on furniture.
+   * Still the rule: whatever wears this is money. Never chrome, never admin.
+   */
+  jackpot: '#4fd1e0',
 } as const;
 
 /**

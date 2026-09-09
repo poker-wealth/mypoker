@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Volume2, Vibrate, Trophy, Wallet, Megaphone, Languages, ShieldCheck, LifeBuoy, Sun, Moon, User, LogOut } from 'lucide-react';
+import { Volume2, Vibrate, Trophy, Wallet, Megaphone, Languages, ShieldCheck, LifeBuoy, Sun, Moon, LogOut } from 'lucide-react';
 import { ListRow } from '@/components/ui/ListRow';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Switch } from '@/components/ui/Switch';
+import { Avatar } from '@/components/ui/Avatar';
 import { LanguageSheet } from '@/components/LanguageSheet';
 import { useSettings, useUpdateSettings } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
@@ -15,7 +16,7 @@ import { useTheme } from '@/store/theme';
 import { SUPPORT_URL } from '@/config';
 import { LANGUAGES } from '@/i18n/languages';
 import { toast } from '@/store/toast';
-import type { PlayerSettings } from '@/api/settings';
+import type { SettingsPatch } from '@/api/settings';
 
 /**
  * Settings — account-scoped, so preferences follow the player to a new device.
@@ -41,7 +42,7 @@ export function Settings() {
 
   const currentLanguage = LANGUAGES.find((l) => l.code === i18n.resolvedLanguage)?.label ?? '';
 
-  const set = (patch: Partial<PlayerSettings>): void => {
+  const set = (patch: SettingsPatch): void => {
     update.mutate(patch);
   };
 
@@ -159,11 +160,13 @@ export function Settings() {
           <ListRow
             title={player.displayName}
             leading={
-              player.photoUrl ? (
-                <img src={player.photoUrl} alt="" className="size-[18px] rounded-full object-cover" referrerPolicy="no-referrer" />
-              ) : (
-                <User size={18} className="text-brand" />
-              )
+              <Avatar
+                avatarId={settings.data?.avatarId}
+                playerId={player.playerId}
+                photoUrl={player.photoUrl}
+                name={player.displayName}
+                size={18}
+              />
             }
             value={player.username ? `@${player.username}` : `ID: ${player.playerId.slice(0, 14)}…`}
           />

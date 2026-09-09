@@ -18,6 +18,20 @@ import { tableCommandSchema, type TableSummary } from './room-state';
 export type TokenVerifier = (token: string) => { playerId: string };
 
 /**
+ * May this player reach this table at all?
+ *
+ * Supplied by the gateway (`gateway/table-access.ts`), which owns the policy;
+ * the hub only asks. Same shape and same reasoning as `TokenVerifier` above —
+ * one rule, both surfaces — so a private table refuses a stranger on the socket
+ * for the same reason the REST API would.
+ *
+ * Optional, and absent means "no opinion, allow": every existing caller (eleven
+ * test files and `mount.ts`) predates this and must keep working. The tables it
+ * actually guards are registered explicitly, so silence here is not a hole.
+ */
+export type TableGuard = (tableId: string, playerId: string) => boolean;
+
+/**
  * TableHub — the live tables and the socket in front of them.
  *
  * It owns the room list and translates the transport's three verbs (`join` / `action` / `leave`)
@@ -43,13 +57,57 @@ export class TableHub {
     verifyToken: TokenVerifier,
     /** Optional connection log — see `GameSocketServerConfig.onEvent`. */
     onEvent?: GameSocketServerConfig['onEvent'],
+    /** Whether a player may hold a socket — see `GameSocketServerConfig.authorizeSession`. */
+    authorizeSession?: GameSocketServerConfig['authorizeSession'],
+    /** Optional private-table guard — see `TableGuard`. */
+    private readonly mayJoin?: TableGuard,
   ) {
     this.socket = new GameSocketServer({
       verifyToken,
       onInbound: (ctx, msg): Promise<void> => this.onInbound(ctx, msg),
       onClose: (ctx): void => this.onClose(ctx),
       ...(onEvent ? { onEvent } : {}),
+      ...(authorizeSession ? { authorizeSession } : {}),
     });
+  }
+
+  /**
+   * Remove a player from the felt right now: stand them up, then drop their
+   * sockets.
+   *
+   * The handshake gate only stops the NEXT connection. A player already seated
+   * when the ban lands keeps their socket, and with it their seat and their
+   * turn — so a suspension applied mid-session did nothing until they happened
+   * to reconnect. Called by the admin suspend route.
+   *
+   * Order matters. Standing up first releases the seat through the room's own
+   * path — chips returned, §8.1 freed — so a later reconnect is not refused at
+   * every table by a seat nobody is sitting in. Closing the socket first would
+   * leave that seat held by a connection that no longer exists.
+   *
+   * Returns what it did, so the route can say so rather than claim it.
+   */
+  async evict(playerId: string, reason = 'suspended'): Promise<{ stoodUp: boolean; socketsClosed: number }> {
+    let stoodUp = false;
+    for (const room of this.rooms.values()) {
+      if (!room.hasSeated(playerId)) continue;
+      try {
+        await room.command(playerId, { kind: 'stand' });
+        stoodUp = true;
+      } catch (err) {
+        // A room that refuses the stand (mid-hand rules, say) must not stop the
+        // socket from closing — the point is to get them off the felt.
+        console.error(`[evict] ${playerId} could not stand at ${room.summary().tableId}:`, err);
+      }
+    }
+
+    let socketsClosed = 0;
+    for (const ctx of [...this.subscriptions.keys()]) {
+      if (ctx.session.playerId !== playerId) continue;
+      ctx.close(reason);
+      socketsClosed += 1;
+    }
+    return { stoodUp, socketsClosed };
   }
 
   /** Open a table. The `game` on the config selects which room implementation runs it. The config
@@ -68,6 +126,26 @@ export class TableHub {
 
   tables(): TableSummary[] {
     return [...this.rooms.values()].map((room) => room.summary());
+  }
+
+  /**
+   * The table this player is seated at, or null.
+   *
+   * The hub is the only party that can answer this — a room can vouch for its
+   * own seats and nothing else. Two callers need it and they must agree:
+   * the sit refusal below, which has to NAME the table it is talking about,
+   * and the lobby, which marks the row so the player does not have to
+   * remember. One account can be seated at one table (§8.1), so this returns
+   * at most one.
+   */
+  seatedAt(playerId: string): { tableId: string; name: string } | null {
+    for (const room of this.rooms.values()) {
+      if (room.hasSeated(playerId)) {
+        const s = room.summary();
+        return { tableId: s.tableId, name: s.name };
+      }
+    }
+    return null;
   }
 
   /** Start the WebSocket listener on its own port. */
@@ -94,6 +172,20 @@ export class TableHub {
     const room = this.rooms.get(msg.roomId);
     if (!room) return ctx.send({ type: 'error', message: `unknown table: ${msg.roomId}` });
     const playerId = ctx.session.playerId;
+
+    // Private-table access, checked HERE — above the switch, not inside a case.
+    //
+    // There are two doors into a table on this rail and they are independent:
+    // `join` subscribes you to snapshots, and `action` acts on the room without
+    // ever consulting whether you joined. Guarding `join` alone would leave
+    // `action: sit` wide open, which is TRAPS §20 and §23 exactly ("a rule
+    // enforced on one door is not enforced", twice already in this codebase).
+    //
+    // So the check sits at the single point every inbound message passes. A
+    // fourth verb added later inherits it without anyone remembering to.
+    if (this.mayJoin && !this.mayJoin(msg.roomId, playerId)) {
+      return ctx.send({ type: 'error', message: 'this table needs its invite code' });
+    }
 
     switch (msg.type) {
       case 'join': {
@@ -148,13 +240,16 @@ export class TableHub {
         // playing several at once, which is the classic multi-boxing tell the
         // anti-bot section exists to prevent.
         if (parsed.data.kind === 'sit') {
-          const seatedElsewhere = [...this.rooms.values()].some(
-            (r) => r !== room && r.hasSeated(playerId),
-          );
-          if (seatedElsewhere) {
+          const elsewhere = this.seatedAt(playerId);
+          if (elsewhere && elsewhere.tableId !== room.summary().tableId) {
+            // NAME THE TABLE. This used to read "stand up at your other table
+            // first" and stop there — true, and useless against thirteen
+            // tables when you cannot remember which one you sat at. The rule
+            // is right; being told which table to go to is what turns a wall
+            // into a direction.
             return ctx.send({
               type: 'error',
-              message: 'one table at a time — stand up at your other table first',
+              message: `one table at a time — stand up at ${elsewhere.name} first`,
             });
           }
         }
