@@ -46,12 +46,19 @@ export function PlayerSeat({ seat, align = 'bottom', onSit, onClick, accent = 'v
     // seated (or watching a table you cannot join) `onSit` is absent, and a ring of "+ SIT HERE"
     // buttons that do nothing is just noise on the felt. `onClick` is the challenge handler and
     // never sits anyone down, so it does not count.
+    // Both states are a dashed ring with a word in it, the way the reference
+    // table draws an unoccupied chair — the difference is whether it is offering
+    // you something. A blank circle read as a rendering gap rather than a seat.
+    const emptySeat = cn(
+      AVATAR,
+      'grid place-items-center rounded-full border-dashed text-center text-[0.58rem] font-bold leading-tight tracking-wide',
+    );
+
     if (!onSit) {
       return (
-        <div
-          className={cn(AVATAR, 'rounded-full border border-dashed border-white/15 bg-black/20')}
-          aria-hidden
-        />
+        <div className={cn(emptySeat, 'border border-white/15 bg-black/20 text-white/35')}>
+          {t('table.seatEmpty')}
+        </div>
       );
     }
 
@@ -60,9 +67,9 @@ export function PlayerSeat({ seat, align = 'bottom', onSit, onClick, accent = 'v
         whileTap={{ scale: 0.93 }}
         onClick={onSit ?? onClick}
         className={cn(
-          AVATAR,
-          'grid place-items-center rounded-full border-[1.5px] border-dashed text-[0.6rem] font-black leading-tight tracking-wider backdrop-blur-md transition-all hover:opacity-100 shadow-md',
-          'opacity-90 hover:scale-105',
+          emptySeat,
+          'border-[1.5px] font-black backdrop-blur-md shadow-md transition-all',
+          'opacity-90 hover:scale-105 hover:opacity-100',
         )}
         style={{
           borderColor: accent,
@@ -70,9 +77,7 @@ export function PlayerSeat({ seat, align = 'bottom', onSit, onClick, accent = 'v
           background: `color-mix(in srgb, ${accent} 20%, rgba(0,0,0,0.6))`,
         }}
       >
-        + SIT
-        <br />
-        HERE
+        {t('table.seatOpen')}
       </motion.button>
     );
   }

@@ -65,6 +65,14 @@ export interface FairnessSnapshot {
 export interface TableSnapshot {
   tableId: string;
   name: string;
+  /** Which game this table hosts — the hub stamps it; the felt is picked from
+   *  it when the table id is a created `t-…` one the registry can't name. */
+  game?: string;
+  /** Manual-start table still waiting for its owner; `isOwner` marks who may press go. */
+  awaitingStart?: boolean;
+  isOwner?: boolean;
+  /** This table bans same-GPS seating — attach a location to the sit command. */
+  gpsRequired?: boolean;
   variant: string;
   smallBlind: number;
   bigBlind: number;
@@ -169,8 +177,11 @@ export interface TableAction {
 }
 
 export type TableCommand =
-  | { kind: 'sit'; seat: number; buyIn: number }
+  /** `gps` rides along on tables that ban same-GPS seating (see `gpsRequired`). */
+  | { kind: 'sit'; seat: number; buyIn: number; name?: string; avatarUrl?: string; gps?: string }
   | { kind: 'stand' }
+  /** Owner of a manual-start table says go. The server checks who is asking. */
+  | { kind: 'start_game' }
   | { kind: 'act'; action: TableAction }
   | { kind: 'sitOut' }
   | { kind: 'sitIn' }

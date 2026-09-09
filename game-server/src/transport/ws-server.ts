@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { Server as HttpServer } from 'node:http';
+import type { IncomingMessage, Server as HttpServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { WebSocketServer, WebSocket } from 'ws';
 import { generateEphemeralKeyPair, deriveSessionKey } from './crypto';
@@ -24,8 +24,22 @@ import {
 
 export interface ClientContext {
   readonly session: Session;
+  /**
+   * Where this connection comes from: the first hop of `x-forwarded-for` when
+   * a proxy (Heroku's router) put one there, else the socket's own address.
+   * Read at the upgrade — never from anything the client sends afterwards.
+   * Undefined only when the socket is gone before we asked.
+   */
+  readonly ip?: string;
   send(msg: Outbound): void;
   close(reason?: string): void;
+}
+
+/** The connection's network address, proxy-aware. Exported for the tests. */
+export function connectionIp(req: IncomingMessage | undefined): string | undefined {
+  const forwarded = req?.headers['x-forwarded-for'];
+  const first = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0]?.trim();
+  return first || req?.socket?.remoteAddress || undefined;
 }
 
 export interface GameSocketServerConfig {
@@ -69,7 +83,7 @@ export class GameSocketServer {
   async listen(port = 0): Promise<number> {
     this.wss = new WebSocketServer({ port, maxPayload: MAX_MESSAGE_BYTES });
     await new Promise<void>((resolve) => this.wss!.once('listening', resolve));
-    this.wss.on('connection', (ws) => this.handleConnection(ws));
+    this.wss.on('connection', (ws, req) => this.handleConnection(ws, req));
     return (this.wss.address() as AddressInfo).port;
   }
 
@@ -83,7 +97,7 @@ export class GameSocketServer {
       ...(path ? { path } : {}),
       maxPayload: MAX_MESSAGE_BYTES,
     });
-    this.wss.on('connection', (ws) => this.handleConnection(ws));
+    this.wss.on('connection', (ws, req) => this.handleConnection(ws, req));
   }
 
   async close(): Promise<void> {
@@ -95,7 +109,8 @@ export class GameSocketServer {
     this.wss = undefined;
   }
 
-  private handleConnection(ws: WebSocket): void {
+  private handleConnection(ws: WebSocket, req?: IncomingMessage): void {
+    const ip = connectionIp(req);
     const { privateKey, publicKeyB64 } = generateEphemeralKeyPair();
     const connectionId = randomUUID();
     let session: Session | undefined;
@@ -142,6 +157,7 @@ export class GameSocketServer {
       clearTimeout(handshakeTimer);
       ctx = {
         session,
+        ...(ip ? { ip } : {}),
         send: (msg): void => sendRaw(session!.signOutbound(JSON.stringify(msg))),
         close,
       };

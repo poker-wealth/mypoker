@@ -46,6 +46,22 @@ export interface PokerVariant {
    * NO_LIMIT, which is Hold'em and Short Deck.
    */
   limit?: BetLimit;
+  /**
+   * The most chairs a table of this variant may have. THE one source of truth —
+   * every path that creates a table checks this, and the lobby catalogue is
+   * derived from it.
+   *
+   * The number is set by the FELT, not by the rules. Each design in
+   * `frontend/src/lib/tableDesigns.ts` defines seat positions per count, and
+   * only up to a point: the portrait stadium felt defines 2–6, the wide felt
+   * 2–8. Ask for more than that and `ringFor` falls through to an evenly-spaced
+   * circle, which on an oval felt drops players into the middle of the table
+   * instead of onto the rail.
+   *
+   * So RAISING one of these is not a one-line change here — it needs the rings
+   * for that count to exist first. Lowering one is free.
+   */
+  maxSeats: number;
 }
 
 export const TEXAS: PokerVariant = {
@@ -54,6 +70,9 @@ export const TEXAS: PokerVariant = {
   holeCards: 2,
   deckFor: (seed) => shuffle(standardDeck(), seed),
   evaluate: (hole, board) => evaluateBest([...hole, ...board], STANDARD_RULES),
+  // Portrait stadium felt, now carrying rings for 2..8 — three seats down each
+  // long rail plus the two rounded ends.
+  maxSeats: 8,
 };
 
 export const SHORT_DECK: PokerVariant = {
@@ -63,6 +82,8 @@ export const SHORT_DECK: PokerVariant = {
   deckFor: (seed) => shuffle(shortDeck(), seed),
   // Short-deck rules: flush beats full house, and A-6-7-8-9 is the low straight.
   evaluate: (hole, board) => evaluateBest([...hole, ...board], SHORT_DECK_RULES),
+  // Wide landscape felt: `wideRings` defines 2..8.
+  maxSeats: 8,
 };
 
 export const OMAHA: PokerVariant = {
@@ -75,6 +96,8 @@ export const OMAHA: PokerVariant = {
   // Omaha is POT-limit. With four hole cards everyone flops something, and
   // no-limit sizing on top of that turns every board into a shove-or-fold.
   limit: 'POT_LIMIT',
+  // Wide landscape felt, same as Short Deck.
+  maxSeats: 8,
 };
 
 export const VARIANTS: Readonly<Record<VariantId, PokerVariant>> = {

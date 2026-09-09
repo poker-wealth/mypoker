@@ -19,15 +19,67 @@ export interface CreatedTable {
   visibility: TableVisibility;
 }
 
-/** Open a table. v1 is Hold'em only; the `game` field leaves room to widen. */
+/** The poker variants — the games with the full create-options screen. */
+export type PlayerPokerGame = 'texas' | 'short-deck' | 'omaha';
+
+/**
+ * Every game a player may open a table for. Poker variants take the full
+ * options screen; the rest open as a fresh copy of that game's house table
+ * (the server ignores the poker-only fields for them).
+ */
+export type PlayerTableGame =
+  | PlayerPokerGame
+  | 'baccarat'
+  | 'niu-niu'
+  | 'san-zhang'
+  | 'red-packet'
+  | 'cowboy-beauty'
+  | 'dou-di-zhu'
+  | 'lottery'
+  | 'slots'
+  | 'texas-cowboy';
+
+/** Open a table, with the settings the creator chose. */
 export const createPlayerTableApi = (body: {
-  game?: 'texas';
+  game?: PlayerTableGame;
   visibility: TableVisibility;
   /**
-   * Chairs at the table, 2–6 — not players required. Two ready players deal a
-   * hand whatever this is; the remaining chairs wait for someone to take one.
-   * The server clamps it, so an out-of-range value is refused rather than
-   * silently producing a table the felt cannot draw.
+   * Chairs at the table — not players required. Two ready players deal a hand
+   * whatever this is; the remaining chairs wait for someone to take one.
+   *
+   * The ceiling is per game and belongs to the felt, not to the rules: a design
+   * places seats up to a point and no further. The server refuses anything
+   * above it rather than producing a table the felt cannot draw.
    */
   seats?: number;
+  /** Chips, not currency — 1 chip = $0.01. The small blind must be the smaller. */
+  smallBlind?: number;
+  bigBlind?: number;
+  /**
+   * Minimum buy-in in BIG BLINDS, so it means the same thing at every stake.
+   * The server derives the chip figures and allows up to 10x for the maximum.
+   */
+  buyInBB?: number;
+  /** Maximum buy-in in big blinds. Absent keeps the server's 10x spread. */
+  buyInMaxBB?: number;
+
+  // ── Game options (the create-a-game screen) — all default to off/normal. ──
+  /** Forced ante, chips, dead into the pot before the blinds. */
+  ante?: number;
+  /** UTG posts a live 2×BB straddle each hand. */
+  straddle?: boolean;
+  /** Every action is the whole stack or the muck. Refused for pot-limit games. */
+  allInOrFold?: boolean;
+  /** Your own cards stay face-down preflop until it is your turn to act. */
+  hideHoleCards?: boolean;
+  /** false → "restricting onlookers": only seated players receive the table. */
+  spectatorsAllowed?: boolean;
+  /** false → this table never offers insurance. */
+  insuranceEnabled?: boolean;
+  /** Refuse a seat when a seated player shares the connection's IP. */
+  banSameIp?: boolean;
+  /** Refuse a seat when a seated player shares the reported GPS point. */
+  banSameGps?: boolean;
+  /** Seated players required before the first hand deals (2..seats). */
+  autoStartPlayers?: number;
 }): Promise<CreatedTable> => api.post<CreatedTable>('/tables', body);

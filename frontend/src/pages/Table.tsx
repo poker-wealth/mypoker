@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, Volume2, VolumeX, Settings2, Wifi, WifiOff, MessageSquare } from 'lucide-react';
+import { ChevronLeft, Volume2, VolumeX, Settings2, Wifi, WifiOff, MessageSquare, List as ListIcon, Spade, Mic } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { PokerTable } from '@/components/poker/PokerTable';
 import { ActionBar } from '@/components/poker/ActionBar';
@@ -139,7 +139,10 @@ function LiveTable({ tableId }: { tableId: string }) {
   // table, not a skin. Games without one leave the player's choice alone.
   const gameDesign = designForGame(tableId, snapshot?.variant, chosenDesign);
   const playersReady = snapshot?.seats.filter((s) => s.status !== 'sittingout').length ?? 0;
-  const Felt = feltFor(tableId);
+  // By table id for the fixed tables; by the snapshot's game for created
+  // `t-…` ones — without the fallback a player-created baccarat table dealt
+  // community cards on the poker felt.
+  const Felt = feltFor(tableId) ?? (snapshot?.game ? feltFor(snapshot.game) : undefined);
 
   return (
     <div
@@ -166,6 +169,16 @@ function LiveTable({ tableId }: { tableId: string }) {
         ) : (
           <PokerTable
             state={view}
+            {...(snapshot
+              ? {
+                  info: {
+                    name: snapshot.name,
+                    tableId: snapshot.tableId,
+                    smallBlind: snapshot.smallBlind,
+                    bigBlind: snapshot.bigBlind,
+                  },
+                }
+              : {})}
             // The game brings its own felt where it has one — Short Deck is a
             // different table, not a skin of Hold'em — and that wins over the
             // picker. Games with no felt of their own leave the choice alone.
@@ -175,26 +188,6 @@ function LiveTable({ tableId }: { tableId: string }) {
           />
         )}
         
-        {/* Floating Chat Toggle Button */}
-        <button
-          onClick={() => setChatOpen((o) => !o)}
-          aria-label={unread > 0 ? t('table.chatUnread', { count: unread }) : t('table.chat')}
-          className={`absolute bottom-[4.5rem] right-4 grid size-12 place-items-center rounded-full shadow-2xl border border-border transition-colors z-50 ${
-            chatOpen ? 'bg-brand text-brand-fg' : 'bg-surface text-dim hover:text-text'
-          }`}
-        >
-          <MessageSquare size={20} />
-          {/* Unread count. Without it an incoming message was invisible — the
-              drawer is closed by default, so a player could be spoken to all
-              session and never know. Capped at 9+ so the badge stays a dot-sized
-              thing on the rim rather than growing into the button. */}
-          {unread > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 grid min-w-[1.15rem] place-items-center rounded-full bg-danger px-1 text-[0.62rem] font-black leading-[1.15rem] text-white shadow-lg ring-2 ring-bg">
-              {unread > 9 ? '9+' : unread}
-            </span>
-          )}
-        </button>
-
         {/* Chat Drawer Overlay */}
         <AnimatePresence>
           {chatOpen && (
@@ -278,6 +271,24 @@ function LiveTable({ tableId }: { tableId: string }) {
             />
             <ActionBar state={view} onAction={live.heroAct} />
           </>
+        ) : snapshot?.awaitingStart ? (
+          // A manual-start table ("auto-start: None"): the owner gets the
+          // button; everyone else gets told what the wait is.
+          <div className="flex items-center gap-2">
+            <div className="flex-1 text-[0.8rem] text-dim">
+              {snapshot.isOwner ? t('table.startWhenReady') : t('table.waitingOwner')}
+            </div>
+            {snapshot.isOwner && (
+              <button
+                type="button"
+                disabled={playersReady < 2}
+                onClick={() => live.command({ kind: 'start_game' })}
+                className="rounded-(--radius-app) bg-gold px-6 py-2 text-sm font-bold text-bg transition active:scale-[0.98] disabled:opacity-50"
+              >
+                {t('table.startGame')}
+              </button>
+            )}
+          </div>
         ) : seated ? (
           <div className="flex items-center gap-2">
             <div className="flex-1 text-[0.8rem] text-dim">
@@ -332,11 +343,41 @@ function LiveTable({ tableId }: { tableId: string }) {
                 : t('table.connectingTable')}
           </div>
         )}
+
+        {/* The reference app's bottom toolbar: table options, fairness, voice,
+            chat. Every icon does something real — the mic and the bubble both
+            reach the chat drawer, where the recorder lives. */}
+        <div className="mt-1 flex items-center justify-between border-t border-border/50 pt-1.5">
+          <ToolbarIcon label={t('table.tableDesign')} onClick={() => setDesignsOpen(true)}>
+            <ListIcon size={19} />
+          </ToolbarIcon>
+          <ToolbarIcon label={t('table.fairness')} onClick={() => navigate('/fairness')}>
+            <Spade size={19} />
+          </ToolbarIcon>
+          <ToolbarIcon label={t('table.voice')} onClick={() => setChatOpen(true)}>
+            <Mic size={19} />
+          </ToolbarIcon>
+          <ToolbarIcon
+            label={unread > 0 ? t('table.chatUnread', { count: unread }) : t('table.chat')}
+            onClick={() => setChatOpen((o) => !o)}
+          >
+            <MessageSquare size={19} />
+            {/* Unread count — the drawer is closed by default, so without the
+                badge a player could be spoken to all session and never know. */}
+            {unread > 0 && (
+              <span className="absolute -right-1 -top-1 grid min-w-[1.05rem] place-items-center rounded-full bg-danger px-1 text-[0.58rem] font-black leading-[1.05rem] text-white ring-2 ring-bg">
+                {unread > 9 ? '9+' : unread}
+              </span>
+            )}
+          </ToolbarIcon>
+        </div>
       </div>
 
       <BuyInSheet
         open={buyInFor !== false}
         onClose={() => setBuyInFor(false)}
+        tableName={snapshot?.name ?? ''}
+        smallBlind={snapshot?.smallBlind ?? 10}
         min={snapshot?.minBuyIn ?? 0}
         max={snapshot?.maxBuyIn ?? 0}
         bigBlind={snapshot?.bigBlind ?? 20}
@@ -399,6 +440,28 @@ function statusLine(
  * A game with no table behind it yet. Only Texas Hold'em is playable; the rest of the catalogue is
  * still tiles. Better to say so than to open a poker felt under a Baccarat heading.
  */
+/** One icon of the bottom toolbar — a plain tap target with room for a badge. */
+function ToolbarIcon({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className="relative grid h-10 flex-1 place-items-center text-dim transition-colors active:text-text"
+    >
+      {children}
+    </button>
+  );
+}
+
 function NoTableYet({ gameId }: { gameId: string | undefined }) {
   const navigate = useNavigate();
   const game = GAMES.find((g) => g.id === gameId);

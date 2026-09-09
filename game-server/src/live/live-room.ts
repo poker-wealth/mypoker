@@ -34,8 +34,13 @@ export interface RoomDeps {
 
 /** The contract `TableHub` drives, and the one thing every game's live room must satisfy. */
 export interface LiveRoom {
-  /** Subscribe a client to snapshots/events; returns an unsubscribe function. */
-  join(playerId: string, client: RoomSink): () => void;
+  /**
+   * Subscribe a client to snapshots/events; returns an unsubscribe function.
+   * `meta.ip` is the transport's word for where the connection comes from —
+   * rooms with same-IP seating rules read it; every other room ignores it,
+   * which is why it is optional on the interface.
+   */
+  join(playerId: string, client: RoomSink, meta?: { ip?: string }): () => void;
   /** Apply a player command (sit / act / stand / …). Rejects illegal moves; never trusts the client. */
   command(playerId: string, command: TableCommand): Promise<void>;
   /** The snapshot this player is allowed to see — their own cards, never an opponent's. */

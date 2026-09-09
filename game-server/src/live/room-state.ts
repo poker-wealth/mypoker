@@ -106,6 +106,14 @@ export interface JackpotWinSnapshot {
 export interface TableSnapshot {
   tableId: string;
   name: string;
+  /**
+   * Which game this table hosts (`GameId`) — stamped by the hub on the way to
+   * the socket, not built by the rooms, so it is present on live snapshots and
+   * absent from ones built in-process (tests calling `snapshotFor` directly).
+   * The client picks the felt from it when the table id says nothing (a
+   * player-created `t-…` table).
+   */
+  game?: string;
   variant: string;
   smallBlind: number;
   bigBlind: number;
@@ -161,6 +169,16 @@ export interface TableSnapshot {
    * starts, so the animation's own duration governs how long it plays.
    */
   jackpot: JackpotWinSnapshot | null;
+
+  /**
+   * A manual-start table (auto-start "None") still waiting for its owner to
+   * say go. Present only while true; `isOwner` rides with it so the one
+   * viewer who can press the button knows it is theirs.
+   */
+  awaitingStart?: boolean;
+  isOwner?: boolean;
+  /** This table bans same-GPS seating: attach a location to the sit command. */
+  gpsRequired?: boolean;
 
   /** Your seat index, or null if you're watching. */
   yourSeat: number | null;
@@ -309,6 +327,14 @@ export const tableCommandSchema = z.discriminatedUnion('kind', [
      */
     name: z.string().max(24).optional(),
     avatarUrl: z.string().url().max(300).optional(),
+    /**
+     * Client-reported GPS point (an opaque, already-rounded token — the client
+     * decides precision) for tables that ban same-GPS seating. Optional and
+     * trusted only as far as it goes: it can refuse the sender a seat, never
+     * earn them anything, so lying about it buys nothing except a refusal
+     * that would not have happened.
+     */
+    gps: z.string().max(40).optional(),
   }),
   z.object({ kind: z.literal('stand') }),
   z.object({ kind: z.literal('act'), action: betActionSchema }),
@@ -357,6 +383,12 @@ export const tableCommandSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('answer_challenge'), passed: z.boolean(), responseMs: z.number().nonnegative() }),
   /** Supply your own device-generated client seed (32 bytes hex) — your entropy for the shuffle. */
   z.object({ kind: z.literal('set_client_seed'), seed: z.string().regex(/^[0-9a-f]{64}$/i) }),
+  /**
+   * Start a manual (auto-start "None") table. Owner-only — the room checks the
+   * sender against its `ownerId`; the command carries nothing because there is
+   * nothing a client should get to say about it.
+   */
+  z.object({ kind: z.literal('start_game') }),
 ]);
 
 export type TableCommand = z.infer<typeof tableCommandSchema>;

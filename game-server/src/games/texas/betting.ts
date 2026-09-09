@@ -62,6 +62,43 @@ export interface BettingConfig {
   buttonIndex?: number;
   /** Defaults to NO_LIMIT, which is what every existing caller assumed. */
   limit?: BetLimit;
+  /**
+   * A forced bet every player posts before the blinds, dead into the pot.
+   *
+   * NOT a bet. It reaches `totalContributed` — so it is in the pot and in the
+   * side-pot arithmetic — and deliberately never reaches `streetContributed`,
+   * because chips a player owes nobody must not count toward what they have
+   * already put in for the current round. Post it through `commit` and the big
+   * blind would arrive holding an ante's worth of "call" it never made.
+   *
+   * Absent or 0 means no antes, which is every existing caller.
+   */
+  ante?: number;
+  /**
+   * UTG straddle: the seat after the big blind posts a LIVE 2×BB blind before
+   * the deal and buys the right to act last preflop, exactly as the big blind
+   * does without one.
+   *
+   * Table stakes double for the hand — the straddle becomes the bet to match,
+   * and the min-raise increment is the straddle itself (so the smallest raise
+   * is to 4×BB). The spec is silent on straddles; these are the reference
+   * app's rules, labelled here as the assumption they are.
+   *
+   * Ignored heads-up: with two players the "seat after the big blind" is the
+   * small blind again, and a forced double-blind war is not what anyone who
+   * toggled this on was asking for.
+   */
+  straddle?: boolean;
+  /**
+   * All-in or Fold: every decision is the whole stack or the muck.
+   *
+   * Enforced here, not just advertised in `legalActions` — checks are refused,
+   * a call is legal only when it already puts the caller all-in (a short stack
+   * calling a bigger shove), and the only legal raise is to exactly the
+   * player's all-in. Blinds and antes post normally; the discipline starts
+   * when the action does.
+   */
+  allInOrFold?: boolean;
 }
 
 interface Seat {
@@ -87,6 +124,7 @@ export class TexasBetting {
   private minRaise: number;
   private toActIndex = -1;
   private readonly limit: BetLimit;
+  private readonly allInOrFold: boolean;
 
   /**
    * The largest legal raise-TO for the player on the clock.
@@ -117,6 +155,7 @@ export class TexasBetting {
     this.bigBlind = cfg.bigBlind;
     this.minRaise = cfg.bigBlind;
     this.limit = cfg.limit ?? 'NO_LIMIT';
+    this.allInOrFold = cfg.allInOrFold ?? false;
     this.seats = players.map((p) => ({
       id: p.id,
       stack: p.stack,
@@ -126,14 +165,41 @@ export class TexasBetting {
       hasActed: false,
     }));
 
+    // Antes first, from everyone, before either blind. A short stack that cannot
+    // cover the ante posts what it has and is all-in before a card is dealt —
+    // `commitDead` clamps to the stack exactly like `commit` does.
+    const ante = cfg.ante ?? 0;
+    if (ante > 0) for (const seat of this.seats) this.commitDead(seat, ante);
+
     const sb = this.n === 2 ? this.button : (this.button + 1) % this.n;
     const bb = this.n === 2 ? (this.button + 1) % this.n : (this.button + 2) % this.n;
     this.postBlind(sb, this.smallBlind);
     this.postBlind(bb, this.bigBlind);
     this.currentBet = Math.max(this.seats[sb]!.streetContributed, this.seats[bb]!.streetContributed);
 
-    // First to act preflop: heads-up = button (SB); otherwise the seat after the big blind.
-    const firstPreflop = this.n === 2 ? this.button : (this.button + 3) % this.n;
+    // The straddle posts after the blinds and before anyone acts. Live, like a
+    // blind: it reaches streetContributed through the same postBlind path, so
+    // the straddler still gets their option when the action limps back around
+    // (nextActionableFrom sees hasActed === false, exactly as it does for the
+    // big blind). A short-stacked straddler posts what they have, and the bet
+    // to match never drops below the full big blind because of them.
+    const straddles = (cfg.straddle ?? false) && this.n >= 3;
+    if (straddles) {
+      const straddleSeat = (this.button + 3) % this.n;
+      this.postBlind(straddleSeat, this.bigBlind * 2);
+      this.currentBet = Math.max(
+        this.currentBet,
+        this.seats[straddleSeat]!.streetContributed,
+      );
+      // The straddle is the last full bet, so it sets the raise increment: the
+      // smallest raise-to is 4×BB, not 3×BB.
+      this.minRaise = this.bigBlind * 2;
+    }
+
+    // First to act preflop: heads-up = button (SB); otherwise the seat after
+    // the last forced bet — the big blind, or the straddle when there is one.
+    const firstPreflop =
+      this.n === 2 ? this.button : (this.button + (straddles ? 4 : 3)) % this.n;
     this.toActIndex = this.nextActionableFrom(firstPreflop);
   }
 
@@ -196,6 +262,23 @@ export class TexasBetting {
     const toCall = this.currentBet - seat.streetContributed;
     const maxRaiseTo = this.maxRaiseToFor(seat);
     const canRaise = maxRaiseTo > this.currentBet;
+    const allInTo = seat.streetContributed + seat.stack;
+
+    // All-in or Fold: two buttons. No checks; a call only when it IS the
+    // all-in (a short stack matching a bigger shove); the one legal raise is
+    // to exactly everything they have.
+    if (this.allInOrFold) {
+      const shoveIsRaise = allInTo > this.currentBet;
+      return {
+        canFold: true,
+        canCheck: false,
+        callAmount: !shoveIsRaise && toCall > 0 ? Math.min(toCall, seat.stack) : null,
+        minRaiseTo: shoveIsRaise ? allInTo : null,
+        maxRaiseTo: shoveIsRaise ? allInTo : null,
+        allInRaiseTo: allInTo,
+      };
+    }
+
     return {
       canFold: true,
       canCheck: toCall === 0,
@@ -204,7 +287,7 @@ export class TexasBetting {
       maxRaiseTo: canRaise ? maxRaiseTo : null,
       // Reported whether or not a raise is legal: it is a fact about the seat,
       // and the confirm gate needs it precisely when the cap has hidden it.
-      allInRaiseTo: seat.streetContributed + seat.stack,
+      allInRaiseTo: allInTo,
     };
   }
 
@@ -223,16 +306,25 @@ export class TexasBetting {
         seat.hasActed = true;
         break;
       case 'check':
+        if (this.allInOrFold) throw new IllegalActionError('all-in or fold — there is no check');
         if (toCall !== 0) throw new IllegalActionError('cannot check facing a bet');
         seat.hasActed = true;
         break;
       case 'call': {
         if (toCall <= 0) throw new IllegalActionError('nothing to call');
+        // AoF: enforced, not merely advertised. A call that would leave chips
+        // behind is a flat-call this table does not deal in.
+        if (this.allInOrFold && toCall < seat.stack) {
+          throw new IllegalActionError('all-in or fold — a call must be your whole stack');
+        }
         this.commit(seat, Math.min(toCall, seat.stack));
         seat.hasActed = true;
         break;
       }
       case 'raise': {
+        if (this.allInOrFold && (action.amount ?? 0) !== seat.streetContributed + seat.stack) {
+          throw new IllegalActionError('all-in or fold — the only raise is everything');
+        }
         this.applyRaise(seat, action.amount ?? 0);
         break;
       }
@@ -280,6 +372,20 @@ export class TexasBetting {
     const amount = Math.min(chips, seat.stack);
     seat.stack -= amount;
     seat.streetContributed += amount;
+    seat.totalContributed += amount;
+    if (seat.stack === 0) seat.status = 'allin';
+  }
+
+  /**
+   * Put chips in the pot that buy no claim on the current round.
+   *
+   * The whole difference from `commit` is the missing `streetContributed`.
+   * Antes are dead money: they size the pot and they belong in the side-pot
+   * arithmetic, but nobody is owed a call for having posted one.
+   */
+  private commitDead(seat: Seat, chips: number): void {
+    const amount = Math.min(chips, seat.stack);
+    seat.stack -= amount;
     seat.totalContributed += amount;
     if (seat.stack === 0) seat.status = 'allin';
   }

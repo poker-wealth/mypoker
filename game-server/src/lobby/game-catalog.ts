@@ -14,6 +14,8 @@
  * data — rather than in a slide — is what keeps the transparency claim true as the catalogue grows.
  */
 
+import { variant } from '../games/texas/variants';
+
 export type GameId =
   | 'texas'
   | 'short-deck'
@@ -46,9 +48,9 @@ export interface GameSpec {
  * both are player-banked/pari-mutuel and need a real counterparty — minimum 2.
  */
 export const GAME_CATALOG: Readonly<Record<GameId, GameSpec>> = {
-  texas: { id: 'texas', name: "Texas Hold'em", minPlayers: 2, maxPlayers: 9, fairness: 'PROVABLE' },
-  'short-deck': { id: 'short-deck', name: "Short Deck Hold'em", minPlayers: 2, maxPlayers: 9, fairness: 'PROVABLE' },
-  omaha: { id: 'omaha', name: 'Omaha', minPlayers: 2, maxPlayers: 9, fairness: 'PROVABLE' },
+  texas: { id: 'texas', name: "Texas Hold'em", minPlayers: 2, maxPlayers: variant('texas').maxSeats, fairness: 'PROVABLE' },
+  'short-deck': { id: 'short-deck', name: "Short Deck Hold'em", minPlayers: 2, maxPlayers: variant('short-deck').maxSeats, fairness: 'PROVABLE' },
+  omaha: { id: 'omaha', name: 'Omaha', minPlayers: 2, maxPlayers: variant('omaha').maxSeats, fairness: 'PROVABLE' },
   baccarat: { id: 'baccarat', name: 'Baccarat', minPlayers: 2, maxPlayers: 12, fairness: 'PROVABLE' },
   'niu-niu': { id: 'niu-niu', name: 'Niu Niu', minPlayers: 3, maxPlayers: 10, fairness: 'PROVABLE' },
   'dou-di-zhu': { id: 'dou-di-zhu', name: 'Dou Di Zhu', minPlayers: 3, maxPlayers: 3, fairness: 'PROVABLE' },

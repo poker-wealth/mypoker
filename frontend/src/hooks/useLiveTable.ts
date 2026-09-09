@@ -150,16 +150,47 @@ export function useLiveTable(tableId: string): LiveTable {
     (seat: number, buyIn: number): void => {
       // Name and photo travel with the request because the gateway keeps no player rows — they
       // label the seat and nothing more.
-      send({
-        kind: 'sit',
-        seat,
-        buyIn,
-        ...(player?.displayName ? { name: player.displayName.slice(0, 24) } : {}),
-        ...(player?.photoUrl ? { avatarUrl: player.photoUrl } : {}),
-      });
-      // Register this device's own client seed the moment we're seated, so every deal from here uses
-      // the player's entropy, not the server's. Stable per device; published back in the round data.
-      send({ kind: 'set_client_seed', seed: deviceClientSeed() });
+      const finish = (gps?: string): void => {
+        send({
+          kind: 'sit',
+          seat,
+          buyIn,
+          ...(gps ? { gps } : {}),
+          ...(player?.displayName ? { name: player.displayName.slice(0, 24) } : {}),
+          ...(player?.photoUrl ? { avatarUrl: player.photoUrl } : {}),
+        });
+        // Register this device's own client seed the moment we're seated, so every deal from here
+        // uses the player's entropy, not the server's. Stable per device; published back in the
+        // round data.
+        send({ kind: 'set_client_seed', seed: deviceClientSeed() });
+      };
+
+      // Tables with the same-GPS rule ask for a location. Three decimals is
+      // ~110m — enough to say "same point", too coarse to say which flat.
+      // Denied, unavailable or slow → sit anyway: the rule matches only
+      // evidence actually held, and a permission prompt must not eat the seat.
+      if (!latest.current?.gpsRequired || !navigator.geolocation) {
+        finish();
+        return;
+      }
+      let done = false;
+      const once = (gps?: string): void => {
+        if (done) return;
+        done = true;
+        finish(gps);
+      };
+      const fallback = setTimeout(() => once(), 4_000);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          clearTimeout(fallback);
+          once(`${pos.coords.latitude.toFixed(3)},${pos.coords.longitude.toFixed(3)}`);
+        },
+        () => {
+          clearTimeout(fallback);
+          once();
+        },
+        { timeout: 3_500, maximumAge: 300_000 },
+      );
     },
     [send, player?.displayName, player?.photoUrl],
   );

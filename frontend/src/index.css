@@ -34,6 +34,13 @@
      for accumulated pots, so anything wearing this colour is money on the table.
      Reusing it for ordinary emphasis would spend that meaning. */
   --jackpot: #f5b93b;
+  /* Table-setup gold: the reference app's tan for stake figures and the
+     create/join CTAs. Deliberately its own token, not --jackpot — jackpot gold
+     means "money on the table" and must keep meaning only that. */
+  --gold: #d4b06a;
+  /* Poker-chip red, for the chip-styled slider thumbs and toggle knobs.
+     Artwork, not semantics — never a substitute for --danger. */
+  --chip: #d8453c;
 
   --felt: #12233f; /* deep indigo table */
 
@@ -64,6 +71,8 @@
   --danger: #dc2650;
   --info: #0891b2;
   --jackpot: #b07908;
+  --gold: #a8843c;
+  --chip: #c93c33;
 
   --felt: #1b3a6b;
 
@@ -90,6 +99,8 @@
   --color-danger: var(--danger);
   --color-info: var(--info);
   --color-jackpot: var(--jackpot);
+  --color-gold: var(--gold);
+  --color-chip: var(--chip);
   --color-felt: var(--felt);
 
   --radius-app: var(--radius);
