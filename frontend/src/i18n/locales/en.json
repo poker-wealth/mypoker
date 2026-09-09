@@ -624,6 +624,8 @@
     "send": "Send chips",
     "sent": "Chips sent",
     "confirmTitle": "Send these chips?",
+    "telegramLogin": "Log in with Telegram",
+    "responsible": "Play responsibly. Refuse harmful and counterfeit games, protect yourself from scams, and manage your time — enjoy a healthy balance.",
     "confirmBody": "Send {{amount}} to {{player}} from the alliance inventory.",
     "noMembers": "No one to fund yet",
     "noMembersBlurb": "Invite players to the alliance first.",

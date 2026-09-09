@@ -624,6 +624,8 @@
     "send": "チップを送る",
     "sent": "チップを送信しました",
     "confirmTitle": "このチップを送りますか？",
+    "telegramLogin": "Telegram でログイン",
+    "responsible": "節度あるプレイを。有害・偽造ゲームを拒み、詐欺にご注意ください。時間を管理し、健康的に楽しみましょう。",
     "confirmBody": "アライアンス在庫から {{player}} へ {{amount}} を送ります。",
     "noMembers": "配布できるメンバーがいません",
     "noMembersBlurb": "まずアライアンスにプレイヤーを招待してください。",

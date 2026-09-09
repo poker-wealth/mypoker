@@ -624,6 +624,8 @@
     "send": "Gửi chip",
     "sent": "Đã gửi chip",
     "confirmTitle": "Gửi số chip này?",
+    "telegramLogin": "Đăng nhập bằng Telegram",
+    "responsible": "Chơi có trách nhiệm. Từ chối game độc hại và giả mạo, cảnh giác lừa đảo, quản lý thời gian để giữ cân bằng lành mạnh.",
     "confirmBody": "Gửi {{amount}} cho {{player}} từ kho liên minh.",
     "noMembers": "Chưa có thành viên để cấp",
     "noMembersBlurb": "Hãy mời người chơi vào liên minh trước.",

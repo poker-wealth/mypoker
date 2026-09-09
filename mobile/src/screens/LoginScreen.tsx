@@ -1,6 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Image,
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiError } from '../api';
 import { ApiUrlField } from '../ApiUrlField';
@@ -21,6 +32,13 @@ import { Button, Card, ErrorState } from '../ui';
  */
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * The other way in: the Telegram Mini App, via the bot. Mirrors the
+ * frontend's config default (frontend/src/config.ts TELEGRAM_BOT_NAME) —
+ * one bot, two clients.
+ */
+const TELEGRAM_URL = 'https://t.me/mypoker777_bot';
 
 /** Digits in a confirmation code. Must match OTP_LENGTH on the gateway. */
 const CODE_LENGTH = 6;
@@ -186,6 +204,19 @@ export function LoginScreen() {
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      {/* The reference's photographic base: chips and aces anchored to the
+          bottom, fading up into the black so the form floats above it. */}
+      <View pointerEvents="none" style={styles.backdrop}>
+        <Image
+          source={require('../../assets/brand/login-bg.png')}
+          style={styles.backdropImage}
+          resizeMode="cover"
+        />
+        <LinearGradient
+          colors={[theme.bg, 'transparent']}
+          style={styles.backdropFade}
+        />
+      </View>
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
@@ -194,14 +225,22 @@ export function LoginScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.header}>
-          <Text style={styles.title}>
-            {mode === 'confirm' ? t('auth.confirmTitle') : t('auth.title')}
-          </Text>
-          <Text style={styles.subtitle}>
-            {mode === 'confirm'
-              ? t('auth.confirmSubtitle', { email: pendingEmail })
-              : t('auth.subtitle')}
-          </Text>
+          {/* The wordmark speaks for itself, as on the reference — a text
+              title beside it would say MYPOKER twice. The confirm step keeps
+              its words: "check your email" is an instruction, not branding. */}
+          <Image
+            source={require('../../assets/brand/logo-gold.png')}
+            style={styles.wordmark}
+            resizeMode="contain"
+          />
+          {mode === 'confirm' && (
+            <>
+              <Text style={styles.title}>{t('auth.confirmTitle')}</Text>
+              <Text style={styles.subtitle}>
+                {t('auth.confirmSubtitle', { email: pendingEmail })}
+              </Text>
+            </>
+          )}
         </View>
 
         {mode === 'confirm' ? (
@@ -340,8 +379,30 @@ export function LoginScreen() {
           {mode === 'signIn' ? t('auth.noAccount') : t('auth.haveAccount')}
         </Button>
 
+        {/* The other door, as on the reference: straight to the Mini App.
+            The bot link works on any phone with Telegram installed. */}
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>{t('auth.or')}</Text>
+          <View style={styles.dividerLine} />
+        </View>
+        <Button
+          variant="ghost"
+          onPress={() => {
+            void Linking.openURL(TELEGRAM_URL).catch(() => {
+              // No Telegram and no browser willing to take t.me — nothing
+              // useful to do; the email form is right above.
+            });
+          }}
+        >
+          {t('auth.telegramLogin')}
+        </Button>
+
       </Card>
         )}
+
+        {/* The reference's foot-line, in our own words. */}
+        <Text style={styles.responsible}>{t('auth.responsible')}</Text>
 
       {/* Must live here, not just in Settings: Settings is only reachable
           after sign-in, and sign-in needs a working API URL. Without this
@@ -357,7 +418,21 @@ export function LoginScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.bg },
   scrollContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: space.lg, gap: space.lg },
-  header: { gap: space.xs },
+  header: { gap: space.xs, alignItems: 'center' },
+  wordmark: { width: 200, height: 64 },
+  backdrop: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '42%' },
+  backdropImage: { width: '100%', height: '100%' },
+  // The fade covers the image's upper half so the photo emerges from the
+  // black instead of ending at a hard edge.
+  backdropFade: { position: 'absolute', left: 0, right: 0, top: 0, height: '55%' },
+  responsible: {
+    color: theme.dim,
+    fontSize: 10,
+    lineHeight: 15,
+    textAlign: 'center',
+    fontFamily: weight('400'),
+    opacity: 0.8,
+  },
   title: { color: theme.text, fontSize: 24, fontFamily: weight('900') },
   subtitle: { color: theme.dim, fontSize: 13, lineHeight: 19, fontFamily: weight('400') },
   card: { gap: space.md },

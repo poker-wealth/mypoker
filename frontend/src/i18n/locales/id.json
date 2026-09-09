@@ -624,6 +624,8 @@
     "send": "Kirim chip",
     "sent": "Chip terkirim",
     "confirmTitle": "Kirim chip ini?",
+    "telegramLogin": "Masuk dengan Telegram",
+    "responsible": "Bermainlah dengan bijak. Tolak permainan berbahaya dan palsu, waspadai penipuan, dan atur waktu untuk keseimbangan yang sehat.",
     "confirmBody": "Kirim {{amount}} ke {{player}} dari inventaris aliansi.",
     "noMembers": "Belum ada anggota untuk didanai",
     "noMembersBlurb": "Undang pemain ke aliansi terlebih dahulu.",

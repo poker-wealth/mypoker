@@ -624,6 +624,8 @@
     "send": "发送筹码",
     "sent": "筹码已发送",
     "confirmTitle": "确认发送筹码？",
+    "telegramLogin": "使用 Telegram 登录",
+    "responsible": "理性游戏。拒绝有害与假冒游戏，谨防诈骗，合理安排时间，享受健康生活。",
     "confirmBody": "从联盟库存向 {{player}} 发送 {{amount}}。",
     "noMembers": "暂无可充值的成员",
     "noMembersBlurb": "请先邀请玩家加入联盟。",
