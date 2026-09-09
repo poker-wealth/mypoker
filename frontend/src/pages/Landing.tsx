@@ -96,14 +96,19 @@ export function Landing() {
             {t('download.navHome')}
           </Link>
           <span className="text-gold">{t('download.navDownload')}</span>
-          {/* The one route into the game from here. Sign-in happens when the
-              visitor chooses to play — never as the first screen. */}
-          <Link
-            to="/login"
-            className="rounded-full bg-gold px-4 py-1.5 text-[0.8rem] font-bold text-bg transition active:scale-[0.98]"
-          >
-            {t('download.playNow')}
-          </Link>
+          {/*
+            No "Play now" here, by the owner's decision.
+
+            This was the only web sign-in route on the public site, so the front
+            door is now download-only: the way in is the app, via the store
+            buttons and the Telegram link below. `/login` still exists and still
+            works for anyone who has the URL — it is unlinked, not removed.
+
+            `download.playNow` is deliberately left in all eight locale files.
+            Nothing renders it today, but the button is one line to restore and
+            deleting a key across eight files (and putting it back) is the kind
+            of churn that breaks locale parity for no gain.
+          */}
           <label className="flex items-center gap-1 text-dim">
             <Globe size={14} aria-hidden />
             <select
