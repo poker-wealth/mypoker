@@ -123,7 +123,7 @@
     "tableName": "Tên bàn (tùy chọn)",
     "tableNamePlaceholder": "ví dụ: Đêm thứ Sáu",
     "tableBlindOrder": "Blind nhỏ phải nhỏ hơn blind lớn.",
-    "tableSeatRange": "Một bàn có từ 2 đến {{max}} chỗ ngồi.",
+    "tableSeatRange": "Một bàn có từ 2 đến 9 chỗ ngồi.",
     "tableRakeNote": "Phí hồ {{pct}}% — mức hiện tại của liên minh. Khoản này về liên minh, không về nền tảng.",
     "tableConfirm": "Mở bàn này?",
     "tableConfirmBody": "Blind {{sb}}/{{bb}}, {{seats}} ghế. Phí hồ {{rake}}% được chuyển vào kho của liên minh.",
@@ -318,7 +318,8 @@
     },
     "timeBank": "Quỹ thời gian: {{seconds}}s",
     "timeBankRunning": "Đang dùng quỹ thời gian",
-    "timeBankAuto": "Tự động"
+    "timeBankAuto": "Tự động",
+    "unlocking": "Đang kiểm tra lời mời…"
   },
   "a11y": {
     "toggleTheme": "Đổi giao diện",
@@ -731,7 +732,7 @@
     "public": "Công khai",
     "publicBlurb": "Hiển thị trong sảnh — ai cũng có thể tham gia.",
     "private": "Riêng tư",
-    "privateBlurb": "Chỉ theo lời mời — chỉ tham gia được qua liên kết bạn chia sẻ.",
+    "privateBlurb": "Chỉ dành cho người được mời — bạn bè cần liên kết hoặc mã để ngồi vào bàn.",
     "createCta": "Tạo bàn",
     "ready": "Bàn của bạn đã sẵn sàng",
     "shareBlurb": "Gửi liên kết này để mời bạn bè vào đúng bàn này.",
@@ -747,7 +748,9 @@
     "buyIn": "Mua vào tối thiểu",
     "buyInBlurb": "Người chơi mua vào từ {{min}} đến {{max}}.",
     "seats": "Chỗ ngồi",
-    "seatsBlurb": "{{count}} chỗ. Hai người là đủ để bắt đầu."
+    "seatsBlurb": "{{count}} chỗ. Hai người là đủ để bắt đầu.",
+    "codeLabel": "Mã mời",
+    "shareBlurbPrivate": "Gửi liên kết này để mời bạn bè — liên kết đã kèm mã."
   },
   "createGame": {
     "title": "Tạo ván chơi",

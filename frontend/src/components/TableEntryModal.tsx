@@ -1,7 +1,7 @@
 import { useState, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Users, Plus, Link2, Check } from 'lucide-react';
+import { Users, Plus, Link2, Check, KeyRound } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { CreateGameScreen } from '@/components/table-setup/CreateGameScreen';
@@ -11,14 +11,16 @@ import { DEFAULT_TABLE_ID } from '@/config';
 /**
  * Tapping Hold'em opens this (owner-approved; not in the FairPlay doc): join the
  * open public table, or open your own. A created table hands back a shareable
- * `/table/<id>` link the creator can send to a friend.
+ * `/table/<id>` link the creator can send to a friend — and, for a PRIVATE
+ * table, the join code that link carries.
  *
  * A CENTERED Modal, not a bottom sheet — Victor asked for the dialog in the
  * middle of the screen with a dimmed backdrop.
  *
  * The create form itself is `CreateGameScreen`: the full-page, reference-styled
  * settings screen (chip sliders, chip toggles, Start now). This modal keeps two
- * jobs — the join/create choice, and showing the invite link afterwards.
+ * jobs — the join/create choice, and showing the invite link (and private code)
+ * afterwards.
  *
  * "Join" goes to DEFAULT_TABLE_ID, exactly what the tile did before this
  * existed, so nothing is lost for a player who just wants a seat.
@@ -29,16 +31,30 @@ export function TableEntryModal({ open, onClose }: { open: boolean; onClose: () 
 
   const [creating, setCreating] = useState(false);
   const [createdId, setCreatedId] = useState<string | null>(null);
+  /** Private tables only; null for public. See CreatedTable.joinCode. */
+  const [createdCode, setCreatedCode] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const close = (): void => {
     setCreating(false);
     setCreatedId(null);
+    setCreatedCode(null);
     setCopied(false);
     onClose();
   };
 
-  const inviteLink = createdId ? `${window.location.origin}/table/${createdId}` : '';
+  /**
+   * The code rides in the link.
+   *
+   * Not decoration: a private table now REFUSES anyone who has not presented
+   * its code, and before this change the link was the only thing a creator had
+   * to send. A link without the code would therefore have been a link that no
+   * longer works — closing the hole would have broken sharing. The code is also
+   * shown separately below, for reading aloud when a link cannot be pasted.
+   */
+  const inviteLink = createdId
+    ? `${window.location.origin}/table/${createdId}${createdCode ? `?code=${createdCode}` : ''}`
+    : '';
 
   const join = (): void => {
     navigate(`/table/${DEFAULT_TABLE_ID}`);
@@ -61,7 +77,10 @@ export function TableEntryModal({ open, onClose }: { open: boolean; onClose: () 
 
   const enter = (): void => {
     if (!createdId) return;
-    navigate(`/table/${createdId}`);
+    // The creator already holds access server-side — they were just handed the
+    // code — so this needs no `?code=`. It is carried anyway so that a reload
+    // of the resulting URL still works from a fresh session.
+    navigate(`/table/${createdId}${createdCode ? `?code=${createdCode}` : ''}`);
     close();
   };
 
@@ -75,11 +94,28 @@ export function TableEntryModal({ open, onClose }: { open: boolean; onClose: () 
                 <Check size={16} className="shrink-0 text-brand" />
                 <span className="font-semibold">{t('tableEntry.ready')}</span>
               </div>
-              <p className="text-[0.7rem] leading-relaxed text-dim">{t('tableEntry.shareBlurb')}</p>
+              <p className="text-[0.7rem] leading-relaxed text-dim">
+                {createdCode ? t('tableEntry.shareBlurbPrivate') : t('tableEntry.shareBlurb')}
+              </p>
               <div className="flex items-center gap-2 rounded-(--radius-app) border border-border bg-surface-2 px-3 py-2">
                 <Link2 size={14} className="shrink-0 text-dim" />
                 <span className="min-w-0 flex-1 truncate text-[0.7rem] text-text">{inviteLink}</span>
               </div>
+              {/* The code, shown on its own so it can be read out. Spaced and
+                  tabular so six digits are unambiguous when spoken. */}
+              {createdCode ? (
+                <div className="flex items-center gap-2 rounded-(--radius-app) border border-border bg-surface-2 px-3 py-2">
+                  <KeyRound size={14} className="shrink-0 text-brand" />
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-[0.62rem] font-semibold text-dim">
+                      {t('tableEntry.codeLabel')}
+                    </span>
+                    <span className="block font-mono text-[0.95rem] tracking-[0.3em] tabular-nums text-text">
+                      {createdCode}
+                    </span>
+                  </div>
+                </div>
+              ) : null}
             </div>
             <Button full variant="ghost" onClick={copy}>
               {copied ? t('tableEntry.copied') : t('tableEntry.copy')}
@@ -112,6 +148,8 @@ export function TableEntryModal({ open, onClose }: { open: boolean; onClose: () 
         onCreated={(table) => {
           setCreating(false);
           setCreatedId(table.tableId);
+          // Private tables carry a join code; public ones return null.
+          setCreatedCode(table.joinCode ?? null);
         }}
       />
     </>

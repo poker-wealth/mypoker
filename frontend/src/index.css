@@ -1,39 +1,59 @@
 @import 'tailwindcss';
 
 /*
- * ── FairPlay design tokens ────────────────────────────────────────────────────
+ * ── MYPOKER design tokens ─────────────────────────────────────────────────────
  * Semantic CSS variables are the single source of truth for the whole look.
  * Light/dark and the Telegram theme override THESE variables at runtime, and
  * Tailwind utilities (bg-bg, text-brand, …) read them via the @theme map below.
  *
  * BRANDING: when the owner sends logo + colors, only the values in this block
  * change — every screen restyles automatically.
+ *
+ * v3 (Sep 2026): repaletted to the HHPoker reference, which Operating Guide
+ * v3.0 names as the UI brief. See docs/REFERENCE-STUDY-HH.md §1 and §14.1.
+ * Those values are EYEBALLED FROM SCREENSHOTS, not sampled — correct them
+ * against a committed PNG with a colour picker when one exists.
+ *
+ * GROUNDS. HH does not use one background; it uses four, and which one you are
+ * standing on carries meaning:
+ *
+ *   --bg              chrome        nav, profile, messages, lobby   LIVE
+ *   --ground-config   config        create-a-table, settings sheets  unused
+ *   --felt-poker      poker felt    the table itself                 unused
+ *   --felt-casino     casino felt   Cowboy and house-banked games    unused
+ *
+ * Only --bg is repainted in this change. --felt keeps its indigo because it is
+ * consumed inside gradients whose other stops are hardcoded; see the note on it
+ * below. The felts are Esther's side of the seam (mobile/CLAUDE.md).
+ *
+ * MONEY. Gold used to be the money signal — it was --jackpot and nothing else
+ * wore it. HH makes gold its chrome colour, so that signal had to move or be
+ * spent on ordinary furniture. HH solves the same problem by colouring money
+ * per CURRENCY, and so do we: --jackpot is now the cyan of a diamond balance.
+ * Money reads as money because of which currency it is, not because it is gold.
+ * Do NOT reach for --brand to mark a figure.
  */
 
 :root,
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  /* MYPOKER — dark-forward, near-black with a violet tint. */
-  --bg: #0d0d1a;
-  --surface: #17172b;
-  --surface-2: #21213a;
-  --border: #2c2c48;
+  /* Chrome ground — HH is near-black behind navigation and lists. */
+  --bg: #0c0c0c;
+  --surface: #1a1a1a;
+  --surface-2: #242424;
+  --border: #33302b;
 
-  --text: #f2f2fa;
-  --text-dim: #9797b8;
+  --text: #f5efe3;
+  --text-dim: #9a9182;
 
-  --brand: #bb5cf6; /* violet — primary brand */
-  --brand-strong: #9a3fe4;
-  --brand-2: #6366f1; /* indigo — gradient partner */
-  --accent: #00d4ff; /* neon cyan */
+  --brand: #d9b87c; /* gold — chrome, icons, active nav, focus ring */
+  --brand-strong: #b8934f;
+  --brand-2: #8a5a2b; /* deep copper — gradient partner */
+  --accent: #c87a3a; /* copper — button outlines, secondary emphasis */
   --success: #3fd07a;
   --danger: #f85677;
-  --info: #00d4ff;
-  /* Jackpot gold. Its own token, not --accent: the design uses gold exclusively
-     for accumulated pots, so anything wearing this colour is money on the table.
-     Reusing it for ordinary emphasis would spend that meaning. */
-  --jackpot: #f5b93b;
+  --info: #6ba8c4;
   /* Table-setup gold: the reference app's tan for stake figures and the
      create/join CTAs. Deliberately its own token, not --jackpot — jackpot gold
      means "money on the table" and must keep meaning only that. */
@@ -42,45 +62,78 @@
      Artwork, not semantics — never a substitute for --danger. */
   --chip: #d8453c;
 
-  --felt: #12233f; /* deep indigo table */
+  /* Money. See the MONEY note above. This is a diamond balance and an
+     accumulated pot; it is deliberately NOT --info, which is chrome. */
+  --jackpot: #4fd1e0;
+  /* The other two currency marks HH uses. Nothing renders them yet — we ship a
+     single currency — so they exist to keep the scheme in one place for when
+     multi-currency lands, and for no other reason. */
+  --coin-gold: #e8b93b;
+  --coin-green: #45b872;
 
-  --brand-gradient: linear-gradient(120deg, #6366f1 0%, #bb5cf6 55%, #00d4ff 120%);
+  /* --felt is LIVE: PokerTable.tsx and TableDesignSheet.tsx build a radial
+     gradient around it whose other stops are hardcoded blues. Repainting it
+     alone yields blue-to-maroon-to-blue. The felt is Esther's side of the seam
+     (mobile/CLAUDE.md), so it keeps its indigo until she re-skins the table. */
+  --felt: #12233f; /* deep indigo table — unchanged in v3 */
+
+  /* The remaining v3 grounds, from docs/REFERENCE-STUDY-HH.md §14.1. NOTHING
+     READS THESE YET. They are declared so the values live beside the palette
+     they belong to rather than in a screenshot, and so the felt work has them
+     ready. If you are adding a screen, use them; if they are still unused in a
+     month, delete them rather than let them drift. */
+  --ground-config: #132a45; /* navy — create-a-table and settings sheets */
+  --felt-poker: #4a2028; /* maroon — HH's poker felt, target for the re-skin */
+  --felt-casino: #3d6b52; /* forest green — house-banked games */
+
+  --brand-gradient: linear-gradient(120deg, #b8934f 0%, #d9b87c 55%, #ebd3a0 120%);
 
   --radius: 0.875rem;
   --shadow-card: 0 2px 10px rgb(0 0 0 / 0.4);
   --shadow-pop: 0 14px 44px rgb(0 0 0 / 0.55);
-  --glow-brand: 0 0 28px rgb(187 92 246 / 0.35);
+  --glow-brand: 0 0 28px rgb(217 184 124 / 0.3);
 }
 
 :root[data-theme='light'] {
   color-scheme: light;
 
-  --bg: #f4f4fb;
+  /* HH itself has no light mode. The Mini App does, and dropping it is a
+     product decision nobody has taken — so this is the same palette carried
+     into light: warm off-white grounds, with the golds and coppers darkened
+     until they hold contrast against them. */
+  --bg: #f5f1e8;
   --surface: #ffffff;
-  --surface-2: #ececf7;
-  --border: #dedeee;
+  --surface-2: #ede7da;
+  --border: #ddd3c0;
 
-  --text: #14142a;
-  --text-dim: #616184;
+  --text: #1a1610;
+  --text-dim: #6b6152;
 
-  --brand: #7c3aed;
-  --brand-strong: #6d28d9;
-  --brand-2: #4f46e5;
-  --accent: #0891b2;
+  --brand: #8a6a28;
+  --brand-strong: #6e5320;
+  --brand-2: #a35d22;
+  --accent: #a35d22;
   --success: #1f9d54;
   --danger: #dc2650;
-  --info: #0891b2;
-  --jackpot: #b07908;
+  --info: #2c7a94;
   --gold: #a8843c;
   --chip: #c93c33;
 
-  --felt: #1b3a6b;
+  --jackpot: #0e7c8c;
+  --coin-gold: #a37c12;
+  --coin-green: #1f9d54;
 
-  --brand-gradient: linear-gradient(120deg, #4f46e5 0%, #7c3aed 55%, #0891b2 120%);
+  --felt: #1b3a6b; /* unchanged — see the dark block */
+
+  --ground-config: #1e3a5c;
+  --felt-poker: #5e2a34;
+  --felt-casino: #37604a;
+
+  --brand-gradient: linear-gradient(120deg, #6e5320 0%, #8a6a28 55%, #a35d22 120%);
 
   --shadow-card: 0 2px 10px rgb(0 0 0 / 0.08);
   --shadow-pop: 0 14px 44px rgb(0 0 0 / 0.18);
-  --glow-brand: 0 0 24px rgb(124 58 237 / 0.22);
+  --glow-brand: 0 0 24px rgb(138 106 40 / 0.22);
 }
 
 /* Map semantic tokens into Tailwind's theme so utilities resolve at runtime. */
@@ -101,7 +154,12 @@
   --color-jackpot: var(--jackpot);
   --color-gold: var(--gold);
   --color-chip: var(--chip);
+  --color-coin-gold: var(--coin-gold);
+  --color-coin-green: var(--coin-green);
+  --color-ground-config: var(--ground-config);
   --color-felt: var(--felt);
+  --color-felt-poker: var(--felt-poker);
+  --color-felt-casino: var(--felt-casino);
 
   --radius-app: var(--radius);
   --font-sans: 'Nunito', 'Lora', 'Inter', 'Poppins', ui-sans-serif, system-ui, -apple-system, sans-serif;

@@ -123,7 +123,7 @@
     "tableName": "牌桌名称（可选）",
     "tableNamePlaceholder": "例如：周五之夜",
     "tableBlindOrder": "小盲注必须小于大盲注。",
-    "tableSeatRange": "每张牌桌可坐 2 至 {{max}} 名玩家。",
+    "tableSeatRange": "每张牌桌可坐 2 至 9 名玩家。",
     "tableRakeNote": "抽水 {{pct}}%——联盟当前费率，归联盟所有，不归平台。",
     "tableConfirm": "确认开设这张牌桌？",
     "tableConfirmBody": "盲注 {{sb}}/{{bb}}，{{seats}} 个座位。{{rake}}% 的抽水将计入联盟库存。",
@@ -318,7 +318,8 @@
     },
     "timeBank": "时间银行：{{seconds}} 秒",
     "timeBankRunning": "时间银行使用中",
-    "timeBankAuto": "自动"
+    "timeBankAuto": "自动",
+    "unlocking": "正在验证邀请…"
   },
   "a11y": {
     "toggleTheme": "切换主题",
@@ -731,7 +732,7 @@
     "public": "公开",
     "publicBlurb": "在大厅中显示——任何人都可加入。",
     "private": "私人",
-    "privateBlurb": "仅限邀请——只能通过你分享的链接加入。",
+    "privateBlurb": "仅限受邀者 — 朋友需要链接或邀请码才能入座。",
     "createCta": "创建牌桌",
     "ready": "你的牌桌已就绪",
     "shareBlurb": "发送此链接，邀请好友加入这张牌桌。",
@@ -747,7 +748,9 @@
     "buyIn": "最低买入",
     "buyInBlurb": "玩家买入 {{min}} 至 {{max}}。",
     "seats": "座位",
-    "seatsBlurb": "{{count}} 个座位。两人即可开局。"
+    "seatsBlurb": "{{count}} 个座位。两人即可开局。",
+    "codeLabel": "邀请码",
+    "shareBlurbPrivate": "把链接发给朋友，链接里已带邀请码。"
   },
   "createGame": {
     "title": "创建牌局",

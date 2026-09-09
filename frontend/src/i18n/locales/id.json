@@ -123,7 +123,7 @@
     "tableName": "Nama meja (opsional)",
     "tableNamePlaceholder": "mis. Malam Jumat",
     "tableBlindOrder": "Small blind harus lebih kecil daripada big blind.",
-    "tableSeatRange": "Satu meja memuat 2 sampai {{max}} pemain.",
+    "tableSeatRange": "Satu meja memuat 2 sampai 9 pemain.",
     "tableRakeNote": "Rake {{pct}}% — tarif aliansi saat ini. Rake masuk ke aliansi, bukan ke platform.",
     "tableConfirm": "Buka meja ini?",
     "tableConfirmBody": "Blind {{sb}}/{{bb}}, {{seats}} kursi. Rake {{rake}}% masuk ke inventaris aliansi.",
@@ -318,7 +318,8 @@
     },
     "timeBank": "Bank Waktu: {{seconds}}d",
     "timeBankRunning": "Bank waktu berjalan",
-    "timeBankAuto": "Otomatis"
+    "timeBankAuto": "Otomatis",
+    "unlocking": "Memeriksa undangan Anda…"
   },
   "a11y": {
     "toggleTheme": "Ganti tema",
@@ -731,7 +732,7 @@
     "public": "Publik",
     "publicBlurb": "Tampil di lobi — siapa saja bisa gabung.",
     "private": "Pribadi",
-    "privateBlurb": "Hanya undangan — hanya bisa gabung lewat tautan yang kamu bagikan.",
+    "privateBlurb": "Khusus undangan — teman perlu tautan atau kode untuk duduk.",
     "createCta": "Buat meja",
     "ready": "Meja kamu sudah siap",
     "shareBlurb": "Kirim tautan ini untuk mengundang teman ke meja ini.",
@@ -747,7 +748,9 @@
     "buyIn": "Buy-in minimum",
     "buyInBlurb": "Pemain buy-in {{min}} sampai {{max}}.",
     "seats": "Kursi",
-    "seatsBlurb": "{{count}} kursi. Dua pemain sudah cukup untuk mulai."
+    "seatsBlurb": "{{count}} kursi. Dua pemain sudah cukup untuk mulai.",
+    "codeLabel": "Kode undangan",
+    "shareBlurbPrivate": "Kirim tautan ini untuk mengundang teman — kodenya sudah termasuk."
   },
   "createGame": {
     "title": "Buat Permainan",

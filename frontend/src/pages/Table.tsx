@@ -27,6 +27,7 @@ import { useTableChat } from '@/hooks/useTableChat';
 import { useSettings, useUpdateSettings } from '@/api/hooks';
 import { haptic } from '@/lib/telegram';
 import { ChallengeModal } from '@/components/poker/ChallengeModal';
+import { unlockTableApi } from '@/api/tables';
 
 import { feltFor } from '@/components/games/registry';
 
@@ -47,10 +48,68 @@ export function Table() {
   const tableId = isOpenableTableId(id) ? id : null;
 
   if (!tableId) return <NoTableYet gameId={id} />;
-  return params.get('demo') === '1' ? <DemoTable /> : <LiveTable tableId={tableId} />;
+  if (params.get('demo') === '1') return <DemoTable />;
+  return (
+    <PrivateTableGate tableId={tableId} code={params.get('code')}>
+      <LiveTable tableId={tableId} />
+    </PrivateTableGate>
+  );
 }
 
 // ── The real thing ────────────────────────────────────────────────────────────
+
+/**
+ * Redeem a private table's invite code before the socket opens.
+ *
+ * A private table refuses anyone who has not presented its code, on every
+ * inbound socket message — so this has to finish BEFORE `useLiveTable` connects,
+ * or the first `join` is refused and the player sees an error on a table they
+ * were invited to.
+ *
+ * It always falls through to the table once the attempt settles, whatever the
+ * outcome. That is deliberate: the socket is the authority, and a gate that
+ * blocked on its own failure would become a second, weaker place to be refused
+ * — including for a table this registry never heard of (the fixed lobby tables
+ * answer "unknown", which is not a reason to hide a public felt). If the code
+ * really was wrong, the rail says so in its own words.
+ *
+ * The ref is not decoration. TRAPS §14: a guard on react state is a render
+ * behind, and this must fire once — a second attempt spends one of the ten
+ * tries the server allows per player before it stops listening.
+ */
+function PrivateTableGate({
+  tableId,
+  code,
+  children,
+}: {
+  tableId: string;
+  code: string | null;
+  children: React.ReactNode;
+}) {
+  const { t } = useTranslation();
+  const fired = useRef(false);
+  const [settled, setSettled] = useState(!code);
+
+  useEffect(() => {
+    if (!code || fired.current) return;
+    fired.current = true;
+    void unlockTableApi(tableId, code)
+      .catch(() => {
+        // Swallowed on purpose — see the note above. The socket refuses if this
+        // mattered, with a message about the code rather than about the network.
+      })
+      .finally(() => setSettled(true));
+  }, [tableId, code]);
+
+  if (!settled) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center text-[0.8rem] text-dim">
+        {t('table.unlocking')}
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
 
 function LiveTable({ tableId }: { tableId: string }) {
   const navigate = useNavigate();

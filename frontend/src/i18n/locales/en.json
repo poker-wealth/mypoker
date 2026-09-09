@@ -123,7 +123,7 @@
     "tableName": "Table name (optional)",
     "tableNamePlaceholder": "e.g. Friday night",
     "tableBlindOrder": "The small blind must be smaller than the big blind.",
-    "tableSeatRange": "A table seats between 2 and {{max}} players.",
+    "tableSeatRange": "A table seats between 2 and 9 players.",
     "tableRakeNote": "Rake {{pct}}% — the alliance's current rate. It goes to the alliance, not the platform.",
     "tableConfirm": "Open this table?",
     "tableConfirmBody": "Blinds {{sb}}/{{bb}}, {{seats}} seats. Rake {{rake}}% goes to the alliance inventory.",
@@ -318,7 +318,8 @@
     },
     "timeBank": "Time Bank: {{seconds}}s",
     "timeBankRunning": "Time bank running",
-    "timeBankAuto": "Auto"
+    "timeBankAuto": "Auto",
+    "unlocking": "Checking your invite…"
   },
   "a11y": {
     "toggleTheme": "Toggle theme",
@@ -731,7 +732,7 @@
     "public": "Public",
     "publicBlurb": "Listed in the lobby — anyone can join.",
     "private": "Private",
-    "privateBlurb": "Invite-only — reachable only by the link you share.",
+    "privateBlurb": "Invite-only — a friend needs the link or the code to take a seat.",
     "createCta": "Create table",
     "ready": "Your table is ready",
     "shareBlurb": "Send this link to invite a friend to this exact table.",
@@ -747,7 +748,9 @@
     "buyIn": "Minimum buy-in",
     "buyInBlurb": "Players buy in for {{min}} to {{max}}.",
     "seats": "Seats",
-    "seatsBlurb": "{{count}} chairs. Two players is enough to start."
+    "seatsBlurb": "{{count}} chairs. Two players is enough to start.",
+    "codeLabel": "Invite code",
+    "shareBlurbPrivate": "Send this link to invite a friend — the code travels with it."
   },
   "createGame": {
     "title": "Create a game",
