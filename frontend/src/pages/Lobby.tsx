@@ -194,7 +194,7 @@ export function Lobby() {
                 className={cn(
                   'px-3.5 py-2 text-xs font-black tracking-wider transition-all rounded-lg shrink-0',
                   active
-                    ? 'bg-[#0f3922] border border-[#22c55e] text-[#22c55e] shadow-[0_0_12px_rgba(34,197,94,0.25)]'
+                    ? 'border border-gold bg-[color-mix(in_srgb,var(--gold)_16%,transparent)] text-gold shadow-[0_0_12px_color-mix(in_srgb,var(--gold)_28%,transparent)]'
                     : 'bg-surface-2/60 text-dim border border-transparent hover:text-text',
                 )}
               >
@@ -216,7 +216,7 @@ export function Lobby() {
                   className={cn(
                     'px-3 py-1.5 text-xs font-bold transition-all rounded-md shrink-0',
                     active
-                      ? 'bg-[#15803d] text-white shadow-xs'
+                      ? 'bg-gold text-bg shadow-xs'
                       : 'bg-surface-2/80 text-dim hover:text-text',
                   )}
                 >
@@ -238,7 +238,7 @@ export function Lobby() {
             className={cn(
               'grid size-7 shrink-0 place-items-center rounded-md border transition-colors active:scale-95',
               onlyOpen
-                ? 'border-[#22c55e] bg-[#0f3922] text-[#22c55e]'
+                ? 'border-gold bg-[color-mix(in_srgb,var(--gold)_16%,transparent)] text-gold'
                 : 'border-border bg-surface-2 text-dim hover:text-text',
             )}
           >
@@ -313,13 +313,13 @@ export function Lobby() {
                           {t('lobby.wait')}
                         </span>
                       ) : tbl.jackpot !== null ? (
-                        <span className="inline-block min-w-16 rounded-md border border-[#22c55e]/40 bg-[#064e3b]/80 px-2.5 py-1 text-center text-[0.7rem] font-bold text-[#4ade80] shadow-xs">
+                        <span className="inline-block min-w-16 rounded-md border border-jackpot/40 bg-[color-mix(in_srgb,var(--jackpot)_14%,transparent)] px-2.5 py-1 text-center text-[0.7rem] font-bold text-jackpot shadow-xs">
                           ${formatMicros(tbl.jackpot, 0)}
                         </span>
                       ) : (
                         // Open, but with no pool to advertise. Say the table is
                         // open rather than print a dollar sign next to nothing.
-                        <span className="inline-block min-w-16 rounded-md border border-[#22c55e]/40 bg-[#064e3b]/80 px-2.5 py-1 text-center text-[0.7rem] font-bold text-[#4ade80] shadow-xs">
+                        <span className="inline-block min-w-16 rounded-md border border-jackpot/40 bg-[color-mix(in_srgb,var(--jackpot)_14%,transparent)] px-2.5 py-1 text-center text-[0.7rem] font-bold text-jackpot shadow-xs">
                           {t('lobby.open')}
                         </span>
                       )}
