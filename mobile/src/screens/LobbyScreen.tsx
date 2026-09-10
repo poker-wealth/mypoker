@@ -432,7 +432,10 @@ const styles = StyleSheet.create({
   scrollContent: { padding: space.lg, gap: space.lg, paddingBottom: 100 },
   
   // Home View specific styles
-  promoWrap: { height: 140, marginBottom: 32, marginTop: space.md },
+  // No marginBottom: the 32 here existed to clear the CREATE/JOIN bar back
+  // when it overhung the banner. The bar is in flow now, so that gap was
+  // dead space stacked on top of the bar's own margin.
+  promoWrap: { height: 140, marginTop: space.md },
   promoSlide: { width: Dimensions.get('window').width - (space.lg * 2), flex: 1, justifyContent: 'center', paddingLeft: space.lg },
   promoBgImage: { borderRadius: 16 },
   promoContent: { alignItems: 'flex-start', gap: 4, marginBottom: 20 },
@@ -450,7 +453,7 @@ const styles = StyleSheet.create({
   // "View details by clicking" pill painted into the image.
   promoActions: {
     flexDirection: 'row',
-    marginTop: space.md,
+    marginTop: space.sm,
     marginHorizontal: space.lg,
     height: 48,
     backgroundColor: '#EED9A0',
