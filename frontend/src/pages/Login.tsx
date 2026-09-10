@@ -268,7 +268,7 @@ export function Login() {
         <div className="overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl">
           <div className="px-5 pt-8 pb-2 text-center">
             <img
-              src="/brand/logo.png"
+              src="/brand/logo-gold.png"
               alt="MyPoker"
               className="mx-auto mb-2 h-20 w-auto object-contain drop-shadow-2xl"
             />

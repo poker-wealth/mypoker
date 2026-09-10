@@ -54,6 +54,22 @@ export const PERMANENT_DOMAIN = import.meta.env.VITE_PERMANENT_DOMAIN ?? 'mypoke
 export const SUPPORT_EMAIL = import.meta.env.VITE_SUPPORT_EMAIL ?? 'wang@mypoker777.com';
 
 /**
+ * Where the PLAYER APP lives — the owner's app subdomain. The marketing site
+ * (apex/www) sends "Play now" here; on this host the front door is the app
+ * itself, so a signed-out visitor gets the sign-in card, not the landing.
+ */
+export const APP_URL = import.meta.env.VITE_APP_URL ?? 'https://app.mypoker777.com';
+
+/** True when this page is being served from the app subdomain. */
+export const isAppHost = (): boolean => {
+  try {
+    return window.location.host === new URL(APP_URL).host;
+  } catch {
+    return false;
+  }
+};
+
+/**
  * Where "Support" links to — a Telegram chat, help desk, or mailto. Falls back
  * to the bot's chat when only the bot is configured; empty means the Settings
  * row shows a "connecting" toast instead of navigating nowhere.

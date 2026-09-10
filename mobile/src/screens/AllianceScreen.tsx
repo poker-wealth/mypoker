@@ -1,10 +1,16 @@
 import { type ReactNode, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TextInput, View, Pressable } from 'react-native';
+import { Svg, Circle, Path } from 'react-native-svg';
 import { api } from '../api';
 import { radius, space, theme, weight } from '../theme';
 import { Badge, Button, Card, EmptyState, ErrorState, ListRow, Screen, Sheet, Toggle } from '../ui';
+import { CreateTableSheet } from '../components/CreateTableSheet';
+import { useContextStore } from '../store/context';
+import { useNavigation } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import type { TabParamList } from '../navigation';
 
 /**
  * Alliance — leagues you belong to, and leagues you could join. Ported from
@@ -44,8 +50,15 @@ interface League {
 export function AllianceScreen() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const tabNav = useNavigation<BottomTabNavigationProp<TabParamList>>();
   const [createOpen, setCreateOpen] = useState(false);
   const [joiningId, setJoiningId] = useState<string | null>(null);
+  const [tableFor, setTableFor] = useState<League | null>(null);
+
+  const activeLeagueId = useContextStore((s) => s.leagueId);
+  const enterLeague = useContextStore((s) => s.enterLeague);
+  const leavePlatformContext = useContextStore((s) => s.leavePlatformContext);
+  const leaveContextIfGone = useContextStore((s) => s.leaveContextIfGone);
 
   const mine = useQuery({
     queryKey: ['leagues', 'mine'],
@@ -74,26 +87,70 @@ export function AllianceScreen() {
   const myIds = new Set((mine.data?.leagues ?? []).map((l) => l.leagueId));
   const joinable = (discover.data?.leagues ?? []).filter((l) => !myIds.has(l.leagueId));
 
+  // A context that outlived its membership shows an empty lobby with no explanation.
+  if (mine.isSuccess) {
+    leaveContextIfGone(mine.data.leagues.map((l) => l.leagueId));
+  }
+
   return (
     <>
       <Screen query={mine} errorLabel={{ retry: t('common.retry'), fallback: t('states.error') }}>
         {(data) => (
           <>
-            <Section title={t('alliance.mine')}>
+
+            <Section title="YOUR ALLIANCES">
               {data.leagues.length === 0 ? (
-                <Card>
-                  <EmptyState title={t('alliance.noneYet')} body={t('alliance.noneYetBlurb')} />
+                <Card style={{ backgroundColor: '#1C1C1C', paddingVertical: 24 }}>
+                  <EmptyState
+                    title="Not in an alliance yet"
+                    body="Join one below, or start your own."
+                    icon={
+                      <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#2A2A2A', alignItems: 'center', justifyContent: 'center' }}>
+                        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={theme.dim} strokeWidth={2}>
+                          <Path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                        </Svg>
+                      </View>
+                    }
+                  />
                 </Card>
               ) : (
                 <View style={styles.list}>
                   {data.leagues.map((l) => (
-                    <LeagueRow key={l.leagueId} league={l} />
+                    <LeagueRow
+                      key={l.leagueId}
+                      league={l}
+                      action={
+                        <View style={{ gap: 8, marginLeft: space.md, paddingVertical: space.xs }}>
+                          <Pressable
+                            onPress={() => {
+                              enterLeague(l.leagueId, l.name);
+                              tabNav.navigate('Tables');
+                            }}
+                            style={{ backgroundColor: '#D9B87C', paddingHorizontal: 24, paddingVertical: 8, borderRadius: 20, alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            <Text style={{ color: 'white', fontFamily: weight('800'), fontSize: 13 }}>Enter</Text>
+                          </Pressable>
+                          
+                          <Pressable 
+                            onPress={() => setTableFor(l)}
+                            style={{ backgroundColor: '#2A2A2A', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                          >
+                            <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2}>
+                              <Path d="M3 3h18v18H3z" />
+                              <Path d="M3 9h18" />
+                              <Path d="M9 21V9" />
+                            </Svg>
+                            <Text style={{ color: 'white', fontFamily: weight('700'), fontSize: 13 }}>New table</Text>
+                          </Pressable>
+                        </View>
+                      }
+                    />
                   ))}
                 </View>
               )}
             </Section>
 
-            <Section title={t('alliance.discover')}>
+            <Section title="DISCOVER">
               {discover.isPending && <ActivityIndicator color={theme.brand} style={styles.pad} />}
 
               {discover.isError && (
@@ -107,8 +164,20 @@ export function AllianceScreen() {
               )}
 
               {discover.isSuccess && joinable.length === 0 && (
-                <Card>
-                  <EmptyState title={t('alliance.nothingToJoin')} />
+                <Card style={{ backgroundColor: '#1C1C1C', paddingVertical: 24 }}>
+                  <EmptyState 
+                    title={t('alliance.nothingToJoin', { defaultValue: 'No open alliances right now' })} 
+                    icon={
+                      <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#2A2A2A', alignItems: 'center', justifyContent: 'center' }}>
+                        <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={theme.dim} strokeWidth={2}>
+                          <Path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                          <Circle cx="9" cy="7" r="4" />
+                          <Path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                          <Path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                        </Svg>
+                      </View>
+                    }
+                  />
                 </Card>
               )}
 
@@ -119,16 +188,15 @@ export function AllianceScreen() {
                       key={l.leagueId}
                       league={l}
                       action={
-                        <Button
-                          variant="ghost"
+                        <Pressable
                           disabled={join.isPending && joiningId === l.leagueId}
                           onPress={() => {
                             setJoiningId(l.leagueId);
                             join.mutate(l.leagueId);
                           }}
                         >
-                          {t('alliance.join')}
-                        </Button>
+                          <Text style={{ color: '#D9B87C', fontFamily: weight('600'), fontSize: 13 }}>Join</Text>
+                        </Pressable>
                       }
                     />
                   ))}
@@ -142,14 +210,18 @@ export function AllianceScreen() {
               )}
             </Section>
 
-            <Button variant="ghost" onPress={() => setCreateOpen(true)}>
-              {t('alliance.create')}
-            </Button>
+            <Pressable style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: space.xl, gap: 8 }} onPress={() => setCreateOpen(true)}>
+              <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={theme.dim} strokeWidth={2}>
+                <Path d="M12 5v14M5 12h14" />
+              </Svg>
+              <Text style={{ color: theme.dim, fontSize: 14, fontFamily: weight('700') }}>Create an alliance</Text>
+            </Pressable>
           </>
         )}
       </Screen>
 
       <CreateSheet open={createOpen} onClose={() => setCreateOpen(false)} />
+      <CreateTableSheet league={tableFor} open={tableFor !== null} onClose={() => setTableFor(null)} />
     </>
   );
 }
@@ -157,7 +229,7 @@ export function AllianceScreen() {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <Text style={[styles.sectionTitle, { color: '#D9B87C' }]}>{title}</Text>
       {children}
     </View>
   );
@@ -169,10 +241,33 @@ function LeagueRow({ league, action }: { league: League; action?: ReactNode }) {
     t('alliance.members', { count: league.memberCount }) +
     (league.description ? ` · ${league.description}` : '');
 
+  const isDragon = league.name.toLowerCase() === 'dragon';
+  const leftIcon = isDragon ? (
+    <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: '#D9B87C', alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={1.5}>
+        <Path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      </Svg>
+    </View>
+  ) : (
+    <View style={{ width: 48, height: 48, borderRadius: 12, backgroundColor: theme.surface2, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={theme.dim} strokeWidth={1.5}>
+        <Path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      </Svg>
+    </View>
+  );
+
+  const crown = isDragon ? (
+    <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#D9B87C" strokeWidth={2}>
+      <Path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14" />
+    </Svg>
+  ) : undefined;
+
   return (
     <Card style={styles.leagueCard}>
       <ListRow
+        left={leftIcon}
         label={league.name}
+        labelRight={crown}
         hint={hint}
         right={
           <View style={styles.leagueRight}>
@@ -259,6 +354,7 @@ const styles = StyleSheet.create({
   list: { gap: space.sm },
   leagueCard: { padding: 0, paddingHorizontal: space.md, gap: 0 },
   leagueRight: { alignItems: 'flex-end', gap: space.xs },
+  mineActions: { gap: space.xs, marginTop: space.sm, marginBottom: space.sm, alignItems: 'flex-end' },
   pad: { alignSelf: 'flex-start', paddingVertical: space.sm },
   errorText: { color: theme.danger, fontSize: 12, fontFamily: weight('400') },
   field: { gap: space.xs },

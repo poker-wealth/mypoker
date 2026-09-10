@@ -640,6 +640,11 @@
     "deviceModifiedBody": "루팅 또는 탈옥 도구가 감지되었습니다. 계속 플레이할 수 있지만 변조된 기기는 조작에 취약하므로 입출금 시 주의하세요."
   },
   "auth": {
+    "telegramLogin": "Telegram으로 로그인",
+    "emailLogin": "이메일 로그인",
+    "signUp": "가입하기",
+    "passwordHint": "8자 이상",
+    "responsible": "책임감 있게 플레이하세요. 유해·위조 게임을 거부하고 사기에 주의하며, 시간을 관리해 건강하게 즐기세요.",
     "title": "로그인",
     "subtitle": "로그인하여 플레이하거나 계정을 만드세요.",
     "email": "이메일",

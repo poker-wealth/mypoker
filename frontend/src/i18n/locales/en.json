@@ -640,6 +640,11 @@
     "deviceModifiedBody": "Root or jailbreak tools were detected. You can keep playing, but a modified device is easier to tamper with — take care with deposits and withdrawals."
   },
   "auth": {
+    "telegramLogin": "Log in with Telegram",
+    "emailLogin": "Email login",
+    "signUp": "Sign up",
+    "passwordHint": "8+ characters",
+    "responsible": "Play responsibly. Refuse harmful and counterfeit games, protect yourself from scams, and manage your time — enjoy a healthy balance.",
     "title": "Sign in",
     "subtitle": "Sign in to play, or create an account.",
     "email": "Email",

@@ -41,7 +41,15 @@ function GroupIcon({ size = 32 }: { size?: number }) {
   );
 }
 import { cn } from '@/lib/cn';
-import { PERMANENT_DOMAIN, SUPPORT_EMAIL, SUPPORT_URL, TELEGRAM_BOT_NAME } from '@/config';
+import { APP_URL, PERMANENT_DOMAIN, SUPPORT_EMAIL, SUPPORT_URL, TELEGRAM_BOT_NAME } from '@/config';
+
+/**
+ * Where "Play now" points. Served from the marketing domain, the game lives
+ * on the app subdomain — an absolute hop. Anywhere else (dev, or one host
+ * serving both) the in-app login route does the job.
+ */
+const onMarketingHost = (): boolean =>
+  [PERMANENT_DOMAIN, `www.${PERMANENT_DOMAIN}`].includes(window.location.host);
 
 /**
  * The public landing / download page, after the reference app's — navbar,
@@ -90,7 +98,7 @@ export function Landing() {
     <div className="min-h-full bg-bg text-text">
       {/* ── Navbar ── */}
       <header className="flex items-center justify-between gap-3 border-b border-border bg-surface/80 px-4 py-3 backdrop-blur md:px-8">
-        <img src="/brand/logo-wordmark.png" alt="MYPOKER" className="h-7 w-auto select-none" />
+        <img src="/brand/logo-gold.png" alt="MYPOKER" className="h-7 w-auto select-none" />
         <nav className="flex items-center gap-4 text-sm font-semibold">
           <Link to="/" className="text-dim transition-colors hover:text-text">
             {t('download.navHome')}
@@ -98,12 +106,21 @@ export function Landing() {
           <span className="text-gold">{t('download.navDownload')}</span>
           {/* The one route into the game from here. Sign-in happens when the
               visitor chooses to play — never as the first screen. */}
-          <Link
-            to="/login"
-            className="rounded-full bg-gold px-4 py-1.5 text-[0.8rem] font-bold text-bg transition active:scale-[0.98]"
-          >
-            {t('download.playNow')}
-          </Link>
+          {onMarketingHost() ? (
+            <a
+              href={`${APP_URL}/login`}
+              className="rounded-full bg-gold px-4 py-1.5 text-[0.8rem] font-bold text-bg transition active:scale-[0.98]"
+            >
+              {t('download.playNow')}
+            </a>
+          ) : (
+            <Link
+              to="/login"
+              className="rounded-full bg-gold px-4 py-1.5 text-[0.8rem] font-bold text-bg transition active:scale-[0.98]"
+            >
+              {t('download.playNow')}
+            </Link>
+          )}
           <label className="flex items-center gap-1 text-dim">
             <Globe size={14} aria-hidden />
             <select
@@ -241,7 +258,7 @@ export function Landing() {
              reference ghosts its logo, with the copyright line beneath ── */}
       <footer className="relative overflow-hidden border-t border-border px-4 pb-6 pt-12 text-center">
         <img
-          src="/brand/logo-wordmark.png"
+          src="/brand/logo-gold.png"
           alt=""
           aria-hidden
           className="mx-auto mb-6 h-16 w-auto select-none opacity-[0.13] md:h-20"

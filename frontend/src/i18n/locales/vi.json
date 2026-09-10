@@ -640,6 +640,11 @@
     "deviceModifiedBody": "Đã phát hiện công cụ root hoặc jailbreak. Bạn vẫn có thể chơi, nhưng thiết bị đã chỉnh sửa dễ bị can thiệp hơn — hãy thận trọng khi nạp và rút tiền."
   },
   "auth": {
+    "telegramLogin": "Đăng nhập bằng Telegram",
+    "emailLogin": "Đăng nhập bằng email",
+    "signUp": "Đăng ký",
+    "passwordHint": "Từ 8 ký tự",
+    "responsible": "Chơi có trách nhiệm. Từ chối game độc hại và giả mạo, cảnh giác lừa đảo, quản lý thời gian để giữ cân bằng lành mạnh.",
     "title": "Đăng nhập",
     "subtitle": "Đăng nhập để chơi, hoặc tạo tài khoản mới.",
     "email": "Email",

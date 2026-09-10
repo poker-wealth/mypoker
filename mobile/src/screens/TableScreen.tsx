@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import type { TableScreenProps } from '../navigation';
@@ -66,7 +66,7 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
   useEffect(() => {
     navigation.setOptions({ title: snapshot?.name || tableId });
   }, [navigation, snapshot?.name, tableId]);
-  const { messages, sendChat } = useTableChat(socket);
+  const { messages, sendChat, sendVoice } = useTableChat(socket);
   const { challengerId, clear: clearChallenge } = useChallengePrompt(socket);
   const [chatOpen, setChatOpen] = useState(false);
   const [buyInFor, setBuyInFor] = useState<number | null | false>(false);
@@ -279,18 +279,21 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
 
       <TableDesignSheet open={designOpen} onClose={() => setDesignOpen(false)} />
 
-      <Sheet open={chatOpen} onClose={() => setChatOpen(false)} title="Table chat">
-        <View style={styles.chatHost}>
-          <ChatBox
-            messages={messages}
-            onSend={sendChat}
-            {...(snapshot.you ? { myPlayerId: snapshot.you.playerId } : {})}
-            // Chat is a seated privilege; a spectator watching a table does not get to talk at it.
-            disabled={!snapshot.you || snapshot.yourSeat === null}
-            placeholder={snapshot.yourSeat === null ? 'Take a seat to chat' : 'Say something...'}
-          />
+      {chatOpen && (
+        <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, flexDirection: 'row', zIndex: 100 }}>
+          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' }} onPress={() => setChatOpen(false)} />
+          <View style={{ width: 320, backgroundColor: '#1C1C1C', height: '100%' }}>
+            <ChatBox
+              messages={messages}
+              onSend={sendChat}
+              onSendVoice={sendVoice}
+              {...(snapshot.you ? { myPlayerId: snapshot.you.playerId } : {})}
+              disabled={!snapshot.you || snapshot.yourSeat === null}
+              placeholder={snapshot.yourSeat === null ? 'Take a seat to chat' : 'Chat is disabled'}
+            />
+          </View>
         </View>
-      </Sheet>
+      )}
 
       {/* The bot check. Arrives addressed to this viewer only, and cannot be dismissed — see
           ChallengeModal. Answering clears it; the server scores how long it took. */}

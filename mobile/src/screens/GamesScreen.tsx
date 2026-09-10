@@ -13,37 +13,14 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Circle, Path } from 'react-native-svg';
+import { Svg, Path, Circle } from 'react-native-svg';
 import { api } from '../api';
 import type { RootStackParamList } from '../navigation';
 import { money } from '../money';
 import { radius, space, theme, weight } from '../theme';
-import { EmptyState, Segmented, Skeleton } from '../ui';
+import { Badge, Card, Dialog, EmptyState, ListRow, Screen, Segmented, Sheet, Skeleton } from '../ui';
 import { artFor, visibleGames, type GameCategory, type GameDef } from '../games';
-
-/**
- * Games — the catalogue screen, ported from `frontend/src/pages/Games.tsx`.
- *
- * THE GATE — this must iterate `visibleGames()`, never the raw `GAMES` array.
- * The launch gate (`HIDDEN_GAMES`, withheld on Victor's instruction) lives
- * inside that filter. An audit previously caught this exact page bypassing
- * the gate on the web and rendering withheld games as tappable tiles that
- * navigated to real tables — do not reintroduce that here.
- *
- * FIGURES — table counts and jackpots are live values from GET /lobby/games,
- * keyed by game id. There is nothing to fall back to when the lobby hasn't
- * answered yet: a tile shows an em dash for tables and no jackpot line at
- * all, never a zero — a zero is a claim about the pools, and it would be the
- * wrong one.
- *
- * NAVIGATION — the web pushes `/table/${g.id}`, where the game's own id
- * doubles as a table-server "slug" that opens that game's default table (see
- * `frontend/src/config.ts`'s `LIVE_TABLE_IDS`/`isOpenableTableId`). The
- * mobile `Table` stack screen takes the same shape of parameter
- * (`{ tableId: string }`), so a tap here mirrors that call: `navigate('Table',
- * { tableId: game.id })`. There is no mobile equivalent of a lobby "filtered
- * to one game" route, and inventing one is out of scope for this screen.
- */
+import { CreateTableSheet } from '../components/CreateTableSheet';
 
 type Filter = 'all' | GameCategory;
 
@@ -52,13 +29,11 @@ const COMING_SOON = ['blackjack', 'sicbo', 'fishingWar', 'setteMezzo'];
 interface GameSummary {
   gameId: string;
   tables: number;
-  /** micro-USD */
   jackpot: number;
 }
 
 interface LobbyGames {
   games: GameSummary[];
-  /** micro-USD */
   totalJackpot: number;
 }
 
@@ -67,6 +42,8 @@ export function GamesScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [cat, setCat] = useState<Filter>('all');
   const [q, setQ] = useState('');
+  const [actionGame, setActionGame] = useState<GameDef | null>(null);
+  const [createSheetGame, setCreateSheetGame] = useState<GameDef | null>(null);
 
   const lobby = useQuery({
     queryKey: ['lobby', 'games'],
@@ -76,13 +53,8 @@ export function GamesScreen() {
     retry: 1,
   });
 
-  // Null, not a formatted zero, while the lobby is still answering — a zero
-  // jackpot is a claim about the pools, and it is the wrong one.
-  const jackpot = lobby.data ? money(lobby.data.totalJackpot, { decimals: 2 }) : null;
+  const jackpot = lobby.data ? lobby.data.totalJackpot : null;
 
-  // Live figures per game, keyed by id. The tiles take their table count and
-  // jackpot from here; nothing on this screen comes from the static catalog
-  // except artwork, names and categories.
   const live = useMemo(
     () => new Map((lobby.data?.games ?? []).map((g) => [g.gameId, g])),
     [lobby.data],
@@ -90,10 +62,6 @@ export function GamesScreen() {
 
   const query = q.trim().toLowerCase();
 
-  // visibleGames(), NOT GAMES: the launch gate (HIDDEN_GAMES, withheld on
-  // Victor's instruction) lives in that filter, and iterating the raw list
-  // here rendered withheld games as tappable tiles that navigated to real
-  // tables. An audit caught this page as the one map site bypassing the gate.
   const games = visibleGames();
   const grouped = {
     poker: games.filter((g) => g.category === 'poker'),
@@ -118,6 +86,7 @@ export function GamesScreen() {
   ];
 
   return (
+    <>
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
       {/* Search */}
       <View style={styles.search}>
@@ -128,32 +97,28 @@ export function GamesScreen() {
         <TextInput
           value={q}
           onChangeText={setQ}
-          placeholder={t('games.searchPlaceholder')}
+          placeholder="Search games"
           placeholderTextColor={theme.dim}
           style={styles.searchInput}
         />
       </View>
 
-      {/* Jackpot hero */}
+      {/* Jackpot Hero */}
       <View style={styles.hero}>
         <LinearGradient
-          colors={[theme.brand, theme.accent]}
+          colors={['#C9A15F', '#E8C98E', '#B38B4A']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
-        <View style={styles.heroBody}>
-          <Text style={styles.heroLabel}>{t('jackpot.tier.GRAND')}</Text>
+        <Image source={require('../../assets/brand/trophy.png')} style={styles.trophy} resizeMode="contain" />
+        <View style={styles.heroRight}>
+          <Text style={styles.heroLabel}>GRAND JACKPOT</Text>
           {lobby.isPending ? (
-            <View style={styles.heroSkeletonWrap}>
-              <Skeleton width={180} />
-            </View>
+            <Skeleton width={100} />
           ) : (
             <Text style={styles.heroValue}>
-              {/* Em dash when the lobby failed — a hero that renders empty
-                  looks broken, and a formatted zero would claim there is
-                  nothing to win. Unknown is neither. */}
-              {jackpot ?? '—'}
+              {money(jackpot ?? 0, { decimals: 0 })}
             </Text>
           )}
         </View>
@@ -185,7 +150,7 @@ export function GamesScreen() {
                       game={g}
                       tables={live.get(g.id)?.tables}
                       jackpot={live.get(g.id)?.jackpot}
-                      onPress={() => openGame(g.id)}
+                      onPress={() => setActionGame(g)}
                     />
                   ))}
                 </View>
@@ -213,14 +178,68 @@ export function GamesScreen() {
         </View>
       </View>
     </ScrollView>
+
+    {/* Game Action Drawer (Screenshot 1) */}
+    <Dialog 
+      open={actionGame !== null} 
+      onClose={() => setActionGame(null)} 
+      title={actionGame ? t(`gameNames.${actionGame.id}`, { defaultValue: actionGame.name }) : ''}
+    >
+      <View style={{ gap: space.sm }}>
+        <Pressable
+          style={styles.actionCard}
+          onPress={() => {
+            if (actionGame) {
+              openGame(actionGame.id);
+              setActionGame(null);
+            }
+          }}
+        >
+          <View style={[styles.actionIconWrap, { backgroundColor: '#2A2A2A' }]}>
+            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#D9B87C" strokeWidth={2}>
+              <Path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <Circle cx="9" cy="7" r="4" />
+              <Path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+              <Path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </Svg>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.actionTitle}>Join a table</Text>
+            <Text style={styles.actionHint}>Take a seat at the open table.</Text>
+          </View>
+        </Pressable>
+
+        <Pressable
+          style={styles.actionCard}
+          onPress={() => {
+            const g = actionGame;
+            setActionGame(null);
+            setTimeout(() => setCreateSheetGame(g), 100);
+          }}
+        >
+          <View style={[styles.actionIconWrap, { backgroundColor: '#2A2A2A' }]}>
+            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#D9B87C" strokeWidth={2}>
+              <Path d="M12 5v14M5 12h14" />
+            </Svg>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.actionTitle}>Create a table</Text>
+            <Text style={styles.actionHint}>Open your own and invite friends.</Text>
+          </View>
+        </Pressable>
+      </View>
+    </Dialog>
+
+    {/* Custom CreateTableSheet (Screenshot 2) */}
+    <CreateTableSheet
+      initialVariant={createSheetGame?.id as any}
+      open={createSheetGame !== null}
+      onClose={() => setCreateSheetGame(null)}
+    />
+    </>
   );
 }
 
-/**
- * One game tile, mirroring `frontend/src/components/GameTile.tsx`: sized by
- * aspect ratio (never a fixed height) so every card in the grid is identical
- * regardless of how long its name is or whether its figures have loaded.
- */
 const TILE_RATIO = 6 / 7;
 
 function GameTile({
@@ -242,12 +261,6 @@ function GameTile({
       onPress={onPress}
       style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
     >
-      <LinearGradient
-        colors={game.gradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
       <View style={styles.tileArt}>
         {art ? (
           <Image source={art} style={styles.tileImage} resizeMode="contain" />
@@ -261,9 +274,6 @@ function GameTile({
       <Text style={styles.tileTables}>
         {tables === undefined ? '—' : t('games.tableCount', { count: tables })}
       </Text>
-      {/* The gold figure is this game's pooled jackpot across its tables. Shown
-          only when there is one — a formatted zero on every card is noise, and
-          on a game with no pool it would be a promise of nothing. */}
       {jackpot !== undefined && jackpot > 0 && (
         <Text style={styles.tileJackpot}>{money(jackpot, { decimals: 2 })}</Text>
       )}
@@ -275,7 +285,7 @@ const GRID_GAP = space.sm;
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.bg },
-  content: { padding: space.lg, gap: space.md },
+  content: { padding: space.lg, paddingTop: space.md, gap: space.xl },
   search: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -288,26 +298,29 @@ const styles = StyleSheet.create({
     paddingVertical: space.sm + 2,
   },
   searchInput: { flex: 1, color: theme.text, fontSize: 14, fontFamily: weight('400') },
+  
   hero: {
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: theme.border,
+    height: 140,
+    borderRadius: 16,
     overflow: 'hidden',
-    height: 128,
-    justifyContent: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  heroBody: { alignItems: 'center', gap: 2, paddingHorizontal: space.lg },
-  heroLabel: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 1, fontFamily: weight('800') },
-  heroSkeletonWrap: { marginTop: space.sm },
-  heroValue: {
-    marginTop: 2,
-    color: theme.jackpot,
-    fontSize: 35,
-    letterSpacing: -0.5, fontFamily: weight('900') },
+  trophy: {
+    position: 'absolute',
+    left: -20,
+    bottom: -10,
+    width: 180,
+    height: 180,
+  },
+  heroRight: {
+    flex: 1,
+    alignItems: 'center',
+    marginLeft: 100,
+  },
+  heroLabel: { color: 'rgba(255,255,255,0.9)', fontSize: 12, fontFamily: weight('800'), letterSpacing: 0.5 },
+  heroValue: { color: '#FFD700', fontSize: 38, fontFamily: weight('900'), textShadowColor: 'rgba(0,0,0,0.2)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
+
   sections: { gap: space.xl },
   section: { gap: space.sm },
   sectionTitle: { color: theme.text, fontSize: 12, letterSpacing: 1, fontFamily: weight('800') },
@@ -358,4 +371,33 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   soonBadgeText: { color: theme.dim, fontSize: 9, fontFamily: weight('800') },
+  actionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    padding: space.md,
+    backgroundColor: theme.surface,
+    borderRadius: radius.card,
+    borderColor: theme.border,
+    borderWidth: 1,
+  },
+  actionIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(187,92,246,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionTitle: {
+    color: theme.text,
+    fontSize: 16,
+    fontFamily: weight('700'),
+  },
+  actionHint: {
+    color: theme.dim,
+    fontSize: 12,
+    marginTop: 2,
+    fontFamily: weight('400'),
+  },
 });

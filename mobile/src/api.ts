@@ -110,6 +110,21 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body as T;
 }
 
+/**
+ * Forgot-password, both steps — unauthenticated, same contract the Mini App
+ * uses (gateway: /auth/forgot-password, /auth/reset-password). Step 1 answers
+ * identically whether or not the email exists (anti-enumeration — never
+ * "helpfully" distinguish); step 2 takes the mailed code and the new password.
+ */
+export const forgotPasswordApi = (email: string): Promise<{ resendAvailableAt?: string | null }> =>
+  api.post('/auth/forgot-password', { email });
+
+export const resetPasswordApi = (
+  email: string,
+  code: string,
+  newPassword: string,
+): Promise<unknown> => api.post('/auth/reset-password', { email, code, newPassword });
+
 export const api = {
   get: <T>(path: string): Promise<T> => request<T>(path),
   post: <T>(path: string, body?: unknown): Promise<T> =>

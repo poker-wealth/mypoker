@@ -30,6 +30,64 @@ function Frame({ color, size = 24, children }: IconProps & { children: ReactNode
   );
 }
 
+/**
+ * Headset — support, top-right of the sign-in screen. The reference draws it
+ * SOLID: a filled gold disc with the headset cut into it, not a line glyph —
+ * so this one paints the disc in `color` and the headset in `inner` (the
+ * screen's background colour), inverting the usual stroke recipe.
+ */
+export function HeadsetIcon({ color, size = 24, inner = '#0c0c0c' }: IconProps & { inner?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={12} r={11} fill={color} />
+      <Path
+        d="M6.7 14v-2a5.3 5.3 0 0 1 10.6 0v2"
+        stroke={inner}
+        strokeWidth={1.9}
+        strokeLinecap="round"
+      />
+      <Rect x={5.6} y={13} width={3.1} height={4.8} rx={1.4} fill={inner} />
+      <Rect x={15.3} y={13} width={3.1} height={4.8} rx={1.4} fill={inner} />
+      <Path
+        d="M16.9 18.2v.4a1.9 1.9 0 0 1-1.9 1.9h-2.4"
+        stroke={inner}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+/** Envelope — the email-login tab on the sign-in screen. */
+export function MailIcon(p: IconProps) {
+  return (
+    <Frame {...p}>
+      <Rect x={3} y={5.5} width={18} height={13} rx={2} />
+      <Path d="m3.5 7 8.5 6 8.5-6" />
+    </Frame>
+  );
+}
+
+/** Padlock — the password field's leading mark. */
+export function LockIcon(p: IconProps) {
+  return (
+    <Frame {...p}>
+      <Rect x={5.5} y={10.5} width={13} height={9} rx={2} />
+      <Path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" />
+    </Frame>
+  );
+}
+
+/** Paper plane — the Telegram door on the sign-in screen. */
+export function SendIcon(p: IconProps) {
+  return (
+    <Frame {...p}>
+      <Path d="M21 3.5 3.2 10.4c-.8.3-.75 1.4.07 1.65l6.1 1.9 1.9 6.1c.25.82 1.36.87 1.65.07L21 3.5Z" />
+      <Path d="M21 3.5 9.4 13.9" />
+    </Frame>
+  );
+}
+
 /** Wallet — a billfold with a clasp. */
 export function WalletIcon(p: IconProps) {
   return (
@@ -152,6 +210,24 @@ export function ChatIcon(p: IconProps) {
   return (
     <Frame {...p}>
       <Path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 9.5 9.5 0 0 1-3.6-.7L3 21l1.9-5A8.2 8.2 0 0 1 4 11.5a8.4 8.4 0 0 1 9-8.4 8.4 8.4 0 0 1 8 8.4Z" />
+    </Frame>
+  );
+}
+
+export function EyeIcon(p: IconProps) {
+  return (
+    <Frame {...p}>
+      <Path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <Circle cx="12" cy="12" r="3" />
+    </Frame>
+  );
+}
+
+export function EyeOffIcon(p: IconProps) {
+  return (
+    <Frame {...p}>
+      <Path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+      <Path d="M1 1l22 22" />
     </Frame>
   );
 }
