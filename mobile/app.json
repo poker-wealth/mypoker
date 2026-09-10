@@ -61,6 +61,12 @@
           "photosPermission": "MYPOKER uses your photos so you can set one as your profile picture.",
           "cameraPermission": false
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#d9b87c"
+        }
       ]
     ],
     "owner": "xantle-application",

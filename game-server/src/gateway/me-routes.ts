@@ -236,6 +236,10 @@ export function buildMeRouter(config: GatewayConfig, deps: MeRouterDeps = {}): R
   r.get('/leagues', (req, res) => void forwardTo(config, req, res, '/me/leagues'));
   r.get('/notifications', (req, res) => void forwardTo(config, req, res, '/me/notifications'));
   r.post('/notifications/read', (req, res) => void forwardTo(config, req, res, '/me/notifications/read'));
+  // Push tokens. The device tells us its own address; forwardTo carries the
+  // method and body through, so registering and forgetting are one line each.
+  r.post('/push-tokens', (req, res) => void forwardTo(config, req, res, '/me/push-tokens'));
+  r.delete('/push-tokens', (req, res) => void forwardTo(config, req, res, '/me/push-tokens'));
   r.post('/referral', (req, res) => void forwardTo(config, req, res, '/me/referral'));
   r.get('/settings', (req, res) => void forwardTo(config, req, res, '/me/settings'));
   r.patch('/settings', (req, res) => void forwardTo(config, req, res, '/me/settings'));

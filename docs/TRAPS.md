@@ -968,3 +968,39 @@ exist, because it clears badges for tabs nobody opened — and the badges are th
 only reason to have tabs. It now marks the ids actually on screen. Whenever a
 screen gains a filter, re-read every write it performs: the writes were
 scoped to "the whole thing" when the whole thing was all you could see.
+
+---
+
+## 34. Register on the state, not on each way of reaching it
+
+Push registration has to happen once a player is signed in. There are four ways
+to become signed in here — Telegram, Google, email, and the silent restore from
+a stored token on cold start — and the obvious implementation calls
+`registerForPush()` from each of them.
+
+Three of four is the failure, and it is invisible. The player who signed in with
+Google gets deposit alerts; the one whose app restored a saved session does not,
+and nothing distinguishes them on any screen. Nobody reports "I get
+notifications when I sign in a particular way" because nobody knows that is the
+variable. It is §20/§23 again — *a rule enforced on one door is not enforced* —
+with the doors being routes into the same state rather than transports.
+
+So it hangs off the state: one `useEffect` keyed on `status === 'signedIn'`. A
+fifth sign-in route added next year is covered without anyone remembering.
+
+**The mirror of it, on the way out, is an ordering bug.** `signOut` clears the
+session token, and the request that de-registers the device needs that token to
+authenticate. Written in the natural order:
+
+```ts
+await clearToken();
+await unregisterFromPush();   // 401 — the device is never dropped
+```
+
+it fails silently, in a way that matters on a shared handset: the phone keeps
+showing the previous player's deposits and withdrawals on its lock screen. The
+unregister must come **first**, while the credential it needs still exists.
+
+The general form: teardown that calls the network runs before the credentials
+are destroyed, and setup that depends on a state attaches to the state rather
+than to each of its causes.
