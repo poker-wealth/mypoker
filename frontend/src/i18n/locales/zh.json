@@ -175,6 +175,8 @@
     "wallet": "钱包",
     "fairness": "公平性验证",
     "history": "游戏记录",
+    "results": "战绩",
+    "jackpot": "彩池",
     "settings": "设置",
     "support": "客服支持",
     "language": "语言",
@@ -497,6 +499,12 @@
     "signInToSee": "登录以查看通知",
     "empty": "暂无通知",
     "emptyBlurb": "牌局结果、充值与公告将显示在此处。",
+    "tab": {
+      "system": "系统消息",
+      "results": "战绩",
+      "deposits": "存款",
+      "promos": "优惠活动"
+    },
     "handWon": "您赢得 ${{amount}}",
     "handLost": "牌局结算 — ${{amount}}",
     "deposit": "充值 ${{amount}} 已到账",

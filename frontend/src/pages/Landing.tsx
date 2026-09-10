@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
@@ -41,15 +41,7 @@ function GroupIcon({ size = 32 }: { size?: number }) {
   );
 }
 import { cn } from '@/lib/cn';
-import { APP_URL, PERMANENT_DOMAIN, SUPPORT_EMAIL, SUPPORT_URL, TELEGRAM_BOT_NAME } from '@/config';
-
-/**
- * Where "Play now" points. Served from the marketing domain, the game lives
- * on the app subdomain — an absolute hop. Anywhere else (dev, or one host
- * serving both) the in-app login route does the job.
- */
-const onMarketingHost = (): boolean =>
-  [PERMANENT_DOMAIN, `www.${PERMANENT_DOMAIN}`].includes(window.location.host);
+import { PERMANENT_DOMAIN, SUPPORT_EMAIL, SUPPORT_URL, TELEGRAM_BOT_NAME } from '@/config';
 
 /**
  * The public landing / download page, after the reference app's — navbar,
@@ -104,23 +96,19 @@ export function Landing() {
             {t('download.navHome')}
           </Link>
           <span className="text-gold">{t('download.navDownload')}</span>
-          {/* The one route into the game from here. Sign-in happens when the
-              visitor chooses to play — never as the first screen. */}
-          {onMarketingHost() ? (
-            <a
-              href={`${APP_URL}/login`}
-              className="rounded-full bg-gold px-4 py-1.5 text-[0.8rem] font-bold text-bg transition active:scale-[0.98]"
-            >
-              {t('download.playNow')}
-            </a>
-          ) : (
-            <Link
-              to="/login"
-              className="rounded-full bg-gold px-4 py-1.5 text-[0.8rem] font-bold text-bg transition active:scale-[0.98]"
-            >
-              {t('download.playNow')}
-            </Link>
-          )}
+          {/*
+            No "Play now" here, by the owner's decision.
+
+            This was the only web sign-in route on the public site, so the front
+            door is now download-only: the way in is the app, via the store
+            buttons and the Telegram link below. `/login` still exists and still
+            works for anyone who has the URL — it is unlinked, not removed.
+
+            `download.playNow` is deliberately left in all eight locale files.
+            Nothing renders it today, but the button is one line to restore and
+            deleting a key across eight files (and putting it back) is the kind
+            of churn that breaks locale parity for no gain.
+          */}
           <label className="flex items-center gap-1 text-dim">
             <Globe size={14} aria-hidden />
             <select
@@ -259,6 +247,8 @@ export function Landing() {
       <footer className="relative overflow-hidden border-t border-border px-4 pb-6 pt-12 text-center">
         <img
           src="/brand/logo-gold.png"
+          loading="lazy"
+          decoding="async"
           alt=""
           aria-hidden
           className="mx-auto mb-6 h-16 w-auto select-none opacity-[0.13] md:h-20"
@@ -297,9 +287,11 @@ function FeatureCard({
   if (fullPanel) {
     return (
       <img
-        src={`/brand/feature-${n}.png`}
+        src={`/brand/feature-${n}.webp`}
         alt={title}
         onError={() => setFullPanel(false)}
+        loading="lazy"
+        decoding="async"
         className="w-full select-none rounded-2xl"
         draggable={false}
       />
@@ -323,7 +315,7 @@ function FeatureCard({
 
       {hasPhone && (
         <img
-          src={`/brand/feature-${n}.png`}
+          src={`/brand/feature-${n}.webp`}
           alt=""
           aria-hidden
           onError={() => setHasPhone(false)}
@@ -347,12 +339,33 @@ function FeatureCard({
 
 /**
  * The hero: a slide carousel over the owner's banner art at
- * `public/brand/hero-1.png`, `hero-2.png`, … (arrows + dots, auto-advance).
+ * `public/brand/hero-1.webp`, `hero-2.webp`, … (arrows + dots, auto-advance).
  * Slides that fail to load fall out of the rotation; with none present the
  * carousel is a single brand-gradient slide with the wordmark, so the page
  * never shows a broken image while the art is on its way into the repo.
  */
-const HERO_SLIDES = ['/brand/hero-1.png', '/brand/hero-2.png'];
+const HERO_SLIDES = ['/brand/hero-1.webp', '/brand/hero-2.webp'];
+
+/**
+ * How tall the banner slot is allowed to be.
+ *
+ * The art was previously rendered at its own natural size — `h-auto w-full` —
+ * so its height was whatever the viewport width divided by the art's ratio came
+ * to. hero-1 is 1024x569 (1.80), which on a 1920-wide screen is a 1067px tall
+ * banner sitting below a ~110px header: the bottom edge landed roughly 300px
+ * past the fold and the owner had to scroll to see the end of his own banner.
+ *
+ * `58svh` is the cap that fixes that — a little over half the viewport, so the
+ * banner always finishes on screen with the page's next section showing beneath
+ * it. `56vw` keeps it from going letterbox-thin on a phone, where the natural
+ * height already fits: at 390px wide, 56vw is 218px and the art's own height is
+ * 217px, so the cap is a no-op there and the picture is untouched.
+ *
+ * The pair of slides do not share a ratio (1.80 and 2.05), so before this the
+ * carousel also changed height mid-rotation and shunted the page around. A
+ * fixed slot removes that too.
+ */
+const HERO_HEIGHT = 'min(56vw, 58svh)';
 
 function HeroCarousel() {
   const { t } = useTranslation();
@@ -390,27 +403,40 @@ function HeroCarousel() {
 
   return (
     <section className="relative overflow-hidden bg-black">
-      {/* Probe every slide so a missing file drops out instead of flashing broken. */}
-      {HERO_SLIDES.map((s) => (
-        <img
-          key={`probe-${s}`}
-          src={s}
-          alt=""
-          aria-hidden
-          className="hidden"
-          onError={() => setDead((d) => new Set(d).add(s))}
-        />
-      ))}
       {/* The complete banners on a sliding track — the whole row shifts one
-          screen-width per slide, so a change is a glide, not a cut. Full
-          width at each art's own aspect; nothing is cropped to fit a box. */}
+          screen-width per slide, so a change is a glide, not a cut. Each sits
+          in a capped slot (see HERO_HEIGHT) and is fitted with `object-contain`,
+          so the whole banner stays on screen and nothing is cropped to fit.
+          A slide that fails to load drops out of the rotation. */}
       <div className="overflow-hidden">
         <div
-          className="flex items-start transition-transform duration-500 ease-out"
+          className="flex transition-transform duration-500 ease-out"
           style={{ transform: `translateX(-${Math.min(at, count - 1) * 100}%)` }}
         >
-          {live.map((s) => (
-            <img key={s} src={s} alt="" className="h-auto w-full shrink-0 select-none" draggable={false} />
+          {live.map((s, i) => (
+            <div
+              key={s}
+              className="relative w-full shrink-0 overflow-hidden"
+              style={{ height: HERO_HEIGHT }}
+            >
+              {/* Whatever `contain` leaves over at the sides is filled with the
+                  art's own edges, blurred — the same file, so no second
+                  request, and no new art needed from the designer. */}
+              <div
+                aria-hidden
+                className="absolute inset-0 scale-110 bg-cover bg-center blur-2xl"
+                style={{ backgroundImage: `url("${s}")` }}
+              />
+              <img
+                src={s}
+                alt=""
+                onError={() => setDead((d) => new Set(d).add(s))}
+                className="relative h-full w-full select-none object-contain"
+                draggable={false}
+                decoding="async"
+                fetchPriority={i === 0 ? 'high' : 'low'}
+              />
+            </div>
           ))}
         </div>
       </div>
@@ -523,8 +549,71 @@ function VideoSlot({ index }: { index: number }) {
   const { t } = useTranslation();
   const [missing, setMissing] = useState(false);
   const [playing, setPlaying] = useState(false);
+  const [warm, setWarm] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const src = `/brand/video${index}.mp4`;
   const label = t(`download.video${index}Label`);
+
+  /*
+   * Start buffering when someone shows interest, not when they click.
+   *
+   * The reference keeps its <video> in the DOM from page load with the src
+   * already set — its `v-show` toggles `display`, it does not mount and
+   * unmount the element — so by the time you click, the clip is buffered and
+   * it simply appears, playing. Ours mounted the element on click, which meant
+   * every click created a fresh <video> and you sat watching the browser's own
+   * empty player fill up. That is the "video HTML tag loader".
+   *
+   * Copying them exactly would mean four <video> elements pulling on ~28 MB of
+   * MP4 at page load, which is the cost that made this page slow in the first
+   * place. So the element is permanent like theirs — never re-created, so it
+   * never re-buffers — but it holds `preload="none"` until a pointer touches
+   * the tile. Hover on a desktop and it is ready long before the click; on a
+   * phone, `pointerdown` fires before the tap completes, which buys a little.
+   * Nobody who scrolls past pays anything.
+   */
+  const warmUp = useCallback((): void => setWarm(true), []);
+
+  /* load() in an effect, not inside warmUp: it has to run AFTER the render
+     that sets preload="auto", because calling it while the attribute still
+     reads "none" is a request the browser is entitled to ignore. */
+  useEffect(() => {
+    if (warm) videoRef.current?.load();
+  }, [warm]);
+
+  /* The element is always mounted, so play/pause is what opening and closing
+     actually means — not mounting and unmounting. */
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    if (playing) void el.play().catch(() => undefined);
+    else el.pause();
+  }, [playing]);
+
+  /*
+   * Does the file exist? Ask, rather than open it.
+   *
+   * This was a hidden `<video preload="metadata">` per tile. Four of those
+   * mount four media pipelines against four MP4s totalling ~28 MB on every
+   * single page load, just to learn whether the files are there — and because
+   * an MP4's moov atom sits at the end of the file, "metadata" can mean
+   * range-requesting deep into a 14 MB clip. A HEAD request answers the same
+   * question in a few hundred bytes and downloads no video at all.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    const fail = (): void => {
+      if (!cancelled) setMissing(true);
+    };
+    fetch(src, { method: 'HEAD' })
+      .then((r) => {
+        if (!r.ok) fail();
+      })
+      .catch(fail);
+    return () => {
+      cancelled = true;
+    };
+  }, [src]);
   const title = label.replace(/\n/g, ' ');
 
   return (
@@ -533,8 +622,7 @@ function VideoSlot({ index }: { index: number }) {
         className="relative aspect-square overflow-hidden rounded-2xl"
         style={{ background: TILE_ART[index - 1] }}
       >
-        {/* Probe so a missing file downgrades the tile instead of breaking it. */}
-        <video src={src} preload="metadata" className="hidden" onError={() => setMissing(true)} />
+
         {/* The game name, ghosted big and tilted across the cloth, in the
             cloth's own paler shade. */}
         <span
@@ -552,7 +640,13 @@ function VideoSlot({ index }: { index: number }) {
           type="button"
           aria-label={title}
           disabled={missing}
-          onClick={() => setPlaying(true)}
+          onPointerEnter={warmUp}
+          onPointerDown={warmUp}
+          onFocus={warmUp}
+          onClick={() => {
+            warmUp();
+            setPlaying(true);
+          }}
           className="absolute inset-0 grid place-items-center"
         >
           {/* The reference's ring: an outlined circle, not a filled disc. */}
@@ -567,35 +661,49 @@ function VideoSlot({ index }: { index: number }) {
         )}
       </div>
 
-      {/* The reference's player: the video floats centered over the page as
-          it is — no dark wash behind it, just the clip and its shadow. Tap
-          outside (or the ×) to close. */}
-      {playing && !missing && (
-        <div
-          className="fixed inset-0 z-[90] grid place-items-center p-4"
+      {/*
+        The player. Hidden with CSS rather than unmounted — see warmUp above;
+        this is what makes it open already playing instead of starting a
+        download. `hidden` is Tailwind's `display: none`, which is exactly the
+        `v-show` the reference uses.
+
+        The dark wash IS the reference's: `.mask { background: #0c0e0f;
+        opacity: .5 }`, sitting under the clip at z-index 1. A comment here
+        used to say they had no wash and that we were matching them by leaving
+        it out. That was wrong — it is in their stylesheet — so it is back.
+
+        `autoPlay` is gone with it. The element now outlives the modal, so an
+        autoplay attribute would fire on a hidden video at page load; the
+        effect above calls play() on open, which is also the click-initiated
+        gesture browsers actually allow.
+      */}
+      <div
+        className={cn('fixed inset-0 z-[90] grid place-items-center p-4', !playing && 'hidden')}
+        onClick={() => setPlaying(false)}
+      >
+        <div className="absolute inset-0 bg-[#0c0e0f] opacity-50" aria-hidden />
+        <video
+          ref={videoRef}
+          controls
+          playsInline
+          preload={warm ? 'auto' : 'none'}
+          src={src}
+          className="relative max-h-[85vh] max-w-full rounded-lg shadow-[0_10px_60px_rgb(0_0_0/0.8)]"
+          onClick={(e) => e.stopPropagation()}
+          onError={() => {
+            setMissing(true);
+            setPlaying(false);
+          }}
+        />
+        <button
+          type="button"
+          aria-label={t('common.cancel')}
           onClick={() => setPlaying(false)}
+          className="absolute right-4 top-4 grid size-10 place-items-center rounded-full bg-white/15 text-white"
         >
-          <video
-            controls
-            autoPlay
-            src={src}
-            className="max-h-[85vh] max-w-full rounded-lg shadow-[0_10px_60px_rgb(0_0_0/0.8)]"
-            onClick={(e) => e.stopPropagation()}
-            onError={() => {
-              setMissing(true);
-              setPlaying(false);
-            }}
-          />
-          <button
-            type="button"
-            aria-label={t('common.cancel')}
-            onClick={() => setPlaying(false)}
-            className="absolute right-4 top-4 grid size-10 place-items-center rounded-full bg-white/15 text-white"
-          >
-            <X size={20} />
-          </button>
-        </div>
-      )}
+          <X size={20} />
+        </button>
+      </div>
     </>
   );
 }

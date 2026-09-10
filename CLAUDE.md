@@ -87,3 +87,40 @@ Also known: **16 pre-existing eslint `any` errors** in
 Branch per task off `main`, one thing per PR, `--samuel` suffix. PR descriptions carry: what changed, **what was verified and how**, what is still open. That doubles as the handoff artifact for the next session.
 
 Claim only what was checked. "Tests pass" is not "it works" — say which was done.
+
+## The public site has a weight budget
+
+`/` and `/download` are the marketing front door — `frontend/src/pages/Landing.tsx`,
+outside `AppShell`, rendered for people who have never signed in and are
+deciding whether to bother. It is the one surface where load time is the
+product, and it has already been reported as slow once (TRAPS §27–30).
+
+- **Brand art goes in as WebP, not PNG.** The six landing images were 3.2 MB of
+  PNG and are 273 KB of WebP at q90 — 91.6% off, no visible difference. There
+  is no `sharp` and no image plugin in the build; convert before committing
+  (Pillow will do it) and commit only the WebP, so nothing can quietly go on
+  serving a heavy copy. Anything above the fold should be counted, not assumed.
+- **Below the fold means `loading="lazy"`.** With `decoding="async"`.
+- **Never probe a file's existence with the element that plays it.** `hidden`
+  does not stop a fetch. Use `fetch(url, { method: 'HEAD' })`. TRAPS §28.
+- **Routes are code split** (`src/router.tsx`, React Router's `lazy`). `AppShell`
+  and `Landing` are deliberately eager — they are what the front door renders.
+  If you add a route, it should be lazy unless it is on the first paint.
+- **The splash has a minimum visible time** and it is not a bug:
+  `src/lib/splash.ts` holds 2200ms inside Telegram, 300ms in a browser. It is a
+  floor on perceived load that no bundle analyser can see, so check it before
+  hunting bytes. If routes stop being lazy, the `router.state.initialized` wait
+  in `main.tsx` becomes dead weight rather than wrong.
+
+Sizes to keep honest, measured 2026-09-09: entry chunk 286 KB gzipped,
+above-the-fold images 160 KB.
+
+## Who owns the public pages
+
+`Landing.tsx` is Esther's (PR #65, merged as `15ce058`, and it is what
+mypoker777.com serves). `feat/download-page--samuel` carries a different shape
+for the same ground — `Home.tsx` + `Download.tsx` + `components/public/`,
+treating landing and download as two pages where hers is one. **That
+disagreement is unresolved.** Do not "fix" one into the other on the way past;
+it needs Victor, and until then, edits to `Landing.tsx` are edits to someone
+else's file and she should be told.

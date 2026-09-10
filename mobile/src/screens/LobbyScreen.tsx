@@ -103,7 +103,7 @@ export function LobbyScreen() {
               <Skeleton width={100} />
             ) : (
               <Text style={styles.heroValue}>
-                {money(totalJackpot ?? 0, { decimals: 0 })}
+                {money(totalJackpot, { decimals: 0 })}
               </Text>
             )}
           </View>

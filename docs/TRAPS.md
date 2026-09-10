@@ -694,3 +694,277 @@ runs in `frontend npm run build` and in `mobile npm run verify`. Mutation-tested
 in both directions — each of the five drifts is caught, and renaming the CSS
 rule produces a loud PARSE FAILURE rather than a silent pass, which is the
 mistake `check-parity` made (§25).
+
+---
+
+## 27. An image with no height has whatever height the viewport gives it
+
+The owner opened the live site and could not see the bottom of his own banner
+without scrolling. The hero slides were:
+
+```tsx
+<img src={s} className="h-auto w-full shrink-0" />
+```
+
+No height. So the slot's height was viewport width ÷ the art's aspect ratio,
+and the art is 1024x569. On the 1920-wide screen he was using that is a 1067px
+banner sitting under a ~110px header — the bottom edge landed about 300px past
+the fold. On the 1280-wide laptop it was authored on it very nearly fitted, and
+looked fine.
+
+**`h-auto w-full` is not a layout, it is a ratio.** Anything sized that way is
+only ever "correct" at the width you happened to look at it. A slot that must
+relate to the fold needs a viewport-height term in it — ours is now
+`min(56vw, 58svh)`, where the `svh` half answers the complaint and the `vw`
+half stops it going letterbox-thin on a phone.
+
+Two related things this surfaced:
+
+*The obvious fix was the wrong one.* Capping height with `object-fit: cover`
+crops. Cropping this 1.80 image into the ~3.2 slot a wide desktop implies takes
+44% of its height off, and the tagline sits about 78% down — it would have gone.
+`publicSite.css` already carried a note about exactly this happening once
+before, a 2.05 banner cropped into a 1.68 box losing the wordmark off the left.
+The fix that keeps the whole picture is `contain`, with the same file blurred
+underneath to fill what is left over: no crop, no second request, no new art.
+
+*Two slides, two ratios.* hero-1 is 1.80 and hero-2 is 2.05, so the carousel
+changed height as it rotated and moved the page under the reader. Nobody had
+reported that, and it went away for free once the slot was fixed. Sibling art
+in one carousel needs one ratio, or one fixed slot.
+
+---
+
+## 28. A probe that opens a media pipeline is not a probe
+
+Each of the four welcome tiles carried this, to find out whether its file
+exists:
+
+```tsx
+<video src={src} preload="metadata" className="hidden" onError={...} />
+```
+
+`className="hidden"` is `display: none`, which does not stop a fetch. Four of
+these mount four media pipelines against four MP4s totalling **28 MB** on every
+page load, and because an MP4's `moov` atom sits at the end of the file,
+"metadata" can mean range-requesting deep into a 14 MB clip. The intent was
+good — a missing file should downgrade the tile, never show a dead player — and
+the cost was invisible in the source, because the element looks like markup and
+not like a download.
+
+**To ask whether a file exists, ask.** `fetch(src, { method: 'HEAD' })` answers
+the same question in a few hundred bytes and downloads no video. Same
+degradation, same UX, ~28 MB less traffic.
+
+The general form: `display: none`, `hidden`, `visibility: hidden` and
+zero-size all hide a thing from the reader and none of them hides it from the
+network. If it has a `src`, it is a request.
+
+---
+
+## 29. A deliberate delay does not show up in any performance measurement
+
+The same "page is slow" report had four causes. Three were the usual kind —
+3.2 MB of PNG, the video probes above, a 1.42 MB unsplit JS bundle. The largest
+was this, in `src/lib/splash.ts`:
+
+```ts
+const MINIMUM_VISIBLE_MS = 2200;
+```
+
+A hard floor. Plus a 320ms fade, so **nothing could appear in under ~2.5s**, no
+matter how fast the app was ready — and the faster you made it, the more of the
+2.5s was pure waiting. It was a considered decision with a correct rationale
+written above it (the coin-spin needs about two-thirds of a turn to read as
+intentional rather than as a flicker), and it is right *inside Telegram*, where
+you tapped an app and it is opening. It is wrong on the open web, where nobody
+following a link asked for a title card.
+
+**No bundle analyser, asset audit or lighthouse-style byte count can see a
+`setTimeout`.** When someone reports slowness, grep for the delays you wrote on
+purpose before optimising the ones you did not. The fix was not to delete the
+decision but to scope it: 2200ms under `isTelegram()`, 300ms in a browser.
+
+And a second-order note: `isTelegram()` is now called at dismissal rather than
+at module load. `splash.ts` is imported by `main.tsx` before `initTelegram()`
+runs and `window.Telegram.WebApp` is populated by a script tag, so evaluating it
+during module evaluation is §14 again — a guard a beat early — and it fails in
+the direction that silently costs the Mini App its launch screen.
+
+---
+
+## 30. Two correct changes, one bug between them
+
+Shortening the splash floor to 300ms is correct. Code-splitting the routes is
+correct. Together they are a white screen.
+
+The sequence: React commits an empty shell, the two rAFs pass, the splash fades
+at 300ms — and the matched route's lazy chunk is still in flight, so the
+visitor watches nothing until it lands. Neither change has this problem alone.
+The old 2200ms floor was accidentally covering the chunk fetch, and the unsplit
+bundle meant there was never a chunk to fetch.
+
+The fix is to dismiss on the real event rather than on a timer that used to
+correlate with it: wait for `router.state.initialized`, which flips only once
+the initial match *and its lazy module* have resolved. Already true when nothing
+had to be fetched, so warm loads are untouched. With an 8s ceiling, because a
+splash that never leaves is worse than one that leaves early.
+
+**This is the case the audit-between-tasks rule exists for.** Task B did not
+break task A; B and A were each fine and their seam was not. Neither diff
+reviewed on its own shows it — you only see it by asking what the page does
+between the two of them.
+
+---
+
+## 31. §28 has a mirror image: don't unmount the media you do need
+
+§28 removed four `<video>` elements that were mounted at page load and cost
+28 MB. The obvious next move — mount the player only when someone clicks it —
+is the same mistake pointing the other way, and the owner caught it in a day:
+
+> "When I click the video to view the video, it shouldn't start with video HTML
+> tag loader, it should open the video as it is on the reference site."
+
+Our modal was `{playing && <video src autoPlay />}`. Conditional render means
+every click **creates a brand-new element**, which starts fetching a multi-MB
+MP4 from zero, so what you get is the browser's empty player: a black
+rectangle, a spinner, a scrub bar sitting at 0:00. The reference does not:
+
+```js
+i("video", { directives: [{ name: "show", value: t.videoState }],
+             attrs: { src: ..., controls: "controls" } })
+```
+
+`v-show`, not `v-if` — it toggles `display`, the element is in the DOM from
+page load with `src` set, and by click time the clip is buffered. It opens
+already playing.
+
+**The two failures share one root: `preload` was never the thing being
+controlled — mounting was.** Mounting is a blunt instrument for it. The fix
+that satisfies both §28 and this one is to make the element permanent, like
+theirs, and control the bytes with the attribute that exists for it:
+
+- `preload="none"` while nobody has shown interest — zero bytes, so scrolling
+  past the section costs nothing, which is what §28 was protecting.
+- flip to `preload="auto"` on `pointerenter` / `pointerdown` / `focus` — a
+  desktop hover buys most of a second before the click; on a phone
+  `pointerdown` fires before the tap completes, which buys a little.
+- never unmount, so the buffer survives closing and reopening.
+
+Two details that bite:
+
+*`load()` must run after the render that sets the attribute.* Calling it while
+`preload` still reads `"none"` is a request the browser may ignore. It belongs
+in an effect keyed on the warm flag, not inside the handler that sets it.
+
+*`autoPlay` has to go with the change.* An element that outlives the modal
+would fire its autoplay attribute on a hidden video at page load. Call `play()`
+from the open handler instead — which is also the user gesture that autoplay
+policy actually accepts.
+
+And a smaller one found while reading their stylesheet: the comment in our
+player claimed the reference had "no dark wash behind it" and that we were
+matching them by leaving it out. Their CSS says `.mask { background: #0c0e0f;
+opacity: .5 }`. It was §7 — a comment asserting a fact about someone else's
+code that nobody had checked. When a comment justifies a choice by citing a
+reference, cite the line.
+
+---
+
+## 32. Code-splitting the routes blinded the parity checker
+
+`check-parity.mjs` is the only thing standing between us and the web and the
+app quietly growing different screens. It reads `router.tsx` and `App.tsx` and
+compares them. It reads them **as text**, with regexes anchored on the shape
+the router happened to have:
+
+```js
+childrenBlock(routerSrc, 'element: <AppShell />')
+const ROUTE_ENTRY_RE = /\{\s*(index:\s*true|path:\s*'[^']+')\s*,\s*element:\s*<(\w+)/g;
+```
+
+§29's fix split the routes for page weight, turning every one of them from
+
+```js
+{ path: 'games', element: <Games /> }
+```
+
+into
+
+```js
+{ path: 'games', lazy: async () => ({ Component: (await import('@/pages/Games')).Games }) }
+```
+
+Both are correct routers. Only one is a router this checker can read. Every
+anchor and both capture groups stopped matching at once.
+
+**What saved it was that the checker fails loudly.** It has an explicit guard —
+"extracted zero routes … treat this as broken, not clean" — so it died at
+PARSE FAILURE instead of comparing an empty list to an empty list and printing
+`parity ok`. A checker written the obvious way, returning `[]` and finding no
+mismatches in it, would have gone green on the same commit and stayed green
+while the two platforms drifted for a release. That guard is the entire reason
+this is a §32 and not an incident.
+
+Two smaller versions of the same thing came out with it, both mine:
+
+- `PARAM_KEY_RE` matched `undefined` and `{…}` but not
+  `NavigatorScreenParams<TabParamList>`, so a key plainly declared in
+  `navigation.ts` was reported missing from it. Changing a type to the correct
+  one broke a checker that was pattern-matching the old one.
+- `/download` had no `ACCEPTED_WEB_ONLY` entry. It landed in PR #65 while the
+  checker was already dead, so nothing asked for one.
+
+**The rule.** A checker that parses source is coupled to that source's shape,
+and nothing tells you when the shape moves — the commit that breaks it is
+never the commit that touches it. So:
+
+1. When a check goes PARSE FAILURE, find out whether you caused it before
+   filing it under "pre-existing". §25 recorded parity as red on `main` for a
+   different reason that had since been fixed; this looked identical from the
+   outside and was a fresh regression in the branch's own diff.
+2. Fixing it means teaching it the new shape, never loosening it until it
+   passes. The difference is testable, so test it: feed the regex both forms
+   and confirm it extracts the right name from each, **and** feed it three
+   things that are not routes and confirm it returns null. A pattern that
+   accepts everything reports no mismatches either.
+
+---
+
+## 33. A filter over a paged list belongs on the server, and its control belongs outside the result
+
+Two mistakes the Messages tabs would have made, both of which look fine on a
+screen with a dozen rows in it and are wrong on a real account.
+
+**The filter.** The notification list pages with a cursor. Tabs implemented as
+a client-side filter over the fetched pages would show a tab as empty because
+the reader had not scrolled far enough — and there is no way to tell that
+apart from genuinely empty. The badge would be worse: it would count what was
+loaded rather than what exists. So `kinds` became a real query parameter, and
+the load-bearing test is not "it filters" but **"it keeps filtering across
+pages"** — a filter applied to page one and forgotten on page two passes every
+obvious test and fails the first time anyone scrolls.
+
+The related distinction, written into the store: `kinds: undefined` means
+unfiltered, `kinds: []` means *none*. A caller that meant to build a filter and
+built an empty one should get an empty list, not silently get everything.
+
+**The control.** `Screen` renders its query's pending, error and empty state
+*instead of* its children. Put the tab strip inside those children and it
+disappears the moment you select a tab that is empty — the reader is now on a
+blank screen with no way back to the tabs. That is §12 with the affordance not
+missing but destroyed by the state it is meant to escape.
+
+Hence `Screen`'s `header` slot, which renders above all three states. **Any
+control that CHANGES a query has to live outside that query's own result** —
+tab strips, period switches, search boxes, sort orders. If selecting an option
+can empty the list, and the selector is inside the list, the selector is gone
+exactly when it is needed.
+
+**One more, smaller.** This screen previously marked everything read on open
+with a bodyless `POST /read`. Correct for one list; wrong the moment tabs
+exist, because it clears badges for tabs nobody opened — and the badges are the
+only reason to have tabs. It now marks the ids actually on screen. Whenever a
+screen gains a filter, re-read every write it performs: the writes were
+scoped to "the whole thing" when the whole thing was all you could see.

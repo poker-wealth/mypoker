@@ -62,7 +62,38 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-// Two frames, not one: after `render` returns React has committed to the DOM but
-// the browser has not yet painted it. Dismissing here would fade the splash out
-// over a blank screen. The second rAF fires once the app's first frame is up.
-requestAnimationFrame(() => requestAnimationFrame(dismissSplash));
+/*
+ * Take the boot screen away once there is genuinely something behind it.
+ *
+ * Two frames, not one: after `render` returns React has committed to the DOM
+ * but the browser has not yet painted it. Dismissing there would fade the
+ * splash out over a blank screen. The second rAF fires once the app's first
+ * frame is up.
+ *
+ * And not until the router says it is initialized. Most routes are now code
+ * split (see router.tsx), so on a cold load React can commit an empty shell
+ * while the matched route's chunk is still in flight — React commits, the two
+ * frames pass, the splash fades, and the visitor watches a white screen until
+ * the chunk lands. `initialized` flips only once the initial match, including
+ * its lazy module, has resolved. It is already true when nothing had to be
+ * fetched, so a warm load is unaffected.
+ */
+function dismissWhenPainted(): void {
+  requestAnimationFrame(() => requestAnimationFrame(dismissSplash));
+}
+
+if (router.state.initialized) {
+  dismissWhenPainted();
+} else {
+  const stop = router.subscribe((state) => {
+    if (!state.initialized) return;
+    stop();
+    dismissWhenPainted();
+  });
+  // A splash that never leaves is worse than one that leaves early, so the
+  // wait has an end. Nothing normal reaches this; a chunk that 404s does.
+  window.setTimeout(() => {
+    stop();
+    dismissWhenPainted();
+  }, 8000);
+}

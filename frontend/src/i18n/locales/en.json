@@ -175,6 +175,8 @@
     "wallet": "Wallet",
     "fairness": "Fairness verification",
     "history": "Game history",
+    "results": "Results",
+    "jackpot": "Jackpot",
     "settings": "Settings",
     "support": "Support",
     "language": "Language",
@@ -497,6 +499,12 @@
     "signInToSee": "Sign in to see your notifications",
     "empty": "Nothing yet",
     "emptyBlurb": "Results, deposits and announcements will appear here.",
+    "tab": {
+      "system": "System",
+      "results": "Results",
+      "deposits": "Deposits",
+      "promos": "Promotions"
+    },
     "handWon": "You won ${{amount}}",
     "handLost": "Hand settled — ${{amount}}",
     "deposit": "Deposit of ${{amount}} credited",

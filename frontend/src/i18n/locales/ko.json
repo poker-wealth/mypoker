@@ -175,6 +175,8 @@
     "wallet": "지갑",
     "fairness": "공정성 검증",
     "history": "게임 기록",
+    "results": "전적",
+    "jackpot": "잭팟",
     "settings": "설정",
     "support": "고객 지원",
     "language": "언어",
@@ -497,6 +499,12 @@
     "signInToSee": "로그인하면 알림을 볼 수 있습니다",
     "empty": "아직 알림이 없습니다",
     "emptyBlurb": "게임 결과, 입금, 공지가 여기에 표시됩니다.",
+    "tab": {
+      "system": "시스템",
+      "results": "전적",
+      "deposits": "입금",
+      "promos": "프로모션"
+    },
     "handWon": "${{amount}}을(를) 획득했습니다",
     "handLost": "핸드 정산 — ${{amount}}",
     "deposit": "${{amount}} 입금이 반영되었습니다",

@@ -171,3 +171,123 @@ describe('isolation between players', () => {
     expect(mine.unread).toBe(1);
   });
 });
+
+
+/**
+ * The Messages screen's tabs rest entirely on this. A tab that filtered
+ * client-side over whatever pages had been fetched would look empty because
+ * the reader had not scrolled far enough, so the filter has to be here, and it
+ * has to survive paging.
+ */
+describe('filtering by kind', () => {
+  beforeEach(async () => {
+    await updateSettings(PLAYER, { notifyPromos: true });
+    await raise({ kind: 'SYSTEM', titleKey: 'notifications.system', eventId: 'k-sys-1' });
+    await raise({ kind: 'SYSTEM', titleKey: 'notifications.system', eventId: 'k-sys-2' });
+    await raise({ kind: 'PROMO', titleKey: 'notifications.promo', eventId: 'k-promo' });
+    await raise({ kind: 'RESULT', eventId: 'k-result' });
+    await raise({ kind: 'JACKPOT', titleKey: 'notifications.jackpot', eventId: 'k-jackpot' });
+  });
+
+  it('returns only the kind asked for', async () => {
+    const { notifications } = await listNotifications(PLAYER, { kinds: ['SYSTEM'] });
+    expect(notifications).toHaveLength(2);
+    expect(notifications.every((n) => n.kind === 'SYSTEM')).toBe(true);
+  });
+
+  it('accepts several kinds, which is what a tab actually is', async () => {
+    // The Results tab is RESULT + JACKPOT, following GOVERNED_BY's own grouping.
+    const { notifications } = await listNotifications(PLAYER, { kinds: ['RESULT', 'JACKPOT'] });
+    expect(notifications).toHaveLength(2);
+    expect(new Set(notifications.map((n) => n.kind))).toEqual(new Set(['RESULT', 'JACKPOT']));
+  });
+
+  it('returns everything when kinds is omitted', async () => {
+    expect((await listNotifications(PLAYER)).notifications).toHaveLength(5);
+  });
+
+  it('treats an empty array as "no kinds", never as "all kinds"', async () => {
+    // A caller that meant to build a filter and built an empty one should see
+    // an empty list, not silently see everything.
+    expect((await listNotifications(PLAYER, { kinds: [] })).notifications).toHaveLength(0);
+  });
+
+  it('keeps filtering across pages', async () => {
+    const first = await listNotifications(PLAYER, { kinds: ['SYSTEM'], limit: 1 });
+    expect(first.notifications).toHaveLength(1);
+    expect(first.nextCursor).not.toBeNull();
+
+    const second = await listNotifications(PLAYER, {
+      kinds: ['SYSTEM'],
+      limit: 1,
+      cursor: first.nextCursor!,
+    });
+    // The second page must still be SYSTEM. A filter applied only to page one
+    // is the bug this whole endpoint change exists to avoid.
+    expect(second.notifications).toHaveLength(1);
+    expect(second.notifications[0]!.kind).toBe('SYSTEM');
+    expect(second.notifications[0]!.id).not.toBe(first.notifications[0]!.id);
+  });
+
+  it('leaves the bell counting the whole account, not the open tab', async () => {
+    const page = await listNotifications(PLAYER, { kinds: ['SYSTEM'] });
+    expect(page.notifications).toHaveLength(2);
+    expect(page.unread).toBe(5);
+  });
+
+  it('never reaches another player through the filter', async () => {
+    await notify({
+      playerId: OTHER,
+      kind: 'SYSTEM',
+      titleKey: 'notifications.system',
+      eventId: 'other-sys',
+    });
+    const { notifications } = await listNotifications(PLAYER, { kinds: ['SYSTEM'] });
+    expect(notifications).toHaveLength(2);
+  });
+});
+
+describe('unread per kind, for the tab badges', () => {
+  beforeEach(async () => {
+    await updateSettings(PLAYER, { notifyPromos: true });
+    await raise({ kind: 'SYSTEM', titleKey: 'notifications.system', eventId: 'b-sys-1' });
+    await raise({ kind: 'SYSTEM', titleKey: 'notifications.system', eventId: 'b-sys-2' });
+    await raise({ kind: 'PROMO', titleKey: 'notifications.promo', eventId: 'b-promo' });
+  });
+
+  it('counts each kind separately', async () => {
+    const { unreadByKind } = await listNotifications(PLAYER);
+    expect(unreadByKind.SYSTEM).toBe(2);
+    expect(unreadByKind.PROMO).toBe(1);
+  });
+
+  it('reports zero rather than nothing for a kind with no unread', async () => {
+    // A tab reading `undefined` renders an empty badge; a tab reading 0
+    // renders no badge. Every kind is present.
+    const { unreadByKind } = await listNotifications(PLAYER);
+    expect(unreadByKind.DEPOSIT).toBe(0);
+    expect(unreadByKind.JACKPOT).toBe(0);
+    expect(Object.keys(unreadByKind).sort()).toEqual(
+      ['DEPOSIT', 'JACKPOT', 'PROMO', 'RESULT', 'SYSTEM'],
+    );
+  });
+
+  it('stops counting one once it is read', async () => {
+    const { notifications } = await listNotifications(PLAYER, { kinds: ['SYSTEM'] });
+    await markRead(PLAYER, [notifications[0]!.id]);
+
+    const after = await listNotifications(PLAYER);
+    expect(after.unreadByKind.SYSTEM).toBe(1);
+    expect(after.unreadByKind.PROMO).toBe(1);
+  });
+
+  it('does not count another player unread messages', async () => {
+    await notify({
+      playerId: OTHER,
+      kind: 'SYSTEM',
+      titleKey: 'notifications.system',
+      eventId: 'other-b-sys',
+    });
+    expect((await listNotifications(PLAYER)).unreadByKind.SYSTEM).toBe(2);
+  });
+});

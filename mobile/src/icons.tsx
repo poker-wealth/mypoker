@@ -223,11 +223,73 @@ export function EyeIcon(p: IconProps) {
   );
 }
 
+/**
+ * The Me grid's three additions. Same Frame, same stroke weight, so they read
+ * as one set with the tab icons rather than as a second family that happens to
+ * sit nearby.
+ */
+
+/** Jackpot — a cup on a stem, handles either side. */
+export function TrophyIcon(p: IconProps) {
+  return (
+    <Frame {...p}>
+      <Path d="M7 4h10v5a5 5 0 0 1-10 0Z" />
+      <Path d="M7 6H4.5v1.5A3.5 3.5 0 0 0 8 11" />
+      <Path d="M17 6h2.5v1.5A3.5 3.5 0 0 1 16 11" />
+      <Path d="M12 14v3" />
+      <Path d="M8.5 20h7l-.7-3h-5.6Z" />
+    </Frame>
+  );
+}
+
 export function EyeOffIcon(p: IconProps) {
   return (
     <Frame {...p}>
       <Path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
       <Path d="M1 1l22 22" />
+    </Frame>
+  );
+}
+
+/** Invite — a person with a plus beside them. */
+export function InviteIcon(p: IconProps) {
+  return (
+    <Frame {...p}>
+      <Circle cx={9.5} cy={8} r={3.5} />
+      <Path d="M3 20a6.5 6.5 0 0 1 13 0" />
+      <Path d="M19 8v6M22 11h-6" />
+    </Frame>
+  );
+}
+
+/** Edit alias — a pencil over a baseline. */
+export function EditIcon(p: IconProps) {
+  return (
+    <Frame {...p}>
+      <Path d="M16.4 3.6a2.1 2.1 0 0 1 3 3L9 17l-4 1 1-4Z" />
+      <Path d="M4 21h16" />
+    </Frame>
+  );
+}
+
+/** System notices — ruled lines in a frame, after the reference's tab glyph. */
+export function SystemIcon(p: IconProps) {
+  return (
+    <Frame {...p}>
+      <Rect x={4} y={4} width={16} height={16} rx={3} />
+      <Path d="M8 9.5h8M8 13h8M8 16.5h5" />
+    </Frame>
+  );
+}
+
+/** Promotions — a wrapped box with a bow. */
+export function GiftIcon(p: IconProps) {
+  return (
+    <Frame {...p}>
+      <Rect x={3.5} y={9.5} width={17} height={10.5} rx={2} />
+      <Path d="M2.5 9.5h19M12 9.5V20" />
+      <Path d="M12 9.5C10.6 6.6 8.8 5.2 7.4 6.1c-1.3.8-.4 3.4 4.6 3.4Z" />
+      <Path d="M12 9.5c1.4-2.9 3.2-4.3 4.6-3.4 1.3.8.4 3.4-4.6 3.4Z" />
     </Frame>
   );
 }

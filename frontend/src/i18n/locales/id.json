@@ -175,6 +175,8 @@
     "wallet": "Dompet",
     "fairness": "Verifikasi keadilan",
     "history": "Riwayat permainan",
+    "results": "Hasil",
+    "jackpot": "Jackpot",
     "settings": "Pengaturan",
     "support": "Bantuan",
     "language": "Bahasa",
@@ -497,6 +499,12 @@
     "signInToSee": "Masuk untuk melihat notifikasi Anda",
     "empty": "Belum ada apa pun",
     "emptyBlurb": "Hasil, setoran, dan pengumuman akan muncul di sini.",
+    "tab": {
+      "system": "Sistem",
+      "results": "Hasil",
+      "deposits": "Deposit",
+      "promos": "Promosi"
+    },
     "handWon": "Anda memenangkan ${{amount}}",
     "handLost": "Ronde diselesaikan — ${{amount}}",
     "deposit": "Setoran ${{amount}} telah masuk",

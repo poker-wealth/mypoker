@@ -1,3 +1,4 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 /**
@@ -8,11 +9,14 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
  * types how that decision reaches the table screen. Esther gets
  * `route.params.tableId` as a checked string rather than `any`.
  *
- * `undefined` for Tabs means the tab navigator takes no params of its own —
- * each tab manages its own state.
+ * Tabs carries `NavigatorScreenParams<TabParamList>` rather than `undefined`:
+ * the Me screen's grid reaches the Data tab, and that is a nested navigate —
+ * `navigate('Tabs', { screen: 'Data' })`. Typed as `undefined` the params are
+ * accepted at the call site and silently dropped at runtime, which is a tile
+ * that looks wired and goes nowhere (TRAPS §12).
  */
 export type RootStackParamList = {
-  Tabs: undefined;
+  Tabs: NavigatorScreenParams<TabParamList>;
   Table: { tableId: string };
   Vip: undefined;
   Notifications: undefined;

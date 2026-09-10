@@ -118,7 +118,7 @@ export function GamesScreen() {
             <Skeleton width={100} />
           ) : (
             <Text style={styles.heroValue}>
-              {money(jackpot ?? 0, { decimals: 0 })}
+              {money(jackpot, { decimals: 0 })}
             </Text>
           )}
         </View>
