@@ -262,6 +262,8 @@
     }
   },
   "table": {
+    "chatTakeSeat": "Duduklah untuk mengobrol",
+    "chatSay": "Katakan sesuatu…",
     "fold": "Lipat",
     "check": "Cek",
     "call": "Call {{amount}}",

@@ -40,7 +40,15 @@ export type Cue =
   /** The pot arriving at the winner. The one the table is really waiting for. */
   | 'win'
   /** Your turn to act — see the latch in `pages/Table.tsx`. */
-  | 'turn';
+  | 'turn'
+  /** A new hand: cards coming out. Fires once per hand, for everyone. */
+  | 'deal'
+  /** Chips going in — a bet, a raise, or a call. */
+  | 'chip'
+  /** A check: the quiet knuckle-rap on the felt. */
+  | 'check'
+  /** A fold: cards pushed away. */
+  | 'fold';
 
 let ctx: AudioContext | null = null;
 let enabled = false;
@@ -139,6 +147,35 @@ export function play(cue: Cue): void {
         // anything sharper becomes something players mute the game to escape.
         note(c, { freq: 587.33, at: 0, duration: 0.16, type: 'sine', gain: 0.1 });
         note(c, { freq: 880, at: 0.1, duration: 0.2, type: 'sine', gain: 0.09 });
+        break;
+
+      case 'deal': {
+        // Four quick clipped ticks — cards skimming out, not a melody. Short
+        // and dry so a full table dealing does not turn into a chord.
+        for (let i = 0; i < 4; i++) {
+          note(c, { freq: 2100 - i * 90, at: i * 0.055, duration: 0.035, type: 'square', gain: 0.03 });
+        }
+        break;
+      }
+
+      case 'chip': {
+        // Two bright clicks a hair apart: chips landing on chips. Quieter than
+        // 'turn' because it fires for every seat's action, not just yours.
+        note(c, { freq: 2400, at: 0, duration: 0.04, type: 'square', gain: 0.045 });
+        note(c, { freq: 1800, at: 0.035, duration: 0.05, type: 'square', gain: 0.035 });
+        break;
+      }
+
+      case 'check':
+        // One low, soft knock — the knuckles on the felt.
+        note(c, { freq: 220, at: 0, duration: 0.07, type: 'sine', gain: 0.09 });
+        break;
+
+      case 'fold':
+        // A short downward slide: cards pushed away, and the only cue that
+        // falls in pitch, so folding never reads as something good happening.
+        note(c, { freq: 420, at: 0, duration: 0.09, type: 'triangle', gain: 0.06 });
+        note(c, { freq: 260, at: 0.06, duration: 0.12, type: 'triangle', gain: 0.05 });
         break;
     }
   } catch {

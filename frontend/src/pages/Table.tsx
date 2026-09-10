@@ -146,6 +146,53 @@ function LiveTable({ tableId }: { tableId: string }) {
     play('turn');
   }, [yourTurn]);
 
+  /**
+   * A new hand is being dealt — one cue for everyone at the table.
+   *
+   * Keyed on the hand NUMBER rather than the phase: a snapshot refetch can
+   * repeat a phase, and re-dealing the same hand audibly is how a table starts
+   * sounding broken. Skips the very first snapshot, which would otherwise
+   * deal-sound at whatever hand happened to be in progress when you sat down.
+   */
+  const handNumber = snapshot?.handNumber ?? 0;
+  const lastDealt = useRef<number | null>(null);
+  useEffect(() => {
+    if (handNumber <= 0) return;
+    if (lastDealt.current === null) {
+      lastDealt.current = handNumber;
+      return;
+    }
+    if (handNumber === lastDealt.current) return;
+    lastDealt.current = handNumber;
+    play('deal');
+  }, [handNumber]);
+
+  /**
+   * Everyone's actions, heard as they land.
+   *
+   * Driven off each seat's `lastAction`, which the server sets and clears — so
+   * this reacts to what the table actually did rather than to what this client
+   * sent, and a remote player's raise sounds the same as your own. The map
+   * remembers what was already voiced per seat, so a re-render or a refetch
+   * that carries the same action does not replay it.
+   */
+  const voicedActions = useRef(new Map<number, string>());
+  useEffect(() => {
+    if (!snapshot) return;
+    for (const seat of snapshot.seats) {
+      const action = seat.lastAction;
+      if (!action || typeof action === 'string') continue;
+      // Include the amount so a call of 20 and a later call of 60 are
+      // different events rather than one repeated 'call'.
+      const stamp = `${snapshot.handNumber}:${action.kind}:${action.amount ?? ''}`;
+      if (voicedActions.current.get(seat.index) === stamp) continue;
+      voicedActions.current.set(seat.index, stamp);
+      if (action.kind === 'fold') play('fold');
+      else if (action.kind === 'check') play('check');
+      else play('chip'); // call, raise, all-in — all of them move chips
+    }
+  }, [snapshot]);
+
   /** Buy-in sheet target: a seat index to sit in, `null` to top up, `false` when closed. */
   const { t } = useTranslation();
   const [buyInFor, setBuyInFor] = useState<number | null | false>(false);
@@ -273,8 +320,13 @@ function LiveTable({ tableId }: { tableId: string }) {
                   // Spectators cannot chat (§10.1) and so cannot voice either —
                   // withholding the button matches what the server would refuse.
                   {...(live.watching ? {} : { onSendVoice: sendVoice })}
+                  // Still gated while watching, because the SERVER refuses a
+                  // spectator's message (`SPECTATORS_CANNOT_CHAT`) — an open
+                  // box that swallows what you type and answers "Chat denied"
+                  // is worse than one that says so first. But the reason is on
+                  // screen now, with what to do about it: take a seat.
                   disabled={status !== 'ready' || live.watching}
-                  placeholder={live.watching ? "Spectators cannot chat" : "Say something..."}
+                  placeholder={live.watching ? t('table.chatTakeSeat') : t('table.chatSay')}
                 />
               </motion.div>
             </>

@@ -262,6 +262,8 @@
     }
   },
   "table": {
+    "chatTakeSeat": "นั่งลงเพื่อแชท",
+    "chatSay": "พิมพ์ข้อความ…",
     "fold": "หมอบ",
     "check": "เช็ค",
     "call": "ตาม {{amount}}",

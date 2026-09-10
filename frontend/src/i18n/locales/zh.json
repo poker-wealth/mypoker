@@ -262,6 +262,8 @@
     }
   },
   "table": {
+    "chatTakeSeat": "入座后即可聊天",
+    "chatSay": "说点什么…",
     "fold": "弃牌",
     "check": "过牌",
     "call": "跟注 {{amount}}",

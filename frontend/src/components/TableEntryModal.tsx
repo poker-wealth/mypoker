@@ -1,10 +1,11 @@
 import { useState, type ComponentType } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Users, Plus, Link2, Check, KeyRound } from 'lucide-react';
+import { Users, Plus, Link2, Check, KeyRound, Copy } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { CreateGameScreen } from '@/components/table-setup/CreateGameScreen';
+import { cn } from '@/lib/cn';
 import { toast } from '@/lib/toast';
 import { DEFAULT_TABLE_ID } from '@/config';
 
@@ -97,10 +98,30 @@ export function TableEntryModal({ open, onClose }: { open: boolean; onClose: () 
               <p className="text-[0.7rem] leading-relaxed text-dim">
                 {createdCode ? t('tableEntry.shareBlurbPrivate') : t('tableEntry.shareBlurb')}
               </p>
-              <div className="flex items-center gap-2 rounded-(--radius-app) border border-border bg-surface-2 px-3 py-2">
+              {/* The copy control lives ON the link, not under it.
+                  It used to be a full-width ghost button below the box, which
+                  renders as plain text — so the row above looked inert and the
+                  button looked like a caption, and nobody could tell either was
+                  tappable. Now the whole row is the button, with a labelled
+                  Copy chip at its right edge saying so. */}
+              <button
+                type="button"
+                onClick={copy}
+                aria-label={t('tableEntry.copy')}
+                className="flex w-full items-center gap-2 rounded-(--radius-app) border border-border bg-surface-2 px-3 py-2 text-left transition-colors hover:border-brand/60"
+              >
                 <Link2 size={14} className="shrink-0 text-dim" />
                 <span className="min-w-0 flex-1 truncate text-[0.7rem] text-text">{inviteLink}</span>
-              </div>
+                <span
+                  className={cn(
+                    'flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[0.62rem] font-bold transition-colors',
+                    copied ? 'bg-success/15 text-success' : 'bg-brand/15 text-brand',
+                  )}
+                >
+                  {copied ? <Check size={11} /> : <Copy size={11} />}
+                  {copied ? t('tableEntry.copied') : t('tableEntry.copy')}
+                </span>
+              </button>
               {/* The code, shown on its own so it can be read out. Spaced and
                   tabular so six digits are unambiguous when spoken. */}
               {createdCode ? (
@@ -117,9 +138,6 @@ export function TableEntryModal({ open, onClose }: { open: boolean; onClose: () 
                 </div>
               ) : null}
             </div>
-            <Button full variant="ghost" onClick={copy}>
-              {copied ? t('tableEntry.copied') : t('tableEntry.copy')}
-            </Button>
             <Button full onClick={enter}>
               {t('tableEntry.enter')}
             </Button>

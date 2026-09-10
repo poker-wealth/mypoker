@@ -2,14 +2,11 @@ import { useState } from 'react';
 import { Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { motion } from 'motion/react';
 import { Segmented } from '@/components/ui/Segmented';
-import { Skeleton } from '@/components/ui/Skeleton';
 import { GameTile } from '@/components/GameTile';
 import { TableEntryModal } from '@/components/TableEntryModal';
 import { visibleGames, type GameCategory, type GameDef } from '@/lib/games';
 import { useLobbyGames } from '@/api/hooks';
-import { formatMicros } from '@/api/lobby';
 
 type Filter = 'all' | GameCategory;
 
@@ -25,9 +22,6 @@ export function Games() {
   const [entryOpen, setEntryOpen] = useState(false);
 
   const lobby = useLobbyGames();
-  // Null, not '$ 0.00', while the lobby is still answering — a zero jackpot is
-  // a claim about the pools, and it is the wrong one.
-  const jackpot = lobby.data ? `$ ${formatMicros(lobby.data.totalJackpot)}` : null;
 
   // Live figures per game, keyed by id. The tiles take their table count and
   // jackpot from here; nothing on this screen comes from the static catalog
@@ -67,42 +61,6 @@ export function Games() {
           placeholder={t('games.searchPlaceholder')}
           className="w-full bg-transparent text-sm text-text placeholder:text-dim focus:outline-none"
         />
-      </div>
-
-      {/* Jackpot hero */}
-      <div
-        className="relative overflow-hidden rounded-2xl border border-border p-5 text-center flex flex-col justify-center h-32"
-        style={{ boxShadow: 'var(--glow-brand)' }}
-      >
-        <div className="absolute inset-0" style={{ backgroundImage: 'var(--brand-gradient)', opacity: 0.9 }} />
-        <img 
-          src="/brand/trophy.png" 
-          alt="Grand Jackpot Trophy" 
-          className="absolute left-2 top-1/2 -translate-y-1/2 h-[115%] w-auto object-contain drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)] z-10 pointer-events-none" 
-        />
-        <motion.div
-          className="absolute inset-y-0 w-1/3 bg-white/20 blur-2xl"
-          initial={{ x: '-120%' }}
-          animate={{ x: '360%' }}
-          transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut', repeatDelay: 1.5 }}
-        />
-        <div className="relative text-white z-10 flex flex-col items-center pl-20">
-          <div className="text-[0.7rem] font-bold uppercase tracking-wider text-white/90">
-            {t('lobby.grandJackpot')}
-          </div>
-          {lobby.isPending ? (
-            <div className="mt-1 flex justify-center">
-              <Skeleton className="h-10 w-52 bg-white/25" />
-            </div>
-          ) : (
-            <div className="mt-0.5 text-[2.2rem] font-black leading-none tracking-tight tabular-nums text-yellow-400 drop-shadow-sm">
-              {/* Em dash when the lobby failed — a hero that renders empty
-                  looks broken, and "$ 0.00" would claim there is nothing to
-                  win. Unknown is neither. */}
-              {jackpot ?? '—'}
-            </div>
-          )}
-        </div>
       </div>
 
       <Segmented

@@ -262,6 +262,8 @@
     }
   },
   "table": {
+    "chatTakeSeat": "Ngồi vào bàn để trò chuyện",
+    "chatSay": "Nhập tin nhắn…",
     "fold": "Bỏ bài",
     "check": "Xem bài",
     "call": "Theo {{amount}}",

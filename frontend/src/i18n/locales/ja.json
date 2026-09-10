@@ -262,6 +262,8 @@
     }
   },
   "table": {
+    "chatTakeSeat": "着席するとチャットできます",
+    "chatSay": "メッセージを入力…",
     "fold": "フォールド",
     "check": "チェック",
     "call": "コール {{amount}}",

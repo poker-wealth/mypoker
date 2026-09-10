@@ -262,6 +262,8 @@
     }
   },
   "table": {
+    "chatTakeSeat": "자리에 앉으면 채팅할 수 있습니다",
+    "chatSay": "메시지를 입력하세요…",
     "fold": "폴드",
     "check": "체크",
     "call": "콜 {{amount}}",

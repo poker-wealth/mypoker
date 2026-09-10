@@ -262,6 +262,8 @@
     }
   },
   "table": {
+    "chatTakeSeat": "चैट करने के लिए सीट लें",
+    "chatSay": "कुछ कहें…",
     "fold": "फ़ोल्ड",
     "check": "चेक",
     "call": "कॉल {{amount}}",

@@ -262,6 +262,8 @@
     }
   },
   "table": {
+    "chatTakeSeat": "Take a seat to chat",
+    "chatSay": "Say something…",
     "fold": "Fold",
     "check": "Check",
     "call": "Call {{amount}}",
