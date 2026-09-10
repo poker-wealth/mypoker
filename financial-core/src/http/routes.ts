@@ -93,6 +93,7 @@ import {
   listNotifications,
   markRead,
 } from '../notifications/notification-store';
+import { registerPushToken, forgetPushToken } from '../notifications/push/push-token-store';
 import { sendEmail } from '../notifications/email/send-email';
 import { emailConfirmationCode } from '../notifications/email/templates';
 import { getVolumeFacts, recordVolume, getPublicRtp } from '../vip/volume-tracker';
@@ -685,6 +686,57 @@ export function buildRouter(): Router {
           ...(kinds !== undefined ? { kinds } : {}),
         }),
       );
+    }),
+  );
+
+  /*
+   * Device push tokens.
+   *
+   * The token is minted on the device and only the device knows it, so this is
+   * the one notification address the player's own app has to tell us. Scoped to
+   * the caller by dataScopeMiddleware: a token registers against the player
+   * holding the session, never against an id in the body, or anyone could point
+   * someone else's phone at their own money notices.
+   *
+   * The format is checked rather than stored blind. An unrecognised token is a
+   * 400, matching how `kinds` treats an unknown value above: a visible refusal
+   * beats a row that silently never delivers.
+   */
+  const pushTokenBody = z.object({
+    token: z
+      .string()
+      .min(1)
+      .max(256)
+      .regex(/^Exp(o|onent)PushToken\[[^\]]+\]$/, 'not an Expo push token'),
+    platform: z.enum(['android', 'ios']),
+  });
+  r.post(
+    '/me/push-tokens',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { token, platform } = pushTokenBody.parse(req.body ?? {});
+      await registerPushToken(req.dataScope!.playerId, token, platform);
+      res.json({ registered: true });
+    }),
+  );
+
+  /*
+   * Sign-out, and the app asking to be forgotten.
+   *
+   * Takes the token alone, not the player: on a shared handset the row may
+   * already belong to whoever signed in after you, and scoping the delete to
+   * the caller would leave it delivering their deposits to this device.
+   * Holding the token is the proof, and it is not a secret worth guarding
+   * beyond that - the worst a stolen one buys is silencing that device.
+   */
+  const forgetTokenBody = z.object({ token: z.string().min(1).max(256) });
+  r.delete(
+    '/me/push-tokens',
+    dataScopeMiddleware,
+    asyncHandler(async (req: Request, res: Response) => {
+      const { token } = forgetTokenBody.parse(req.body ?? {});
+      await forgetPushToken(token);
+      res.json({ forgotten: true });
     }),
   );
 

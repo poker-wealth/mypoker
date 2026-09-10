@@ -118,4 +118,9 @@ export const api = {
   // (game-server/src/gateway/me-routes.ts), and nothing here needed it before.
   patch: <T>(path: string, body?: unknown): Promise<T> =>
     request<T>(path, { method: 'PATCH', ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }),
+  // Added for push tokens: forgetting a device on sign-out is a DELETE, and it
+  // carries the token in a body rather than the path, because an Expo token
+  // contains brackets that would need escaping in a URL.
+  del: <T>(path: string, body?: unknown): Promise<T> =>
+    request<T>(path, { method: 'DELETE', ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }),
 };
