@@ -12,6 +12,7 @@ import type { RootStackParamList, TabParamList } from '../navigation';
 import { money } from '../money';
 import { radius, space, theme, weight } from '../theme';
 import { Screen, Skeleton } from '../ui';
+import { GAMES } from '../games';
 import { useContextStore } from '../store/context';
 import { ContextBanner } from '../components/ContextBanner';
 
@@ -225,29 +226,6 @@ export function LobbyScreen() {
             )}
           </Screen>
         </ScrollView>
-
-        <View style={styles.actionRow}>
-          <Pressable
-            style={styles.btnQuick}
-            onPress={() => {
-              if (!tables.data) return;
-              const target = tables.data.tables.find((tb) => tb.status !== 'FULL' && tb.players < tb.maxPlayers) ?? tables.data.tables[0];
-              if (target) navigation.navigate('Table', { tableId: target.id });
-            }}
-          >
-            <Svg width={20} height={20} viewBox="0 0 24 24" fill="white">
-              <Path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-            </Svg>
-            <Text style={styles.btnQuickText}>QUICK JOIN</Text>
-          </Pressable>
-          <Pressable
-            style={styles.btnCreate}
-            onPress={() => tabNav.navigate('Alliance')}
-          >
-            <Text style={styles.btnCreateIcon}>+</Text>
-            <Text style={styles.btnCreateText}>CREATE PRIVATE TABLE</Text>
-          </Pressable>
-        </View>
       </View>
     );
   }
@@ -299,9 +277,10 @@ export function LobbyScreen() {
               <View key={i} style={[styles.promoDot, activeSlide === i && styles.promoDotActive]} />
             ))}
           </View>
+        </View>
 
-          {/* Overlapping Action Buttons */}
-          <View style={styles.promoActions}>
+        {/* CREATE / JOIN — beneath the banner, so the artwork stays whole */}
+        <View style={styles.promoActions}>
             <Pressable
               style={[styles.promoActionBtn, { borderTopLeftRadius: 16, borderBottomLeftRadius: 16, borderRightWidth: 1, borderRightColor: 'rgba(0,0,0,0.2)' }]}
               onPress={() => tabNav.navigate('Alliance')}
@@ -326,7 +305,6 @@ export function LobbyScreen() {
               <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth={2}><Path d="M9 18l6-6-6-6"/></Svg>
             </Pressable>
           </View>
-        </View>
 
         {/* My Games Section */}
         <View style={styles.myGamesHeader}>
@@ -348,21 +326,35 @@ export function LobbyScreen() {
           </View>
         </View>
 
-        {/* Game Type Filters */}
+        {/* Game filters — OUR catalogue (src/games.ts), not the reference's.
+            The names are translated, the fire marks the games the catalogue
+            actually flags `hot`, and a chip opens that game's tables rather
+            than sitting there as decoration. */}
         <View style={styles.filterGrid}>
-          <View style={styles.filterRow}>
-            <View style={[styles.filterChip, styles.filterChipActive]}>
-              <Text style={[styles.filterChipText, { color: '#000' }]}>All</Text>
-            </View>
-            <Text style={styles.filterText}>NLHE</Text>
-            <Text style={styles.filterText}>🔥CrazyClown</Text>
-            <Text style={styles.filterText}>🔥Cowboy</Text>
-          </View>
-          <View style={styles.filterRow}>
-            <Text style={styles.filterText}>🔥SD</Text>
-            <Text style={styles.filterText}>Omaha</Text>
-            <Text style={styles.filterText}>POFC</Text>
-            <Text style={styles.filterText}>Caribbean</Text>
+          <View style={styles.filterRowWrap}>
+            <Pressable
+              onPress={() => {
+                setGame('texas');
+                setView('tables');
+              }}
+              style={[styles.filterChip, styles.filterChipActive]}
+            >
+              <Text style={[styles.filterChipText, { color: '#000' }]}>{t('games.filterAll')}</Text>
+            </Pressable>
+            {GAMES.map((g) => (
+              <Pressable
+                key={g.id}
+                onPress={() => {
+                  setGame(g.id);
+                  setView('tables');
+                }}
+              >
+                <Text style={styles.filterText}>
+                  {g.hot ? '🔥' : ''}
+                  {t(`gameNames.${g.id}`)}
+                </Text>
+              </Pressable>
+            ))}
           </View>
         </View>
 
@@ -453,12 +445,13 @@ const styles = StyleSheet.create({
   promoDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.4)' },
   promoDotActive: { backgroundColor: 'white', width: 14 },
   
+  // Sits BELOW the banner, not over it. It used to be absolutely positioned
+  // at bottom:-22, which laid the gold bar across the artwork and hid the
+  // "View details by clicking" pill painted into the image.
   promoActions: {
     flexDirection: 'row',
-    position: 'absolute',
-    bottom: -22,
-    left: space.lg,
-    right: space.lg,
+    marginTop: space.md,
+    marginHorizontal: space.lg,
     height: 48,
     backgroundColor: '#EED9A0',
     borderRadius: 16,
@@ -487,6 +480,8 @@ const styles = StyleSheet.create({
 
   filterGrid: { backgroundColor: theme.surface, borderRadius: 16, padding: space.md, gap: space.md },
   filterRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  // Wraps: our catalogue has more games than the reference's fixed two rows.
+  filterRowWrap: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space.md, rowGap: space.sm },
   filterChip: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: '#D9B87C' },
   filterChipActive: { backgroundColor: '#D9B87C' },
   filterChipText: { fontSize: 12, fontFamily: weight('800') },
