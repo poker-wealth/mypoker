@@ -653,19 +653,36 @@ export function buildRouter(): Router {
   );
 
   // ── Notifications ────────────────────────────────────────────────────────
+  /**
+   * `kinds` is a comma-separated list — `?kinds=PROMO,JACKPOT` — because the
+   * gateway forwards only string query values (gateway/me-routes.ts forwardTo
+   * skips anything that is not a string), so repeated `?kinds=a&kinds=b` would
+   * arrive as an array on one hop and be dropped on the other.
+   *
+   * The enum is the whole point: an unknown kind is a 400 rather than a filter
+   * that silently matches nothing and shows the player an empty tab.
+   */
+  const notificationKind = z.enum(['RESULT', 'DEPOSIT', 'PROMO', 'JACKPOT', 'SYSTEM']);
   const notificationsQuery = z.object({
     limit: z.coerce.number().int().positive().max(100).optional(),
     cursor: z.string().min(1).optional(),
+    kinds: z
+      .string()
+      .min(1)
+      .transform((raw) => raw.split(',').map((k) => k.trim()))
+      .pipe(z.array(notificationKind).nonempty())
+      .optional(),
   });
   r.get(
     '/me/notifications',
     dataScopeMiddleware,
     asyncHandler(async (req: Request, res: Response) => {
-      const { limit, cursor } = notificationsQuery.parse(req.query);
+      const { limit, cursor, kinds } = notificationsQuery.parse(req.query);
       res.json(
         await listNotifications(req.dataScope!.playerId, {
           ...(limit !== undefined ? { limit } : {}),
           ...(cursor !== undefined ? { cursor } : {}),
+          ...(kinds !== undefined ? { kinds } : {}),
         }),
       );
     }),

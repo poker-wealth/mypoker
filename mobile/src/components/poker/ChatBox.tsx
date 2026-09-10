@@ -132,10 +132,22 @@ export function ChatBox({
       const status = await recording.getStatusAsync();
       const durationMs = status.durationMillis;
       
-      // Only send if > 500ms
-      if (uri && durationMs > 500 && onSendVoice) {
+      // Send a clip only if it is long enough to be intentional AND small
+      // enough for the table socket. The web recorder caps at 10s / 24KB for a
+      // reason: `ws` DROPS the connection on a frame over 64KB, so an oversized
+      // voice note would sever the felt mid-hand. base64 inflates ~1.33x, so
+      // 24KB decoded is ~32KB encoded; HIGH_QUALITY can blow that in ~1s, so an
+      // over-budget clip is refused rather than allowed to kill the socket.
+      // (Tuning the recording quality so a longer clip still fits is a follow-up.)
+      const MAX_MS = 10_000;
+      const MAX_B64_LEN = 33 * 1024;
+      if (uri && durationMs > 500 && durationMs <= MAX_MS && onSendVoice) {
         const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
-        onSendVoice(base64, durationMs, 'audio/m4a');
+        if (base64.length <= MAX_B64_LEN) {
+          onSendVoice(base64, durationMs, 'audio/m4a');
+        } else {
+          console.warn('[voice] clip exceeds the table socket budget; not sent');
+        }
       }
     } catch (error) {
       console.error('Failed to stop recording', error);

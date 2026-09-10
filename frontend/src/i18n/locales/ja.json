@@ -175,6 +175,8 @@
     "wallet": "ウォレット",
     "fairness": "公正性の検証",
     "history": "プレイ履歴",
+    "results": "戦績",
+    "jackpot": "ジャックポット",
     "settings": "設定",
     "support": "サポート",
     "language": "言語",
@@ -497,6 +499,12 @@
     "signInToSee": "ログインすると通知が表示されます",
     "empty": "まだ通知はありません",
     "emptyBlurb": "ゲーム結果、入金、お知らせがここに表示されます。",
+    "tab": {
+      "system": "システム",
+      "results": "戦績",
+      "deposits": "入金",
+      "promos": "プロモ"
+    },
     "handWon": "${{amount}} を獲得しました",
     "handLost": "ハンド精算 — ${{amount}}",
     "deposit": "${{amount}} の入金が反映されました",

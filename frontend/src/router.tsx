@@ -1,28 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { AppShell } from '@/components/AppShell';
-import { Alliance } from '@/pages/Alliance';
-import { Lobby } from '@/pages/Lobby';
-import { Games } from '@/pages/Games';
-import { Data } from '@/pages/Data';
-import { Wallet } from '@/pages/Wallet';
-import { Profile } from '@/pages/Profile';
-import { PersonalInfo } from '@/pages/PersonalInfo';
-import { Settings } from '@/pages/Settings';
-import { Fairness } from '@/pages/Fairness';
-import { Jackpot } from '@/pages/Jackpot';
-import { Vip } from '@/pages/Vip';
-import { Notifications } from '@/pages/Notifications';
-import { AgentCenter } from '@/pages/AgentCenter';
-import { Table } from '@/pages/Table';
-import { Login } from '@/pages/Login';
 import { Landing } from '@/pages/Landing';
-import { AdminShell } from '@/components/AdminShell';
-import { AdminOverview } from '@/pages/admin/Overview';
-import { AdminPlayers } from '@/pages/admin/Players';
-import { AdminAlerts } from '@/pages/admin/Alerts';
-import { AdminLeagues } from '@/pages/admin/Leagues';
-import { AdminWithdrawals } from '@/pages/admin/Withdrawals';
-import { AdminAdmins } from '@/pages/admin/Admins';
 // The styled admin dead-end (the "crash tab" fix) lives in route-fallbacks now; the withdrawals
 // stub that file also carries is unused here — the real review queue landed with league-funding.
 import { AdminRouteError } from '@/pages/admin/route-fallbacks';
@@ -31,12 +9,12 @@ import { isAdminHost } from '@/lib/adminHost';
 // The panel's sections, mounted at whatever base the host uses (root on the admin
 // subdomain, /admin on the player host — see below).
 const adminChildren = [
-  { index: true, element: <AdminOverview /> },
-  { path: 'withdrawals', element: <AdminWithdrawals /> },
-  { path: 'users', element: <AdminPlayers /> },
-  { path: 'leagues', element: <AdminLeagues /> },
-  { path: 'alerts', element: <AdminAlerts /> },
-  { path: 'admins', element: <AdminAdmins /> },
+  { index: true, lazy: async () => ({ Component: (await import('@/pages/admin/Overview')).AdminOverview }) },
+  { path: 'withdrawals', lazy: async () => ({ Component: (await import('@/pages/admin/Withdrawals')).AdminWithdrawals }) },
+  { path: 'users', lazy: async () => ({ Component: (await import('@/pages/admin/Players')).AdminPlayers }) },
+  { path: 'leagues', lazy: async () => ({ Component: (await import('@/pages/admin/Leagues')).AdminLeagues }) },
+  { path: 'alerts', lazy: async () => ({ Component: (await import('@/pages/admin/Alerts')).AdminAlerts }) },
+  { path: 'admins', lazy: async () => ({ Component: (await import('@/pages/admin/Admins')).AdminAdmins }) },
 ];
 
 /**
@@ -55,7 +33,7 @@ export const router = isAdminHost()
   ? createBrowserRouter([
       {
         path: '/',
-        element: <AdminShell />,
+        lazy: async () => ({ Component: (await import('@/components/AdminShell')).AdminShell }),
         errorElement: <AdminRouteError />,
         children: adminChildren,
       },
@@ -69,24 +47,24 @@ export const router = isAdminHost()
           // A signed-out browser never reaches it: AppShell's gate sends a
           // stranger at the root to /download (the public landing) — ONE place
           // decides who sees what at the front door, and it is the shell.
-          { index: true, element: <Lobby /> },
-          { path: 'alliance', element: <Alliance /> },
-          { path: 'games', element: <Games /> },
-          { path: 'data', element: <Data /> },
-          { path: 'profile', element: <Profile /> },
+          { index: true, lazy: async () => ({ Component: (await import('@/pages/Lobby')).Lobby }) },
+          { path: 'alliance', lazy: async () => ({ Component: (await import('@/pages/Alliance')).Alliance }) },
+          { path: 'games', lazy: async () => ({ Component: (await import('@/pages/Games')).Games }) },
+          { path: 'data', lazy: async () => ({ Component: (await import('@/pages/Data')).Data }) },
+          { path: 'profile', lazy: async () => ({ Component: (await import('@/pages/Profile')).Profile }) },
           // Not a tab — reached from My Account's deposit/withdraw.
-          { path: 'wallet', element: <Wallet /> },
-          { path: 'settings', element: <Settings /> },
+          { path: 'wallet', lazy: async () => ({ Component: (await import('@/pages/Wallet')).Wallet }) },
+          { path: 'settings', lazy: async () => ({ Component: (await import('@/pages/Settings')).Settings }) },
           // Not a tab — reached from Profile's "Personal Info" row.
-          { path: 'personal', element: <PersonalInfo /> },
+          { path: 'personal', lazy: async () => ({ Component: (await import('@/pages/PersonalInfo')).PersonalInfo }) },
           // Browser sign-in (email/password + Google); inside Telegram the Mini App
           // signs in automatically and this screen is never routed to.
-          { path: 'login', element: <Login /> },
-          { path: 'fairness', element: <Fairness /> },
-          { path: 'jackpot', element: <Jackpot /> },
-          { path: 'vip', element: <Vip /> },
-          { path: 'notifications', element: <Notifications /> },
-          { path: 'agent', element: <AgentCenter /> },
+          { path: 'login', lazy: async () => ({ Component: (await import('@/pages/Login')).Login }) },
+          { path: 'fairness', lazy: async () => ({ Component: (await import('@/pages/Fairness')).Fairness }) },
+          { path: 'jackpot', lazy: async () => ({ Component: (await import('@/pages/Jackpot')).Jackpot }) },
+          { path: 'vip', lazy: async () => ({ Component: (await import('@/pages/Vip')).Vip }) },
+          { path: 'notifications', lazy: async () => ({ Component: (await import('@/pages/Notifications')).Notifications }) },
+          { path: 'agent', lazy: async () => ({ Component: (await import('@/pages/AgentCenter')).AgentCenter }) },
         ],
       },
       // Admin. Its own shell, deliberately outside AppShell so it never appears in
@@ -94,11 +72,11 @@ export const router = isAdminHost()
       // The real gate is server-side: every /admin API answers 404 to non-ops.
       {
         path: '/admin',
-        element: <AdminShell />,
+        lazy: async () => ({ Component: (await import('@/components/AdminShell')).AdminShell }),
         errorElement: <AdminRouteError />,
         children: adminChildren,
       },
-      { path: '/table/:id', element: <Table /> },
+      { path: '/table/:id', lazy: async () => ({ Component: (await import('@/pages/Table')).Table }) },
       // The public landing/download page. Outside AppShell on purpose: it is
       // the marketing front door (navbar, hero, store buttons), not an app
       // tab, and it must render for people who have never signed in.

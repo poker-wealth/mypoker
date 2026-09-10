@@ -54,6 +54,13 @@ const navigationSrc = readFileSync(navigationPath, 'utf8');
 /** Web routes with no mobile counterpart, and why that's correct. Matched by path PREFIX. */
 const ACCEPTED_WEB_ONLY = [
   {
+    path: '/download',
+    reason:
+      'The public front door — the page that hands out the app, so it cannot live inside it: ' +
+      'a mobile counterpart would be an app telling you to install the app. No session, no ' +
+      'AppShell, no bottom nav; whoever lands here has not signed up.',
+  },
+  {
     path: '/admin',
     reason:
       'Desktop-only ops panel, deliberately outside AppShell/BottomNav on the web too. ' +
@@ -111,8 +118,14 @@ function matchingBracket(text, openIdx, open, close) {
  * subdomain mounts the panel at the root — and the first one is not the one
  * this wants.
  */
-function childrenBlock(text, anchor) {
-  const containerIdx = text.indexOf(anchor);
+function childrenBlock(text, anchors) {
+  // A list, because a route may name its component two ways — see ROUTE_ENTRY_RE.
+  // The first anchor that appears wins; a shell written either way is found.
+  let containerIdx = -1;
+  for (const a of [anchors].flat()) {
+    const i = text.indexOf(a);
+    if (i !== -1 && (containerIdx === -1 || i < containerIdx)) containerIdx = i;
+  }
   if (containerIdx === -1) return null;
   const childrenKeyIdx = text.indexOf('children:', containerIdx);
   if (childrenKeyIdx === -1) return null;
@@ -138,8 +151,23 @@ function childrenBlock(text, anchor) {
   return { start: open, end: close + 1, text: text.slice(open, close + 1) };
 }
 
-/** `{ path: 'x', element: <Comp ... }` or `{ index: true, element: <Comp ... }` entries, in order. */
-const ROUTE_ENTRY_RE = /\{\s*(index:\s*true|path:\s*'[^']+')\s*,\s*element:\s*<(\w+)/g;
+/**
+ * Route entries, in order, in either of the two forms the router writes.
+ *
+ *   { path: 'x',      element: <Comp /> }
+ *   { index: true,    lazy: async () => ({ Component: (await import('@/pages/Comp')).Comp }) }
+ *
+ * The lazy form arrived when the routes were code-split, and this regex did
+ * not follow it. It matched nothing, so the check died at "extracted zero
+ * routes" — loudly, which is the only reason it was caught. Had it been
+ * written to return [] quietly, web and mobile could have drifted apart for a
+ * release with a green check on top (TRAPS §1, §25).
+ *
+ * The component name is the last identifier in the lazy expression — the
+ * `.Comp` after the import — so both forms yield the same name.
+ */
+const ROUTE_ENTRY_RE =
+  /\{\s*(index:\s*true|path:\s*'[^']+')\s*,\s*(?:element:\s*<(\w+)|lazy:.*?\)\)\.(\w+))/g;
 
 function extractRouteEntries(blockText) {
   const entries = [];
@@ -147,7 +175,8 @@ function extractRouteEntries(blockText) {
   ROUTE_ENTRY_RE.lastIndex = 0;
   while ((m = ROUTE_ENTRY_RE.exec(blockText))) {
     const head = m[1];
-    const component = m[2];
+    // m[2] is the element form, m[3] the lazy one. Exactly one matches.
+    const component = m[2] ?? m[3];
     if (head.startsWith('index')) {
       entries.push({ isIndex: true, path: '', component });
     } else {
@@ -160,15 +189,17 @@ function extractRouteEntries(blockText) {
 
 // ─── 1 & 2. parse the web: router.tsx and BottomNav.tsx ────────────────────
 
-const tabShell = childrenBlock(routerSrc, 'element: <AppShell />');
-const adminShell = childrenBlock(routerSrc, 'element: <AdminShell />');
+const tabShell = childrenBlock(routerSrc, ['element: <AppShell />', ')).AppShell']);
+const adminShell = childrenBlock(routerSrc, ['element: <AdminShell />', ')).AdminShell']);
 
 if (!tabShell) {
-  fail('PARSE FAILURE: could not find the AppShell ("element: <AppShell />") children block in router.tsx. ' +
+  fail('PARSE FAILURE: could not find the AppShell children block in router.tsx — looked for both ' +
+    '"element: <AppShell />" and the lazy form ")).AppShell". ' +
     'The route table shape changed — update check-parity.mjs, do not let this pass silently.');
 }
 if (!adminShell) {
-  fail('PARSE FAILURE: could not find the AdminShell ("element: <AdminShell />") children block in router.tsx.');
+  fail('PARSE FAILURE: could not find the AdminShell children block in router.tsx — looked for both ' +
+    '"element: <AdminShell />" and the lazy form ")).AdminShell".');
 }
 
 // Every route entry carries a `fullPath` computed for its own category — the raw `path:` capture
@@ -309,7 +340,11 @@ if (paramListStart === -1) {
 const paramListOpen = navigationSrc.indexOf('{', paramListStart);
 const paramListClose = matchingBracket(navigationSrc, paramListOpen, '{', '}');
 const paramListText = navigationSrc.slice(paramListOpen, paramListClose + 1);
-const PARAM_KEY_RE = /(\w+)\s*:\s*(?:undefined|\{[^}]*\})\s*;/g;
+// `NavigatorScreenParams<...>` is the third form a key takes: a nested navigator
+// that accepts `{ screen }`. Tabs became one when the Me grid started reaching
+// the Data tab. Without it here the key is invisible and this reports the screen
+// as missing from a file it is plainly declared in.
+const PARAM_KEY_RE = /(\w+)\s*:\s*(?:undefined|NavigatorScreenParams<[^>]*>|\{[^}]*\})\s*;/g;
 const paramListKeys = [];
 let pm;
 while ((pm = PARAM_KEY_RE.exec(paramListText))) paramListKeys.push(pm[1]);
