@@ -10,7 +10,6 @@ import { useTranslation } from 'react-i18next';
 import { useSettings } from '@/api/hooks';
 import { setLanguage } from '@/i18n';
 import { initData } from '@/lib/telegram';
-import { isAppHost } from '@/config';
 import { Login } from '@/pages/Login';
 import { Landing } from '@/pages/Landing';
 
@@ -55,9 +54,16 @@ export function AppShell() {
   // without the app's header and tab bar around it.
   const isTelegram = Boolean(initData());
   if (!isTelegram && !token) {
-    // On the APP subdomain the app is the front door — sign-in, as always.
-    // Everywhere else (the marketing domain, dev) the root is the landing.
-    if (location.pathname === '/' && !isAppHost()) return <Landing />;
+    // EVERY host, including the app subdomain. There used to be an isAppHost()
+    // exception here that made app.mypoker777.com open on the sign-in card, on
+    // the reasoning that the app host IS the product. In practice that meant a
+    // visitor's first sight of the site was a Google button, with the home
+    // page only reachable by typing /download — which is backwards. The front
+    // door is the front door wherever it is served from.
+    //
+    // Telegram is unaffected: initData() is set there, so the Mini App signs
+    // in and lands in the lobby without ever reaching this branch.
+    if (location.pathname === '/') return <Landing />;
     return <Login />;
   }
 

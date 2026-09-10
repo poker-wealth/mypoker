@@ -80,5 +80,6 @@ export const router = isAdminHost()
       // The public landing/download page. Outside AppShell on purpose: it is
       // the marketing front door (navbar, hero, store buttons), not an app
       // tab, and it must render for people who have never signed in.
+      //
       { path: '/download', element: <Landing /> },
     ]);
