@@ -11,6 +11,7 @@ import {
   Text,
   TextInput,
   View,
+  ImageBackground,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Svg, Path, Circle } from 'react-native-svg';
@@ -87,155 +88,155 @@ export function GamesScreen() {
 
   return (
     <>
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      {/* Search */}
-      <View style={styles.search}>
-        <Svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke={theme.dim} strokeWidth={2} strokeLinecap="round">
-          <Circle cx={11} cy={11} r={7} />
-          <Path d="M21 21l-4.3-4.3" />
-        </Svg>
-        <TextInput
-          value={q}
-          onChangeText={setQ}
-          placeholder="Search games"
-          placeholderTextColor={theme.dim}
-          style={styles.searchInput}
-        />
-      </View>
+      <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+        {/* Search */}
+        <View style={styles.search}>
+          <Svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke={theme.dim} strokeWidth={2} strokeLinecap="round">
+            <Circle cx={11} cy={11} r={7} />
+            <Path d="M21 21l-4.3-4.3" />
+          </Svg>
+          <TextInput
+            value={q}
+            onChangeText={setQ}
+            placeholder="Search games"
+            placeholderTextColor={theme.dim}
+            style={styles.searchInput}
+          />
+        </View>
 
-      {/* Jackpot Hero */}
-      <View style={styles.hero}>
-        <LinearGradient
-          colors={['#C9A15F', '#E8C98E', '#B38B4A']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
+        {/* Jackpot Hero */}
+        <View style={styles.hero}>
+          <LinearGradient
+            colors={['#C9A15F', '#E8C98E', '#B38B4A']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <Image source={require('../../assets/brand/trophy.png')} style={styles.trophy} resizeMode="contain" />
+          <View style={styles.heroRight}>
+            <Text style={styles.heroLabel}>GRAND JACKPOT</Text>
+            {lobby.isPending ? (
+              <Skeleton width={100} />
+            ) : (
+              <Text style={styles.heroValue}>
+                {money(jackpot ?? 0, { decimals: 0 })}
+              </Text>
+            )}
+          </View>
+        </View>
+
+        <Segmented
+          value={cat}
+          onChange={setCat}
+          options={[
+            { value: 'all', label: t('games.filterAll').toUpperCase() },
+            { value: 'poker', label: t('games.filter.poker').toUpperCase() },
+            { value: 'card', label: t('games.filter.card').toUpperCase() },
+            { value: 'arcade', label: t('games.filter.arcade').toUpperCase() },
+            { value: 'quick', label: t('games.filter.quick').toUpperCase() },
+          ]}
         />
-        <Image source={require('../../assets/brand/trophy.png')} style={styles.trophy} resizeMode="contain" />
-        <View style={styles.heroRight}>
-          <Text style={styles.heroLabel}>GRAND JACKPOT</Text>
-          {lobby.isPending ? (
-            <Skeleton width={100} />
-          ) : (
-            <Text style={styles.heroValue}>
-              {money(jackpot, { decimals: 0 })}
-            </Text>
+
+        {/* Game sections */}
+        <View style={styles.sections}>
+          {sections.map(
+            (section) =>
+              section.list.length > 0 && (
+                <View key={section.key} style={styles.section}>
+                  <Text style={styles.sectionTitle}>{section.title.toUpperCase()}</Text>
+                  <View style={styles.grid}>
+                    {section.list.map((g) => (
+                      <GameTile
+                        key={g.id}
+                        game={g}
+                        tables={live.get(g.id)?.tables}
+                        jackpot={live.get(g.id)?.jackpot}
+                        onPress={() => setActionGame(g)}
+                      />
+                    ))}
+                  </View>
+                </View>
+              ),
+          )}
+
+          {getShown(games).length === 0 && (
+            <EmptyState title={t('games.noMatch', { query: q })} />
           )}
         </View>
-      </View>
 
-      <Segmented
-        value={cat}
-        onChange={setCat}
-        options={[
-          { value: 'all', label: t('games.filterAll').toUpperCase() },
-          { value: 'poker', label: t('games.filter.poker').toUpperCase() },
-          { value: 'card', label: t('games.filter.card').toUpperCase() },
-          { value: 'arcade', label: t('games.filter.arcade').toUpperCase() },
-          { value: 'quick', label: t('games.filter.quick').toUpperCase() },
-        ]}
-      />
-
-      {/* Game sections */}
-      <View style={styles.sections}>
-        {sections.map(
-          (section) =>
-            section.list.length > 0 && (
-              <View key={section.key} style={styles.section}>
-                <Text style={styles.sectionTitle}>{section.title.toUpperCase()}</Text>
-                <View style={styles.grid}>
-                  {section.list.map((g) => (
-                    <GameTile
-                      key={g.id}
-                      game={g}
-                      tables={live.get(g.id)?.tables}
-                      jackpot={live.get(g.id)?.jackpot}
-                      onPress={() => setActionGame(g)}
-                    />
-                  ))}
+        {/* Coming soon */}
+        <View style={styles.comingSoon}>
+          <Text style={styles.comingSoonTitle}>{t('games.comingSoon')}</Text>
+          <View style={styles.comingSoonGrid}>
+            {COMING_SOON.map((id) => (
+              <View key={id} style={styles.comingSoonCard}>
+                <Text style={styles.comingSoonName}>{t(`gameNames.${id}`)}</Text>
+                <View style={styles.soonBadge}>
+                  <Text style={styles.soonBadgeText}>{t('games.soonBadge')}</Text>
                 </View>
               </View>
-            ),
-        )}
-
-        {getShown(games).length === 0 && (
-          <EmptyState title={t('games.noMatch', { query: q })} />
-        )}
-      </View>
-
-      {/* Coming soon */}
-      <View style={styles.comingSoon}>
-        <Text style={styles.comingSoonTitle}>{t('games.comingSoon')}</Text>
-        <View style={styles.comingSoonGrid}>
-          {COMING_SOON.map((id) => (
-            <View key={id} style={styles.comingSoonCard}>
-              <Text style={styles.comingSoonName}>{t(`gameNames.${id}`)}</Text>
-              <View style={styles.soonBadge}>
-                <Text style={styles.soonBadgeText}>{t('games.soonBadge')}</Text>
-              </View>
-            </View>
-          ))}
+            ))}
+          </View>
         </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
 
-    {/* Game Action Drawer (Screenshot 1) */}
-    <Dialog 
-      open={actionGame !== null} 
-      onClose={() => setActionGame(null)} 
-      title={actionGame ? t(`gameNames.${actionGame.id}`, { defaultValue: actionGame.name }) : ''}
-    >
-      <View style={{ gap: space.sm }}>
-        <Pressable
-          style={styles.actionCard}
-          onPress={() => {
-            if (actionGame) {
-              openGame(actionGame.id);
+      {/* Game Action Drawer (Screenshot 1) */}
+      <Dialog
+        open={actionGame !== null}
+        onClose={() => setActionGame(null)}
+        title={actionGame ? t(`gameNames.${actionGame.id}`, { defaultValue: actionGame.name }) : ''}
+      >
+        <View style={{ gap: space.sm }}>
+          <Pressable
+            style={styles.actionCard}
+            onPress={() => {
+              if (actionGame) {
+                openGame(actionGame.id);
+                setActionGame(null);
+              }
+            }}
+          >
+            <View style={[styles.actionIconWrap, { backgroundColor: '#2A2A2A' }]}>
+              <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#D9B87C" strokeWidth={2}>
+                <Path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <Circle cx="9" cy="7" r="4" />
+                <Path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                <Path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </Svg>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.actionTitle}>Join a table</Text>
+              <Text style={styles.actionHint}>Take a seat at the open table.</Text>
+            </View>
+          </Pressable>
+
+          <Pressable
+            style={styles.actionCard}
+            onPress={() => {
+              const g = actionGame;
               setActionGame(null);
-            }
-          }}
-        >
-          <View style={[styles.actionIconWrap, { backgroundColor: '#2A2A2A' }]}>
-            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#D9B87C" strokeWidth={2}>
-              <Path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-              <Circle cx="9" cy="7" r="4" />
-              <Path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-              <Path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </Svg>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.actionTitle}>Join a table</Text>
-            <Text style={styles.actionHint}>Take a seat at the open table.</Text>
-          </View>
-        </Pressable>
+              setTimeout(() => setCreateSheetGame(g), 100);
+            }}
+          >
+            <View style={[styles.actionIconWrap, { backgroundColor: '#2A2A2A' }]}>
+              <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#D9B87C" strokeWidth={2}>
+                <Path d="M12 5v14M5 12h14" />
+              </Svg>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.actionTitle}>Create a table</Text>
+              <Text style={styles.actionHint}>Open your own and invite friends.</Text>
+            </View>
+          </Pressable>
+        </View>
+      </Dialog>
 
-        <Pressable
-          style={styles.actionCard}
-          onPress={() => {
-            const g = actionGame;
-            setActionGame(null);
-            setTimeout(() => setCreateSheetGame(g), 100);
-          }}
-        >
-          <View style={[styles.actionIconWrap, { backgroundColor: '#2A2A2A' }]}>
-            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="#D9B87C" strokeWidth={2}>
-              <Path d="M12 5v14M5 12h14" />
-            </Svg>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.actionTitle}>Create a table</Text>
-            <Text style={styles.actionHint}>Open your own and invite friends.</Text>
-          </View>
-        </Pressable>
-      </View>
-    </Dialog>
-
-    {/* Custom CreateTableSheet (Screenshot 2) */}
-    <CreateTableSheet
-      initialVariant={createSheetGame?.id as any}
-      open={createSheetGame !== null}
-      onClose={() => setCreateSheetGame(null)}
-    />
+      {/* Custom CreateTableSheet (Screenshot 2) */}
+      <CreateTableSheet
+        initialVariant={createSheetGame?.id as any}
+        open={createSheetGame !== null}
+        onClose={() => setCreateSheetGame(null)}
+      />
     </>
   );
 }
@@ -298,7 +299,7 @@ const styles = StyleSheet.create({
     paddingVertical: space.sm + 2,
   },
   searchInput: { flex: 1, color: theme.text, fontSize: 14, fontFamily: weight('400') },
-  
+
   hero: {
     height: 140,
     borderRadius: 16,

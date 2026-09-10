@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Svg, Path, Circle } from 'react-native-svg';
 import { radius, space, theme } from '../../theme';
-import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+import { VoiceNote } from '../../VoiceNote';
+import { useVoiceRecorder } from '../../useVoiceRecorder';
 
 /** Mirrors `ChatMessage` in frontend/src/hooks/useTableChat.ts. */
 export interface ChatMessage {
@@ -20,60 +20,19 @@ export interface ChatMessage {
 
 const MAX_LENGTH = 200;
 
-function VoiceNoteBubble({ voice, mine }: { voice: { clip: string; durationMs: number; mime: string }; mine: boolean }) {
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-
-  async function play() {
-    if (sound) {
-      if (isPlaying) {
-        await sound.pauseAsync();
-        setIsPlaying(false);
-      } else {
-        await sound.playAsync();
-        setIsPlaying(true);
-      }
-      return;
-    }
-    try {
-      const ext = voice.mime.includes('mp4') || voice.mime.includes('m4a') ? 'm4a' : 'caf';
-      const uri = (FileSystem as any).documentDirectory + 'note_' + Date.now() + '.' + ext;
-      await FileSystem.writeAsStringAsync(uri, voice.clip, { encoding: FileSystem.EncodingType.Base64 });
-      
-      const { sound: s } = await Audio.Sound.createAsync({ uri });
-      s.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded && status.didJustFinish) {
-          setIsPlaying(false);
-          s.setPositionAsync(0);
-        }
-      });
-      setSound(s);
-      await s.playAsync();
-      setIsPlaying(true);
-    } catch (e) {
-      console.error('Playback failed', e);
-    }
-  }
-
-  useEffect(() => {
-    return () => {
-      if (sound) sound.unloadAsync();
-    };
-  }, [sound]);
-
-  return (
-    <Pressable onPress={play} style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs, { flexDirection: 'row', alignItems: 'center', gap: 8 }]}>
-      <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: mine ? 'rgba(255,255,255,0.2)' : theme.surface, alignItems: 'center', justifyContent: 'center' }}>
-        <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke={mine ? "white" : theme.brand} strokeWidth={2}>
-          {isPlaying ? <Path d="M10 4v16M14 4v16" /> : <Path d="M5 3l14 9-14 9V3z" />}
-        </Svg>
-      </View>
-      <Text style={mine ? {color: 'white', fontSize: 13} : styles.bubbleText}>
-        {Math.max(1, Math.round(voice.durationMs / 1000))}s
-      </Text>
-    </Pressable>
-  );
-}
+/*
+ * Playback and recording come from the app's own audio pieces — `VoiceNote`
+ * and `useVoiceRecorder`, both built on **expo-audio**.
+ *
+ * This file used to carry a SECOND implementation on `expo-av`, the
+ * deprecated predecessor. Nothing else in the app pulls that library in, so
+ * it was never compiled into the binary and the app died at boot with
+ * "Cannot find native module 'ExponentAV'".
+ *
+ * The shared recorder also owns every rule about a usable clip (minimum
+ * length, the 24KB ceiling, the pinned bitrate) in ONE place, rather than a
+ * second copy of those limits drifting here.
+ */
 
 export function ChatBox({
   messages,
@@ -92,7 +51,8 @@ export function ChatBox({
 }) {
   const [input, setInput] = useState('');
   const scrollRef = useRef<ScrollView>(null);
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const voice = useVoiceRecorder();
+  const recording = voice.recording;
 
   // Follow the conversation
   useEffect(() => {
@@ -106,52 +66,20 @@ export function ChatBox({
     setInput('');
   };
 
-  async function startRecording() {
+  function startRecording(): void {
     if (disabled || !onSendVoice) return;
-    try {
-      const permission = await Audio.requestPermissionsAsync();
-      if (permission.status === 'granted') {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true,
-        });
-        const { recording: r } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-        setRecording(r);
-      }
-    } catch (err) {
-      console.error('Failed to start recording', err);
-    }
+    voice.start();
   }
 
-  async function stopRecording() {
-    if (!recording) return;
-    setRecording(null);
-    try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      const status = await recording.getStatusAsync();
-      const durationMs = status.durationMillis;
-      
-      // Send a clip only if it is long enough to be intentional AND small
-      // enough for the table socket. The web recorder caps at 10s / 24KB for a
-      // reason: `ws` DROPS the connection on a frame over 64KB, so an oversized
-      // voice note would sever the felt mid-hand. base64 inflates ~1.33x, so
-      // 24KB decoded is ~32KB encoded; HIGH_QUALITY can blow that in ~1s, so an
-      // over-budget clip is refused rather than allowed to kill the socket.
-      // (Tuning the recording quality so a longer clip still fits is a follow-up.)
-      const MAX_MS = 10_000;
-      const MAX_B64_LEN = 33 * 1024;
-      if (uri && durationMs > 500 && durationMs <= MAX_MS && onSendVoice) {
-        const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
-        if (base64.length <= MAX_B64_LEN) {
-          onSendVoice(base64, durationMs, 'audio/m4a');
-        } else {
-          console.warn('[voice] clip exceeds the table socket budget; not sent');
-        }
-      }
-    } catch (error) {
-      console.error('Failed to stop recording', error);
-    }
+  /**
+   * Stop and send. The hook returns null when the clip fails any of its own
+   * rules, so a too-short tap or an over-budget recording sends nothing —
+   * rather than a frame big enough to make `ws` drop the table socket.
+   */
+  async function stopRecording(): Promise<void> {
+    if (!voice.recording) return;
+    const clip = await voice.stop();
+    if (clip && onSendVoice) onSendVoice(clip.clip, clip.durationMs, clip.mime);
   }
 
   return (
@@ -173,7 +101,12 @@ export function ChatBox({
                 {!msg.isSystem ? <Text style={styles.sender}>{msg.senderName}</Text> : null}
 
                 {msg.voice ? (
-                  <VoiceNoteBubble voice={msg.voice} mine={mine} />
+                  <VoiceNote
+                    clip={msg.voice.clip}
+                    durationMs={msg.voice.durationMs}
+                    mime={msg.voice.mime}
+                    mine={mine}
+                  />
                 ) : msg.text === undefined ? (
                   <Text style={styles.note}>Voice note expired</Text>
                 ) : (
