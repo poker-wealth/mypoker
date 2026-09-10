@@ -117,7 +117,9 @@ export const headerRightFor = (screen: 'Alliance' | 'Games' | 'Tables' | 'Data' 
         <Bell />
         {screen === 'Alliance' && <HelpIcon color={theme.dim} size={18} />}
         {screen === 'Tables' && <FairSecureBadge />}
-        {(screen === 'Data' || screen === 'Account') && <SettingsButton />}
+        {/* Data only. Account's own grid carries a Settings tile, and two
+            controls opening one screen from one view read as two places. */}
+        {screen === 'Data' && <SettingsButton />}
       </View>
     );
   };
