@@ -19,6 +19,9 @@
     "cancel": "キャンセル"
   },
   "lobby": {
+    "create": "作成",
+    "join": "参加",
+    "myGames": "マイゲーム",
     "dailyJackpot": "デイリージャックポット",
     "jackpotBlurb": "MYPOKER でプレイされるすべてのハンドで増えていきます。",
     "provablyFair": "証明可能な公正性 · オンチェーンで検証可能",

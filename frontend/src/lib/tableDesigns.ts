@@ -381,17 +381,18 @@ export const TABLE_DESIGNS: TableDesign[] = [
 /**
  * The felt a player sees before they choose anything.
  *
- * House Maroon, because the brief is that the app looks like the reference and
- * the reference's table is burgundy. A new felt that has to be found in a picker
- * is not a restyle — almost nobody opens the picker, so the product would still
- * look the way it looked.
+ * Emerald Classic — the green cloth on the black-and-gold rail. It is the
+ * owner's default, and it MUST match `DEFAULT_DESIGN_ID` in
+ * `mobile/src/table/tableDesigns.ts`: one product, one table, whether it is
+ * opened in Telegram, a browser or the native app. (It was House Maroon here
+ * and Emerald there, so the same player met two different tables.)
  *
  * NOTE for anyone testing: a stored choice still WINS over this. The store reads
  * localStorage first, so anyone who has opened the app before keeps the felt
  * they had. To see this one on an existing browser, pick it once in the picker
  * or clear `fp-table-design`.
  */
-export const DEFAULT_DESIGN_ID = 'house-maroon';
+export const DEFAULT_DESIGN_ID = 'emerald';
 
 export function designById(id: string | null | undefined): TableDesign {
   return TABLE_DESIGNS.find((d) => d.id === id) ?? TABLE_DESIGNS[0]!;

@@ -1,15 +1,32 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { motion } from 'motion/react';
+
 import { useNavigate } from 'react-router-dom';
-import { Zap, SlidersHorizontal, Plus } from 'lucide-react';
-import { useLobbyGames, useTables } from '@/api/hooks';
+import { Zap, SlidersHorizontal, Plus, ChevronRight, LayoutGrid, Dice5 } from 'lucide-react';
+import { useTables } from '@/api/hooks';
 import { formatMicros } from '@/api/lobby';
+
 import { ContextBanner } from '@/components/ContextBanner';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { GAMES } from '@/lib/games';
 import { cn } from '@/lib/cn';
 import { haptic } from '@/lib/telegram';
 import { toast } from '@/lib/toast';
+
+/**
+ * The promo banners, mirroring `PROMO_SLIDES` in
+ * `mobile/src/screens/LobbyScreen.tsx` — one lobby, two clients.
+ *
+ * WebP, not the PNGs the app ships: these are 626 KB here against 5.7 MB of
+ * source art, and the web side has a weight budget the native app does not
+ * (root CLAUDE.md). Each banner is FINISHED artwork — the wordmark, the
+ * headline and the "View details by clicking" pill are painted in — so
+ * nothing is drawn on top of them.
+ */
+const PROMO_SLIDES = ['/brand/promo-1.webp', '/brand/promo-2.webp', '/brand/promo-3.webp', '/brand/promo-4.webp'];
+
+/** How long a banner holds before the next slides in. Matches the app. */
+const PROMO_INTERVAL_MS = 5_000;
 
 /**
  * A lobby row, built only from what the server actually sent.
@@ -82,7 +99,6 @@ function formatBlinds(stakes: number | null, smallBlind?: number | null): string
 
 export function Lobby() {
   const navigate = useNavigate();
-  const lobby = useLobbyGames();
   const [variant, setVariant] = useState('dezhou');
   const [blinds, setBlinds] = useState('all');
   const [onlyOpen, setOnlyOpen] = useState(false);
@@ -114,8 +130,6 @@ export function Lobby() {
 
   // Null while the lobby has not answered. '$ 0.00' is a claim about the pools
   // and it is the wrong one — the hero shows a skeleton instead.
-  const rawJackpot = lobby.data?.totalJackpot;
-  const jackpotDisplay = rawJackpot === undefined ? null : `$ ${formatMicros(rawJackpot)}`;
 
   const displayTables: DisplayTable[] = rawTables.map((t) => ({
     id: t.id,
@@ -136,6 +150,23 @@ export function Lobby() {
     stakes: t.stakes,
   }));
 
+  // ── Promo carousel ────────────────────────────────────────────────────────
+  const [slide, setSlide] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const trackRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Advance on its own, pausing while a pointer rests on the banner.
+   *
+   * Scheduled from the slide actually showing, so a manual tap on a dot
+   * restarts the clock rather than firing on the old one's leftover timer.
+   */
+  useEffect(() => {
+    if (paused || PROMO_SLIDES.length < 2) return;
+    const id = setTimeout(() => setSlide((s) => (s + 1) % PROMO_SLIDES.length), PROMO_INTERVAL_MS);
+    return () => clearTimeout(id);
+  }, [slide, paused]);
+
   const handleQuickJoin = () => {
     const available = displayTables.find((t) => !t.isFull) || displayTables[0];
     if (available) {
@@ -147,39 +178,106 @@ export function Lobby() {
     <div className="flex flex-col space-y-3.5 pb-4">
       <ContextBanner />
 
-      {/* Jackpot hero - exact match with in-game / Games page */}
+      {/* Promo banners — the app's lobby, on the web. The slide is the image
+          and nothing else: the art already carries its own headline and CTA,
+          so any text here would print the words twice. */}
       <div
-        className="relative overflow-hidden rounded-2xl border border-border p-5 text-center flex flex-col justify-center h-32"
-        style={{ boxShadow: 'var(--glow-brand)' }}
+        className="relative overflow-hidden rounded-2xl"
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+        onTouchStart={() => setPaused(true)}
+        onTouchEnd={() => setPaused(false)}
       >
-        <div className="absolute inset-0" style={{ backgroundImage: 'var(--brand-gradient)', opacity: 0.9 }} />
-        <img 
-          src="/brand/trophy.png" 
-          alt="Grand Jackpot Trophy" 
-          className="absolute left-2 top-1/2 -translate-y-1/2 h-[115%] w-auto object-contain drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)] z-10 pointer-events-none" 
-        />
-        <motion.div
-          className="absolute inset-y-0 w-1/3 bg-white/20 blur-2xl"
-          initial={{ x: '-120%' }}
-          animate={{ x: '360%' }}
-          transition={{ duration: 3.2, repeat: Infinity, ease: 'easeInOut', repeatDelay: 1.5 }}
-        />
-        <div className="relative text-white z-10 flex flex-col items-center pl-20">
-          <div className="text-[0.7rem] font-bold uppercase tracking-wider text-white/90">
-            {t('lobby.grandJackpot')}
+        <div
+          ref={trackRef}
+          className="flex transition-transform duration-500 ease-out"
+          style={{ transform: `translateX(-${slide * 100}%)` }}
+        >
+          {PROMO_SLIDES.map((src, i) => (
+            <img
+              key={src}
+              src={src}
+              alt=""
+              aria-hidden
+              draggable={false}
+              // The first banner is the one on screen at first paint; the rest
+              // can wait until the carousel reaches them.
+              loading={i === 0 ? 'eager' : 'lazy'}
+              decoding="async"
+              className="w-full shrink-0 select-none rounded-2xl"
+            />
+          ))}
+        </div>
+        {PROMO_SLIDES.length > 1 && (
+          <div className="absolute inset-x-0 bottom-2 flex justify-center gap-1.5">
+            {PROMO_SLIDES.map((src, i) => (
+              <button
+                key={src}
+                type="button"
+                aria-label={`${i + 1} / ${PROMO_SLIDES.length}`}
+                onClick={() => setSlide(i)}
+                className={cn(
+                  'h-1.5 rounded-full transition-all',
+                  i === slide ? 'w-3.5 bg-white' : 'w-1.5 bg-white/40',
+                )}
+              />
+            ))}
           </div>
-          {lobby.isPending ? (
-            <div className="mt-1 flex justify-center">
-              <Skeleton className="h-10 w-52 bg-white/25" />
-            </div>
-          ) : (
-            <div className="mt-0.5 text-[2.2rem] font-black leading-none tracking-tight tabular-nums text-yellow-400 drop-shadow-sm">
-              {/* An em dash when the pools are unknown. A jackpot is the one
-                  number on this screen a player might act on, and "$ 0.00"
-                  would be a statement that there is nothing to win. */}
-              {jackpotDisplay ?? '—'}
-            </div>
-          )}
+        )}
+      </div>
+
+      {/* CREATE / JOIN — beneath the banner, never over it: the artwork
+          carries its own call to action and a bar across it hides that. */}
+      <div className="flex overflow-hidden rounded-2xl bg-gold text-bg shadow-lg">
+        <button
+          type="button"
+          onClick={() => {
+            haptic('light');
+            navigate('/games');
+          }}
+          className="flex flex-1 items-center justify-center gap-2 border-r border-black/20 py-3 text-sm font-black tracking-wide transition active:scale-[0.99]"
+        >
+          <LayoutGrid size={18} />
+          {t('lobby.create')}
+          <ChevronRight size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            haptic('light');
+            handleQuickJoin();
+          }}
+          className="flex flex-1 items-center justify-center gap-2 py-3 text-sm font-black tracking-wide transition active:scale-[0.99]"
+        >
+          <Dice5 size={18} />
+          {t('lobby.join')}
+          <ChevronRight size={14} />
+        </button>
+      </div>
+
+      {/* My Games — OUR catalogue, translated, with the fire mark only on the
+          games the catalogue actually flags hot. */}
+      <div>
+        <div className="mb-2 text-base font-black">{t('lobby.myGames')}</div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <button
+            type="button"
+            onClick={() => setVariant('dezhou')}
+            className="rounded-full bg-gold px-3 py-1 text-xs font-black text-bg"
+          >
+            {t('games.filterAll')}
+          </button>
+          {GAMES.map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              onClick={() => navigate(`/table/${g.id}`)}
+              className="text-[0.8rem] font-semibold text-dim transition-colors hover:text-text"
+            >
+              {g.hot ? '🔥' : ''}
+              {t(`gameNames.${g.id}`)}
+            </button>
+          ))}
         </div>
       </div>
 

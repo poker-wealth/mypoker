@@ -19,6 +19,9 @@
     "cancel": "取消"
   },
   "lobby": {
+    "create": "创建",
+    "join": "加入",
+    "myGames": "我的游戏",
     "dailyJackpot": "每日彩池",
     "jackpotBlurb": "MYPOKER 每一手牌都会让彩池增长。",
     "provablyFair": "公平可验证 · 链上可查",

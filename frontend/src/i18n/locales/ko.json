@@ -19,6 +19,9 @@
     "cancel": "취소"
   },
   "lobby": {
+    "create": "만들기",
+    "join": "참가",
+    "myGames": "내 게임",
     "dailyJackpot": "데일리 잭팟",
     "jackpotBlurb": "MYPOKER에서 진행되는 모든 핸드마다 잭팟이 쌓입니다.",
     "provablyFair": "증명 가능한 공정성 · 온체인 검증",

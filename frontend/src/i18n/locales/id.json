@@ -19,6 +19,9 @@
     "cancel": "Batal"
   },
   "lobby": {
+    "create": "BUAT",
+    "join": "GABUNG",
+    "myGames": "Game Saya",
     "dailyJackpot": "Jackpot Harian",
     "jackpotBlurb": "Bertambah setiap kali satu ronde dimainkan di MYPOKER.",
     "provablyFair": "Terbukti adil · dapat diverifikasi on-chain",

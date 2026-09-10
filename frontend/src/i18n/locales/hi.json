@@ -19,6 +19,9 @@
     "cancel": "रद्द करें"
   },
   "lobby": {
+    "create": "बनाएं",
+    "join": "शामिल हों",
+    "myGames": "मेरे गेम",
     "dailyJackpot": "डेली जैकपॉट",
     "jackpotBlurb": "MYPOKER पर खेले गए हर हाथ के साथ बढ़ता है।",
     "provablyFair": "प्रमाणित निष्पक्ष · ऑन-चेन सत्यापन योग्य",

@@ -19,6 +19,9 @@
     "cancel": "Cancel"
   },
   "lobby": {
+    "create": "CREATE",
+    "join": "JOIN",
+    "myGames": "My Games",
     "dailyJackpot": "Daily Jackpot",
     "jackpotBlurb": "Grows with every hand played across MYPOKER.",
     "provablyFair": "Provably fair · verifiable on-chain",

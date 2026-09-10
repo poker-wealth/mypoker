@@ -19,6 +19,9 @@
     "cancel": "Hủy"
   },
   "lobby": {
+    "create": "TẠO BÀN",
+    "join": "THAM GIA",
+    "myGames": "Trò chơi của tôi",
     "dailyJackpot": "Jackpot hằng ngày",
     "jackpotBlurb": "Tăng lên theo mỗi ván bài được chơi trên MYPOKER.",
     "provablyFair": "Công bằng minh bạch · xác minh trên chuỗi",
