@@ -20,6 +20,8 @@
     "cancel": "Batal"
   },
   "lobby": {
+    "tournaments": "Turnamen",
+    "noTournaments": "Belum ada turnamen terjadwal. Nantikan.",
     "liveTables": "Meja Langsung",
     "create": "BUAT",
     "join": "GABUNG",

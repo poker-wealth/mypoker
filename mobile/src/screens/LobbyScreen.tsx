@@ -350,10 +350,18 @@ export function LobbyScreen() {
           </View>
         </View>
 
-        {/* Tournaments are not built yet — the section is omitted rather than
-            shown with invented freerolls, fake prize pools, and a Register
-            button that does nothing (honesty rule + TRAPS §16). Restore it once
-            a real tournament feed and registration exist. */}
+        {/* Tournaments. The SECTION is here — the web lobby carries the same
+            one — but its contents are not invented. There is no tournament
+            backend at all (no route, no engine), so the fake freerolls, prize
+            pools and dead Register buttons that used to sit here are gone and
+            the space says so plainly. It fills itself the day a schedule
+            exists. Honesty rule + TRAPS §16. */}
+        <View style={styles.tournamentHeader}>
+          <Text style={styles.tournamentTitle}>{t('lobby.tournaments')}</Text>
+          <View style={styles.tourneyEmpty}>
+            <Text style={styles.tourneyEmptyText}>{t('lobby.noTournaments')}</Text>
+          </View>
+        </View>
       </ScrollView>
     </View>
   );
@@ -439,6 +447,16 @@ const styles = StyleSheet.create({
   tournamentFilterLabel: { color: theme.dim, fontSize: 13, fontFamily: weight('600') },
   tournamentHotGrid: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
 
+  tourneyEmpty: {
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderStyle: 'dashed',
+    borderRadius: 16,
+    paddingVertical: space.xl,
+    paddingHorizontal: space.lg,
+    alignItems: 'center',
+  },
+  tourneyEmptyText: { color: theme.dim, fontSize: 12, textAlign: 'center', fontFamily: weight('400') },
   tournamentCards: { gap: space.md, marginTop: space.sm },
   tourneyCard: { backgroundColor: '#212A2D', borderRadius: 12, padding: space.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
   tourneyTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: space.md },

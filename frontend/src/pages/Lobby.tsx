@@ -463,6 +463,21 @@ export function Lobby() {
         </div>
       </div>
 
+      {/* Tournament — the section the app carries, with the truth in it.
+          There is NO tournament backend: no route, no engine, nothing on the
+          server answers for an MTT. The app's version of this lists invented
+          events ("Golden Freeroll-8 Max", a 500 prize, a date in September)
+          that no player can enter and no code produced. Copying those here
+          would have doubled a fabrication rather than shipped a feature, so
+          the section says what is true and will fill itself the day a
+          schedule exists. */}
+      <div>
+        <div className="mb-2 text-base font-black">{t('lobby.tournaments')}</div>
+        <div className="rounded-2xl border border-dashed border-border bg-surface px-4 py-6 text-center text-[0.8rem] text-dim">
+          {t('lobby.noTournaments')}
+        </div>
+      </div>
+
       {/* No QUICK JOIN / CREATE PRIVATE TABLE pair here. CREATE and JOIN live
           on the lobby's home view; repeating them at the foot of the table
           list gave the same two doors different names on one screen. Removed

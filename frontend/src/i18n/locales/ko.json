@@ -20,6 +20,8 @@
     "cancel": "취소"
   },
   "lobby": {
+    "tournaments": "토너먼트",
+    "noTournaments": "예정된 토너먼트가 없습니다. 기대해 주세요.",
     "liveTables": "라이브 테이블",
     "create": "만들기",
     "join": "참가",

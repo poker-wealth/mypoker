@@ -20,6 +20,8 @@
     "cancel": "取消"
   },
   "lobby": {
+    "tournaments": "锦标赛",
+    "noTournaments": "暂无赛事安排，敬请期待。",
     "liveTables": "实时牌桌",
     "create": "创建",
     "join": "加入",

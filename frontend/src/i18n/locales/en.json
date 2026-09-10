@@ -20,6 +20,8 @@
     "cancel": "Cancel"
   },
   "lobby": {
+    "tournaments": "Tournament",
+    "noTournaments": "No tournaments scheduled yet. Watch this space.",
     "liveTables": "Live Tables",
     "create": "CREATE",
     "join": "JOIN",

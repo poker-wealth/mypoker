@@ -20,6 +20,8 @@
     "cancel": "Hủy"
   },
   "lobby": {
+    "tournaments": "Giải đấu",
+    "noTournaments": "Chưa có giải đấu nào được lên lịch. Hãy đón chờ.",
     "liveTables": "Bàn trực tiếp",
     "create": "TẠO BÀN",
     "join": "THAM GIA",
