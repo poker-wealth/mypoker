@@ -8,6 +8,7 @@
     "account": "내 정보"
   },
   "common": {
+    "back": "뒤로",
     "online": "접속 중",
     "members": "멤버",
     "join": "가입",
@@ -19,6 +20,7 @@
     "cancel": "취소"
   },
   "lobby": {
+    "liveTables": "라이브 테이블",
     "create": "만들기",
     "join": "참가",
     "myGames": "내 게임",

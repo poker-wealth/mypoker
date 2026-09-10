@@ -8,6 +8,7 @@
     "account": "Akun"
   },
   "common": {
+    "back": "Kembali",
     "online": "Daring",
     "members": "anggota",
     "join": "Gabung",
@@ -19,6 +20,7 @@
     "cancel": "Batal"
   },
   "lobby": {
+    "liveTables": "Meja Langsung",
     "create": "BUAT",
     "join": "GABUNG",
     "myGames": "Game Saya",

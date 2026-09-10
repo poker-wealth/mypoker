@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useNavigate } from 'react-router-dom';
-import { Zap, SlidersHorizontal, Plus, ChevronRight, LayoutGrid, Dice5 } from 'lucide-react';
+import { SlidersHorizontal, ChevronRight, ChevronLeft, LayoutGrid, Dice5 } from 'lucide-react';
 import { useTables } from '@/api/hooks';
 import { formatMicros } from '@/api/lobby';
 
@@ -11,7 +11,6 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { GAMES } from '@/lib/games';
 import { cn } from '@/lib/cn';
 import { haptic } from '@/lib/telegram';
-import { toast } from '@/lib/toast';
 
 /**
  * The promo banners, mirroring `PROMO_SLIDES` in
@@ -102,6 +101,8 @@ export function Lobby() {
   const [variant, setVariant] = useState('dezhou');
   const [blinds, setBlinds] = useState('all');
   const [onlyOpen, setOnlyOpen] = useState(false);
+  /** 'home' is the lobby; 'tables' is the Live Tables screen JOIN opens. */
+  const [view, setView] = useState<'home' | 'tables'>('home');
   const { t } = useTranslation();
 
   const targetStakes = STAKES_OPTIONS.find((s) => s.id === blinds)?.minStakes;
@@ -167,12 +168,193 @@ export function Lobby() {
     return () => clearTimeout(id);
   }, [slide, paused]);
 
-  const handleQuickJoin = () => {
-    const available = displayTables.find((t) => !t.isFull) || displayTables[0];
-    if (available) {
-      navigate(`/table/${available.id}`);
-    }
-  };
+  /**
+   * The tables list, as its own screen — the shape the native app uses.
+   *
+   * Everything below (the DEZHOU/AUSHA/OTHERS tabs, the blind filters, the
+   * table itself) used to sit stacked under the banner on one long page,
+   * which is not what the app does and not what the owner approved: there,
+   * JOIN opens "Live Tables" and the lobby home stays a lobby.
+   */
+  /**
+   * Tabs, blind filters and the table itself — the whole Live Tables
+   * screen, held in one place so the `tables` view above renders exactly
+   * what the lobby used to render inline.
+   */
+  const tablesSection = (
+    <>
+        {/* Game Type Filter Tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+          {VARIANTS.map((v) => {
+            const active = variant === v.id;
+            return (
+              <button
+                key={v.id}
+                onClick={() => setVariant(v.id)}
+                className={cn(
+                  'px-3.5 py-2 text-xs font-black tracking-wider transition-all rounded-lg shrink-0',
+                  active
+                    ? 'bg-[#0f3922] border border-[#22c55e] text-[#22c55e] shadow-[0_0_12px_rgba(34,197,94,0.25)]'
+                    : 'bg-surface-2/60 text-dim border border-transparent hover:text-text',
+                )}
+              >
+                {v.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Stakes Filter Pills */}
+        <div className="flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-1.5">
+            {STAKES_OPTIONS.map((s) => {
+              const active = blinds === s.id;
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => setBlinds(s.id)}
+                  className={cn(
+                    'px-3 py-1.5 text-xs font-bold transition-all rounded-md shrink-0',
+                    active
+                      ? 'bg-[#15803d] text-white shadow-xs'
+                      : 'bg-surface-2/80 text-dim hover:text-text',
+                  )}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+          {/* Was inert. Toggles the one filter a player in a lobby actually
+              wants — hide tables they cannot sit at — which the API already
+              supports via hasSeats. */}
+          <button
+            aria-label={t('lobby.onlyOpen')}
+            aria-pressed={onlyOpen}
+            onClick={() => {
+              haptic('light');
+              setOnlyOpen((v) => !v);
+            }}
+            className={cn(
+              'grid size-7 shrink-0 place-items-center rounded-md border transition-colors active:scale-95',
+              onlyOpen
+                ? 'border-[#22c55e] bg-[#0f3922] text-[#22c55e]'
+                : 'border-border bg-surface-2 text-dim hover:text-text',
+            )}
+          >
+            <SlidersHorizontal size={14} />
+          </button>
+        </div>
+
+        {/* Table List Grid */}
+        <div className="overflow-hidden rounded-xl border border-border/80 bg-surface/90 shadow-sm">
+          <table className="w-full text-left text-xs">
+            <thead>
+              <tr className="border-b border-border/60 text-[0.65rem] text-dim uppercase tracking-wider">
+                <th className="px-3 py-2.5 font-bold">Table</th>
+                <th className="px-3 py-2.5 font-bold">Blinds</th>
+                <th className="px-3 py-2.5 font-bold">Players</th>
+                <th className="px-3 py-2.5 font-bold">Buy-in</th>
+                <th className="px-3 py-2.5 text-right font-bold">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/40">
+              {tables.isPending ? (
+                [0, 1, 2].map((i) => (
+                  <tr key={i}>
+                    <td colSpan={5} className="px-3 py-3">
+                      <Skeleton className="h-4 w-full" />
+                    </td>
+                  </tr>
+                ))
+              ) : tables.isError ? (
+                // An unreachable lobby is not an empty one. Saying "no tables
+                // found" when the request failed tells the player the platform
+                // is dead rather than that we could not ask.
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-dim">
+                    {t('states.serviceUnavailable')}
+                  </td>
+                </tr>
+              ) : displayTables.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-dim">
+                    {t('lobby.noTables')}
+                  </td>
+                </tr>
+              ) : (
+                displayTables.map((tbl) => (
+                  <tr
+                    key={tbl.id}
+                    onClick={() => navigate(`/table/${tbl.id}`)}
+                    className="cursor-pointer transition-colors active:bg-surface-2/80 hover:bg-surface-2/40"
+                  >
+                    {/* The table's real id. It used to render `T-00${index}`, a
+                        label invented per render that matched nothing a player
+                        could be told over support. */}
+                    <td className="px-3 py-3 font-bold text-[#eab308]">
+                      {tbl.id}
+                      {/* The row holding this player's seat. It is the reason every
+                          other table is refusing them, and the only row that can
+                          release it — so it is marked next to the name rather than
+                          buried in the status column. */}
+                      {tbl.youAreSeated && (
+                        <span className="ml-2 rounded-full bg-brand/20 px-2 py-0.5 text-[0.6rem] font-bold text-brand align-middle">
+                          {t('lobby.yourSeat')}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 tabular-nums text-dim font-medium">{tbl.blinds}</td>
+                    <td className="px-3 py-3 tabular-nums font-semibold text-text">{tbl.players}</td>
+                    <td className="px-3 py-3 tabular-nums text-dim font-medium">{tbl.buyIn}</td>
+                    <td className="px-3 py-3 text-right">
+                      {tbl.isFull ? (
+                        <span className="inline-block min-w-16 rounded-md border border-border bg-surface-2 px-2.5 py-1 text-center text-[0.7rem] font-bold text-dim">
+                          {t('lobby.wait')}
+                        </span>
+                      ) : tbl.jackpot !== null ? (
+                        <span className="inline-block min-w-16 rounded-md border border-[#22c55e]/40 bg-[#064e3b]/80 px-2.5 py-1 text-center text-[0.7rem] font-bold text-[#4ade80] shadow-xs">
+                          ${formatMicros(tbl.jackpot, 0)}
+                        </span>
+                      ) : (
+                        // Open, but with no pool to advertise. Say the table is
+                        // open rather than print a dollar sign next to nothing.
+                        <span className="inline-block min-w-16 rounded-md border border-[#22c55e]/40 bg-[#064e3b]/80 px-2.5 py-1 text-center text-[0.7rem] font-bold text-[#4ade80] shadow-xs">
+                          {t('lobby.open')}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+    </>
+  );
+
+  if (view === 'tables') {
+    return (
+      <div className="flex flex-col space-y-3.5 pb-4">
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={() => setView('home')}
+            aria-label={t('common.back')}
+            className="grid size-9 place-items-center rounded-lg text-dim transition-colors hover:bg-surface-2 hover:text-text"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          {/* Padded by the button's width so the title centres on the screen. */}
+          <h2 className="min-w-0 flex-1 truncate pr-9 text-center text-base font-black">
+            {t('lobby.liveTables')}
+          </h2>
+        </div>
+        {tablesSection}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col space-y-3.5 pb-4">
@@ -245,7 +427,7 @@ export function Lobby() {
           type="button"
           onClick={() => {
             haptic('light');
-            handleQuickJoin();
+            setView('tables');
           }}
           className="flex flex-1 items-center justify-center gap-2 py-3 text-sm font-black tracking-wide transition active:scale-[0.99]"
         >
@@ -281,184 +463,10 @@ export function Lobby() {
         </div>
       </div>
 
-      {/* Game Type Filter Tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-        {VARIANTS.map((v) => {
-          const active = variant === v.id;
-          return (
-            <button
-              key={v.id}
-              onClick={() => setVariant(v.id)}
-              className={cn(
-                'px-3.5 py-2 text-xs font-black tracking-wider transition-all rounded-lg shrink-0',
-                active
-                  ? 'bg-[#0f3922] border border-[#22c55e] text-[#22c55e] shadow-[0_0_12px_rgba(34,197,94,0.25)]'
-                  : 'bg-surface-2/60 text-dim border border-transparent hover:text-text',
-              )}
-            >
-              {v.label}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Stakes Filter Pills */}
-      <div className="flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar">
-        <div className="flex items-center gap-1.5">
-          {STAKES_OPTIONS.map((s) => {
-            const active = blinds === s.id;
-            return (
-              <button
-                key={s.id}
-                onClick={() => setBlinds(s.id)}
-                className={cn(
-                  'px-3 py-1.5 text-xs font-bold transition-all rounded-md shrink-0',
-                  active
-                    ? 'bg-[#15803d] text-white shadow-xs'
-                    : 'bg-surface-2/80 text-dim hover:text-text',
-                )}
-              >
-                {s.label}
-              </button>
-            );
-          })}
-        </div>
-        {/* Was inert. Toggles the one filter a player in a lobby actually
-            wants — hide tables they cannot sit at — which the API already
-            supports via hasSeats. */}
-        <button
-          aria-label={t('lobby.onlyOpen')}
-          aria-pressed={onlyOpen}
-          onClick={() => {
-            haptic('light');
-            setOnlyOpen((v) => !v);
-          }}
-          className={cn(
-            'grid size-7 shrink-0 place-items-center rounded-md border transition-colors active:scale-95',
-            onlyOpen
-              ? 'border-[#22c55e] bg-[#0f3922] text-[#22c55e]'
-              : 'border-border bg-surface-2 text-dim hover:text-text',
-          )}
-        >
-          <SlidersHorizontal size={14} />
-        </button>
-      </div>
-
-      {/* Table List Grid */}
-      <div className="overflow-hidden rounded-xl border border-border/80 bg-surface/90 shadow-sm">
-        <table className="w-full text-left text-xs">
-          <thead>
-            <tr className="border-b border-border/60 text-[0.65rem] text-dim uppercase tracking-wider">
-              <th className="px-3 py-2.5 font-bold">Table</th>
-              <th className="px-3 py-2.5 font-bold">Blinds</th>
-              <th className="px-3 py-2.5 font-bold">Players</th>
-              <th className="px-3 py-2.5 font-bold">Buy-in</th>
-              <th className="px-3 py-2.5 text-right font-bold">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border/40">
-            {tables.isPending ? (
-              [0, 1, 2].map((i) => (
-                <tr key={i}>
-                  <td colSpan={5} className="px-3 py-3">
-                    <Skeleton className="h-4 w-full" />
-                  </td>
-                </tr>
-              ))
-            ) : tables.isError ? (
-              // An unreachable lobby is not an empty one. Saying "no tables
-              // found" when the request failed tells the player the platform
-              // is dead rather than that we could not ask.
-              <tr>
-                <td colSpan={5} className="py-8 text-center text-dim">
-                  {t('states.serviceUnavailable')}
-                </td>
-              </tr>
-            ) : displayTables.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="py-8 text-center text-dim">
-                  {t('lobby.noTables')}
-                </td>
-              </tr>
-            ) : (
-              displayTables.map((tbl) => (
-                <tr
-                  key={tbl.id}
-                  onClick={() => navigate(`/table/${tbl.id}`)}
-                  className="cursor-pointer transition-colors active:bg-surface-2/80 hover:bg-surface-2/40"
-                >
-                  {/* The table's real id. It used to render `T-00${index}`, a
-                      label invented per render that matched nothing a player
-                      could be told over support. */}
-                  <td className="px-3 py-3 font-bold text-[#eab308]">
-                    {tbl.id}
-                    {/* The row holding this player's seat. It is the reason every
-                        other table is refusing them, and the only row that can
-                        release it — so it is marked next to the name rather than
-                        buried in the status column. */}
-                    {tbl.youAreSeated && (
-                      <span className="ml-2 rounded-full bg-brand/20 px-2 py-0.5 text-[0.6rem] font-bold text-brand align-middle">
-                        {t('lobby.yourSeat')}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-3 tabular-nums text-dim font-medium">{tbl.blinds}</td>
-                  <td className="px-3 py-3 tabular-nums font-semibold text-text">{tbl.players}</td>
-                  <td className="px-3 py-3 tabular-nums text-dim font-medium">{tbl.buyIn}</td>
-                  <td className="px-3 py-3 text-right">
-                    {tbl.isFull ? (
-                      <span className="inline-block min-w-16 rounded-md border border-border bg-surface-2 px-2.5 py-1 text-center text-[0.7rem] font-bold text-dim">
-                        {t('lobby.wait')}
-                      </span>
-                    ) : tbl.jackpot !== null ? (
-                      <span className="inline-block min-w-16 rounded-md border border-[#22c55e]/40 bg-[#064e3b]/80 px-2.5 py-1 text-center text-[0.7rem] font-bold text-[#4ade80] shadow-xs">
-                        ${formatMicros(tbl.jackpot, 0)}
-                      </span>
-                    ) : (
-                      // Open, but with no pool to advertise. Say the table is
-                      // open rather than print a dollar sign next to nothing.
-                      <span className="inline-block min-w-16 rounded-md border border-[#22c55e]/40 bg-[#064e3b]/80 px-2.5 py-1 text-center text-[0.7rem] font-bold text-[#4ade80] shadow-xs">
-                        {t('lobby.open')}
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Action Buttons: Quick Join & Create Private Table */}
-      <div className="flex items-center gap-3 pt-2">
-        <button
-          onClick={handleQuickJoin}
-          className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#16a34a] hover:bg-[#15803d] py-3 px-4 text-sm font-black text-white shadow-lg shadow-green-950/40 active:scale-[0.98] transition-all"
-        >
-          <Zap size={18} className="fill-current text-white" />
-          QUICK JOIN
-        </button>
-        {/* Live again, but as a signpost rather than a creator.
-
-            A private table is a LEAGUE room (v5.9 §2: "league tables visible
-            only to league members, completely invisible to lobby players") and
-            only that league's owner or an admin may open one. So a creator here
-            would be a control almost nobody looking at it can use. This routes
-            to the alliance tab, where the control belongs, and says why — which
-            is also the answer for a player who is not in an alliance yet. */}
-        <button
-          onClick={() => {
-            haptic('light');
-            toast.info(t('lobby.createPrivateHint'));
-            navigate('/alliance');
-          }}
-          title={t('lobby.createPrivateHint')}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-border bg-surface-2 py-3 px-3 text-xs font-bold text-text transition-all active:scale-[0.98]"
-        >
-          <Plus size={16} className="text-brand" />
-          {t('lobby.createPrivate')}
-        </button>
-      </div>
+      {/* No QUICK JOIN / CREATE PRIVATE TABLE pair here. CREATE and JOIN live
+          on the lobby's home view; repeating them at the foot of the table
+          list gave the same two doors different names on one screen. Removed
+          from the app for that reason — the clients match. */}
     </div>
   );
 }

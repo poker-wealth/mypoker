@@ -8,6 +8,7 @@
     "account": "我的"
   },
   "common": {
+    "back": "返回",
     "online": "在线",
     "members": "成员",
     "join": "加入",
@@ -19,6 +20,7 @@
     "cancel": "取消"
   },
   "lobby": {
+    "liveTables": "实时牌桌",
     "create": "创建",
     "join": "加入",
     "myGames": "我的游戏",

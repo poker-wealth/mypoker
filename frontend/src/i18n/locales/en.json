@@ -8,6 +8,7 @@
     "account": "My Account"
   },
   "common": {
+    "back": "Back",
     "online": "online",
     "members": "members",
     "join": "Join",
@@ -19,6 +20,7 @@
     "cancel": "Cancel"
   },
   "lobby": {
+    "liveTables": "Live Tables",
     "create": "CREATE",
     "join": "JOIN",
     "myGames": "My Games",

@@ -8,6 +8,7 @@
     "account": "खाता"
   },
   "common": {
+    "back": "वापस",
     "online": "ऑनलाइन",
     "members": "सदस्य",
     "join": "जुड़ें",
@@ -19,6 +20,7 @@
     "cancel": "रद्द करें"
   },
   "lobby": {
+    "liveTables": "लाइव टेबल",
     "create": "बनाएं",
     "join": "शामिल हों",
     "myGames": "मेरे गेम",

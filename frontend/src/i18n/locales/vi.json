@@ -8,6 +8,7 @@
     "account": "Tài khoản"
   },
   "common": {
+    "back": "Quay lại",
     "online": "trực tuyến",
     "members": "thành viên",
     "join": "Tham gia",
@@ -19,6 +20,7 @@
     "cancel": "Hủy"
   },
   "lobby": {
+    "liveTables": "Bàn trực tiếp",
     "create": "TẠO BÀN",
     "join": "THAM GIA",
     "myGames": "Trò chơi của tôi",

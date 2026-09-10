@@ -8,6 +8,7 @@
     "account": "บัญชี"
   },
   "common": {
+    "back": "ย้อนกลับ",
     "online": "ออนไลน์",
     "members": "สมาชิก",
     "join": "เข้าร่วม",
@@ -19,6 +20,7 @@
     "cancel": "ยกเลิก"
   },
   "lobby": {
+    "liveTables": "โต๊ะสด",
     "create": "สร้าง",
     "join": "เข้าร่วม",
     "myGames": "เกมของฉัน",

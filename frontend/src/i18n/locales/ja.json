@@ -8,6 +8,7 @@
     "account": "マイページ"
   },
   "common": {
+    "back": "戻る",
     "online": "オンライン",
     "members": "メンバー",
     "join": "参加",
@@ -19,6 +20,7 @@
     "cancel": "キャンセル"
   },
   "lobby": {
+    "liveTables": "ライブテーブル",
     "create": "作成",
     "join": "参加",
     "myGames": "マイゲーム",
