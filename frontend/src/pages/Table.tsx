@@ -13,6 +13,7 @@ import { BuyInSheet } from '@/components/poker/BuyInSheet';
 import { TableDesignSheet } from '@/components/poker/TableDesignSheet';
 import { TableMenu } from '@/components/poker/TableMenu';
 import { HandRankings } from '@/components/poker/HandRankings';
+import { TableSettingsSheet } from '@/components/poker/TableSettingsSheet';
 import { toast } from '@/lib/toast';
 import { inviteUrl } from '@/lib/tableInvite';
 import { TELEGRAM_BOT_NAME } from '@/config';
@@ -582,7 +583,7 @@ function LiveTable({ tableId }: { tableId: string }) {
         }}
       />
 
-      <TableDesignSheet open={designsOpen} onClose={() => setDesignsOpen(false)} />
+      <TableSettingsSheet open={designsOpen} onClose={() => setDesignsOpen(false)} tableId={tableId} />
     </div>
   );
 }
