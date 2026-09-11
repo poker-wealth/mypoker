@@ -8,7 +8,7 @@ import { PotToWinner } from './PotToWinner';
 import { chips } from '@/lib/money';
 import { ChipStack } from './ChipStack';
 import type { TableState } from '@/lib/table';
-import { ringFor, type TableDesign } from '@/lib/tableDesigns';
+import { groundFor, ringFor, type TableDesign } from '@/lib/tableDesigns';
 import { useTableDesign } from '@/store/tableDesign';
 import { cn } from '@/lib/cn';
 import { PERMANENT_DOMAIN } from '@/config';
@@ -161,7 +161,8 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
             rendering; sampling it literally loses the colour. */}
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_center,#6d2230_0%,#4a1622_45%,#2a0d14_100%)]"
+          className="pointer-events-none absolute inset-0 z-0"
+          style={{ background: groundFor(design) }}
         />
 
         {/* The brand across the felt, as on the reference table. Always there,
