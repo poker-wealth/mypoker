@@ -4,25 +4,26 @@ import { X } from 'lucide-react';
 import { PlayingCard } from './PlayingCard';
 
 /**
- * The hand-rankings chart, strongest first.
+ * The hand-rankings chart, strongest first — FOR THE VARIANT BEING PLAYED.
  *
- * THE ORDER HERE MATCHES THE SERVER'S EVALUATOR, not a textbook. That matters
- * because they currently disagree for one variant:
+ * SHORT DECK REORDERS TWO ROWS. With the 2s–5s stripped a flush becomes rarer
+ * than a full house and outranks it, and the server implements exactly that:
+ * `SHORT_DECK_RULES` in `game-server/src/games/texas/hand-evaluator.ts` ranks
+ * Flush 6 and FullHouse 5, wired at `variants.ts`. Hands compare on a
+ * `strength` the variant supplies, NOT on the raw `HandCategory` enum — the
+ * enum is only base numbering, and reading it alone is how an earlier pass here
+ * wrongly concluded the engine had no variant support and shipped the standard
+ * order to Short Deck players.
  *
- *   `game-server/src/games/texas/hand-evaluator.ts` defines ONE `HandCategory`
- *   ordering — Flush(5) below FullHouse(6) — and applies it to every variant,
- *   Short Deck included. Standard Short Deck rules invert those two (a flush is
- *   rarer once the deuces-to-fives are gone, so it beats a full house), but our
- *   engine does not implement that.
+ * That is the error this comment exists to prevent repeating: a chart that
+ * disagrees with the evaluator tells a player the opposite of what their money
+ * will do. If the rules in the engine change, this list changes with them.
  *
- * So this chart shows the standard order everywhere, because that is what the
- * engine actually pays out on. A chart teaching Short Deck's real rankings
- * would be telling a player the opposite of what their money will do — the
- * worse error by far. If the engine is fixed to reorder for Short Deck, this
- * component has to learn the variant at the same time; the two must not drift.
+ * (Triton rules, per the engine's own note: trips do NOT beat a straight, so
+ * only the flush/full-house pair moves.)
  *
- * Example hands are illustrative and fixed — they are a picture of a category,
- * not a claim about anything that was dealt.
+ * Example hands are illustrative and fixed — a picture of a category, never a
+ * claim about anything that was dealt.
  */
 
 interface Ranking {
@@ -45,8 +46,30 @@ const RANKINGS: Ranking[] = [
   { key: 'highCard', cards: ['Qc', 'Jd', '7s', 'Kh', '6c'] },
 ];
 
-export function HandRankings({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function HandRankings({
+  open,
+  onClose,
+  game,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /** The variant being played. Short Deck ranks a flush above a full house. */
+  game?: string;
+}) {
   const { t } = useTranslation();
+
+  // Swap the two rows Short Deck inverts, mirroring SHORT_DECK_RULES. Built
+  // from the standard list rather than kept as a second hardcoded array, so the
+  // examples and names cannot drift apart between variants.
+  const rankings = (() => {
+    if (game !== 'short-deck') return RANKINGS;
+    const out = [...RANKINGS];
+    const flush = out.findIndex((r) => r.key === 'flush');
+    const full = out.findIndex((r) => r.key === 'fullHouse');
+    if (flush < 0 || full < 0) return RANKINGS;
+    [out[flush], out[full]] = [out[full]!, out[flush]!];
+    return out;
+  })();
 
   return (
     <AnimatePresence>
@@ -81,7 +104,7 @@ export function HandRankings({ open, onClose }: { open: boolean; onClose: () => 
             </div>
 
             <ol className="flex flex-col">
-              {RANKINGS.map((rank, i) => (
+              {rankings.map((rank, i) => (
                 <li
                   key={rank.key}
                   className="flex items-center gap-3 border-b border-border/50 py-2 last:border-b-0"

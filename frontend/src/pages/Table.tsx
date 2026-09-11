@@ -331,7 +331,11 @@ function LiveTable({ tableId }: { tableId: string }) {
         onExit={() => navigate(-1)}
       />
 
-      <HandRankings open={rankingsOpen} onClose={() => setRankingsOpen(false)} />
+      <HandRankings
+        open={rankingsOpen}
+        onClose={() => setRankingsOpen(false)}
+        {...(snapshot?.game ? { game: snapshot.game } : {})}
+      />
 
       {/* A wide felt loses more to gutters than a tall one — it is short enough
           that width is the only dimension it is starved of. The chat button is

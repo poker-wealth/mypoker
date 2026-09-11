@@ -285,6 +285,7 @@
     }
   },
   "table": {
+    "designBlurb": "只改变颜色 — 座位、牌和牌局都保持不变。",
     "menuStore": "商城",
     "menuSoon": "即将推出",
     "menuTitle": "菜单",

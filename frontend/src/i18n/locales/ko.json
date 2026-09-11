@@ -285,6 +285,7 @@
     }
   },
   "table": {
+    "designBlurb": "색상만 바뀝니다 — 좌석, 카드, 핸드는 그대로입니다.",
     "menuStore": "상점",
     "menuSoon": "준비 중",
     "menuTitle": "메뉴",
