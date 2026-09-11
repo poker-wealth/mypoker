@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, Volume2, VolumeX, Settings2, Wifi, WifiOff, MessageSquare, List as ListIcon, Spade, Mic } from 'lucide-react';
+import { ChevronLeft, Menu, Volume2, VolumeX, Settings2, Wifi, WifiOff, MessageSquare, List as ListIcon, Spade, Mic } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { PokerTable } from '@/components/poker/PokerTable';
 import { ActionBar } from '@/components/poker/ActionBar';
@@ -11,6 +11,10 @@ import { chips } from '@/lib/money';
 import { useTranslation } from 'react-i18next';
 import { BuyInSheet } from '@/components/poker/BuyInSheet';
 import { TableDesignSheet } from '@/components/poker/TableDesignSheet';
+import { TableMenu } from '@/components/poker/TableMenu';
+import { toast } from '@/lib/toast';
+import { inviteUrl } from '@/lib/tableInvite';
+import { TELEGRAM_BOT_NAME } from '@/config';
 import { Button } from '@/components/ui/Button';
 import { GAMES } from '@/lib/games';
 import { isOpenableTableId } from '@/config';
@@ -201,6 +205,33 @@ function LiveTable({ tableId }: { tableId: string }) {
   // replay the celebration.
   const [jackpotSeen, setJackpotSeen] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  /**
+   * Copy this table's invite link.
+   *
+   * The SAME link the create dialog hands out — `inviteUrl`, the Telegram deep
+   * link — not `window.location.href`. A web URL pasted into Telegram opens the
+   * phone's browser, where the recipient meets a sign-in page instead of the
+   * table they were invited to.
+   *
+   * The private join code is not carried here: this is shared from inside a
+   * table by anyone sitting at it, including someone who was let in by a
+   * creator who may not want the code passed on. The creator's own dialog is
+   * where the code-bearing link comes from.
+   */
+  const shareInvite = (): void => {
+    if (!tableId) return;
+    const url = inviteUrl({ tableId }, TELEGRAM_BOT_NAME);
+    void navigator.clipboard
+      ?.writeText(url)
+      .then(() => toast.success(t('tableEntry.copied')))
+      .catch(() => {
+        // Clipboard can be unavailable in a locked-down WebView. A failed copy
+        // is a nuisance, not a dead end — say so rather than failing silently.
+        toast.error(t('states.error'));
+      });
+  };
   const [challengePrompt, setChallengePrompt] = useState<string | null>(null);
 
   const { messages, sendChat, sendVoice, unread, markRead } = useTableChat(
@@ -264,6 +295,32 @@ function LiveTable({ tableId }: { tableId: string }) {
         onBack={() => navigate(-1)}
         status={status}
         onOpenDesigns={() => setDesignsOpen(true)}
+        onOpenMenu={() => setMenuOpen(true)}
+      />
+
+      {/*
+        The table menu. Wired to what exists and nothing else.
+
+        `onStandUp` is the `stand` command — give up the seat, keep watching —
+        and is DELIBERATELY not `sitOut`, which keeps your seat and skips hands.
+        Confusing the two would take a player's seat away when they meant to sit
+        out a hand, at a table they might not be able to rejoin.
+
+        `onRankings` is omitted because the chart does not exist yet; the row
+        disables itself with a reason rather than opening nothing.
+
+        `onExit` leaves the screen. It does NOT stand first — leaving the page
+        while seated is the same as closing the app, and the server's own
+        disconnect handling owns a seat's fate from there. Standing on the way
+        out would forfeit a seat the player may be about to return to.
+      */}
+      <TableMenu
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onShare={shareInvite}
+        {...(seated ? { onStandUp: () => live.command({ kind: 'stand' }) } : {})}
+        onOptions={() => setDesignsOpen(true)}
+        onExit={() => navigate(-1)}
       />
 
       {/* A wide felt loses more to gutters than a tall one — it is short enough
@@ -618,22 +675,37 @@ function TopBar({
   onBack,
   status,
   onOpenDesigns,
+  onOpenMenu,
 }: {
   subtitle: string;
   onBack: () => void;
   status?: string;
   /** Opens the table-design picker. */
   onOpenDesigns?: () => void;
+  /** Opens the table menu drawer. */
+  onOpenMenu?: () => void;
 }) {
   const { t } = useTranslation();
   return (
     <div className="flex items-center justify-between px-4 py-3">
-      <button
-        onClick={onBack}
-        className="grid size-9 place-items-center rounded-full border border-border bg-surface active:scale-95"
-      >
-        <ChevronLeft size={18} />
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={onBack}
+          className="grid size-9 place-items-center rounded-full border border-border bg-surface active:scale-95"
+        >
+          <ChevronLeft size={18} />
+        </button>
+        {/* The menu, top-left beside Back, where the reference app puts it. */}
+        {onOpenMenu && (
+          <button
+            onClick={onOpenMenu}
+            aria-label={t('table.menuTitle')}
+            className="grid size-9 place-items-center rounded-full border border-border bg-surface active:scale-95"
+          >
+            <Menu size={18} />
+          </button>
+        )}
+      </div>
       <div className="text-center">
         <div className="text-[0.66rem] text-dim">{subtitle}</div>
       </div>

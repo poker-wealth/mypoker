@@ -32,8 +32,12 @@ export interface TableMenuProps {
   onShare: () => void;
   /** Give up your seat but keep watching. Absent when you are not seated. */
   onStandUp?: () => void;
-  /** Open the hand-rankings chart. */
-  onRankings: () => void;
+  /**
+   * Open the hand-rankings chart. Optional because the chart does not exist
+   * yet — the row is disabled with a reason until it does, rather than opening
+   * nothing.
+   */
+  onRankings?: () => void;
   /** Open table options (colour, sound, and the rest). */
   onOptions: () => void;
   /** Leave the table entirely. */
@@ -71,7 +75,12 @@ export function TableMenu({
           reason={onStandUp ? undefined : t('table.menuNeedSeat')}
         />
 
-        <Row icon={Layers} label={t('table.menuRankings')} onClick={act(onRankings)} />
+        <Row
+          icon={Layers}
+          label={t('table.menuRankings')}
+          onClick={onRankings ? act(onRankings) : undefined}
+          reason={onRankings ? undefined : t('table.menuSoon')}
+        />
         <Row icon={SlidersHorizontal} label={t('table.menuOptions')} onClick={act(onOptions)} chevron />
         <Row icon={LogOut} label={t('table.menuExit')} onClick={act(onExit)} tone="danger" />
       </div>
