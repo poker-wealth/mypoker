@@ -69,9 +69,12 @@ export function PlayerSeat({
       'grid place-items-center rounded-full border-dashed text-center text-[0.58rem] font-bold leading-tight tracking-wide',
     );
 
+    // The watch-only chair, matched to the sittable one below: same faded
+    // white hairline, no fill. It was `bg-black/20`, which on the bare ground
+    // read as a filled — and so occupied — seat.
     if (!onSit) {
       return (
-        <div className={cn(emptySeat, 'border border-white/15 bg-black/20 text-white/35')}>
+        <div className={cn(emptySeat, 'border border-white/[0.16] text-white/30')}>
           {t('table.seatEmpty')}
         </div>
       );
@@ -83,13 +86,29 @@ export function PlayerSeat({
         onClick={onSit ?? onClick}
         className={cn(
           emptySeat,
-          'border-[1.5px] font-black backdrop-blur-md shadow-md transition-all',
-          'opacity-90 hover:scale-105 hover:opacity-100',
+          // Hairline, no blur, no shadow. Those were for a filled disc; on a
+          // transparent chair a drop shadow just draws a grey halo on the felt.
+          'border transition-all hover:scale-105 hover:border-white/40',
         )}
+        // NOT the design accent any more.
+        //
+        // This used to take `design.accent`, which on the old Midnight Blue
+        // felt was blue — and with the felts gone it was drawing blue chairs
+        // on the red ground ("blue doesnt look good on red"). The accent was
+        // chosen to read against a design's own artwork, and there is no
+        // artwork left for it to read against.
+        //
+        // Warm translucent white instead, like the reference's faint dashed
+        // chairs: it sits on the red without competing with it, and does not
+        // depend on a design object that no longer decides appearance.
+        // Faded white, and NO FILL — the reference's chairs are barely there:
+        // a thin dashed outline and a whisper of text on the bare ground, with
+        // nothing behind them. Victor: "make the circle faded white like this".
+        // The dark disc an earlier pass used made them read as occupied seats.
         style={{
-          borderColor: accent,
-          color: accent,
-          background: `color-mix(in srgb, ${accent} 20%, rgba(0,0,0,0.6))`,
+          borderColor: 'rgba(255,255,255,0.22)',
+          color: 'rgba(255,255,255,0.34)',
+          background: 'transparent',
         }}
       >
         {t('table.seatOpen')}

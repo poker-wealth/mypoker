@@ -154,6 +154,11 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
             first left the app's near-black background showing through —
             Victor: "why is it blaclk instead of red". It is a plain gradient,
             not a table: no rail, no edge, no oval. The seats make the oval. */}
+        {/* RED. Desaturating this toward the reference screenshot's dusty
+            rose-brown was tried once and reverted — on screen it read as
+            washed-out grey-mauve with the red gone ("what is this change it
+            back to red"). The screenshot's muted look is the phone's own
+            rendering; sampling it literally loses the colour. */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_center,#6d2230_0%,#4a1622_45%,#2a0d14_100%)]"
