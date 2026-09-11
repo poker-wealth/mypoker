@@ -663,7 +663,7 @@ export function buildRouter(): Router {
    * The enum is the whole point: an unknown kind is a 400 rather than a filter
    * that silently matches nothing and shows the player an empty tab.
    */
-  const notificationKind = z.enum(['RESULT', 'DEPOSIT', 'PROMO', 'JACKPOT', 'SYSTEM']);
+  const notificationKind = z.enum(['RESULT', 'DEPOSIT', 'WITHDRAWAL', 'PROMO', 'JACKPOT', 'SYSTEM']);
   const notificationsQuery = z.object({
     limit: z.coerce.number().int().positive().max(100).optional(),
     cursor: z.string().min(1).optional(),

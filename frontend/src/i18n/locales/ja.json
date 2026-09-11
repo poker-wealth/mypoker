@@ -511,7 +511,7 @@
     "tab": {
       "system": "システム",
       "results": "戦績",
-      "deposits": "入金",
+      "money": "入出金",
       "promos": "プロモ"
     },
     "handWon": "${{amount}} を獲得しました",

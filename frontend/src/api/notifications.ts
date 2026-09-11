@@ -2,7 +2,13 @@ import { api } from './client';
 
 /** In-app notifications. Mirrors financial-core/src/notifications. */
 
-export type NotificationKind = 'RESULT' | 'DEPOSIT' | 'PROMO' | 'JACKPOT' | 'SYSTEM';
+export type NotificationKind =
+  | 'RESULT'
+  | 'DEPOSIT'
+  | 'WITHDRAWAL'
+  | 'PROMO'
+  | 'JACKPOT'
+  | 'SYSTEM';
 
 export interface Notification {
   id: string;
@@ -34,7 +40,9 @@ export interface NotificationPage {
 export const MESSAGE_TABS = [
   { id: 'system', kinds: ['SYSTEM'] },
   { id: 'results', kinds: ['RESULT', 'JACKPOT'] },
-  { id: 'deposits', kinds: ['DEPOSIT'] },
+  // Money, both directions. Withdrawals were SYSTEM until this change and
+  // so appeared under System, which is not where anyone looks for them.
+  { id: 'money', kinds: ['DEPOSIT', 'WITHDRAWAL'] },
   { id: 'promos', kinds: ['PROMO'] },
 ] as const satisfies ReadonlyArray<{ id: string; kinds: readonly NotificationKind[] }>;
 

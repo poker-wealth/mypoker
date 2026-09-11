@@ -511,7 +511,7 @@
     "tab": {
       "system": "ระบบ",
       "results": "ผลลัพธ์",
-      "deposits": "ฝากเงิน",
+      "money": "การเงิน",
       "promos": "โปรโมชัน"
     },
     "handWon": "คุณชนะ ${{amount}}",

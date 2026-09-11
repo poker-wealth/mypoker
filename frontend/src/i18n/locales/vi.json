@@ -511,7 +511,7 @@
     "tab": {
       "system": "Hệ thống",
       "results": "Kết quả",
-      "deposits": "Nạp tiền",
+      "money": "Tiền",
       "promos": "Khuyến mãi"
     },
     "handWon": "Bạn thắng ${{amount}}",

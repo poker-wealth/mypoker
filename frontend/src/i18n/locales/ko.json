@@ -511,7 +511,7 @@
     "tab": {
       "system": "시스템",
       "results": "전적",
-      "deposits": "입금",
+      "money": "입출금",
       "promos": "프로모션"
     },
     "handWon": "${{amount}}을(를) 획득했습니다",

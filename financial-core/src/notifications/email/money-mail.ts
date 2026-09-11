@@ -80,7 +80,7 @@ export function setRecipientResolver(resolver: RecipientResolver): void {
  */
 async function preferences(
   playerId: string,
-  kind: 'DEPOSIT' | 'SYSTEM',
+  kind: 'DEPOSIT' | 'WITHDRAWAL' | 'SYSTEM',
 ): Promise<{ allowed: boolean; locale: Locale }> {
   const toggle = GOVERNED_BY[kind];
   try {
@@ -100,7 +100,7 @@ async function preferences(
 async function announce(input: {
   playerId: string;
   eventId: string;
-  kind: 'DEPOSIT' | 'SYSTEM';
+  kind: 'DEPOSIT' | 'WITHDRAWAL' | 'SYSTEM';
   titleKey: string;
   params: Record<string, string | number>;
   /**
@@ -232,7 +232,7 @@ export async function announceWithdrawalRequested(input: {
       // §notification toggles make SYSTEM unsuppressible. A player who has
       // muted deposit alerts must still be told that funds are being sent out —
       // that message is how they find out about a withdrawal they did not make.
-      kind: 'SYSTEM',
+      kind: 'WITHDRAWAL',
       titleKey: 'notifications.withdrawalRequested',
       params: { amount: input.amount },
       template: (locale) =>
@@ -265,7 +265,7 @@ export async function announceWithdrawalSent(input: {
     await announce({
       playerId: input.playerId,
       eventId: `withdrawal:${input.withdrawalId}:sent`,
-      kind: 'SYSTEM',
+      kind: 'WITHDRAWAL',
       titleKey: 'notifications.withdrawalSent',
       params: { amount: input.amount },
       template: (locale) =>
@@ -340,7 +340,7 @@ export async function announceWithdrawalConfirmed(input: {
     await announce({
       playerId: input.playerId,
       eventId: `withdrawal:${input.withdrawalId}:confirmed`,
-      kind: 'SYSTEM',
+      kind: 'WITHDRAWAL',
       titleKey: 'notifications.withdrawalConfirmed',
       params: { amount: input.amount },
       template: (locale) =>
@@ -372,7 +372,7 @@ export async function announceWithdrawalReturned(input: {
     await announce({
       playerId: input.playerId,
       eventId: `withdrawal:${input.withdrawalId}:returned`,
-      kind: 'SYSTEM',
+      kind: 'WITHDRAWAL',
       titleKey: 'notifications.withdrawalReturned',
       params: { amount: input.amount },
       template: (locale) =>
