@@ -189,7 +189,12 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
               <div>www.{PERMANENT_DOMAIN}</div>
             </div>
           )}
-          <div className="select-none text-[10cqmin] font-black tracking-[0.06em] text-white/[0.13]">
+          {/* Faded DARK, not light — the reference's wordmark is a dark grey
+              pressed into the red ground, not a pale watermark over it. It sits
+              at z-[5] under the board (z-10) and is pointer-events-none, so it
+              can neither cover a card nor swallow a tap: the cards deal over
+              the top of it. */}
+          <div className="select-none text-[10cqmin] font-black tracking-[0.06em] text-[#1a1012]/45">
             MYPOKER
           </div>
         </div>
