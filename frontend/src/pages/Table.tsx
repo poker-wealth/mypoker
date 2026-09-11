@@ -269,7 +269,28 @@ function LiveTable({ tableId }: { tableId: string }) {
       {/* A wide felt loses more to gutters than a tall one — it is short enough
           that width is the only dimension it is starved of. The chat button is
           absolutely positioned and unaffected by dropping the padding. */}
-      <div className={cn('relative flex flex-1 items-center', gameDesign ? 'px-0' : 'px-3')}>
+      {/*
+        The two things that render here want opposite alignment, which is why
+        this is conditional rather than one value.
+
+        A GAME FELT fills the space. Its root is `h-full` or `min-h-[Nrem]`, and
+        under `items-center` a flex item does not stretch — so it sat at its
+        content height with black above and below, a green band across the
+        middle of the screen. `items-stretch` is what those roots were written
+        expecting.
+
+        THE POKER TABLE does not. It is aspect-ratio driven with its own
+        max-width ceiling (PokerTable.tsx), so height is not its to choose;
+        stretching its box would leave the oval pinned to the top of a taller
+        container. It keeps the centring it was built against.
+      */}
+      <div
+        className={cn(
+          'relative flex flex-1',
+          Felt ? 'items-stretch' : 'items-center',
+          gameDesign ? 'px-0' : 'px-3',
+        )}
+      >
         {Felt ? (
           <Felt snapshot={snapshot} onCommand={(cmd) => live.command(cmd)} />
         ) : (
