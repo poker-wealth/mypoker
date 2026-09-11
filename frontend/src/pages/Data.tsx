@@ -21,6 +21,7 @@ import { Line } from 'react-chartjs-2';
 import { useStats, useHistory, useVip } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
 import { moneyFromDecimal } from '@/lib/money';
+import { cn } from '@/lib/cn';
 import { useSession } from '@/store/session';
 import type { StatsPeriod } from '@/api/stats';
 import type { HistoryEntry } from '@/api/stats';
@@ -72,6 +73,32 @@ export function Data() {
         onChange={setPeriod}
       />
 
+      {/* THE HEADLINE FIGURE.
+          Net profit was one tile among six, the same size as "Hands" — so the
+          one number a player opens this tab to see had no more weight than a
+          count. The reference leads with it at display size, and it is the
+          right call: everything else on the page is context for this line.
+
+          Still the same value as the tile it replaces, from the same field. */}
+      {stats.isSuccess && (
+        <section className="rounded-(--radius-app) border border-border bg-surface p-4">
+          <h2 className="text-[0.7rem] font-bold uppercase tracking-wider text-dim">
+            {t('data.totalProfit')}
+          </h2>
+          <p
+            className={cn(
+              'mt-1 text-3xl font-black tabular-nums leading-none',
+              Number(stats.data.netProfit) >= 0 ? 'text-success' : 'text-danger',
+            )}
+          >
+            {moneyFromDecimal(stats.data.netProfit, { sign: true })}
+          </p>
+          <p className="mt-1.5 text-[0.68rem] text-dim">
+            {t(PERIODS.find((p) => p.value === period)?.key ?? 'data.periodAll')}
+          </p>
+        </section>
+      )}
+
       {/* Overview */}
       <section>
         <h2 className="mb-2.5 text-sm font-bold">{t('data.overview')}</h2>
@@ -118,10 +145,20 @@ export function Data() {
       {/* Trend — derived from the rounds listed below, so the two always agree. */}
       {rounds.length > 1 && (
         <section className="rounded-(--radius-app) border border-border bg-surface p-4">
-          <h2 className="mb-3 text-[0.7rem] font-bold uppercase tracking-wider text-dim">Profit Trend (USDT)</h2>
+          {/* Was a hardcoded English "Profit Trend (USDT)" — the one string on
+              this page that stayed English in all eight locales. */}
+          <h2 className="mb-3 text-[0.7rem] font-bold uppercase tracking-wider text-dim">
+            {t('data.profitTrend')}
+          </h2>
           <TrendChart rounds={rounds} />
         </section>
       )}
+
+      {/* Time of day — real, and computed the same way the trend is: from the
+          rounds actually loaded, so it can never disagree with the list below.
+          Each round carries its own timestamp, which is the whole of what this
+          needs. Nothing here is estimated. */}
+      <TimeOfDay rounds={rounds} />
 
       {/* Play distribution — real, from the VIP volume tracker, which records
           per-game rounds at settlement. The mockup's fixed 65/20/10/5 split is
@@ -209,6 +246,89 @@ function Tile({
       <div className={`text-base font-black tabular-nums ${toneClass}`}>{value}</div>
       <div className="mt-0.5 text-[0.66rem] text-dim">{label}</div>
     </div>
+  );
+}
+
+/**
+ * Profit split across four six-hour bands.
+ *
+ * REAL, unlike most of what the reference design puts on this screen: every
+ * round carries its own timestamp, so bucketing them needs no data the ledger
+ * does not have. Contrast VPIP/PFR/position/hand-type, which are absent from
+ * this page because they would have to be invented.
+ *
+ * UTC, matching `periodStart` on the server, which defines "today" in UTC for
+ * the same reason: there is no reliable timezone for a player, and a boundary
+ * that shifts per request is worse than one that is consistently explainable.
+ * Said on screen rather than left for someone to discover.
+ *
+ * Computed from the LOADED rounds, like the trend chart above — so as more
+ * pages load, both refine together and neither can contradict the list.
+ */
+function TimeOfDay({ rounds }: { rounds: HistoryEntry[] }) {
+  const { t } = useTranslation();
+  if (rounds.length === 0) return null;
+
+  const BANDS = ['00:00 – 06:00', '06:00 – 12:00', '12:00 – 18:00', '18:00 – 24:00'];
+  const net = [0, 0, 0, 0];
+  const counts = [0, 0, 0, 0];
+
+  for (const round of rounds) {
+    const at = new Date(round.at);
+    const hour = at.getUTCHours();
+    if (Number.isNaN(hour)) continue; // a malformed timestamp is skipped, not bucketed as midnight
+    const band = Math.min(3, Math.floor(hour / 6));
+    net[band] += Number(round.net);
+    counts[band] += 1;
+  }
+
+  // The widest bar is the scale. Absolute, so a losing band is drawn as long
+  // as a winning band of the same size — the colour says which it is.
+  const peak = Math.max(...net.map(Math.abs), 1);
+  // Only meaningful among bands that were actually played.
+  const played = net.map((v, i) => ({ v, i })).filter(({ i }) => counts[i]! > 0);
+  const best = played.length > 0 ? played.reduce((a, b) => (b.v > a.v ? b : a)) : null;
+
+  return (
+    <section className="rounded-(--radius-app) border border-border bg-surface p-4">
+      <h2 className="text-[0.7rem] font-bold uppercase tracking-wider text-dim">
+        {t('data.timeOfDay')}
+      </h2>
+
+      <div className="mt-3 space-y-2">
+        {BANDS.map((label, i) => (
+          <div key={label} className="flex items-center gap-2">
+            <span className="w-24 shrink-0 text-[0.66rem] tabular-nums text-dim">{label}</span>
+            <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-surface-2">
+              <span
+                className={cn(
+                  'block h-full rounded-full',
+                  net[i]! >= 0 ? 'bg-success' : 'bg-danger',
+                )}
+                style={{ width: `${counts[i]! === 0 ? 0 : (Math.abs(net[i]!) / peak) * 100}%` }}
+              />
+            </span>
+            <span
+              className={cn(
+                'w-16 shrink-0 text-right text-[0.66rem] font-bold tabular-nums',
+                // A band with no rounds shows a dash, NOT "+0.00" — nothing
+                // played is not the same claim as played and broke even.
+                counts[i]! === 0 ? 'text-dim' : net[i]! >= 0 ? 'text-success' : 'text-danger',
+              )}
+            >
+              {counts[i]! === 0 ? '—' : moneyFromDecimal(String(net[i]), { sign: true })}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {best !== null && (
+        <p className="mt-3 text-[0.66rem] text-dim">
+          {t('data.bestPeriod')}: <span className="font-bold text-text">{BANDS[best.i]}</span>
+        </p>
+      )}
+      <p className="mt-1 text-[0.62rem] text-dim/70">{t('data.timeOfDayUtc')}</p>
+    </section>
   );
 }
 
