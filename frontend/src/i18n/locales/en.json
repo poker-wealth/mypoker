@@ -511,7 +511,7 @@
     "tab": {
       "system": "System",
       "results": "Results",
-      "deposits": "Deposits",
+      "money": "Money",
       "promos": "Promotions"
     },
     "handWon": "You won ${{amount}}",

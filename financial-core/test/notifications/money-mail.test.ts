@@ -2,7 +2,7 @@ import { Money } from '../../src/domain/money';
 import { AccountType } from '../../src/domain/account-types';
 import { AccountModel } from '../../src/wallet/account.model';
 import { LedgerModel } from '../../src/wallet/ledger.model';
-import { NotificationModel } from '../../src/notifications/notification-store';
+import { GOVERNED_BY, NotificationModel } from '../../src/notifications/notification-store';
 import { creditDeposit } from '../../src/deposit/deposit-credit';
 import { requestWithdrawal } from '../../src/withdrawal/withdrawal-state-machine';
 import { setRecipientResolver } from '../../src/notifications/email/money-mail';
@@ -182,7 +182,7 @@ describe('deposits announce after the credit', () => {
 });
 
 describe('withdrawals announce on request', () => {
-  it('raises an unsuppressible SYSTEM notice', async () => {
+  it('raises an unsuppressible WITHDRAWAL notice', async () => {
     const accountId = await player('p-wd', '100');
     const id = await requestWithdrawal({
       playerAccountId: accountId,
@@ -192,9 +192,15 @@ describe('withdrawals announce on request', () => {
 
     const note = await NotificationModel.findById(`withdrawal:${id}:requested`).lean();
     expect(note).not.toBeNull();
-    // SYSTEM, not DEPOSIT: this is the message that tells someone about a
-    // withdrawal they did not make, so it must survive every mute toggle.
-    expect(note!.kind).toBe('SYSTEM');
+    // WITHDRAWAL, not DEPOSIT. It carried SYSTEM until the Messages screen
+    // grew tabs and filed it next to "your address was changed" instead of
+    // with the player's money.
+    expect(note!.kind).toBe('WITHDRAWAL');
+    // THE LABEL IS NOT THE POINT, THIS IS: whatever kind it carries must not
+    // answer to a mute toggle. This is the message that tells someone about a
+    // withdrawal they did not make. Asserted through GOVERNED_BY rather than
+    // by naming a kind, so the guarantee survives the next re-filing too.
+    expect(GOVERNED_BY[note!.kind]).toBeNull();
     expect(note!.params.amount).toBe('20.000000');
   });
 

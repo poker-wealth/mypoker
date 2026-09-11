@@ -50,11 +50,11 @@ export function Header() {
       break;
     case '/profile':
       title = '';
-      rightElement = (
-        <button onClick={() => navigate('/settings')} aria-label={t('account.settings')}>
-          <Settings size={18} className="text-dim" />
-        </button>
-      );
+      // No gear here. The page's own menu carries a Settings row, and two
+      // controls opening the same screen from one view reads as two different
+      // destinations - the reader has to try one to learn it was not.
+      // /data keeps its gear above precisely because that screen has no
+      // Settings row: there, it is the only way through.
       break;
     default:
       title = 'MYPOKER';
