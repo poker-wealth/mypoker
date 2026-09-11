@@ -1,4 +1,16 @@
 {
+  "handRank": {
+    "royalFlush": "ロイヤルフラッシュ",
+    "straightFlush": "ストレートフラッシュ",
+    "fourOfAKind": "フォーカード",
+    "fullHouse": "フルハウス",
+    "flush": "フラッシュ",
+    "straight": "ストレート",
+    "threeOfAKind": "スリーカード",
+    "twoPair": "ツーペア",
+    "pair": "ワンペア",
+    "highCard": "ハイカード"
+  },
   "nav": {
     "wallet": "ウォレット",
     "alliance": "同盟",

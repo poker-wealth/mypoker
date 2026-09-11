@@ -1,4 +1,16 @@
 {
+  "handRank": {
+    "royalFlush": "로열 플러시",
+    "straightFlush": "스트레이트 플러시",
+    "fourOfAKind": "포카드",
+    "fullHouse": "풀하우스",
+    "flush": "플러시",
+    "straight": "스트레이트",
+    "threeOfAKind": "트리플",
+    "twoPair": "투페어",
+    "pair": "원페어",
+    "highCard": "하이카드"
+  },
   "nav": {
     "wallet": "지갑",
     "alliance": "얼라이언스",

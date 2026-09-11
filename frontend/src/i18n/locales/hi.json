@@ -1,4 +1,16 @@
 {
+  "handRank": {
+    "royalFlush": "रॉयल फ्लश",
+    "straightFlush": "स्ट्रेट फ्लश",
+    "fourOfAKind": "चार एक जैसे",
+    "fullHouse": "फुल हाउस",
+    "flush": "फ्लश",
+    "straight": "स्ट्रेट",
+    "threeOfAKind": "तीन एक जैसे",
+    "twoPair": "दो जोड़े",
+    "pair": "एक जोड़ा",
+    "highCard": "हाई कार्ड"
+  },
   "nav": {
     "wallet": "वॉलेट",
     "alliance": "एलायंस",

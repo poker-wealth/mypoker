@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 import { BuyInSheet } from '@/components/poker/BuyInSheet';
 import { TableDesignSheet } from '@/components/poker/TableDesignSheet';
 import { TableMenu } from '@/components/poker/TableMenu';
+import { HandRankings } from '@/components/poker/HandRankings';
 import { toast } from '@/lib/toast';
 import { inviteUrl } from '@/lib/tableInvite';
 import { TELEGRAM_BOT_NAME } from '@/config';
@@ -204,6 +205,7 @@ function LiveTable({ tableId }: { tableId: string }) {
   const [jackpotSeen, setJackpotSeen] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [rankingsOpen, setRankingsOpen] = useState(false);
 
   /**
    * Copy this table's invite link.
@@ -324,9 +326,12 @@ function LiveTable({ tableId }: { tableId: string }) {
               onSitOut: () => live.command({ kind: 'sitOut' }),
             }
           : {})}
+        onRankings={() => setRankingsOpen(true)}
         onOptions={() => setDesignsOpen(true)}
         onExit={() => navigate(-1)}
       />
+
+      <HandRankings open={rankingsOpen} onClose={() => setRankingsOpen(false)} />
 
       {/* A wide felt loses more to gutters than a tall one — it is short enough
           that width is the only dimension it is starved of. The chat button is

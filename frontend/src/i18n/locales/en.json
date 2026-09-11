@@ -1,4 +1,16 @@
 {
+  "handRank": {
+    "royalFlush": "Royal Flush",
+    "straightFlush": "Straight Flush",
+    "fourOfAKind": "Four of a Kind",
+    "fullHouse": "Full House",
+    "flush": "Flush",
+    "straight": "Straight",
+    "threeOfAKind": "Three of a Kind",
+    "twoPair": "Two Pairs",
+    "pair": "A Pair",
+    "highCard": "High Card"
+  },
   "nav": {
     "wallet": "Wallet",
     "alliance": "Alliance",

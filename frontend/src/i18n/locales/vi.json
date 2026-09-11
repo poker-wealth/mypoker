@@ -1,4 +1,16 @@
 {
+  "handRank": {
+    "royalFlush": "Thùng phá sảnh kép",
+    "straightFlush": "Thùng phá sảnh",
+    "fourOfAKind": "Tứ quý",
+    "fullHouse": "Cù lũ",
+    "flush": "Thùng",
+    "straight": "Sảnh",
+    "threeOfAKind": "Sám cô",
+    "twoPair": "Hai đôi",
+    "pair": "Một đôi",
+    "highCard": "Mậu thầu"
+  },
   "nav": {
     "wallet": "Ví",
     "alliance": "Liên minh",

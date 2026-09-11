@@ -1,4 +1,16 @@
 {
+  "handRank": {
+    "royalFlush": "รอยัลฟลัช",
+    "straightFlush": "สเตรทฟลัช",
+    "fourOfAKind": "โฟร์ออฟอะไคนด์",
+    "fullHouse": "ฟูลเฮ้าส์",
+    "flush": "ฟลัช",
+    "straight": "สเตรท",
+    "threeOfAKind": "ทรีออฟอะไคนด์",
+    "twoPair": "สองคู่",
+    "pair": "หนึ่งคู่",
+    "highCard": "ไฮการ์ด"
+  },
   "nav": {
     "wallet": "กระเป๋าเงิน",
     "alliance": "พันธมิตร",

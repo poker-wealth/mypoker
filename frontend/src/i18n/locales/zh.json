@@ -1,4 +1,16 @@
 {
+  "handRank": {
+    "royalFlush": "皇家同花顺",
+    "straightFlush": "同花顺",
+    "fourOfAKind": "四条",
+    "fullHouse": "葫芦",
+    "flush": "同花",
+    "straight": "顺子",
+    "threeOfAKind": "三条",
+    "twoPair": "两对",
+    "pair": "一对",
+    "highCard": "高牌"
+  },
   "nav": {
     "wallet": "钱包",
     "alliance": "联盟",
