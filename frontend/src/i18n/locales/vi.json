@@ -150,6 +150,9 @@
     "tableClosed": "Bàn của liên minh tạm thời đóng."
   },
   "data": {
+    "pickDay": "Chọn ngày",
+    "clearDay": "Quay lại khoảng thời gian",
+    "dayChartSoon": "Biểu đồ theo khoảng thời gian — xóa ngày để xem",
     "tabOverview": "Tổng quan",
     "tabHands": "Ván bài",
     "totalProfit": "Tổng lợi nhuận",

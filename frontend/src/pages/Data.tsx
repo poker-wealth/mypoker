@@ -51,9 +51,18 @@ export function Data() {
   const { t } = useTranslation();
   const [period, setPeriod] = useState<StatsPeriod>('today');
   const [tab, setTab] = useState<'overview' | 'hands'>('overview');
+  /**
+   * One specific day, or '' for the rolling period.
+   *
+   * A REAL filter, not a label: the server reports on that calendar day alone
+   * (UTC) and ignores `period` while it is set. Picking a date therefore has to
+   * visibly clear the period buttons, or the screen would show "Today"
+   * highlighted above figures from three weeks ago.
+   */
+  const [day, setDay] = useState('');
   const signedIn = useSession((s) => s.status === 'authenticated');
 
-  const stats = useStats(period);
+  const stats = useStats(period, day || undefined);
   const history = useHistory(period);
 
   const rounds = history.data?.pages.flatMap((p) => p.entries) ?? [];
@@ -68,11 +77,45 @@ export function Data() {
 
   return (
     <div className="space-y-4">
-      <Segmented
-        options={PERIODS.map((p) => ({ value: p.value, label: t(p.key) }))}
-        value={period}
-        onChange={setPeriod}
-      />
+      <div className="flex items-center gap-2">
+        <div className={cn('min-w-0 flex-1', day !== '' && 'opacity-40')}>
+          <Segmented
+            options={PERIODS.map((p) => ({ value: p.value, label: t(p.key) }))}
+            value={period}
+            onChange={(next) => {
+              // Choosing a period abandons the specific day. The two answer the
+              // same question differently and only one can be live.
+              setDay('');
+              setPeriod(next);
+            }}
+          />
+        </div>
+
+        {/* A native date input, deliberately: every phone already knows how to
+            present one, in the player's own locale and calendar, and a
+            hand-rolled calendar in eight languages is a lot of surface to get
+            subtly wrong. `max` is today — there are no figures for tomorrow. */}
+        <input
+          type="date"
+          value={day}
+          max={new Date().toISOString().slice(0, 10)}
+          onChange={(e) => setDay(e.target.value)}
+          aria-label={t('data.pickDay')}
+          className="shrink-0 rounded-(--radius-app) border border-border bg-surface px-2 py-1.5 text-[0.7rem] text-text [color-scheme:dark]"
+        />
+      </div>
+
+      {/* The escape hatch. Without it a player who picks a date can only get
+          back to a rolling window by guessing that tapping a period does it. */}
+      {day !== '' && (
+        <button
+          type="button"
+          onClick={() => setDay('')}
+          className="text-[0.68rem] font-semibold text-brand underline underline-offset-2"
+        >
+          {t('data.clearDay')}
+        </button>
+      )}
 
       {/*
         TWO TABS, not the reference's four.
@@ -125,7 +168,7 @@ export function Data() {
               {moneyFromDecimal(stats.data.netProfit, { sign: true })}
             </p>
             <p className="mt-1.5 text-[0.68rem] text-dim">
-              {t(PERIODS.find((p) => p.value === period)?.key ?? 'data.periodAll')}
+              {day !== '' ? day : t(PERIODS.find((p) => p.value === period)?.key ?? 'data.periodAll')}
             </p>
           </div>
 
@@ -136,7 +179,15 @@ export function Data() {
             <h2 className="mb-2 text-[0.7rem] font-bold uppercase tracking-wider text-dim">
               {t('data.profitTrend')}
             </h2>
-            {rounds.length > 1 ? (
+            {/* The curve is drawn from the ROUND LIST, which is still fetched
+                by period — `/me/history` does not take a day yet. So while a
+                specific day is selected the two would describe different
+                windows: the headline saying one date, the chart beside it
+                showing thirty. It says so instead of drawing the mismatch.
+                Remove this branch once history accepts `day` too. */}
+            {day !== '' ? (
+              <p className="py-6 text-center text-[0.7rem] text-dim">{t('data.dayChartSoon')}</p>
+            ) : rounds.length > 1 ? (
               <TrendChart rounds={rounds} />
             ) : (
               <p className="py-6 text-center text-[0.7rem] text-dim">{t('data.noRounds')}</p>

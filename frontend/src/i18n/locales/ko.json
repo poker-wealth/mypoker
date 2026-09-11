@@ -150,6 +150,9 @@
     "tableClosed": "얼라이언스 테이블이 일시적으로 닫혀 있습니다."
   },
   "data": {
+    "pickDay": "날짜 선택",
+    "clearDay": "기간으로 돌아가기",
+    "dayChartSoon": "차트는 기간 기준입니다 — 날짜를 해제하면 표시됩니다",
     "tabOverview": "개요",
     "tabHands": "핸드",
     "totalProfit": "총 수익",

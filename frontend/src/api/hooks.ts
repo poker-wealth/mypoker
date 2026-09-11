@@ -125,12 +125,14 @@ export function useTables(filter: TableFilter = {}) {
   });
 }
 
-export function useStats(period: StatsPeriod = 'all') {
+export function useStats(period: StatsPeriod = 'all', day?: string) {
   const playerId = useSession((s) => s.player?.playerId);
 
   return useQuery({
-    queryKey: ['stats', playerId, period],
-    queryFn: () => fetchStats(period),
+    // `day` is part of the key, or switching dates would serve the previous
+    // day's cached numbers under the new date's heading.
+    queryKey: ['stats', playerId, period, day ?? null],
+    queryFn: () => fetchStats(period, day),
     enabled: Boolean(playerId),
     // Stats move only when a hand settles, so a short window avoids refetching
     // on every visit to the tab without ever showing badly stale numbers.

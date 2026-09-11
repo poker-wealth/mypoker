@@ -150,6 +150,9 @@
     "tableClosed": "同盟テーブルは一時的に閉鎖しています。"
   },
   "data": {
+    "pickDay": "日付を選択",
+    "clearDay": "期間に戻る",
+    "dayChartSoon": "グラフは期間単位です — 日付を解除すると表示されます",
     "tabOverview": "概要",
     "tabHands": "ハンド",
     "totalProfit": "総利益",

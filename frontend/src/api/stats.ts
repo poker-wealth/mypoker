@@ -42,9 +42,17 @@ export interface HistoryPage {
 /** Reporting windows the Data tab offers. Must match financial-core's StatsPeriod. */
 export type StatsPeriod = 'today' | '7d' | '30d' | 'all';
 
-export function fetchStats(period?: StatsPeriod): Promise<PlayerStats> {
-  const suffix = period && period !== 'all' ? `?period=${period}` : '';
-  return api.get<PlayerStats>(`/me/stats${suffix}`);
+/**
+ * `day` (YYYY-MM-DD, UTC) reports on one calendar day and OVERRIDES `period`
+ * server-side, so only one of the two is ever sent — sending both would leave
+ * the URL claiming a window the answer does not describe.
+ */
+export function fetchStats(period?: StatsPeriod, day?: string): Promise<PlayerStats> {
+  const query = new URLSearchParams();
+  if (day) query.set('day', day);
+  else if (period && period !== 'all') query.set('period', period);
+  const suffix = query.toString();
+  return api.get<PlayerStats>(`/me/stats${suffix ? `?${suffix}` : ''}`);
 }
 
 export function fetchHistory(

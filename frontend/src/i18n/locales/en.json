@@ -150,6 +150,9 @@
     "tableClosed": "Alliance tables are temporarily closed."
   },
   "data": {
+    "pickDay": "Pick a day",
+    "clearDay": "Back to periods",
+    "dayChartSoon": "Chart follows the period — clear the date to see it",
     "tabOverview": "Overview",
     "tabHands": "Hands",
     "totalProfit": "Total Profit",

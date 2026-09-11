@@ -150,6 +150,9 @@
     "tableClosed": "Meja aliansi ditutup sementara."
   },
   "data": {
+    "pickDay": "Pilih hari",
+    "clearDay": "Kembali ke periode",
+    "dayChartSoon": "Grafik mengikuti periode — hapus tanggal untuk melihatnya",
     "tabOverview": "Ringkasan",
     "tabHands": "Kartu",
     "totalProfit": "Total Laba",

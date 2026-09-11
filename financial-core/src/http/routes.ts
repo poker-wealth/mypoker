@@ -192,7 +192,20 @@ export function buildRouter(): Router {
   );
 
   const period = z.enum(['today', '7d', '30d', 'all']).optional();
-  const statsQuery = z.object({ period });
+  /**
+   * One calendar day, UTC. Narrower than `period` and wins over it — see
+   * `getPlayerStats`.
+   *
+   * The shape is validated HERE rather than left to the stats function, so a
+   * malformed date is a 400 the caller can see and fix. The function's own
+   * tolerance (ignore and fall back to the period) is a safety net for internal
+   * callers, not the contract this endpoint offers.
+   */
+  const day = z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be YYYY-MM-DD')
+    .optional();
+  const statsQuery = z.object({ period, day });
 
   // Derived from the ledger — see src/stats/player-stats.ts for what is and is
   // not knowable from it. VPIP, PFR and largest-pot are deliberately absent.
@@ -200,10 +213,11 @@ export function buildRouter(): Router {
     '/me/stats',
     dataScopeMiddleware,
     asyncHandler(async (req: Request, res: Response) => {
-      const { period } = statsQuery.parse(req.query);
+      const { period, day } = statsQuery.parse(req.query);
       res.json(
         await getPlayerStats(req.dataScope!.playerId, {
           ...(period !== undefined ? { period } : {}),
+          ...(day !== undefined ? { day } : {}),
         }),
       );
     }),
