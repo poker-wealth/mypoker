@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'motion/react';
 import { PlayerSeat } from './PlayerSeat';
@@ -41,6 +41,55 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
 
   const [failed, setFailed] = useState<string | null>(null);
   const useArt = Boolean(design.artUrl) && failed !== design.artUrl;
+
+  // Whose turn it is, read off the seat the feed already marks — no new prop,
+  // and no second opinion about who is to act. Rendered on the felt below.
+  const toActSeat = state.seats.find((s) => s.status === 'toact');
+  const turnName = toActSeat?.name ?? null;
+  const heroToAct = Boolean(toActSeat?.isHero);
+
+  /**
+   * Where a seat falls in the DEALING order — first seat after the button, and
+   * round from there.
+   *
+   * Hole cards already animated in, but every seat animated at the same
+   * instant, so a deal read as "the cards were simply there". Victor: "it
+   * didn't even show how the cards were shuffled among players, it just gave
+   * card." Offsetting each seat by its distance from the button makes the deal
+   * travel round the table the way a live one does.
+   *
+   * Falls back to raw seat order when no button is set (the demo engine, and
+   * any feed that has not sent one yet) — a deal in table order still looks
+   * dealt, which is the point.
+   */
+  /**
+   * Seconds left on the acting player's clock, ticking once a second.
+   *
+   * The seat avatar already draws a draining ring, but it is a hairline on a
+   * 44px circle and Victor's reading of it was "it doesn't even give me time
+   * to play" — the clock was there and unreadable, which for a 20s decision is
+   * the same as not having one. This puts the number itself on the felt.
+   *
+   * The ticker only runs while somebody is actually on the clock, so an idle
+   * table is not re-rendering every second for nothing.
+   */
+  const deadline = toActSeat?.deadline ?? null;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!deadline) return;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [deadline]);
+  const secondsLeft = deadline ? Math.max(0, Math.ceil((deadline - now) / 1000)) : null;
+
+  const buttonSeat = state.seats.findIndex((s) => s.isDealer);
+  const dealOrder = (i: number): number => {
+    const n = state.seats.length;
+    if (n === 0) return 0;
+    if (buttonSeat < 0) return i;
+    return (i - buttonSeat - 1 + n * 2) % n;
+  };
 
   // "1672 / 941" → wider than tall. Short Deck is landscape; everything else is
   // portrait, and the two want different width ceilings.
@@ -177,6 +226,47 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
             crowded part of the screen. Here it lands where the player is
             already looking when the hand resolves.
           */}
+          {/*
+            Whose turn it is, on the felt.
+
+            This used to live ONLY in the status line under the table, next to
+            Rebuy / Sit out / Leave — dim, small, and in the one part of the
+            screen nobody watches while a hand is running. Victor's words: "this
+            is showing where no one will see it". Same fix, and same reasoning,
+            as the winner banner directly below: the line explaining what the
+            table is waiting for belongs where the player is already looking.
+
+            Hidden once the hand is over, so it cannot argue with that banner —
+            they occupy the same spot, and "X's turn" under a finished hand is
+            just wrong.
+          */}
+          <AnimatePresence>
+            {!state.handOver && turnName && (
+              <motion.div
+                key="turn"
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.16 }}
+                className="max-w-[85%] truncate rounded-full border border-white/15 bg-black/60 px-3 py-0.5 text-center text-[0.68rem] font-bold tracking-wide text-white/90 shadow backdrop-blur-sm"
+              >
+                {heroToAct ? t('table.yourTurn') : t('table.playerTurn', { name: turnName })}
+                {secondsLeft !== null && (
+                  // Amber under 5s. The colour is the only warning a player
+                  // glancing at the felt will register in time.
+                  <span
+                    className={cn(
+                      'ml-1.5 tabular-nums',
+                      secondsLeft <= 5 ? 'text-warn' : 'text-white/55',
+                    )}
+                  >
+                    {secondsLeft}s
+                  </span>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <AnimatePresence>
             {state.handOver && state.message && (
               <motion.div
@@ -225,6 +315,7 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
                 seat={seat}
                 align={pos.align}
                 accent={design.accent}
+                dealOrder={dealOrder(i)}
                 onSit={onSit ? () => onSit(i) : undefined}
                 onClick={() => {
                   if (seat.status !== 'empty' && onChallenge && seat.playerId && !seat.isHero) {

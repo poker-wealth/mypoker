@@ -377,6 +377,7 @@ function LiveTable({ tableId }: { tableId: string }) {
               timeBankMs={snapshot?.timeBankMs ?? 0}
               usingTimeBank={snapshot?.usingTimeBank ?? false}
               autoTimeBank={snapshot?.autoTimeBank ?? false}
+              deadline={snapshot?.actionDeadline ?? null}
               onUse={() => live.command({ kind: 'useTimeBank' })}
               onToggleAuto={(on) => live.command({ kind: 'autoTimeBank', on })}
             />

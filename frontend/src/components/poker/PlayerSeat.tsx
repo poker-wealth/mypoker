@@ -26,6 +26,14 @@ interface PlayerSeatProps {
   onClick?: () => void;
   /** The current table design's accent, so open chairs and the clock read against its felt. */
   accent?: string;
+  /**
+   * This seat's place in the dealing order (0 = first card off the deck).
+   *
+   * Only staggers the hole-card entry animation, so a deal travels round the
+   * table instead of every seat's cards appearing at once. Purely cosmetic —
+   * it has no bearing on what was dealt.
+   */
+  dealOrder?: number;
 }
 
 /**
@@ -39,7 +47,14 @@ interface PlayerSeatProps {
  */
 const AVATAR = 'size-[clamp(44px,17cqmin,70px)]';
 
-export function PlayerSeat({ seat, align = 'bottom', onSit, onClick, accent = 'var(--accent)' }: PlayerSeatProps) {
+export function PlayerSeat({
+  seat,
+  align = 'bottom',
+  onSit,
+  onClick,
+  accent = 'var(--accent)',
+  dealOrder = 0,
+}: PlayerSeatProps) {
   const { t } = useTranslation();
   if (seat.status === 'empty') {
     // An empty chair only invites you to sit when sitting is actually on offer. Once you are
@@ -141,7 +156,15 @@ export function PlayerSeat({ seat, align = 'bottom', onSit, onClick, accent = 'v
                     : `rotate(${spread * 9}deg) translateY(${Math.abs(spread) * 2}px)`,
                 }}
               >
-                <PlayingCard card={c} faceDown={!c} size={seat.isHero ? 'md' : 'sm'} index={i} />
+                {/* Two cards per seat, dealt one round then the second — so the
+                    index is the seat's turn in the round plus a whole lap for
+                    the second card, which is the order a live deal goes in. */}
+                <PlayingCard
+                  card={c}
+                  faceDown={!c}
+                  size={seat.isHero ? 'md' : 'sm'}
+                  index={dealOrder + i * 6}
+                />
               </div>
             );
           })}
