@@ -163,15 +163,49 @@ export function periodStart(period: StatsPeriod, now: Date = new Date()): Date |
   }
 }
 
+/**
+ * One specific calendar day, as a `[since, before)` pair — or null if `day` is
+ * absent or not a real date.
+ *
+ * UTC, matching `periodStart` above, which defines "today" in UTC because the
+ * server has no reliable timezone for a player. A day boundary that moved per
+ * request would make two identical queries disagree.
+ *
+ * `YYYY-MM-DD` only. An unparseable string returns null rather than throwing,
+ * so a malformed query parameter falls back to the period window instead of
+ * failing the whole stats request — but note it does NOT silently become
+ * "today": `Date.parse` rejects it and the caller's `period` applies.
+ *
+ * Half-open on purpose: `$gte` midnight, `$lt` the NEXT midnight. Using `$lte`
+ * on the same day's end would double-count any round landing exactly on the
+ * boundary into both adjacent days.
+ */
+function dayWindow(day?: string): { since: Date; before: Date } | null {
+  if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const since = new Date(`${day}T00:00:00.000Z`);
+  if (Number.isNaN(since.getTime())) return null;
+  const before = new Date(since.getTime() + 86_400_000);
+  return { since, before };
+}
+
 export async function getPlayerStats(
   playerId: string,
-  options: { period?: StatsPeriod; now?: Date } = {},
+  options: { period?: StatsPeriod; now?: Date; day?: string } = {},
 ): Promise<PlayerStats> {
   const account = await getOrCreatePlayerAccount(playerId);
   // Clock is injected rather than mocked: jest's fake timers freeze the ones
   // Mongo's driver depends on, and the query never returns.
-  const since = periodStart(options.period ?? 'all', options.now ?? new Date());
-  const rounds = await roundsFor(account._id, since ? { since } : {});
+  //
+  // `day` wins over `period` when both are sent: a caller naming one specific
+  // date has asked a narrower question than a rolling window, and silently
+  // widening it back out would answer a question they did not ask.
+  const window = dayWindow(options.day);
+  const rounds = window
+    ? await roundsFor(account._id, window)
+    : await (async () => {
+        const since = periodStart(options.period ?? 'all', options.now ?? new Date());
+        return roundsFor(account._id, since ? { since } : {});
+      })();
 
   let netProfit = Money.ZERO;
   let biggestWin = Money.ZERO;
