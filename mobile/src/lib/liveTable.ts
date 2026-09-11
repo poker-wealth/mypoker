@@ -47,7 +47,27 @@ export interface LiveSeat {
   isBot?: boolean;
   /** Card strings you're allowed to see; `null` is a face-down card. */
   cards: (Card | null)[];
-  lastAction?: string;
+  /**
+   * What this seat last did.
+   *
+   * Was typed `string` here while the server has sent `SeatAction | string`
+   * for a long time — the poker rooms emit the OBJECT form. React Native
+   * throws on an object child, so the seat bubble was one action away from
+   * crashing the felt. Mirrors the server and the Mini App now; see
+   * `game-server/src/live/room-state.ts`.
+   */
+  lastAction?: SeatAction | string;
+}
+
+/**
+ * A seat's last move, as a KEY and a number rather than as prose — the server
+ * owns the fact, the client owns the wording, so the table narrates itself in
+ * the player's own language. `amount` is table chips, absent where the action
+ * has no number (fold, check, all-in).
+ */
+export interface SeatAction {
+  kind: 'fold' | 'check' | 'call' | 'raise' | 'allin';
+  amount?: number;
 }
 
 export interface FairnessSnapshot {

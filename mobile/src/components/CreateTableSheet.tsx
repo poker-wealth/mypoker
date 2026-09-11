@@ -1,4 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
+import * as Clipboard from 'expo-clipboard';
+
+/**
+ * Where a shared table link points.
+ *
+ * The APP host. It was `mypoker777.com`, which is the MARKETING domain — a
+ * friend who tapped an invite got the landing page instead of the table.
+ * Override with EXPO_PUBLIC_WEB_URL if the host ever moves.
+ */
+const TABLE_LINK_BASE = process.env.EXPO_PUBLIC_WEB_URL ?? 'https://app.mypoker777.com';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
@@ -23,7 +33,16 @@ const STAKES = [
   { sb: 250, bb: 500 },
 ];
 
-const BUY_IN_STOPS_BB = [50, 100, 150, 200, 250, 300, 400, 600, 800];
+/** Mirrors PokerVariant.maxSeats on the server — all three variants are 8. */
+const POKER_MAX_SEATS = 8;
+
+/**
+ * Minimum buy-ins offered, in big blinds.
+ *
+ * Capped at 500 because that is the server's ceiling for `buyInBB`; the stops
+ * above it (600, 800) could only ever be refused.
+ */
+const BUY_IN_STOPS_BB = [50, 100, 150, 200, 250, 300, 400, 500];
 const MAX_MIN_BUY_IN_BB = 400;
 
 const AUTO_START = [2, 3, 5, 7, 9];
@@ -65,7 +84,7 @@ export function CreateTableSheet({
   const [game, setGame] = useState<string>('texas');
   const [visibility, setVisibility] = useState<'public' | 'private'>('public');
   const [stakeIx, setStakeIx] = useState(0);
-  const [seats, setSeats] = useState(9);
+  const [seats, setSeats] = useState(POKER_MAX_SEATS);
   const [autoStart, setAutoStart] = useState(2);
   const [ante, setAnte] = useState(0);
   const [buyInLowBB, setBuyInLowBB] = useState(100);
@@ -88,7 +107,20 @@ export function CreateTableSheet({
   const { sb, bb } = STAKES[stakeIx]!;
   const isPoker = game === 'texas' || game === 'short-deck' || game === 'omaha';
   
-  const seatCap = isPoker ? (game === 'texas' ? 9 : game === 'short-deck' ? 6 : 9) : 2;
+  /**
+   * Chairs a table may have.
+   *
+   * EIGHT for every poker variant, which is what the SERVER allows —
+   * `PokerVariant.maxSeats` in game-server/src/games/texas/variants.ts, and the
+   * ceiling the felt art actually draws seats up to.
+   *
+   * This used to guess per game (texas 9, short deck 6) and both were wrong.
+   * The 9 was fatal rather than cosmetic: the create endpoint bounds `seats` by
+   * the largest cap across variants, so a default of 9 was rejected before any
+   * other field was read — every "Start now" returned 400 'invalid table
+   * settings', and with no error shown the sheet looked like it did nothing.
+   */
+  const seatCap = isPoker ? POKER_MAX_SEATS : 2;
   const seatsClamped = Math.min(seats, seatCap);
 
   const stakeStops = STAKES.map((s, i) => ({ value: i, label: `${s.sb}/${s.bb}` }));
@@ -109,6 +141,10 @@ export function CreateTableSheet({
   const buyInStops = BUY_IN_STOPS_BB.map((v) => ({ value: v, label: label100bb(v) }));
 
   const aofAllowed = game !== 'omaha';
+  const [copied, setCopied] = useState(false);
+  /** The server's refusal, shown instead of the button silently resetting. */
+  const [failed, setFailed] = useState<string | null>(null);
+
 
   const create = useMutation({
     mutationFn: (body: any) =>
@@ -119,9 +155,17 @@ export function CreateTableSheet({
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['lobby', 'tables'] });
     },
+    onError: (err: unknown) => {
+      // Without this the sheet said NOTHING when the server refused: the
+      // button read 'Starting…', went back to 'Start now', and the table
+      // never appeared. A refusal has a reason and the creator should see it.
+      setFailed(err instanceof Error ? err.message : 'Could not create the table.');
+    },
   });
 
   const close = (): void => {
+    setCopied(false);
+    setFailed(null);
     create.reset();
     onClose();
   };
@@ -161,7 +205,9 @@ export function CreateTableSheet({
   };
 
   if (create.isSuccess && create.data) {
-    const link = `https://mypoker777.com/table/${create.data.tableId}`;
+    // The APP host, not the marketing domain. mypoker777.com serves the
+    // landing page — a friend opening that link met an advert, not the table.
+    const link = `${TABLE_LINK_BASE}/table/${create.data.tableId}`;
     return (
       <Dialog open={open} onClose={close} title={t(`gameNames.${game}`, { defaultValue: 'Texas Hold\'em' })}>
         <View style={{ gap: space.xl, paddingVertical: space.md }}>
@@ -189,8 +235,16 @@ export function CreateTableSheet({
             </Text>
           </View>
 
-          <Pressable style={{ alignItems: 'center', paddingVertical: space.xs }}>
-            <Text style={{ color: theme.dim, fontSize: 14, fontFamily: weight('700') }}>Copy invite link</Text>
+          <Pressable
+            onPress={() => {
+              void Clipboard.setStringAsync(link);
+              setCopied(true);
+            }}
+            style={{ alignItems: 'center', paddingVertical: space.xs }}
+          >
+            <Text style={{ color: copied ? theme.brand : theme.dim, fontSize: 14, fontFamily: weight('700') }}>
+              {copied ? 'Link copied' : 'Copy invite link'}
+            </Text>
           </Pressable>
 
           <Button onPress={goToTable} style={{ backgroundColor: '#D4AF37' }}>
@@ -377,6 +431,11 @@ export function CreateTableSheet({
           <View style={{ height: 120 }} />
         </ScrollView>
 
+        {failed ? (
+          <View style={styles.createError}>
+            <Text style={styles.createErrorText}>{failed}</Text>
+          </View>
+        ) : null}
         <View style={styles.footer}>
           <View style={styles.footerInfo}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -397,7 +456,10 @@ export function CreateTableSheet({
             </View>
           </View>
           <Button
-            onPress={submit}
+            onPress={() => {
+              setFailed(null);
+              submit();
+            }}
             disabled={create.isPending}
             style={{ paddingHorizontal: 32, backgroundColor: '#d9b87c' }}
           >
@@ -481,6 +543,16 @@ const styles = StyleSheet.create({
   footerInfo: {
     gap: 4,
   },
+  createError: {
+    marginHorizontal: space.md,
+    marginBottom: space.sm,
+    padding: space.sm,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: theme.danger,
+    backgroundColor: 'rgba(248,86,119,0.12)',
+  },
+  createErrorText: { color: theme.danger, fontSize: 12, fontFamily: weight('600'), textAlign: 'center' },
   footerLabel: {
     color: theme.dim,
     fontSize: 11,
