@@ -45,7 +45,11 @@ export function SeatStrip({
             <Text style={styles.meta}>
               ₮{seat.stack.toLocaleString()}
               {seat.bet > 0 ? ` · bet ₮${seat.bet.toLocaleString()}` : ''}
-              {seat.lastAction ? ` · ${seat.lastAction}` : ''}
+              {/* Only the legacy STRING form is printed here. The poker
+                  rooms send an object, and interpolating one yields
+                  "[object Object]" on the felt — the seat bubble in
+                  PlayerSeat is what renders those, translated. */}
+              {typeof seat.lastAction === 'string' ? ` · ${seat.lastAction}` : ''}
             </Text>
           </View>
         </View>

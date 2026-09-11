@@ -104,27 +104,6 @@ export function GamesScreen() {
           />
         </View>
 
-        {/* Jackpot Hero */}
-        <View style={styles.hero}>
-          <LinearGradient
-            colors={['#C9A15F', '#E8C98E', '#B38B4A']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-          <Image source={require('../../assets/brand/trophy.png')} style={styles.trophy} resizeMode="contain" />
-          <View style={styles.heroRight}>
-            <Text style={styles.heroLabel}>GRAND JACKPOT</Text>
-            {lobby.isPending ? (
-              <Skeleton width={100} />
-            ) : (
-              <Text style={styles.heroValue}>
-                {money(jackpot, { decimals: 0 })}
-              </Text>
-            )}
-          </View>
-        </View>
-
         <Segmented
           value={cat}
           onChange={setCat}

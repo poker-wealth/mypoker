@@ -54,11 +54,71 @@ let ctx: AudioContext | null = null;
 let enabled = false;
 
 /**
+ * Real recordings, for the cues we have them for.
+ *
+ * The header above promised that sourcing samples would change `play()` and
+ * nothing else — this is that change. A cue listed here plays the file; every
+ * other cue stays synthesised, and so does this one until the file is decoded
+ * (or if it never decodes at all). Nothing waits on audio.
+ *
+ * Kept in `public/`, not imported, so they are fetched on demand rather than
+ * bundled into the entry chunk that the landing page pays for.
+ */
+const SAMPLES: Partial<Record<Cue, string>> = {
+  chip: '/sounds/chips-slide.mp3',
+  win: '/sounds/chips-gather.mp3',
+};
+
+/** Decoded buffers, by cue. Absent until the fetch+decode finishes. */
+const buffers = new Map<Cue, AudioBuffer>();
+/** Cues already being fetched, so a busy table does not request one twice. */
+const loading = new Set<Cue>();
+
+/**
+ * Fetch and decode a cue's file, once.
+ *
+ * Deliberately fire-and-forget: `play()` is synchronous and must never block a
+ * hand on a download. The first firing of a cue is therefore usually the
+ * synthesised one, and every firing after it is the recording.
+ */
+function loadSample(cue: Cue, c: AudioContext): void {
+  const url = SAMPLES[cue];
+  if (!url || buffers.has(cue) || loading.has(cue)) return;
+  loading.add(cue);
+  void fetch(url)
+    .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
+    .then((bytes) => c.decodeAudioData(bytes))
+    .then((buf) => {
+      buffers.set(cue, buf);
+    })
+    .catch(() => {
+      // A missing or unplayable file is not an error a player should meet —
+      // the synthesised cue covers it for the rest of the session.
+    })
+    .finally(() => loading.delete(cue));
+}
+
+/**
+ * Warm the samples up.
+ *
+ * Called when sound is switched on, so the first chip that moves already has
+ * its recording. Safe to call repeatedly — each cue loads at most once.
+ */
+function preloadSamples(): void {
+  const c = audio();
+  if (!c) return;
+  for (const cue of Object.keys(SAMPLES) as Cue[]) loadSample(cue, c);
+}
+
+/**
  * Mirror the player's Settings toggle. Called from a hook that watches it, so
  * flipping the switch takes effect on the next cue rather than the next reload.
  */
 export function setSoundEnabled(on: boolean): void {
   enabled = on;
+  // Only ever on the way ON, and only after a gesture has let a context
+  // exist — so a muted player never fetches audio they asked not to hear.
+  if (on) preloadSamples();
 }
 
 export function isSoundEnabled(): boolean {
@@ -129,6 +189,24 @@ export function play(cue: Cue): void {
     // Cheap no-op when already running; the one thing that un-sticks a context
     // created before the first gesture.
     if (c.state === 'suspended') void c.resume();
+
+    // A real recording, if we have one decoded. Falls through to the
+    // synthesised cue when it is still loading or failed — the table is never
+    // silent waiting on a file.
+    const sample = buffers.get(cue);
+    if (sample) {
+      const src = c.createBufferSource();
+      const amp = c.createGain();
+      src.buffer = sample;
+      // Recordings are mastered far louder than the oscillators; this keeps a
+      // chip landing at the same level as the rest of the table.
+      amp.gain.value = cue === 'win' ? 0.55 : 0.4;
+      src.connect(amp).connect(c.destination);
+      src.start();
+      return;
+    }
+    // Not loaded yet — ask for it, and synthesise this one.
+    loadSample(cue, c);
 
     switch (cue) {
       case 'win': {

@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { PlayingCard } from './PlayingCard';
 import { ChipStack } from './ChipStack';
 import type { LiveSeat } from '../../lib/liveTable';
@@ -28,6 +29,25 @@ export interface PlayerSeatProps {
 const AVATAR = 54;
 
 export function PlayerSeat({ seat, onSit, toAct = false, accent = '#f5c451' }: PlayerSeatProps) {
+  const { t } = useTranslation();
+  /**
+   * The seat bubble's words.
+   *
+   * The server sends a KEY and a number, never prose, so the label is built
+   * here in the player's own language — same construction as the Mini App's
+   * PlayerSeat. Only call and raise carry an amount; a missing one drops the
+   * number rather than printing a zero the server never sent. The legacy
+   * string form (still emitted by the non-poker rooms) passes through as-is.
+   */
+  const a = seat.lastAction;
+  const actionLabel =
+    typeof a !== 'object' || a === null
+      ? a
+      : a.kind !== 'call' && a.kind !== 'raise'
+        ? t(`table.action.${a.kind}`)
+        : typeof a.amount === 'number'
+          ? t(`table.action.${a.kind}`, { amount: a.amount.toLocaleString() })
+          : t(`table.action.${a.kind}Bare`);
   if (!seat.playerId) {
     if (!onSit) return <View style={[styles.avatar, styles.emptyInert]} />;
     return (
@@ -90,7 +110,7 @@ export function PlayerSeat({ seat, onSit, toAct = false, accent = '#f5c451' }: P
       {allIn && <Text style={styles.allIn}>ALL-IN</Text>}
 
       {/* What they last did this street, as the server phrased it. */}
-      {seat.lastAction ? <Text style={styles.lastAction}>{seat.lastAction}</Text> : null}
+      {actionLabel ? <Text style={styles.lastAction}>{actionLabel}</Text> : null}
 
       {/* Chips in front of the seat, the way the felt shows a bet. */}
       {seat.bet > 0 && <ChipStack amount={seat.bet} />}

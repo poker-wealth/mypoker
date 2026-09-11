@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +20,7 @@ import { ChatBox } from '../components/poker/ChatBox';
 import { ChallengeModal } from '../components/poker/ChallengeModal';
 import { useTableChat } from '../table/useTableChat';
 import { useChallengePrompt } from '../table/useChallengePrompt';
+import { useTableSounds } from '../table/useTableSounds';
 
 /**
  * TableScreen — the seam, now joined.
@@ -52,6 +53,9 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
   }, []);
 
   const { snapshot, status, error, command, socket } = useLiveTable(tableId, token);
+
+  // Chips, the pot, your turn — see table/useTableSounds.ts.
+  useTableSounds(snapshot);
 
   /**
    * App.tsx registers this screen with no `options`, so React Navigation's header falls back to
