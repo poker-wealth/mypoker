@@ -273,6 +273,7 @@
     }
   },
   "table": {
+    "menuStore": "स्टोर",
     "menuSoon": "जल्द",
     "menuTitle": "मेन्यू",
     "menuShare": "साझा करें",

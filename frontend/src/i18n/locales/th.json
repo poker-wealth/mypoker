@@ -273,6 +273,7 @@
     }
   },
   "table": {
+    "menuStore": "ร้านค้า",
     "menuSoon": "เร็ว ๆ นี้",
     "menuTitle": "เมนู",
     "menuShare": "แชร์",

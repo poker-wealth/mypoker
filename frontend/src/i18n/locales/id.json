@@ -273,6 +273,7 @@
     }
   },
   "table": {
+    "menuStore": "Toko",
     "menuSoon": "Segera",
     "menuTitle": "Menu",
     "menuShare": "Bagikan",

@@ -273,6 +273,7 @@
     }
   },
   "table": {
+    "menuStore": "Cửa hàng",
     "menuSoon": "Sắp có",
     "menuTitle": "Menu",
     "menuShare": "Chia sẻ",

@@ -273,6 +273,7 @@
     }
   },
   "table": {
+    "menuStore": "ストア",
     "menuSoon": "近日公開",
     "menuTitle": "メニュー",
     "menuShare": "共有",

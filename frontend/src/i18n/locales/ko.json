@@ -273,6 +273,7 @@
     }
   },
   "table": {
+    "menuStore": "상점",
     "menuSoon": "준비 중",
     "menuTitle": "메뉴",
     "menuShare": "공유",

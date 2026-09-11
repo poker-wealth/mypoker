@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { ChevronRight, Share2, Eye, Layers, SlidersHorizontal, LogOut } from 'lucide-react';
-import { Sheet } from '@/components/ui/Sheet';
+import { ChevronRight, Share2, Eye, Layers, SlidersHorizontal, Coins, PauseCircle, Store, LogOut } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
 import { cn } from '@/lib/cn';
 
 /**
@@ -8,21 +8,27 @@ import { cn } from '@/lib/cn';
  *
  * WHAT IS AND IS NOT HERE, and why.
  *
- * The reference lists eight rows. Five are wired to things this platform
- * actually does — Share, Stand up & Watch, Hand Rankings, Options, Exit. Two
- * more (Buyin, Sit Out) exist as controls elsewhere on the table already, so
- * they are passed in as optional handlers rather than duplicated: a menu row
- * that opens the same sheet the footer opens is fine, a second implementation
- * of buying in is not.
+ * ALL EIGHT ROWS the reference lists, in its order — owner's instruction, and
+ * an earlier pass that quietly dropped three was wrong to.
  *
- * STORE IS ABSENT. There is no store — no catalogue, no purchase path, no
- * backend. The reference greys it out; a greyed row with no explanation is a
- * control that looks like it will work later, and this project's rule is that
- * a disabled control needs a reason the player can read. Rather than invent
- * one, the row is not drawn at all.
+ * Share, Stand up & Watch, Poker Hand Rankings, Options, Buyin, Sit Out,
+ * Store, Exit game.
  *
- * Rows that are genuinely unavailable RIGHT NOW — standing up when you are not
- * seated — are disabled WITH that reason shown beside them.
+ * Buyin and Sit Out open the SAME controls the table already has rather than
+ * reimplementing them: a menu row that opens the footer's sheet is fine, a
+ * second way to buy in is not.
+ *
+ * STAND UP AND SIT OUT ARE DIFFERENT ROWS and must stay that way. Stand up
+ * gives the seat up and keeps you watching; Sit out keeps the seat and skips
+ * hands. Collapsing them would hide a choice that costs a player their seat.
+ *
+ * STORE has no backend — no catalogue, no purchase path. It is in the list
+ * because the list is the owner's, but it is disabled and says why rather than
+ * opening an empty screen or appearing to sell something. Hand Rankings is the
+ * same until its chart exists.
+ *
+ * Every disabled row carries a READABLE REASON beside it. A greyed control with
+ * no explanation reads as a feature that exists and is merely quiet.
  */
 
 export interface TableMenuProps {
@@ -40,6 +46,10 @@ export interface TableMenuProps {
   onRankings?: () => void;
   /** Open table options (colour, sound, and the rest). */
   onOptions: () => void;
+  /** Top up your stack. Absent when not seated. */
+  onBuyIn?: () => void;
+  /** Keep your seat, skip hands. Absent when not seated. */
+  onSitOut?: () => void;
   /** Leave the table entirely. */
   onExit: () => void;
 }
@@ -51,6 +61,8 @@ export function TableMenu({
   onStandUp,
   onRankings,
   onOptions,
+  onBuyIn,
+  onSitOut,
   onExit,
 }: TableMenuProps) {
   const { t } = useTranslation();
@@ -63,8 +75,34 @@ export function TableMenu({
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title={t('table.menuTitle')}>
-      <div className="flex flex-col">
+    <AnimatePresence>
+      {open && (
+        <>
+          {/* Click-away. The drawer covers less than half the screen, so the
+              rest of the table stays visible — and tapping it must close,
+              or the visible table looks live while being inert. */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 z-40 bg-black/40"
+          />
+          {/* Slides in from the LEFT, full height, matching the reference —
+              and the mirror of the chat drawer on the right of this screen.
+              Was a bottom Sheet, which is the wrong shape for a list this
+              long and does not match the app it is modelled on. */}
+          <motion.div
+            initial={{ x: '-100%' }}
+            animate={{ x: 0 }}
+            exit={{ x: '-100%' }}
+            transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+            className="fixed inset-y-0 left-0 z-50 flex w-[min(68vw,17rem)] flex-col overflow-y-auto border-r border-border bg-surface/95 shadow-2xl backdrop-blur-md"
+          >
+            <h2 className="px-4 pb-2 pt-5 text-[0.7rem] font-bold uppercase tracking-wider text-dim">
+              {t('table.menuTitle')}
+            </h2>
+            <div className="flex flex-col px-4">
         <Row icon={Share2} label={t('table.menuShare')} onClick={act(onShare)} />
 
         {/* Disabled WITH its reason, rather than silently greyed. */}
@@ -81,10 +119,47 @@ export function TableMenu({
           onClick={onRankings ? act(onRankings) : undefined}
           reason={onRankings ? undefined : t('table.menuSoon')}
         />
-        <Row icon={SlidersHorizontal} label={t('table.menuOptions')} onClick={act(onOptions)} chevron />
-        <Row icon={LogOut} label={t('table.menuExit')} onClick={act(onExit)} tone="danger" />
-      </div>
-    </Sheet>
+              <Row
+                icon={SlidersHorizontal}
+                label={t('table.menuOptions')}
+                onClick={act(onOptions)}
+                chevron
+              />
+
+              {/* Buy in — the same sheet the table's own control opens, not a
+                  second implementation. Absent unless seated: there is no stack
+                  to top up from a chair you are not in. */}
+              <Row
+                icon={Coins}
+                label={t('table.rebuy')}
+                onClick={onBuyIn ? act(onBuyIn) : undefined}
+                reason={onBuyIn ? undefined : t('table.menuNeedSeat')}
+                chevron={Boolean(onBuyIn)}
+              />
+
+              {/* Sit out — keeps your seat and skips hands. Deliberately a
+                  DIFFERENT row from Stand up above, which gives the seat up.
+                  The reference lists both and so does this: collapsing them
+                  into one would hide a choice that costs a seat. */}
+              <Row
+                icon={PauseCircle}
+                label={t('table.sitOut')}
+                onClick={onSitOut ? act(onSitOut) : undefined}
+                reason={onSitOut ? undefined : t('table.menuNeedSeat')}
+              />
+
+              {/* STORE. There is no store — no catalogue, no purchase path, no
+                  backend. It is in the list because the list is the owner's,
+                  but it is disabled and says why rather than opening an empty
+                  screen or pretending to sell something. */}
+              <Row icon={Store} label={t('table.menuStore')} reason={t('table.menuSoon')} />
+
+              <Row icon={LogOut} label={t('table.menuExit')} onClick={act(onExit)} tone="danger" />
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   );
 }
 

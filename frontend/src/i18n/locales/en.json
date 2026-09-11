@@ -273,6 +273,7 @@
     }
   },
   "table": {
+    "menuStore": "Store",
     "menuSoon": "Soon",
     "menuTitle": "Menu",
     "menuShare": "Share",

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, Menu, Volume2, VolumeX, Settings2, Wifi, WifiOff, MessageSquare, List as ListIcon, Spade, Mic } from 'lucide-react';
+import { ChevronLeft, Menu, Wifi, WifiOff, MessageSquare, List as ListIcon, Spade, Mic } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { PokerTable } from '@/components/poker/PokerTable';
 import { ActionBar } from '@/components/poker/ActionBar';
@@ -28,8 +28,6 @@ import { useSoundSetting } from '@/hooks/useSoundSetting';
 import { play } from '@/lib/sound';
 import { ChatBox } from '@/components/poker/ChatBox';
 import { useTableChat } from '@/hooks/useTableChat';
-import { useSettings, useUpdateSettings } from '@/api/hooks';
-import { haptic } from '@/lib/telegram';
 import { ChallengeModal } from '@/components/poker/ChallengeModal';
 import { unlockTableApi } from '@/api/tables';
 
@@ -294,7 +292,6 @@ function LiveTable({ tableId }: { tableId: string }) {
         }
         onBack={() => navigate(-1)}
         status={status}
-        onOpenDesigns={() => setDesignsOpen(true)}
         onOpenMenu={() => setMenuOpen(true)}
       />
 
@@ -318,7 +315,15 @@ function LiveTable({ tableId }: { tableId: string }) {
         open={menuOpen}
         onClose={() => setMenuOpen(false)}
         onShare={shareInvite}
-        {...(seated ? { onStandUp: () => live.command({ kind: 'stand' }) } : {})}
+        {...(seated
+          ? {
+              onStandUp: () => live.command({ kind: 'stand' }),
+              // The table's own buy-in sheet, for this seat — not a second
+              // implementation of buying in.
+              onBuyIn: () => setBuyInFor(snapshot?.yourSeat ?? null),
+              onSitOut: () => live.command({ kind: 'sitOut' }),
+            }
+          : {})}
         onOptions={() => setDesignsOpen(true)}
         onExit={() => navigate(-1)}
       />
@@ -674,14 +679,11 @@ function TopBar({
   subtitle,
   onBack,
   status,
-  onOpenDesigns,
   onOpenMenu,
 }: {
   subtitle: string;
   onBack: () => void;
   status?: string;
-  /** Opens the table-design picker. */
-  onOpenDesigns?: () => void;
   /** Opens the table menu drawer. */
   onOpenMenu?: () => void;
 }) {
@@ -723,14 +725,11 @@ function TopBar({
           </div>
         )}
 
-        <SoundToggle />
-        <button
-          onClick={onOpenDesigns}
-          title={t('table.tableDesign')}
-          className="grid size-9 place-items-center rounded-full border border-border bg-surface text-dim active:scale-95"
-        >
-          <Settings2 size={16} />
-        </button>
+        {/* The sound toggle and the design button used to sit here. Both are
+            reachable from the menu drawer now — Options opens the design
+            picker, and sound is a setting rather than something you reach for
+            mid-hand. Two buttons doing what one menu row does is clutter on a
+            bar that has to share a phone's width with the table's name. */}
       </div>
     </div>
   );
@@ -806,7 +805,6 @@ function DemoTable() {
           blinds: `${chips(10)}/${chips(20)}`,
         })}
         onBack={() => navigate(-1)}
-        onOpenDesigns={() => setDesignsOpen(true)}
       />
 
       <div className="flex flex-1 items-center px-3">
@@ -846,29 +844,3 @@ function DemoTable() {
  * exists — and once the sound layer lands (blocked on licensing, SAMUEL.md
  * task 2), this already governs it with nothing more to wire.
  */
-function SoundToggle() {
-  const { t } = useTranslation();
-  const settings = useSettings();
-  const update = useUpdateSettings();
-
-  // Hidden rather than shown inert while unknown: a mute button whose state is
-  // a guess is the problem this is fixing.
-  if (!settings.isSuccess) return null;
-
-  const on = settings.data.sound;
-
-  return (
-    <button
-      onClick={() => {
-        haptic('light');
-        update.mutate({ sound: !on });
-      }}
-      disabled={update.isPending}
-      aria-pressed={on}
-      title={on ? t('settings.soundOn') : t('settings.soundOff')}
-      className="grid size-9 place-items-center rounded-full border border-border bg-surface text-dim active:scale-95 disabled:opacity-60"
-    >
-      {on ? <Volume2 size={16} /> : <VolumeX size={16} className="text-dim/60" />}
-    </button>
-  );
-}

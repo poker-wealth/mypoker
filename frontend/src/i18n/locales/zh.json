@@ -273,6 +273,7 @@
     }
   },
   "table": {
+    "menuStore": "商城",
     "menuSoon": "即将推出",
     "menuTitle": "菜单",
     "menuShare": "分享",
