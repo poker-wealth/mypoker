@@ -39,8 +39,6 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
   const design = override ?? chosen;
   const positions = ringFor(design, Math.max(2, state.seats.length));
 
-  const [failed, setFailed] = useState<string | null>(null);
-  const useArt = Boolean(design.artUrl) && failed !== design.artUrl;
 
   // Whose turn it is, read off the seat the feed already marks — no new prop,
   // and no second opinion about who is to act. Rendered on the felt below.
@@ -138,25 +136,39 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
           className="absolute inset-0 size-full pointer-events-none rounded-[50%] z-0"
         />
 
-        {/* The table surface */}
-        {useArt ? (
-          <img
-            src={design.artUrl!}
-            alt=""
-            aria-hidden
-            draggable={false}
-            onError={() => setFailed(design.artUrl)}
-            className="absolute inset-0 h-full w-full select-none object-contain"
-          />
-        ) : (
-          <CssTable design={design} />
-        )}
+        {/* NO TABLE SURFACE.
+            Owner's call (11 Sep 2026): "remove the table, leave it plain
+            background... and just put the sit here around it like an oval but
+            no table on it", and when asked whether that meant one new plain
+            design or all of them: "all table design goes".
+
+            So neither the artwork nor the CSS felt is drawn. The seats keep
+            their ring — those positions were MEASURED against the artwork, and
+            they are what makes the oval an oval — but nothing is rendered
+            behind them. The screen's own background shows through.
+
+            `ringFor(design, …)` above is therefore now the only thing the
+            design object is consulted for: geometry, not appearance.
+
+            What IS drawn is the reference's deep red ground. Removing the felt
+            first left the app's near-black background showing through —
+            Victor: "why is it blaclk instead of red". It is a plain gradient,
+            not a table: no rail, no edge, no oval. The seats make the oval. */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_center,#6d2230_0%,#4a1622_45%,#2a0d14_100%)]"
+        />
 
         {/* The brand across the felt, as on the reference table. Always there,
             faint, under the board — a watermark, not a message. */}
         <div className="pointer-events-none absolute inset-0 z-[5] flex flex-col items-center justify-center">
+          {/* WHITE, not black, here and on the wordmark below. Both were
+              `text-black/…`, which was right while a bright felt sat behind
+              them and is invisible now the felt is gone — the table renders on
+              the app's near-black background. The reference shows this block as
+              faint LIGHT type on a dark ground. */}
           {info && state.board.length === 0 && (
-            <div className="mb-[2cqmin] text-center text-[3.2cqmin] leading-relaxed text-black/35">
+            <div className="mb-[2cqmin] text-center text-[3.2cqmin] leading-relaxed text-white/30">
               {/* The reference's centre block, ours: the name between asterisks,
                   the table number (which IS the invitation code here — the
                   share link is /table/<id>), the blinds, and OUR host — read
@@ -172,7 +184,7 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
               <div>www.{PERMANENT_DOMAIN}</div>
             </div>
           )}
-          <div className="select-none text-[10cqmin] font-black tracking-[0.06em] text-black/25">
+          <div className="select-none text-[10cqmin] font-black tracking-[0.06em] text-white/[0.13]">
             MYPOKER
           </div>
         </div>
@@ -340,70 +352,3 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
  * `cssFelt` keeps exactly the colours this used to hardcode, so Neon is
  * untouched.
  */
-function CssTable({ design }: { design: TableDesign }) {
-  const felt = design.cssFelt;
-  const glow = felt?.glow ?? 'var(--brand-2)';
-  const rail: [string, string, string] = felt?.rail ?? [
-    'var(--brand)',
-    'var(--brand-2)',
-    'var(--accent)',
-  ];
-  return (
-    <>
-      {/* Outer glow — the light the rail throws onto the background */}
-      <div
-        className="pointer-events-none absolute -inset-6 rounded-[50%] opacity-70 blur-2xl"
-        style={{
-          background: `radial-gradient(closest-side, color-mix(in srgb, ${glow} 45%, transparent), transparent 75%)`,
-        }}
-      />
-
-      {/* Outer rail ring */}
-      <div
-        className="absolute inset-0 rounded-[50%]"
-        style={{
-          background: `linear-gradient(160deg, ${rail[0]} 0%, ${rail[1]} 45%, ${rail[2]} 100%)`,
-          padding: '2px',
-          boxShadow:
-            `0 0 24px color-mix(in srgb, ${glow} 55%, transparent), 0 0 60px color-mix(in srgb, ${rail[0]} 25%, transparent)`,
-        }}
-      >
-        <div className="h-full w-full rounded-[50%]" style={{ background: 'var(--bg)' }} />
-      </div>
-
-      {/* Inner rail ring */}
-      <div
-        className="absolute inset-[3.5%] rounded-[50%]"
-        style={{
-          background: `linear-gradient(200deg, ${rail[2]} 0%, ${rail[1]} 50%, ${rail[0]} 100%)`,
-          padding: '2px',
-          boxShadow: `0 0 18px color-mix(in srgb, ${rail[2]} 40%, transparent)`,
-        }}
-      >
-        <div
-          className="relative h-full w-full overflow-hidden rounded-[50%]"
-          style={{
-            background:
-              `radial-gradient(ellipse at 50% 42%, ${felt?.centre ?? '#1e3f74'} 0%, ${felt?.mid ?? 'var(--felt)'} 45%, ${felt?.edge ?? '#0a162c'} 78%, ${felt?.outer ?? '#060d1c'} 100%)`,
-            boxShadow: 'inset 0 0 60px rgba(0,0,0,0.75), inset 0 2px 20px rgba(255,255,255,0.06)',
-          }}
-        >
-          <div
-            className="pointer-events-none absolute inset-0 opacity-[0.14] mix-blend-overlay"
-            style={{
-              backgroundImage: 'radial-gradient(#9fd0ff 0.5px, transparent 0.5px)',
-              backgroundSize: '4px 4px',
-            }}
-          />
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <span className="translate-y-[22%] text-2xl font-black tracking-[0.35em] sm:text-3xl"
-              style={{ color: felt?.wordmark ?? 'rgba(255,255,255,0.06)' }}>
-              FAIRPLAY
-            </span>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
