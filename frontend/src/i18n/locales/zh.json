@@ -75,7 +75,8 @@
     "sectionArcade": "街机游戏",
     "sectionQuick": "快速游戏",
     "more": "更多",
-    "tableCount": "{{count}} 张桌",
+    "tableCount_one": "1 张牌桌",
+    "tableCount_other": "{{count}} 张桌",
     "noneInCategory": "此分类暂无游戏",
     "tryAnother": "请尝试其他搜索词。",
     "filter": {
@@ -149,6 +150,10 @@
     "tableClosed": "联盟牌桌暂时关闭。"
   },
   "data": {
+    "totalProfit": "总盈利",
+    "timeOfDay": "时段分布",
+    "bestPeriod": "最佳时段",
+    "timeOfDayUtc": "时间以 UTC 显示",
     "periodToday": "今日",
     "period7d": "7 天",
     "period30d": "30 天",
@@ -262,6 +267,8 @@
     }
   },
   "table": {
+    "timeBankUse": "使用 {{seconds}} 秒",
+    "timeBankLeft": "时间银行 {{seconds}} 秒",
     "chatTakeSeat": "入座后即可聊天",
     "chatSay": "说点什么…",
     "fold": "弃牌",
@@ -360,6 +367,7 @@
     "codeResendFailed": "无法发送新的验证码"
   },
   "settings": {
+    "language": "语言",
     "appearance": "外观",
     "theme": "深色模式",
     "preferences": "偏好设置",
@@ -657,6 +665,10 @@
     "deviceModifiedBody": "检测到 Root 或越狱工具。您仍可继续游戏，但已修改的设备更容易被篡改，请谨慎进行充值与提现。"
   },
   "auth": {
+    "confirmPassword": "确认新密码",
+    "verifyCode": "验证代码",
+    "passwordsDoNotMatch": "两次输入的密码不一致",
+    "codeVerified": "代码已确认 — 请设置新密码",
     "telegramLogin": "使用 Telegram 登录",
     "emailLogin": "邮箱登录",
     "signUp": "注册",

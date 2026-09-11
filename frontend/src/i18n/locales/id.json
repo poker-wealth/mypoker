@@ -75,7 +75,8 @@
     "sectionArcade": "Permainan arkade",
     "sectionQuick": "Permainan cepat",
     "more": "Lainnya",
-    "tableCount": "{{count}} meja",
+    "tableCount_one": "1 meja",
+    "tableCount_other": "{{count}} meja",
     "noneInCategory": "Belum ada apa pun di sini",
     "tryAnother": "Coba pencarian lain.",
     "filter": {
@@ -149,6 +150,10 @@
     "tableClosed": "Meja aliansi ditutup sementara."
   },
   "data": {
+    "totalProfit": "Total Laba",
+    "timeOfDay": "Waktu Bermain",
+    "bestPeriod": "Periode terbaik",
+    "timeOfDayUtc": "Waktu dalam UTC",
     "periodToday": "Hari ini",
     "period7d": "7 hari",
     "period30d": "30 hari",
@@ -262,6 +267,8 @@
     }
   },
   "table": {
+    "timeBankUse": "Pakai {{seconds}}d",
+    "timeBankLeft": "Bank waktu {{seconds}}d",
     "chatTakeSeat": "Duduklah untuk mengobrol",
     "chatSay": "Katakan sesuatu…",
     "fold": "Lipat",
@@ -360,6 +367,7 @@
     "codeResendFailed": "Tidak dapat mengirim kode baru"
   },
   "settings": {
+    "language": "Bahasa",
     "appearance": "Tampilan",
     "theme": "Mode gelap",
     "preferences": "Preferensi",
@@ -657,6 +665,10 @@
     "deviceModifiedBody": "Terdeteksi alat root atau jailbreak. Anda tetap bisa bermain, tetapi perangkat yang dimodifikasi lebih rentan dimanipulasi — berhati-hatilah saat menyetor dan menarik dana."
   },
   "auth": {
+    "confirmPassword": "Konfirmasi kata sandi baru",
+    "verifyCode": "Verifikasi kode",
+    "passwordsDoNotMatch": "Kata sandi tidak cocok",
+    "codeVerified": "Kode terverifikasi — pilih kata sandi baru",
     "telegramLogin": "Masuk dengan Telegram",
     "emailLogin": "Masuk dengan email",
     "signUp": "Daftar",

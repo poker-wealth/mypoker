@@ -75,7 +75,8 @@
     "sectionArcade": "アーケードゲーム",
     "sectionQuick": "クイックゲーム",
     "more": "もっと見る",
-    "tableCount": "{{count}} テーブル",
+    "tableCount_one": "1 テーブル",
+    "tableCount_other": "{{count}} テーブル",
     "noneInCategory": "このカテゴリにはまだありません",
     "tryAnother": "別の語句でお試しください。",
     "filter": {
@@ -149,6 +150,10 @@
     "tableClosed": "同盟テーブルは一時的に閉鎖しています。"
   },
   "data": {
+    "totalProfit": "総利益",
+    "timeOfDay": "時間帯",
+    "bestPeriod": "ベスト時間帯",
+    "timeOfDayUtc": "時刻は UTC 表示",
     "periodToday": "今日",
     "period7d": "7日間",
     "period30d": "30日間",
@@ -262,6 +267,8 @@
     }
   },
   "table": {
+    "timeBankUse": "{{seconds}}秒を使う",
+    "timeBankLeft": "タイムバンク {{seconds}}秒",
     "chatTakeSeat": "着席するとチャットできます",
     "chatSay": "メッセージを入力…",
     "fold": "フォールド",
@@ -360,6 +367,7 @@
     "codeResendFailed": "新しいコードを送信できませんでした"
   },
   "settings": {
+    "language": "言語",
     "appearance": "外観",
     "theme": "ダークモード",
     "preferences": "環境設定",
@@ -657,6 +665,10 @@
     "deviceModifiedBody": "Root化または脱獄ツールが検出されました。プレイは続けられますが、改造された端末は改ざんされやすいため、入出金にはご注意ください。"
   },
   "auth": {
+    "confirmPassword": "新しいパスワードを再入力",
+    "verifyCode": "コードを確認",
+    "passwordsDoNotMatch": "パスワードが一致しません",
+    "codeVerified": "コードを確認しました — 新しいパスワードを設定してください",
     "telegramLogin": "Telegram でログイン",
     "emailLogin": "メールログイン",
     "signUp": "新規登録",

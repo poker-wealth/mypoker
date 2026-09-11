@@ -75,7 +75,8 @@
     "sectionArcade": "Trò chơi arcade",
     "sectionQuick": "Trò chơi nhanh",
     "more": "Thêm",
-    "tableCount": "{{count}} bàn",
+    "tableCount_one": "1 bàn",
+    "tableCount_other": "{{count}} bàn",
     "noneInCategory": "Chưa có gì ở đây",
     "tryAnother": "Thử tìm từ khác.",
     "filter": {
@@ -149,6 +150,10 @@
     "tableClosed": "Bàn của liên minh tạm thời đóng."
   },
   "data": {
+    "totalProfit": "Tổng lợi nhuận",
+    "timeOfDay": "Thời điểm trong ngày",
+    "bestPeriod": "Khung giờ tốt nhất",
+    "timeOfDayUtc": "Giờ hiển thị theo UTC",
     "periodToday": "Hôm nay",
     "period7d": "7 ngày",
     "period30d": "30 ngày",
@@ -262,6 +267,8 @@
     }
   },
   "table": {
+    "timeBankUse": "Dùng {{seconds}}s",
+    "timeBankLeft": "Quỹ thời gian {{seconds}}s",
     "chatTakeSeat": "Ngồi vào bàn để trò chuyện",
     "chatSay": "Nhập tin nhắn…",
     "fold": "Bỏ bài",
@@ -360,6 +367,7 @@
     "codeResendFailed": "Không thể gửi mã mới"
   },
   "settings": {
+    "language": "Ngôn ngữ",
     "appearance": "Giao diện",
     "theme": "Chế độ tối",
     "preferences": "Tùy chọn",
@@ -657,6 +665,10 @@
     "deviceModifiedBody": "Đã phát hiện công cụ root hoặc jailbreak. Bạn vẫn có thể chơi, nhưng thiết bị đã chỉnh sửa dễ bị can thiệp hơn — hãy thận trọng khi nạp và rút tiền."
   },
   "auth": {
+    "confirmPassword": "Xác nhận mật khẩu mới",
+    "verifyCode": "Xác minh mã",
+    "passwordsDoNotMatch": "Mật khẩu không khớp",
+    "codeVerified": "Đã xác minh mã — hãy chọn mật khẩu mới",
     "telegramLogin": "Đăng nhập bằng Telegram",
     "emailLogin": "Đăng nhập bằng email",
     "signUp": "Đăng ký",

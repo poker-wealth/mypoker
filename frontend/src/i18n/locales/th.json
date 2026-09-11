@@ -75,7 +75,8 @@
     "sectionArcade": "เกมอาร์เคด",
     "sectionQuick": "เกมเร็ว",
     "more": "เพิ่มเติม",
-    "tableCount": "{{count}} โต๊ะ",
+    "tableCount_one": "1 โต๊ะ",
+    "tableCount_other": "{{count}} โต๊ะ",
     "noneInCategory": "ยังไม่มีอะไรที่นี่",
     "tryAnother": "ลองค้นหาคำอื่น",
     "filter": {
@@ -149,6 +150,10 @@
     "tableClosed": "โต๊ะของพันธมิตรปิดชั่วคราว"
   },
   "data": {
+    "totalProfit": "กำไรรวม",
+    "timeOfDay": "ช่วงเวลา",
+    "bestPeriod": "ช่วงที่ดีที่สุด",
+    "timeOfDayUtc": "เวลาแสดงเป็น UTC",
     "periodToday": "วันนี้",
     "period7d": "7 วัน",
     "period30d": "30 วัน",
@@ -262,6 +267,8 @@
     }
   },
   "table": {
+    "timeBankUse": "ใช้ {{seconds}} วิ",
+    "timeBankLeft": "เวลาสำรอง {{seconds}} วิ",
     "chatTakeSeat": "นั่งลงเพื่อแชท",
     "chatSay": "พิมพ์ข้อความ…",
     "fold": "หมอบ",
@@ -360,6 +367,7 @@
     "codeResendFailed": "ส่งรหัสใหม่ไม่สำเร็จ"
   },
   "settings": {
+    "language": "ภาษา",
     "appearance": "การแสดงผล",
     "theme": "โหมดมืด",
     "preferences": "การตั้งค่า",
@@ -657,6 +665,10 @@
     "deviceModifiedBody": "ตรวจพบเครื่องมือ Root หรือ Jailbreak คุณยังเล่นต่อได้ แต่อุปกรณ์ที่ถูกดัดแปลงถูกแทรกแซงได้ง่ายกว่า โปรดระมัดระวังในการฝากและถอนเงิน"
   },
   "auth": {
+    "confirmPassword": "ยืนยันรหัสผ่านใหม่",
+    "verifyCode": "ตรวจสอบรหัส",
+    "passwordsDoNotMatch": "รหัสผ่านไม่ตรงกัน",
+    "codeVerified": "ยืนยันรหัสแล้ว — ตั้งรหัสผ่านใหม่",
     "telegramLogin": "เข้าสู่ระบบด้วย Telegram",
     "emailLogin": "เข้าสู่ระบบด้วยอีเมล",
     "signUp": "สมัครสมาชิก",

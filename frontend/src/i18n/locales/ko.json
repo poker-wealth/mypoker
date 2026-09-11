@@ -75,7 +75,8 @@
     "sectionArcade": "아케이드 게임",
     "sectionQuick": "퀵 게임",
     "more": "더 보기",
-    "tableCount": "{{count}}개 테이블",
+    "tableCount_one": "테이블 1개",
+    "tableCount_other": "{{count}}개 테이블",
     "noneInCategory": "이 카테고리에는 아직 없습니다",
     "tryAnother": "다른 검색어를 사용해 보세요.",
     "filter": {
@@ -149,6 +150,10 @@
     "tableClosed": "얼라이언스 테이블이 일시적으로 닫혀 있습니다."
   },
   "data": {
+    "totalProfit": "총 수익",
+    "timeOfDay": "시간대",
+    "bestPeriod": "최고 시간대",
+    "timeOfDayUtc": "시간은 UTC 기준",
     "periodToday": "오늘",
     "period7d": "7일",
     "period30d": "30일",
@@ -262,6 +267,8 @@
     }
   },
   "table": {
+    "timeBankUse": "{{seconds}}초 사용",
+    "timeBankLeft": "타임뱅크 {{seconds}}초",
     "chatTakeSeat": "자리에 앉으면 채팅할 수 있습니다",
     "chatSay": "메시지를 입력하세요…",
     "fold": "폴드",
@@ -360,6 +367,7 @@
     "codeResendFailed": "새 코드를 보낼 수 없습니다"
   },
   "settings": {
+    "language": "언어",
     "appearance": "화면",
     "theme": "다크 모드",
     "preferences": "환경설정",
@@ -657,6 +665,10 @@
     "deviceModifiedBody": "루팅 또는 탈옥 도구가 감지되었습니다. 계속 플레이할 수 있지만 변조된 기기는 조작에 취약하므로 입출금 시 주의하세요."
   },
   "auth": {
+    "confirmPassword": "새 비밀번호 확인",
+    "verifyCode": "코드 확인",
+    "passwordsDoNotMatch": "비밀번호가 일치하지 않습니다",
+    "codeVerified": "코드가 확인되었습니다 — 새 비밀번호를 설정하세요",
     "telegramLogin": "Telegram으로 로그인",
     "emailLogin": "이메일 로그인",
     "signUp": "가입하기",

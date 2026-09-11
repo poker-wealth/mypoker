@@ -75,7 +75,8 @@
     "sectionArcade": "Arcade games",
     "sectionQuick": "Quick games",
     "more": "More",
-    "tableCount": "{{count}} tables",
+    "tableCount_one": "1 table",
+    "tableCount_other": "{{count}} tables",
     "noneInCategory": "Nothing here yet",
     "tryAnother": "Try a different search.",
     "filter": {
@@ -149,6 +150,10 @@
     "tableClosed": "Alliance tables are temporarily closed."
   },
   "data": {
+    "totalProfit": "Total Profit",
+    "timeOfDay": "Time of Day",
+    "bestPeriod": "Best period",
+    "timeOfDayUtc": "Hours shown in UTC",
     "periodToday": "Today",
     "period7d": "7 days",
     "period30d": "30 days",
@@ -262,6 +267,8 @@
     }
   },
   "table": {
+    "timeBankUse": "Use {{seconds}}s",
+    "timeBankLeft": "Time bank {{seconds}}s",
     "chatTakeSeat": "Take a seat to chat",
     "chatSay": "Say something…",
     "fold": "Fold",
@@ -360,6 +367,7 @@
     "codeResendFailed": "Could not send a new code"
   },
   "settings": {
+    "language": "Language",
     "appearance": "Appearance",
     "theme": "Dark mode",
     "preferences": "Preferences",
@@ -657,6 +665,10 @@
     "deviceModifiedBody": "Root or jailbreak tools were detected. You can keep playing, but a modified device is easier to tamper with — take care with deposits and withdrawals."
   },
   "auth": {
+    "confirmPassword": "Confirm new password",
+    "verifyCode": "Verify code",
+    "passwordsDoNotMatch": "Those passwords do not match",
+    "codeVerified": "Code confirmed — choose a new password",
     "telegramLogin": "Log in with Telegram",
     "emailLogin": "Email login",
     "signUp": "Sign up",

@@ -1,7 +1,6 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import { LANGUAGES, DEFAULT_LANGUAGE, resolveLanguage } from './languages';
-import { telegramLanguageCode } from '../lib/telegram';
+import { LANGUAGES, DEFAULT_LANGUAGE } from './languages';
 import en from './locales/en.json';
 import zh from './locales/zh.json';
 import ja from './locales/ja.json';
@@ -18,19 +17,20 @@ import th from './locales/th.json';
  * they're a few KB, and a Mini App opening on a phone shouldn't wait on a second
  * network round-trip to render its first screen in the right language.
  *
- * The app opens in the player's OWN language, following the phone: someone whose
- * Telegram is set to Thai lands on ไทย, a Korean phone on 한국어. An explicit
- * in-app choice still wins and is remembered, so a player who picks a language
- * keeps it regardless of what the phone says.
+ * The app opens in 中文 unless the player has explicitly chosen otherwise:
  *
  *   1. what the player explicitly picked (persisted)
- *   2. the phone's Telegram language   — resolveLanguage(telegramLanguageCode())
- *   3. the browser / device language   — resolveLanguage(navigator.language)
- *   4. 中文 as the final fallback
+ *   2. 中文
  *
- * Owner directive (Aug 2026): "follow the phone's language" — reversing the
- * earlier decision to force 中文 on everyone. 中文 stays the i18next fallback
- * below, so a key missing from a locale still renders in Chinese rather than raw.
+ * Owner directive (11 Sep 2026): "By default it should be in chinese... they
+ * will struggle to find themselves to settings and change the language." This
+ * REVERSES the Aug 2026 "follow the phone's language" rule, which had in turn
+ * reversed an earlier 中文 default — so the history here is a genuine back and
+ * forth, not a drift. The phone tag is no longer consulted at all: it is a
+ * guess about a person, and for this audience it was usually the wrong one.
+ *
+ * 中文 is also the i18next fallback below, so a key missing from a locale still
+ * renders in Chinese rather than raw.
  *
  * Because a player can land on a screen they cannot read, the picker in My
  * Account labels every option in its own language, and sits at a fixed position
@@ -44,13 +44,26 @@ export function storedLanguage(): string | null {
   return saved && LANGUAGES.some((l) => l.code === saved) ? saved : null;
 }
 
+/**
+ * The language the app opens in.
+ *
+ * 中文 UNLESS the player has explicitly chosen otherwise. Owner's call, and
+ * the reasoning is his: the audience is Chinese-speaking, and someone who
+ * opens the app in a language they cannot read has to find their way into
+ * Settings — in that language — to fix it. Defaulting to the audience's
+ * language means almost nobody ever needs the picker.
+ *
+ * The phone/browser language is DELIBERATELY not consulted. It used to come
+ * first, which is why an English-language handset opened in English however
+ * the fallback was set. A device tag is a guess about a person; for this
+ * product it was the wrong guess most of the time.
+ *
+ * An explicit pick still wins and is remembered — the picker in Settings
+ * stays, so anyone who wants English can have it and keep it. This changes
+ * the DEFAULT, not the choice.
+ */
 function detectLanguage(): string {
-  return (
-    storedLanguage() ??
-    resolveLanguage(telegramLanguageCode()) ??
-    resolveLanguage(navigator.language) ??
-    DEFAULT_LANGUAGE
-  );
+  return storedLanguage() ?? DEFAULT_LANGUAGE;
 }
 
 /** Change language and remember the choice. */
