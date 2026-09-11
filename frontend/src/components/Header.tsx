@@ -66,18 +66,26 @@ export function Header() {
       <div className="flex items-center justify-between">
         <h1 className="text-base font-black tracking-tight">{title}</h1>
         <div className="flex items-center gap-2">
-          {(unread.data ?? 0) > 0 && (
-            <button
-              onClick={() => navigate('/notifications')}
-              aria-label={t('notifications.title')}
-              className="relative grid size-8 place-items-center text-dim active:scale-95"
-            >
-              <Bell size={18} />
+          {/* ALWAYS shown, badge or not.
+              It used to appear only when something was unread, on the reasoning
+              that a bell with no badge is a button that usually does nothing.
+              In practice that made notifications unreachable: Victor deposited,
+              saw no balance AND no bell, and had no way in to check — the one
+              moment the screen mattered was the moment it was hidden. A door
+              you can always open beats a door that appears only when we think
+              you need it. */}
+          <button
+            onClick={() => navigate('/notifications')}
+            aria-label={t('notifications.title')}
+            className="relative grid size-8 place-items-center text-dim active:scale-95"
+          >
+            <Bell size={18} />
+            {(unread.data ?? 0) > 0 && (
               <span className="absolute -right-1 -top-1 grid min-w-4 place-items-center rounded-full bg-danger px-1 text-[0.55rem] font-bold text-white">
                 {unread.data! > 9 ? '9+' : unread.data}
               </span>
-            </button>
-          )}
+            )}
+          </button>
           {rightElement}
         </div>
       </div>
