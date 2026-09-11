@@ -150,6 +150,8 @@
     "tableClosed": "Alliance tables are temporarily closed."
   },
   "data": {
+    "tabOverview": "Overview",
+    "tabHands": "Hands",
     "totalProfit": "Total Profit",
     "timeOfDay": "Time of Day",
     "bestPeriod": "Best period",

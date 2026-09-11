@@ -150,6 +150,8 @@
     "tableClosed": "Meja aliansi ditutup sementara."
   },
   "data": {
+    "tabOverview": "Ringkasan",
+    "tabHands": "Kartu",
     "totalProfit": "Total Laba",
     "timeOfDay": "Waktu Bermain",
     "bestPeriod": "Periode terbaik",

@@ -150,6 +150,8 @@
     "tableClosed": "联盟牌桌暂时关闭。"
   },
   "data": {
+    "tabOverview": "总览",
+    "tabHands": "手牌",
     "totalProfit": "总盈利",
     "timeOfDay": "时段分布",
     "bestPeriod": "最佳时段",

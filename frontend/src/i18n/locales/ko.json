@@ -150,6 +150,8 @@
     "tableClosed": "얼라이언스 테이블이 일시적으로 닫혀 있습니다."
   },
   "data": {
+    "tabOverview": "개요",
+    "tabHands": "핸드",
     "totalProfit": "총 수익",
     "timeOfDay": "시간대",
     "bestPeriod": "최고 시간대",

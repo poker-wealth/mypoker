@@ -150,6 +150,8 @@
     "tableClosed": "同盟テーブルは一時的に閉鎖しています。"
   },
   "data": {
+    "tabOverview": "概要",
+    "tabHands": "ハンド",
     "totalProfit": "総利益",
     "timeOfDay": "時間帯",
     "bestPeriod": "ベスト時間帯",

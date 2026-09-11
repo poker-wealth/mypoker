@@ -50,6 +50,7 @@ const PERIODS: { value: StatsPeriod; key: string }[] = [
 export function Data() {
   const { t } = useTranslation();
   const [period, setPeriod] = useState<StatsPeriod>('today');
+  const [tab, setTab] = useState<'overview' | 'hands'>('overview');
   const signedIn = useSession((s) => s.status === 'authenticated');
 
   const stats = useStats(period);
@@ -73,6 +74,31 @@ export function Data() {
         onChange={setPeriod}
       />
 
+      {/*
+        TWO TABS, not the reference's four.
+
+        The reference has Overview / Hands / Tables / Analysis. Only the first
+        two have anything to show. "Tables" would list the tables a player has
+        sat at, which is not recorded — the ledger stores a round's net movement
+        and no table identity. "Analysis" is the radar and its six stats, which
+        need preflop action data that is not recorded either.
+
+        Drawing four tabs where two open an empty screen is the same mistake as
+        a greyed control with no reason: it reads as a feature that exists and
+        is merely quiet. Two honest tabs beat four with nothing behind them, and
+        the other two arrive on their own when hand histories do.
+      */}
+      <Segmented
+        options={[
+          { value: 'overview' as const, label: t('data.tabOverview') },
+          { value: 'hands' as const, label: t('data.tabHands') },
+        ]}
+        value={tab}
+        onChange={setTab}
+      />
+
+      {tab === 'overview' && (
+        <>
       {/* THE HEADLINE FIGURE.
           Net profit was one tile among six, the same size as "Hands" — so the
           one number a player opens this tab to see had no more weight than a
@@ -179,6 +205,11 @@ export function Data() {
           claim about how this player spends their time. */}
       <PlayDistribution />
 
+        </>
+      )}
+
+      {tab === 'hands' && (
+        <>
       {/* History */}
       <section>
         <h2 className="mb-2.5 text-sm font-bold">{t('data.recentRounds')}</h2>
@@ -233,6 +264,8 @@ export function Data() {
           </>
         )}
       </section>
+        </>
+      )}
     </div>
   );
 }

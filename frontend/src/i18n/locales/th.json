@@ -150,6 +150,8 @@
     "tableClosed": "โต๊ะของพันธมิตรปิดชั่วคราว"
   },
   "data": {
+    "tabOverview": "ภาพรวม",
+    "tabHands": "มือ",
     "totalProfit": "กำไรรวม",
     "timeOfDay": "ช่วงเวลา",
     "bestPeriod": "ช่วงที่ดีที่สุด",

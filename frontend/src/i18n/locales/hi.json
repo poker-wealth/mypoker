@@ -150,6 +150,8 @@
     "tableClosed": "गठबंधन की टेबलें फ़िलहाल बंद हैं।"
   },
   "data": {
+    "tabOverview": "अवलोकन",
+    "tabHands": "हैंड",
     "totalProfit": "कुल लाभ",
     "timeOfDay": "दिन का समय",
     "bestPeriod": "सर्वश्रेष्ठ अवधि",
