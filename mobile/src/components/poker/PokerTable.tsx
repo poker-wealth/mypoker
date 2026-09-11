@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { PlayingCard } from './PlayingCard';
 import { PlayerSeat } from './PlayerSeat';
@@ -35,6 +37,7 @@ export interface PokerTableProps {
 }
 
 export function PokerTable({ snapshot, onSit, design: override }: PokerTableProps) {
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
   // The player's saved choice, unless a preview is forcing one.
   const { id: chosen } = useTableDesign();
@@ -65,6 +68,30 @@ export function PokerTable({ snapshot, onSit, design: override }: PokerTableProp
 
   const board = snapshot.board ?? [];
 
+  /**
+   * Whose turn it is, read off the seat the server already marks — no new
+   * prop, and no second opinion about who is acting.
+   */
+  const toActSeat = snapshot.seats.find((s) => s.index === snapshot.toActSeat) ?? null;
+  const turnName = toActSeat?.name ?? null;
+  const heroToAct = toActSeat !== null && toActSeat.index === yourIndex;
+
+  /**
+   * Seconds left on that player's clock, ticking while it runs.
+   *
+   * The interval is created only when there IS a deadline, so an idle table
+   * does not re-render every quarter second for nothing.
+   */
+  const deadline = snapshot.actionDeadline ?? null;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!deadline) return;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [deadline]);
+  const secondsLeft = deadline ? Math.max(0, Math.ceil((deadline - now) / 1000)) : null;
+
   return (
     <View style={[styles.stage, { width: tableWidth, height: tableHeight }]}>
       {design.art ? (
@@ -92,6 +119,27 @@ export function PokerTable({ snapshot, onSit, design: override }: PokerTableProp
             return <PlayingCard key={i} {...(card ? { card } : {})} size="md" />;
           })}
         </View>
+
+        {/* Whose turn it is, and how long they have — ON THE FELT.
+            The web moved this here first, for the reason Victor gave when he
+            saw it buried in the footer strip: "this is showing where no one
+            will see it". The seconds come with it because the seat ring is a
+            hairline on a small avatar, and for a 20s decision an unreadable
+            clock is the same as no clock. Hidden once the hand is over so it
+            cannot argue with the result message directly below. */}
+        {turnName !== null && !snapshot.message ? (
+          <View style={styles.turnPill}>
+            <Text style={styles.turnText}>
+              {heroToAct ? t('table.yourTurn') : t('table.playerTurn', { name: turnName })}
+            </Text>
+            {secondsLeft !== null ? (
+              <Text style={[styles.turnSeconds, secondsLeft <= 5 && styles.turnSecondsLow]}>
+                {' '}
+                {secondsLeft}s
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
 
         {snapshot.message ? <Text style={styles.message}>{snapshot.message}</Text> : null}
       </View>
@@ -188,6 +236,22 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     overflow: 'hidden',
   },
+  /** The turn banner. Same pill as `message`, which sits in the same spot. */
+  turnPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 2,
+    borderRadius: 999,
+    overflow: 'hidden',
+  },
+  turnText: { color: 'rgba(255,255,255,0.9)', fontSize: 10.5 },
+  turnSeconds: { color: 'rgba(255,255,255,0.55)', fontSize: 10.5 },
+  /** Under five seconds. The colour is the only warning a glance registers. */
+  turnSecondsLow: { color: theme.accent },
   // Seats are placed by their centre, so shift each by half its own size.
   seat: { position: 'absolute', marginLeft: -37, marginTop: -34 },
   // Matches PlayerSeat's own AVATAR / emptyOpen / emptyInert / sitText treatment for an
