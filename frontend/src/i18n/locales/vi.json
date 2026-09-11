@@ -267,6 +267,13 @@
     }
   },
   "table": {
+    "menuTitle": "Menu",
+    "menuShare": "Chia sẻ",
+    "menuStandUp": "Đứng dậy & Xem",
+    "menuRankings": "Thứ hạng bài",
+    "menuOptions": "Tùy chọn",
+    "menuExit": "Thoát trò chơi",
+    "menuNeedSeat": "Chỉ khi đang ngồi",
     "timeBankUse": "Dùng {{seconds}}s",
     "timeBankLeft": "Quỹ thời gian {{seconds}}s",
     "chatTakeSeat": "Ngồi vào bàn để trò chuyện",

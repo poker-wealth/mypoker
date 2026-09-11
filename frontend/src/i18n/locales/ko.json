@@ -267,6 +267,13 @@
     }
   },
   "table": {
+    "menuTitle": "메뉴",
+    "menuShare": "공유",
+    "menuStandUp": "일어나서 관전",
+    "menuRankings": "핸드 랭킹",
+    "menuOptions": "옵션",
+    "menuExit": "게임 나가기",
+    "menuNeedSeat": "착석 중에만",
     "timeBankUse": "{{seconds}}초 사용",
     "timeBankLeft": "타임뱅크 {{seconds}}초",
     "chatTakeSeat": "자리에 앉으면 채팅할 수 있습니다",

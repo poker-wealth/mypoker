@@ -267,6 +267,13 @@
     }
   },
   "table": {
+    "menuTitle": "Menu",
+    "menuShare": "Bagikan",
+    "menuStandUp": "Berdiri & Menonton",
+    "menuRankings": "Peringkat Kartu",
+    "menuOptions": "Opsi",
+    "menuExit": "Keluar dari permainan",
+    "menuNeedSeat": "Hanya saat duduk",
     "timeBankUse": "Pakai {{seconds}}d",
     "timeBankLeft": "Bank waktu {{seconds}}d",
     "chatTakeSeat": "Duduklah untuk mengobrol",

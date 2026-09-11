@@ -267,6 +267,13 @@
     }
   },
   "table": {
+    "menuTitle": "เมนู",
+    "menuShare": "แชร์",
+    "menuStandUp": "ลุกขึ้นและดู",
+    "menuRankings": "ลำดับไพ่",
+    "menuOptions": "ตัวเลือก",
+    "menuExit": "ออกจากเกม",
+    "menuNeedSeat": "เฉพาะตอนนั่งอยู่",
     "timeBankUse": "ใช้ {{seconds}} วิ",
     "timeBankLeft": "เวลาสำรอง {{seconds}} วิ",
     "chatTakeSeat": "นั่งลงเพื่อแชท",

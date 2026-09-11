@@ -267,6 +267,13 @@
     }
   },
   "table": {
+    "menuTitle": "メニュー",
+    "menuShare": "共有",
+    "menuStandUp": "離席して観戦",
+    "menuRankings": "役の強さ",
+    "menuOptions": "オプション",
+    "menuExit": "ゲームを終了",
+    "menuNeedSeat": "着席中のみ",
     "timeBankUse": "{{seconds}}秒を使う",
     "timeBankLeft": "タイムバンク {{seconds}}秒",
     "chatTakeSeat": "着席するとチャットできます",

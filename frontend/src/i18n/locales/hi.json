@@ -267,6 +267,13 @@
     }
   },
   "table": {
+    "menuTitle": "मेन्यू",
+    "menuShare": "साझा करें",
+    "menuStandUp": "उठें और देखें",
+    "menuRankings": "हैंड रैंकिंग",
+    "menuOptions": "विकल्प",
+    "menuExit": "गेम से बाहर",
+    "menuNeedSeat": "केवल बैठे होने पर",
     "timeBankUse": "{{seconds}}से इस्तेमाल करें",
     "timeBankLeft": "टाइम बैंक {{seconds}}से",
     "chatTakeSeat": "चैट करने के लिए सीट लें",

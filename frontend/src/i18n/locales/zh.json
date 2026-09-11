@@ -267,6 +267,13 @@
     }
   },
   "table": {
+    "menuTitle": "菜单",
+    "menuShare": "分享",
+    "menuStandUp": "起立观战",
+    "menuRankings": "牌型大小",
+    "menuOptions": "设置",
+    "menuExit": "退出游戏",
+    "menuNeedSeat": "仅限入座后",
     "timeBankUse": "使用 {{seconds}} 秒",
     "timeBankLeft": "时间银行 {{seconds}} 秒",
     "chatTakeSeat": "入座后即可聊天",

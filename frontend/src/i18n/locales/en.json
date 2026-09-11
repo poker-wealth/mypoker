@@ -267,6 +267,13 @@
     }
   },
   "table": {
+    "menuTitle": "Menu",
+    "menuShare": "Share",
+    "menuStandUp": "Stand up & Watch",
+    "menuRankings": "Poker Hand Rankings",
+    "menuOptions": "Options",
+    "menuExit": "Exit game",
+    "menuNeedSeat": "Only while seated",
     "timeBankUse": "Use {{seconds}}s",
     "timeBankLeft": "Time bank {{seconds}}s",
     "chatTakeSeat": "Take a seat to chat",
