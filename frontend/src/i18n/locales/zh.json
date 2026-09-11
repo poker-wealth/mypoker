@@ -150,6 +150,7 @@
     "tableClosed": "联盟牌桌暂时关闭。"
   },
   "data": {
+    "deltaNew": "新增",
     "pickDay": "选择日期",
     "clearDay": "返回时间段",
     "dayChartSoon": "图表按时间段显示 — 清除日期即可查看",

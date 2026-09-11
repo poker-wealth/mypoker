@@ -47,12 +47,45 @@ export type StatsPeriod = 'today' | '7d' | '30d' | 'all';
  * server-side, so only one of the two is ever sent — sending both would leave
  * the URL claiming a window the answer does not describe.
  */
-export function fetchStats(period?: StatsPeriod, day?: string): Promise<PlayerStats> {
+export function fetchStats(
+  period?: StatsPeriod,
+  day?: string,
+  range?: { from: string; to: string },
+): Promise<PlayerStats> {
   const query = new URLSearchParams();
-  if (day) query.set('day', day);
+  // Narrowest wins, matching the server's own precedence — sending two would
+  // leave the URL claiming a window the answer does not describe.
+  if (range) {
+    query.set('from', range.from);
+    query.set('to', range.to);
+  } else if (day) query.set('day', day);
   else if (period && period !== 'all') query.set('period', period);
   const suffix = query.toString();
   return api.get<PlayerStats>(`/me/stats${suffix ? `?${suffix}` : ''}`);
+}
+
+/**
+ * The window immediately before the one a period describes, as `[from, to)`
+ * whole UTC days — what a "+12.3% vs last week" figure is measured against.
+ *
+ * Null for 'all', which has no "before": all time is already everything, and a
+ * comparison against nothing is not a comparison.
+ *
+ * UTC throughout, matching the server's day boundaries — computing these in
+ * local time would slide the window by hours and quietly change the answer.
+ */
+export function previousWindow(period: StatsPeriod, now: Date = new Date()): { from: string; to: string } | null {
+  const DAYS: Partial<Record<StatsPeriod, number>> = { today: 1, '7d': 7, '30d': 30 };
+  const span = DAYS[period];
+  if (span === undefined) return null;
+
+  const iso = (d: Date): string => d.toISOString().slice(0, 10);
+  const DAY_MS = 86_400_000;
+  // Start of today, UTC — the exclusive end of the window just gone.
+  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const to = new Date(todayStart.getTime() - (period === 'today' ? 0 : (span - 1) * DAY_MS));
+  const from = new Date(to.getTime() - span * DAY_MS);
+  return { from: iso(from), to: iso(to) };
 }
 
 export function fetchHistory(

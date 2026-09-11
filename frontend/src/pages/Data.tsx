@@ -19,6 +19,7 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { useStats, useHistory, useVip } from '@/api/hooks';
+import { previousWindow } from '@/api/stats';
 import { errorKey } from '@/api/errors';
 import { moneyFromDecimal } from '@/lib/money';
 import { cn } from '@/lib/cn';
@@ -63,6 +64,10 @@ export function Data() {
   const signedIn = useSession((s) => s.status === 'authenticated');
 
   const stats = useStats(period, day || undefined);
+  // The window just gone, for the deltas. Skipped entirely when a specific day
+  // is selected: a single date is not a rolling window and has no 'previous'.
+  const prevWindow = day === '' ? previousWindow(period) : null;
+  const prevStats = useStats(period, undefined, prevWindow ?? undefined);
   const history = useHistory(period);
 
   const rounds = history.data?.pages.flatMap((p) => p.entries) ?? [];
@@ -224,7 +229,20 @@ export function Data() {
             on the second line. Two across on a narrow phone. */}
         {stats.isSuccess && (
           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-            <Tile label={t('data.hands')} value={String(stats.data.handsPlayed)} />
+            <Tile
+              label={t('data.hands')}
+              value={String(stats.data.handsPlayed)}
+              delta={
+                <Delta
+                  current={stats.data.handsPlayed}
+                  previous={prevStats.data?.handsPlayed ?? 0}
+                  // `hadPrior` is about whether a comparison EXISTS, not whether
+                  // it is non-zero: a loaded prior window of zero hands is still
+                  // "no basis to compare", handled inside Delta.
+                  hadPrior={prevWindow !== null && prevStats.isSuccess}
+                />
+              }
+            />
             <Tile
               label={t('data.winRate')}
               value={stats.data.winRate === null ? '—' : `${stats.data.winRate}%`}
@@ -321,14 +339,57 @@ export function Data() {
   );
 }
 
+/**
+ * Change against the equivalent window just gone — "+18.6%" under Today means
+ * today measured against yesterday.
+ *
+ * THE THREE CASES THAT MUST NOT BECOME A GREEN ARROW:
+ *
+ *  1. NO PRIOR WINDOW. 'all' has no "before", and a specific day is not a
+ *     rolling window either. Renders nothing at all.
+ *  2. THE PRIOR WINDOW IS EMPTY. No hands last week is not "0" last week —
+ *     there is nothing to compare against, so there is no percentage. A dash.
+ *  3. THE PRIOR VALUE IS ZERO. Percent change from zero is undefined: $0 → $50
+ *     is neither "+100%" nor "+∞%". Both are inventions. Shows the direction
+ *     without a figure.
+ *
+ * The reference prints a green arrow and a number on every tile. With a fresh
+ * account every one of them would be fabricated.
+ */
+function Delta({ current, previous, hadPrior }: { current: number; previous: number; hadPrior: boolean }) {
+  const { t } = useTranslation();
+  if (!hadPrior) return <span className="text-[0.6rem] text-dim">—</span>;
+
+  if (previous === 0) {
+    if (current === 0) return <span className="text-[0.6rem] text-dim">—</span>;
+    return (
+      <span className={cn('text-[0.6rem] font-bold', current > 0 ? 'text-success' : 'text-danger')}>
+        {current > 0 ? '▲' : '▼'} {t('data.deltaNew')}
+      </span>
+    );
+  }
+
+  const pct = ((current - previous) / Math.abs(previous)) * 100;
+  if (!Number.isFinite(pct)) return <span className="text-[0.6rem] text-dim">—</span>;
+
+  return (
+    <span className={cn('text-[0.6rem] font-bold tabular-nums', pct >= 0 ? 'text-success' : 'text-danger')}>
+      {pct >= 0 ? '▲' : '▼'} {Math.abs(pct).toFixed(1)}%
+    </span>
+  );
+}
+
 function Tile({
   label,
   value,
   tone,
+  delta,
 }: {
   label: string;
   value: string;
   tone?: 'success' | 'danger' | 'accent';
+  /** Change against the window just gone. Omitted where there is no comparison. */
+  delta?: React.ReactNode;
 }) {
   const toneClass =
     tone === 'success'
@@ -341,7 +402,10 @@ function Tile({
   return (
     <div className="rounded-(--radius-app) border border-border bg-surface px-3 py-3">
       <div className={`text-base font-black tabular-nums ${toneClass}`}>{value}</div>
-      <div className="mt-0.5 text-[0.66rem] text-dim">{label}</div>
+      <div className="mt-0.5 flex items-center justify-between gap-1">
+        <span className="min-w-0 truncate text-[0.66rem] text-dim">{label}</span>
+        {delta}
+      </div>
     </div>
   );
 }

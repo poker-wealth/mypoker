@@ -205,7 +205,17 @@ export function buildRouter(): Router {
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be YYYY-MM-DD')
     .optional();
-  const statsQuery = z.object({ period, day });
+  /**
+   * An explicit `[from, to)` window, for period-over-period comparison.
+   * `to` is exclusive. Narrower than `day`, which is narrower than `period`.
+   */
+  const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'must be YYYY-MM-DD');
+  const statsQuery = z.object({
+    period,
+    day,
+    from: isoDay.optional(),
+    to: isoDay.optional(),
+  });
 
   // Derived from the ledger — see src/stats/player-stats.ts for what is and is
   // not knowable from it. VPIP, PFR and largest-pot are deliberately absent.
@@ -213,11 +223,13 @@ export function buildRouter(): Router {
     '/me/stats',
     dataScopeMiddleware,
     asyncHandler(async (req: Request, res: Response) => {
-      const { period, day } = statsQuery.parse(req.query);
+      const { period, day, from, to } = statsQuery.parse(req.query);
       res.json(
         await getPlayerStats(req.dataScope!.playerId, {
           ...(period !== undefined ? { period } : {}),
           ...(day !== undefined ? { day } : {}),
+          ...(from !== undefined ? { from } : {}),
+          ...(to !== undefined ? { to } : {}),
         }),
       );
     }),

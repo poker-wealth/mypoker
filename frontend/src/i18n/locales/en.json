@@ -150,6 +150,7 @@
     "tableClosed": "Alliance tables are temporarily closed."
   },
   "data": {
+    "deltaNew": "new",
     "pickDay": "Pick a day",
     "clearDay": "Back to periods",
     "dayChartSoon": "Chart follows the period — clear the date to see it",

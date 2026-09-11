@@ -150,6 +150,7 @@
     "tableClosed": "Meja aliansi ditutup sementara."
   },
   "data": {
+    "deltaNew": "baru",
     "pickDay": "Pilih hari",
     "clearDay": "Kembali ke periode",
     "dayChartSoon": "Grafik mengikuti periode — hapus tanggal untuk melihatnya",
