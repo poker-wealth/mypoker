@@ -295,6 +295,10 @@ export function buildPlayerTableRouter(
           players: 0,
           jackpot: 0,
           buyInBB: input.buyInBB,
+          // The seats the creator chose — the same number handed to the room
+          // above. Without it the row advertises the GAME's ceiling, so a table
+          // created for 2 showed "0 / 8".
+          seats: input.seats,
         });
       } catch {
         // A listing failure isn't fatal — the room is open and the resync will
