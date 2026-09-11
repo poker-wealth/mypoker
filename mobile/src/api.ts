@@ -119,6 +119,17 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const forgotPasswordApi = (email: string): Promise<{ resendAvailableAt?: string | null }> =>
   api.post('/auth/forgot-password', { email });
 
+/**
+ * Step 1.5: is the code right, before we ask for a password?
+ *
+ * Deliberately does NOT spend the code — the gateway's `check` leaves the
+ * challenge intact so `resetPasswordApi` below can still use it. Without that
+ * separation, checking the code would consume it and the reset would then fail
+ * with "no reset pending", which is worse than not checking at all.
+ */
+export const checkResetCodeApi = (email: string, code: string): Promise<{ ok: true }> =>
+  api.post('/auth/check-reset-code', { email, code });
+
 export const resetPasswordApi = (
   email: string,
   code: string,

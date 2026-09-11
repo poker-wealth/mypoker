@@ -9,6 +9,26 @@ import * as Clipboard from 'expo-clipboard';
  * Override with EXPO_PUBLIC_WEB_URL if the host ever moves.
  */
 const TABLE_LINK_BASE = process.env.EXPO_PUBLIC_WEB_URL ?? 'https://app.mypoker777.com';
+
+/** The bot the Mini App lives behind. Mirrors the web's TELEGRAM_BOT_NAME. */
+const TELEGRAM_BOT = process.env.EXPO_PUBLIC_TELEGRAM_BOT ?? 'mypoker777_bot';
+
+/**
+ * The link a creator shares.
+ *
+ * A plain web URL opens the phone's BROWSER — a fresh session, so the friend
+ * you invited meets a sign-in page rather than your table. This opens the
+ * Telegram Mini App instead: already authenticated as them, and routed to the
+ * table by the `startapp` token.
+ *
+ * The token packs the id and the private code as `<id>__<code>`, which is what
+ * `frontend/src/lib/tableInvite.ts` parses. Telegram allows only A-Za-z0-9_-
+ * in `startapp`, up to 64 characters; a packed pair is about 21.
+ */
+function inviteLinkFor(tableId: string, joinCode?: string | null): string {
+  const token = joinCode ? `${tableId}__${joinCode}` : tableId;
+  return `https://t.me/${TELEGRAM_BOT}/app?startapp=${token}`;
+}
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
@@ -205,13 +225,14 @@ export function CreateTableSheet({
   };
 
   if (create.isSuccess && create.data) {
-    // The APP host, not the marketing domain. mypoker777.com serves the
-    // landing page — a friend opening that link met an advert, not the table.
-    const link = `${TABLE_LINK_BASE}/table/${create.data.tableId}`;
+    const link = inviteLinkFor(create.data.tableId, create.data.joinCode);
     return (
       <Dialog open={open} onClose={close} title={t(`gameNames.${game}`, { defaultValue: 'Texas Hold\'em' })}>
-        <View style={{ gap: space.xl, paddingVertical: space.md }}>
-          <View style={{ gap: space.sm }}>
+        <View style={{ gap: space.lg, paddingVertical: space.md }}>
+          {/* One bordered card holds the confirmation, the blurb and the link —
+              the Mini App's shape, so a player meets the same dialog whichever
+              client they created from. 'Enter table' sits outside it. */}
+          <View style={styles.readyCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
               <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={theme.brand} strokeWidth={2}>
                 <Path d="M20 6L9 17l-5-5" />
@@ -223,29 +244,56 @@ export function CreateTableSheet({
             <Text style={{ color: theme.dim, fontSize: 13 }}>
               Send this link to invite a friend to this exact table.
             </Text>
-          </View>
 
-          <View style={{ backgroundColor: theme.surface2, borderRadius: radius.card, padding: space.md, flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={theme.dim} strokeWidth={2}>
-              <Path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-              <Path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-            </Svg>
-            <Text style={{ color: 'white', fontSize: 13, fontFamily: weight('600') }} numberOfLines={1} ellipsizeMode="middle">
-              {link}
-            </Text>
-          </View>
-
+          {/* The copy control lives ON the link, not under it — same shape as
+              the Mini App's. A separate label below read as a caption and
+              nobody could tell it was tappable. */}
           <Pressable
             onPress={() => {
               void Clipboard.setStringAsync(link);
               setCopied(true);
             }}
-            style={{ alignItems: 'center', paddingVertical: space.xs }}
+            style={{
+              backgroundColor: theme.surface2,
+              borderRadius: radius.card,
+              padding: space.md,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: space.sm,
+            }}
           >
-            <Text style={{ color: copied ? theme.brand : theme.dim, fontSize: 14, fontFamily: weight('700') }}>
-              {copied ? 'Link copied' : 'Copy invite link'}
+            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={theme.dim} strokeWidth={2}>
+              <Path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+              <Path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+            </Svg>
+            <Text
+              style={{ color: 'white', fontSize: 13, fontFamily: weight('600'), flex: 1 }}
+              numberOfLines={1}
+              ellipsizeMode="middle"
+            >
+              {link}
             </Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                borderRadius: 999,
+                paddingHorizontal: space.sm,
+                paddingVertical: 4,
+                backgroundColor: copied ? 'rgba(63,208,122,0.15)' : 'rgba(217,184,124,0.15)',
+              }}
+            >
+              <Svg width={11} height={11} viewBox="0 0 24 24" fill="none" stroke={copied ? theme.success : theme.brand} strokeWidth={2.5}>
+                {copied ? <Path d="M20 6L9 17l-5-5" /> : <Path d="M8 8h11v11H8zM5 5h11v3H8v8H5z" />}
+              </Svg>
+              <Text style={{ color: copied ? theme.success : theme.brand, fontSize: 11, fontFamily: weight('800') }}>
+                {copied ? 'Link copied' : 'Copy'}
+              </Text>
+            </View>
           </Pressable>
+
+          </View>
 
           <Button onPress={goToTable} style={{ backgroundColor: '#D4AF37' }}>
             <Text style={{ color: 'white', fontSize: 16, fontFamily: weight('800') }}>Enter table</Text>
@@ -542,6 +590,14 @@ const styles = StyleSheet.create({
   },
   footerInfo: {
     gap: 4,
+  },
+  readyCard: {
+    gap: space.md,
+    padding: space.lg,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
   },
   createError: {
     marginHorizontal: space.md,

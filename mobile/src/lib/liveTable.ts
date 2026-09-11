@@ -102,6 +102,15 @@ export interface TableSnapshot {
    * Cowboy's two hands, its markets and its betting window. Each felt narrows it to its own type.
    * Mirrors `gameState` in game-server/src/live/room-state.ts.
    */
+  /**
+   * Which game this table hosts, stamped by the hub.
+   *
+   * Needed because a CREATED table's id is `t-<hex>`, which matches nothing in
+   * the felt registry — the screen has to fall back to this to know what to
+   * draw. Without it every table a player made themselves opened on "no felt
+   * on mobile yet". The Mini App has carried this for a while.
+   */
+  game?: string;
   gameState?: unknown;
   pot: number;
   board: Card[];
