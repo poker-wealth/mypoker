@@ -906,6 +906,53 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
    * made; if it should be allowed, it needs a real "add a password" flow with
    * its own explicit UI treatment, not a side effect of this endpoint.
    */
+  /**
+   * Is this reset code right? Answers WITHOUT spending it.
+   *
+   * The reset form used to take the code and the new password together, so a
+   * mistyped code was only reported after the player had chosen a password and
+   * typed it twice — and both were lost. This lets the screen confirm the code
+   * first and only then ask for the password.
+   *
+   * It is NOT a way in. It mints no token, returns no playerId, and changes
+   * nothing; `/reset-password` still verifies the code itself before touching
+   * the account, so this endpoint cannot be skipped past. A wrong guess here
+   * costs an attempt against the same five-guess ceiling, which is what stops
+   * it becoming an oracle for guessing six digits.
+   */
+  r.post('/check-reset-code', (req: Request, res: Response) => {
+    void (async (): Promise<void> => {
+      const body = (req.body ?? {}) as Record<string, string>;
+      const raw = body['email'] || body['identifier'];
+      const code = body['code'];
+
+      if (!raw || !code) {
+        res.status(400).json({ error: 'email and code are required' });
+        return;
+      }
+
+      const result = await otps.check(normalizeEmail(raw), code, now());
+      if (!result.ok) {
+        const status = result.reason === 'too_many_attempts' ? 429 : 400;
+        // The same wording as /reset-password, from the same reasons, so the
+        // two steps cannot tell the player different stories about one code.
+        const message: Record<typeof result.reason, string> = {
+          no_challenge: 'No password reset is pending for this address. Request a new code.',
+          expired: 'That code has expired. Request a new one.',
+          too_many_attempts: 'Too many incorrect codes. Request a new one.',
+          incorrect: 'That code is not correct.',
+        };
+        res.status(status).json({ error: message[result.reason], code: result.reason });
+        return;
+      }
+
+      res.json({ ok: true });
+    })().catch((err: unknown) => {
+      console.error('[auth] check-reset-code failed:', err);
+      res.status(500).json({ error: 'internal error' });
+    });
+  });
+
   r.post('/reset-password', (req: Request, res: Response) => {
     void (async (): Promise<void> => {
       const body = (req.body ?? {}) as Record<string, string>;
