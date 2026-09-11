@@ -9,6 +9,7 @@ import {
   withdrawalReturned,
 } from './templates';
 import { sendTelegram } from '../telegram/send-telegram';
+import { pushFromTelegram, sendPush } from '../push/send-push';
 import * as tg from '../telegram/messages';
 import { getSettings } from '../../settings/player-settings';
 import { resolveLocale, DEFAULT_LOCALE, type Locale } from './messages';
@@ -79,7 +80,7 @@ export function setRecipientResolver(resolver: RecipientResolver): void {
  */
 async function preferences(
   playerId: string,
-  kind: 'DEPOSIT' | 'SYSTEM',
+  kind: 'DEPOSIT' | 'WITHDRAWAL' | 'SYSTEM',
 ): Promise<{ allowed: boolean; locale: Locale }> {
   const toggle = GOVERNED_BY[kind];
   try {
@@ -99,7 +100,7 @@ async function preferences(
 async function announce(input: {
   playerId: string;
   eventId: string;
-  kind: 'DEPOSIT' | 'SYSTEM';
+  kind: 'DEPOSIT' | 'WITHDRAWAL' | 'SYSTEM';
   titleKey: string;
   params: Record<string, string | number>;
   /**
@@ -138,6 +139,23 @@ async function announce(input: {
     await sendTelegram(input.playerId, input.telegram, input.eventId);
   } catch (err) {
     console.error(`[money-mail] telegram failed for ${input.eventId}:`, err);
+  }
+
+  /*
+   * Push — the native app's only way to reach a phone in a pocket.
+   *
+   * Not an alternative to Telegram but an addition: a player can hold the Mini
+   * App and the native app at once, and both should tell them their money
+   * arrived. `sendPush` returns `no_devices` for anyone who has not installed
+   * it, which is most players, so this costs a single indexed lookup for them.
+   *
+   * Same event id as every other channel, deduped in its own collection, so a
+   * retried credit cannot buzz a phone twice.
+   */
+  try {
+    await sendPush(input.playerId, pushFromTelegram(input.telegram), input.eventId);
+  } catch (err) {
+    console.error(`[money-mail] push failed for ${input.eventId}:`, err);
   }
 
   // Email is the fallback for web sign-ups, who have no Telegram to reach.
@@ -214,7 +232,7 @@ export async function announceWithdrawalRequested(input: {
       // §notification toggles make SYSTEM unsuppressible. A player who has
       // muted deposit alerts must still be told that funds are being sent out —
       // that message is how they find out about a withdrawal they did not make.
-      kind: 'SYSTEM',
+      kind: 'WITHDRAWAL',
       titleKey: 'notifications.withdrawalRequested',
       params: { amount: input.amount },
       template: (locale) =>
@@ -247,7 +265,7 @@ export async function announceWithdrawalSent(input: {
     await announce({
       playerId: input.playerId,
       eventId: `withdrawal:${input.withdrawalId}:sent`,
-      kind: 'SYSTEM',
+      kind: 'WITHDRAWAL',
       titleKey: 'notifications.withdrawalSent',
       params: { amount: input.amount },
       template: (locale) =>
@@ -322,7 +340,7 @@ export async function announceWithdrawalConfirmed(input: {
     await announce({
       playerId: input.playerId,
       eventId: `withdrawal:${input.withdrawalId}:confirmed`,
-      kind: 'SYSTEM',
+      kind: 'WITHDRAWAL',
       titleKey: 'notifications.withdrawalConfirmed',
       params: { amount: input.amount },
       template: (locale) =>
@@ -354,7 +372,7 @@ export async function announceWithdrawalReturned(input: {
     await announce({
       playerId: input.playerId,
       eventId: `withdrawal:${input.withdrawalId}:returned`,
-      kind: 'SYSTEM',
+      kind: 'WITHDRAWAL',
       titleKey: 'notifications.withdrawalReturned',
       params: { amount: input.amount },
       template: (locale) =>

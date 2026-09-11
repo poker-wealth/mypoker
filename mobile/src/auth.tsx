@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from './api';
+import { registerForPush, unregisterFromPush } from './push';
 import {
   confirmEmailCode,
   resendEmailCode,
@@ -76,6 +77,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [player, setPlayer] = useState<Player | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  /*
+   * Register this device for push once we are signed in.
+   *
+   * Keyed on `status` rather than called from each sign-in path: there are
+   * four of those (Telegram, Google, email, and the silent restore from a
+   * stored token on cold start), and a device registered on three of them
+   * is a player who stops getting deposit alerts depending on how they
+   * last got in. One effect covers every route in, and cannot fall behind
+   * a new one.
+   *
+   * registerForPush never throws and never blocks: it returns quietly when
+   * permission is refused, when the build has no push credentials yet, and
+   * on a simulator.
+   */
+  useEffect(() => {
+    if (status !== 'signedIn') return;
+    void registerForPush();
+  }, [status]);
 
   useEffect(() => {
     let cancelled = false;
@@ -257,6 +277,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    // FIRST, while the session token is still valid - the request that drops
+    // this device has to authenticate. After clearToken() it would 401, and
+    // the handset would keep showing the next person's money notices on its
+    // lock screen.
+    await unregisterFromPush();
     await clearToken();
     await clearCachedPlayer();
     setPlayer(null);
