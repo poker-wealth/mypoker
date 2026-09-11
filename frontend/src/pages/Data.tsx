@@ -246,18 +246,50 @@ export function Data() {
             <Tile
               label={t('data.winRate')}
               value={stats.data.winRate === null ? '—' : `${stats.data.winRate}%`}
+              delta={
+                <Delta
+                  current={Number(stats.data.winRate ?? 0)}
+                  previous={Number(prevStats.data?.winRate ?? 0)}
+                  // A null win rate means NO HANDS, in either window — there is
+                  // no rate to compare, so no delta rather than a move from 0%.
+                  hadPrior={
+                    prevWindow !== null &&
+                    prevStats.isSuccess &&
+                    prevStats.data.winRate !== null &&
+                    stats.data.winRate !== null
+                  }
+                />
+              }
             />
             <Tile
               label={t('data.netProfit')}
               value={moneyFromDecimal(stats.data.netProfit, { sign: true })}
               tone={Number(stats.data.netProfit) >= 0 ? 'success' : 'danger'}
+              delta={
+                <Delta
+                  current={Number(stats.data.netProfit)}
+                  previous={Number(prevStats.data?.netProfit ?? 0)}
+                  hadPrior={prevWindow !== null && prevStats.isSuccess}
+                />
+              }
             />
             {/* VPIP and PFR are not here on purpose. They need preflop ACTION
                 data — did the player voluntarily put money in, did they raise —
                 and the ledger records only a round's net movement. The mockup
                 shows 23.1% and 38.7%; those are design-document numbers, and
                 printing them next to real figures makes all six look real. */}
-            <Tile label={t('account.statBiggestWin')} value={moneyFromDecimal(stats.data.biggestWin)} tone="accent" />
+            <Tile
+              label={t('account.statBiggestWin')}
+              value={moneyFromDecimal(stats.data.biggestWin)}
+              tone="accent"
+              delta={
+                <Delta
+                  current={Number(stats.data.biggestWin)}
+                  previous={Number(prevStats.data?.biggestWin ?? 0)}
+                  hadPrior={prevWindow !== null && prevStats.isSuccess}
+                />
+              }
+            />
           </div>
         )}
       </section>
