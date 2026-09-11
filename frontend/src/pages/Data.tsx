@@ -80,22 +80,42 @@ export function Data() {
           right call: everything else on the page is context for this line.
 
           Still the same value as the tile it replaces, from the same field. */}
+      {/* TWO COLUMNS, as the reference has it: the headline figure beside the
+          curve rather than stacked above it. Stacking put the chart a full
+          screen below the number it describes. Single column on a narrow phone,
+          where two would leave both too cramped to read. */}
       {stats.isSuccess && (
-        <section className="rounded-(--radius-app) border border-border bg-surface p-4">
-          <h2 className="text-[0.7rem] font-bold uppercase tracking-wider text-dim">
-            {t('data.totalProfit')}
-          </h2>
-          <p
-            className={cn(
-              'mt-1 text-3xl font-black tabular-nums leading-none',
-              Number(stats.data.netProfit) >= 0 ? 'text-success' : 'text-danger',
+        <section className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-(--radius-app) border border-border bg-surface p-4">
+            <h2 className="text-[0.7rem] font-bold uppercase tracking-wider text-dim">
+              {t('data.totalProfit')}
+            </h2>
+            <p
+              className={cn(
+                'mt-1 text-3xl font-black tabular-nums leading-none',
+                Number(stats.data.netProfit) >= 0 ? 'text-success' : 'text-danger',
+              )}
+            >
+              {moneyFromDecimal(stats.data.netProfit, { sign: true })}
+            </p>
+            <p className="mt-1.5 text-[0.68rem] text-dim">
+              {t(PERIODS.find((p) => p.value === period)?.key ?? 'data.periodAll')}
+            </p>
+          </div>
+
+          {/* The curve, in the second column. Needs two points to be a line —
+              with fewer, the panel says the period is empty rather than drawing
+              a flat line that looks like a real result of zero. */}
+          <div className="rounded-(--radius-app) border border-border bg-surface p-4">
+            <h2 className="mb-2 text-[0.7rem] font-bold uppercase tracking-wider text-dim">
+              {t('data.profitTrend')}
+            </h2>
+            {rounds.length > 1 ? (
+              <TrendChart rounds={rounds} />
+            ) : (
+              <p className="py-6 text-center text-[0.7rem] text-dim">{t('data.noRounds')}</p>
             )}
-          >
-            {moneyFromDecimal(stats.data.netProfit, { sign: true })}
-          </p>
-          <p className="mt-1.5 text-[0.68rem] text-dim">
-            {t(PERIODS.find((p) => p.value === period)?.key ?? 'data.periodAll')}
-          </p>
+          </div>
         </section>
       )}
 
@@ -103,9 +123,11 @@ export function Data() {
       <section>
         <h2 className="mb-2.5 text-sm font-bold">{t('data.overview')}</h2>
 
+        {/* Four skeletons, matching the four real tiles below — six placeholders
+            for four figures made the page reflow as it loaded. */}
         {stats.isPending && (
-          <div className="grid grid-cols-3 gap-3">
-            {[0, 1, 2, 3, 4, 5].map((i) => (
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
               <div key={i} className="rounded-(--radius-app) border border-border bg-surface px-3 py-3">
                 <Skeleton className="h-6 w-14" />
                 <Skeleton className="mt-2 h-2.5 w-10" />
@@ -120,8 +142,11 @@ export function Data() {
           </div>
         )}
 
+        {/* Four across, as the reference's stat strip is — the four figures read
+            as one row of headline numbers rather than a 3+1 grid with an orphan
+            on the second line. Two across on a narrow phone. */}
         {stats.isSuccess && (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
             <Tile label={t('data.hands')} value={String(stats.data.handsPlayed)} />
             <Tile
               label={t('data.winRate')}
@@ -141,18 +166,6 @@ export function Data() {
           </div>
         )}
       </section>
-
-      {/* Trend — derived from the rounds listed below, so the two always agree. */}
-      {rounds.length > 1 && (
-        <section className="rounded-(--radius-app) border border-border bg-surface p-4">
-          {/* Was a hardcoded English "Profit Trend (USDT)" — the one string on
-              this page that stayed English in all eight locales. */}
-          <h2 className="mb-3 text-[0.7rem] font-bold uppercase tracking-wider text-dim">
-            {t('data.profitTrend')}
-          </h2>
-          <TrendChart rounds={rounds} />
-        </section>
-      )}
 
       {/* Time of day — real, and computed the same way the trend is: from the
           rounds actually loaded, so it can never disagree with the list below.
