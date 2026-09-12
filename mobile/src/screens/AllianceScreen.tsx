@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View, Pressable } from 'react-native';
 import { Svg, Circle, Path } from 'react-native-svg';
 import { api } from '../api';
+import { MembersSheet } from '../components/MembersSheet';
 import { radius, space, theme, weight } from '../theme';
 import { Badge, Button, Card, EmptyState, ErrorState, ListRow, Screen, Sheet, Toggle } from '../ui';
 import { CreateTableSheet } from '../components/CreateTableSheet';

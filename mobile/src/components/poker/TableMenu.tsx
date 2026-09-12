@@ -131,7 +131,7 @@ function Row({
     >
       <Text
         style={[styles.rowText, danger && styles.rowDanger, disabled && styles.rowDisabled]}
-        numberOfLines={1}
+        numberOfLines={2}
       >
         {label}
       </Text>
@@ -150,14 +150,19 @@ const styles = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.4)' },
   sheet: { flex: 1, flexDirection: 'row', alignItems: 'flex-start' },
   drawer: {
-    width: '68%',
-    maxWidth: 272,
+    // Wide enough that "Poker Hand Rankings" is not truncated at 16px: 47%
+    // of a 414pt screen leaves ~163pt of text column, which cut it off.
+    width: '58%',
+    maxWidth: 260,
     maxHeight: '88%',
-    borderBottomRightRadius: 18,
+    borderBottomRightRadius: 0,
     borderRightWidth: 1,
     borderBottomWidth: 1,
     borderColor: theme.border,
-    backgroundColor: theme.surface,
+    // Near-black with a little of the table showing through, as the reference
+    // has it. `theme.surface` is the app's card grey and read as a panel bolted
+    // over the felt rather than a drawer cut into it.
+    backgroundColor: 'rgba(20,18,19,0.97)',
     paddingBottom: space.sm,
   },
   title: {

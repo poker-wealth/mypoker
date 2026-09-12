@@ -74,38 +74,8 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
   useEffect(() => {
     navigation.setOptions({
       title: snapshot?.name || tableId,
-      /*
-       * THE MENU LIVES IN THE HEADER, top-left beside Back — where the Mini App
-       * puts it. It was a pill under the felt, bottom-centre, which is both a
-       * different place and the hardest one to reach one-handed on a tall
-       * phone.
-       *
-       * `headerLeft` REPLACES the back button rather than sitting beside it, so
-       * the chevron is rendered here too; dropping it would leave the screen
-       * with no way back except the system gesture.
-       */
-      headerLeft: () => (
-        <View style={styles.headerLeft}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel={t('common.back')}
-          >
-            <Text style={styles.headerGlyph}>‹</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setMenuOpen(true)}
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel={t('table.menuTitle')}
-          >
-            <Text style={styles.headerBurger}>☰</Text>
-          </Pressable>
-        </View>
-      ),
     });
-  }, [navigation, snapshot?.name, tableId, t]);
+  }, [navigation, snapshot?.name, tableId]);
   const { messages, sendChat, sendVoice } = useTableChat(socket);
   const { challengerId, clear: clearChallenge } = useChallengePrompt(socket);
   const [chatOpen, setChatOpen] = useState(false);
@@ -215,6 +185,21 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
           leaving them on the app's near-black surface. */}
       <TableGround />
 
+      {/* THE MENU, floating on the table just under the header — where the
+          reference puts it. Not a header control: the header keeps its own back
+          button, and `headerLeft` would have replaced that rather than sitting
+          beside it. Not under the felt either, which is where it started and
+          where nobody looks for it. */}
+      <Pressable
+        onPress={() => setMenuOpen(true)}
+        hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel={t('table.menuTitle')}
+        style={styles.menuFab}
+      >
+        <Text style={styles.menuGlyph}>☰</Text>
+      </Pressable>
+
       {disconnected ? (
         <View style={styles.connectionBanner} pointerEvents="box-none">
           <View style={styles.connectionBannerInner}>
@@ -311,21 +296,10 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
           </View>
         ) : null}
 
-        {/* THE MENU, not a design pill.
-            This said "Table design" and opened the colour picker directly — the
-            only control under the felt, so share, stand up, rebuy, sit out,
-            rankings, fairness and exit had no way in at all. Options reaches
-            the picker from inside the menu, exactly as on the Mini App.
-
-            Shown for EVERY game, not just the designable ones: the picker was
-            poker-only, but sharing a table and leaving one are not. */}
-        <View style={styles.tableTools}>
-          <Pressable onPress={() => setMenuOpen(true)} style={styles.toolButton}>
-            {/* A hamburger, not a word — the Mini App's own control, and it does
-                not need translating. */}
-            <Text style={styles.menuGlyph}>{'☰'}</Text>
-          </Pressable>
-        </View>
+        {/* The menu button used to be here, under the felt. It now lives in the
+            HEADER beside Back (see `navigation.setOptions` above), and leaving
+            this one behind meant two hamburgers on one screen — one where the
+            reference puts it and one where it used to be. */}
       </ScrollView>
 
       {/*
@@ -554,7 +528,10 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   /** The hamburger. Sized up from the pill text so it reads as an icon. */
-  menuGlyph: { color: theme.text, fontSize: 20, lineHeight: 22 },
+  /* Top-left, on the table, just below the header. Absolute so it floats over
+     the felt rather than taking a row of its own. */
+  menuFab: { position: 'absolute', top: space.sm, left: space.md, zIndex: 20, padding: space.sm },
+  menuGlyph: { color: theme.text, fontSize: 30, lineHeight: 32 },
   /* Back and the menu, side by side — headerLeft replaces the back button, so
      the chevron is drawn here rather than lost. */
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingLeft: space.sm },
