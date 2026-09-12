@@ -24,8 +24,8 @@ export function LotteryFelt({ snapshot, onCommand }: LotteryFeltProps) {
   };
 
   return (
-    <div className="relative flex h-full w-full flex-col justify-between overflow-hidden bg-purple-950 p-4 text-white select-none">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#581c87_0%,#2e1065_100%)] opacity-90" />
+    <div className="relative flex h-full w-full flex-col justify-between overflow-hidden p-4 text-white select-none">
+      {/* No ground layer — the screen paints the player's chosen table colour. */}
 
       <div className="relative z-10 flex items-center justify-between border-b border-purple-800/40 pb-2">
         <div className="flex items-center gap-3">

@@ -71,8 +71,8 @@ export function RedPacketFelt({ snapshot, onCommand }: RedPacketFeltProps) {
   const half = Math.ceil(players.length / 2);
 
   return (
-    <div className="relative flex min-h-[34rem] w-full flex-col self-stretch overflow-hidden bg-[#4a0d22] text-white select-none">
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,#7c1636_0%,#4a0d22_55%,#26030f_100%)]" />
+    <div className="relative flex min-h-[34rem] w-full flex-col self-stretch overflow-hidden text-white select-none">
+      {/* No ground layer — the screen paints the player's chosen table colour. */}
 
       {/* The banner across the top: what is in the middle and how many mines are in it */}
       <div className="relative z-10 flex items-center justify-center gap-3 px-3 pt-3 text-xs font-bold">
