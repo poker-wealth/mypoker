@@ -24,7 +24,7 @@ import { isOpenableTableId } from '@/config';
 import { useDemoHand } from '@/hooks/useDemoHand';
 import { useLiveTable } from '@/hooks/useLiveTable';
 import type { TableSnapshot } from '@/lib/liveTable';
-import { designForGame } from '@/lib/tableDesigns';
+import { designForGame, groundFor } from '@/lib/tableDesigns';
 import { useTableDesign } from '@/store/tableDesign';
 import { cn } from '@/lib/cn';
 import { useSoundSetting } from '@/hooks/useSoundSetting';
@@ -285,9 +285,14 @@ function LiveTable({ tableId }: { tableId: string }) {
   const Felt = feltFor(tableId) ?? (snapshot?.game ? feltFor(snapshot.game) : undefined);
 
   return (
+    /* THE GROUND IS THE WHOLE SCREEN, not a box in the middle of a black one.
+       This was hardcoded #000, so the chosen colour was painted only inside
+       the felt aspect box and everything around it — top bar, dock, footer —
+       stayed black. The reference is one continuous surface with the controls
+       sitting directly on it. */
     <div
       className="flex min-h-full flex-col"
-      style={{ background: '#000' }}
+      style={{ background: groundFor(chosenDesign) }}
     >
       <TopBar
         subtitle={
@@ -338,7 +343,9 @@ function LiveTable({ tableId }: { tableId: string }) {
         open={playersOpen}
         onClose={() => setPlayersOpen(false)}
         seats={snapshot?.seats ?? []}
+        tableId={tableId}
         {...(snapshot?.spectators !== undefined ? { spectators: snapshot.spectators } : {})}
+        {...(snapshot?.openedAt !== undefined ? { openedAt: snapshot.openedAt } : {})}
       />
 
       <HandRankings
@@ -449,7 +456,7 @@ function LiveTable({ tableId }: { tableId: string }) {
       />
 
       {/* Action dock */}
-      <div className="border-t border-border bg-surface/80 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 backdrop-blur">
+      <div className="px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3">
         {live.heroToAct ? (
           <>
             {/* Above the buttons, and only while it is your turn — an opponent's
@@ -540,7 +547,7 @@ function LiveTable({ tableId }: { tableId: string }) {
         {/* The reference app's bottom toolbar: table options, fairness, voice,
             chat. Every icon does something real — the mic and the bubble both
             reach the chat drawer, where the recorder lives. */}
-        <div className="mt-1 flex items-center justify-between border-t border-border/50 pt-1.5">
+        <div className="mt-1 flex items-center justify-between pt-1.5">
           {/* The list icon opens the PLAYER LIST, as in the reference — it
               used to open the settings sheet, which the menu drawer's Options
               row already reaches. Two ways to the same sheet left the one
@@ -854,7 +861,7 @@ function DemoTable() {
       {/* The result now renders under the board, inside PokerTable — it belongs
           next to the cards it is describing, not down here with the controls. */}
 
-      <div className="border-t border-border bg-surface/80 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 backdrop-blur">
+      <div className="px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3">
         {heroToAct ? (
           <ActionBar state={view} onAction={heroAct} />
         ) : (

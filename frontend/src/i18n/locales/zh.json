@@ -285,6 +285,8 @@
     }
   },
   "table": {
+    "insuranceNotLive": "暂未提供保险",
+    "confirmRaise": "确认 {{amount}}",
     "playerList": "玩家",
     "colNickname": "昵称",
     "colHands": "手数",

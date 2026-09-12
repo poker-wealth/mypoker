@@ -81,6 +81,8 @@ export interface TableSnapshot {
   closing?: boolean;
   /** People watching who hold no seat. A count, never a list. */
   spectators?: number;
+  /** Epoch ms this table opened — the player list shows how long it has run. */
+  openedAt?: number;
   /** This table bans same-GPS seating — attach a location to the sit command. */
   gpsRequired?: boolean;
   variant: string;

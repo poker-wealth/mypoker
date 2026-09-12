@@ -299,10 +299,18 @@ export function TableSettingsSheet({
                 value={prefs.chatSound}
                 onChange={prefs.setChatSound}
               />
+              {/* DISABLED, WITH THE REASON. Insurance offers are not live —
+                  `Table.tsx` passes the prompt `quote={null}` because the room
+                  accepts no insurance command and Financial Core takes no
+                  premium, so nothing is ever offered and there is nothing for
+                  this to hide. The preference itself is kept and works; only
+                  the control is off, because a switch that silently changes
+                  nothing is worse than one that says why. */}
               <Switch
                 label={t('table.hideInsurance')}
-                hint={t('table.thisTableOnly')}
+                hint={t('table.insuranceNotLive')}
                 value={hideInsurance}
+                disabled
                 onChange={(v) => prefs.setHideInsurance(tableId, v)}
               />
               <Switch

@@ -285,6 +285,8 @@
     }
   },
   "table": {
+    "insuranceNotLive": "Insurance is not offered yet",
+    "confirmRaise": "Confirm {{amount}}",
     "playerList": "Players",
     "colNickname": "Nickname",
     "colHands": "Hands",

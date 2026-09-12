@@ -344,6 +344,8 @@ export class PokerRoom implements LiveRoom {
   private readonly turnSeen = new Set<string>();
   /** A manual-start (autoStartPlayers: 0) table: has the owner said go yet? */
   /** Owner has stopped new hands. A hand in progress is unaffected. */
+  /** When the room was constructed — the table's age, for the player list. */
+  private readonly openedAt = Date.now();
   private paused = false;
   /** Close requested; the table deals no more and settles when the hand ends. */
   private closing = false;
@@ -1888,6 +1890,8 @@ export class PokerRoom implements LiveRoom {
       ...(this.message ? { message: this.message } : {}),
       ...(fairness ? { fairness } : {}),
       serverTime: Date.now(),
+      /** When this table opened. The client shows how long it has been running. */
+      openedAt: this.openedAt,
     };
   }
 

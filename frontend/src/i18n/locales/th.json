@@ -285,6 +285,8 @@
     }
   },
   "table": {
+    "insuranceNotLive": "ยังไม่มีบริการประกัน",
+    "confirmRaise": "ยืนยัน {{amount}}",
     "playerList": "ผู้เล่น",
     "colNickname": "ชื่อเล่น",
     "colHands": "มือ",

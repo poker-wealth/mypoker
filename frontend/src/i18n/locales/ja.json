@@ -285,6 +285,8 @@
     }
   },
   "table": {
+    "insuranceNotLive": "保険は未提供です",
+    "confirmRaise": "{{amount}} を確定",
     "playerList": "プレイヤー",
     "colNickname": "ニックネーム",
     "colHands": "ハンド",

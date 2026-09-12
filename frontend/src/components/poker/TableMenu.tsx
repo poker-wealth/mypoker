@@ -97,7 +97,12 @@ export function TableMenu({
             animate={{ x: 0 }}
             exit={{ x: '-100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-            className="fixed inset-y-0 left-0 z-50 flex w-[min(68vw,17rem)] flex-col overflow-y-auto border-r border-border bg-surface/95 shadow-2xl backdrop-blur-md"
+            /* AS TALL AS ITS CONTENT, not the whole screen — `inset-y-0`
+               stretched it to full height and left a long empty panel below
+               the last row. The reference ends after "Exit game" and lets the
+               table show beneath. `max-h` keeps it scrollable on a short
+               screen rather than running off the bottom. */
+            className="fixed left-0 top-0 z-50 flex max-h-[88vh] w-[min(68vw,17rem)] flex-col overflow-y-auto rounded-br-2xl border-b border-r border-border bg-surface/95 shadow-2xl backdrop-blur-md"
           >
             <h2 className="px-4 pb-2 pt-5 text-[0.7rem] font-bold uppercase tracking-wider text-dim">
               {t('table.menuTitle')}

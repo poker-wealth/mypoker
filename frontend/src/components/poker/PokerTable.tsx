@@ -8,7 +8,7 @@ import { PotToWinner } from './PotToWinner';
 import { chips } from '@/lib/money';
 import { ChipStack } from './ChipStack';
 import type { TableState } from '@/lib/table';
-import { groundFor, ringFor, type TableDesign } from '@/lib/tableDesigns';
+import { ringFor, type TableDesign } from '@/lib/tableDesigns';
 import { useTableDesign } from '@/store/tableDesign';
 import { cn } from '@/lib/cn';
 import { PERMANENT_DOMAIN } from '@/config';
@@ -159,11 +159,11 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
             washed-out grey-mauve with the red gone ("what is this change it
             back to red"). The screenshot's muted look is the phone's own
             rendering; sampling it literally loses the colour. */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 z-0"
-          style={{ background: groundFor(design) }}
-        />
+        {/* NO GROUND HERE ANY MORE. The SCREEN paints it (see Table.tsx), so
+            painting it again inside the felt's box drew a second radial
+            gradient inside the first — a visible ellipse floating on the page's
+            own. Victor: "it should be one whole back ground complete". One
+            surface, painted once, at the top. */}
 
         {/* The brand across the felt, as on the reference table. Always there,
             faint, under the board — a watermark, not a message. */}

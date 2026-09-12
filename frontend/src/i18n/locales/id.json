@@ -285,6 +285,8 @@
     }
   },
   "table": {
+    "insuranceNotLive": "Asuransi belum tersedia",
+    "confirmRaise": "Konfirmasi {{amount}}",
     "playerList": "Pemain",
     "colNickname": "Nama",
     "colHands": "Ronde",

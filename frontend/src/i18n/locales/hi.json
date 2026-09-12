@@ -285,6 +285,8 @@
     }
   },
   "table": {
+    "insuranceNotLive": "बीमा अभी उपलब्ध नहीं है",
+    "confirmRaise": "{{amount}} की पुष्टि करें",
     "playerList": "खिलाड़ी",
     "colNickname": "उपनाम",
     "colHands": "हैंड",

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'motion/react';
 import { Eye, User } from 'lucide-react';
@@ -35,6 +36,8 @@ export function PlayerListPanel({
   seats,
   spectators,
   onPlayer,
+  tableId,
+  openedAt,
 }: {
   open: boolean;
   onClose: () => void;
@@ -43,8 +46,39 @@ export function PlayerListPanel({
   spectators?: number;
   /** Tapping a row opens that player's profile. */
   onPlayer?: (playerId: string) => void;
+  /** Shown in the header, as the reference does. */
+  tableId?: string;
+  /** Epoch ms the table opened, from the server. */
+  openedAt?: number;
 }) {
   const { t } = useTranslation();
+
+  /**
+   * How long this table has been running, as HH:MM:SS.
+   *
+   * From the SERVER's `openedAt`, not from when this client opened the panel —
+   * the table's age is a fact about the table, and two players opening the list
+   * at different moments must see the same number.
+   *
+   * The interval runs only while the panel is open and only when there is a
+   * time to count from; a closed drawer does not tick.
+   */
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!open || openedAt === undefined) return;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(id);
+  }, [open, openedAt]);
+
+  const elapsed =
+    openedAt === undefined
+      ? null
+      : (() => {
+          const total = Math.max(0, Math.floor((now - openedAt) / 1000));
+          const pad = (n: number) => String(n).padStart(2, '0');
+          return `${pad(Math.floor(total / 3600))}:${pad(Math.floor((total % 3600) / 60))}:${pad(total % 60)}`;
+        })();
 
   return (
     <AnimatePresence>
@@ -66,11 +100,27 @@ export function PlayerListPanel({
             transition={{ type: 'spring', damping: 28, stiffness: 260 }}
             role="dialog"
             aria-label={t('table.playerList')}
-            className="fixed inset-y-0 left-0 z-50 flex w-[min(86vw,22rem)] flex-col overflow-y-auto border-r border-border bg-surface/95 shadow-2xl backdrop-blur-md"
+            /* AS TALL AS ITS CONTENT. `inset-y-0` stretched this to full
+               height, so an empty table showed one line of text above a screen
+               of nothing. It grows with the rows and only reaches the cap when
+               there are genuinely enough players to need it. */
+            className="fixed left-0 top-0 z-50 flex max-h-[88vh] w-[min(86vw,22rem)] flex-col overflow-y-auto rounded-br-2xl border-b border-r border-border bg-surface/95 shadow-2xl backdrop-blur-md"
           >
-            <h2 className="px-4 pb-2 pt-5 text-[0.7rem] font-bold uppercase tracking-wider text-dim">
-              {t('table.playerList')}
-            </h2>
+            {/* The reference's header: table id on the left, how long the
+                table has been running on the right. The clock is driven off
+                the SERVER's `openedAt`, so it is the table's real age rather
+                than how long this client has had the panel open — two people
+                opening it at different times see the same number. */}
+            <div className="flex items-center justify-between gap-3 px-4 pb-2 pt-4">
+              <span className="min-w-0 truncate font-mono text-[0.72rem] text-brand">
+                {tableId ? `#${tableId}` : t('table.playerList')}
+              </span>
+              {elapsed !== null && (
+                <span className="shrink-0 font-mono text-[0.78rem] tabular-nums text-brand">
+                  {elapsed}
+                </span>
+              )}
+            </div>
 
             <table className="w-full text-left text-[0.7rem]">
               <thead>
@@ -149,7 +199,7 @@ export function PlayerListPanel({
             {/* Spectators — a count. Hidden entirely when the server has not
                 sent one, rather than showing a confident zero. */}
             {spectators !== undefined && (
-              <div className="mt-auto flex items-center gap-2 border-t border-border/60 px-4 py-3 text-[0.7rem] text-dim">
+              <div className="flex items-center gap-2 border-t border-border/60 px-4 py-3 text-[0.7rem] text-dim">
                 <Eye size={13} className="shrink-0" />
                 <span>{t('table.spectatorCount', { count: spectators })}</span>
               </div>

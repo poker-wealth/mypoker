@@ -199,6 +199,8 @@ export interface TableSnapshot {
    * not the room's to tell the people at the table.
    */
   spectators?: number;
+  /** Epoch ms this table opened. The client renders elapsed time from it. */
+  openedAt?: number;
   /** This table bans same-GPS seating: attach a location to the sit command. */
   gpsRequired?: boolean;
 

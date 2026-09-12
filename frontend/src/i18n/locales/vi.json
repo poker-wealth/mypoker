@@ -285,6 +285,8 @@
     }
   },
   "table": {
+    "insuranceNotLive": "Chưa có bảo hiểm",
+    "confirmRaise": "Xác nhận {{amount}}",
     "playerList": "Người chơi",
     "colNickname": "Biệt danh",
     "colHands": "Ván",

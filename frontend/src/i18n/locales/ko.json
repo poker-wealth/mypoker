@@ -285,6 +285,8 @@
     }
   },
   "table": {
+    "insuranceNotLive": "보험은 아직 제공되지 않습니다",
+    "confirmRaise": "{{amount}} 확인",
     "playerList": "플레이어",
     "colNickname": "닉네임",
     "colHands": "핸드",
