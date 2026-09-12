@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { radius, space, theme, weight } from '../../theme';
 import type { ChatMessage } from './ChatBox';
@@ -59,6 +60,7 @@ export function CommentSheet({
   disabled?: boolean;
 }) {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<'comment' | 'history'>('comment');
   const [input, setInput] = useState('');
 
@@ -75,7 +77,7 @@ export function CommentSheet({
         <Pressable style={styles.backdrop} onPress={onClose} />
         {/* A bottom sheet, so the table stays visible above — a player should
             be able to watch the hand they are talking about. */}
-        <View style={styles.panel}>
+        <View style={[styles.panel, { paddingBottom: insets.bottom + space.md }]}>
           <View style={styles.tiers}>
             {PAID_TIERS.map((cost) => (
               <View key={cost} style={styles.tier}>

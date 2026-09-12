@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { space, theme, weight } from '../../theme';
 
@@ -52,6 +53,14 @@ export function TableMenu({
   onExit,
 }: TableMenuProps) {
   const { t } = useTranslation();
+  /*
+   * SAFE AREA. This drawer starts at y=0, so without the top inset its first
+   * row sits UNDER the status bar — the table id and the clock were being
+   * covered by the carrier and battery icons. The inset is applied to the
+   * panel rather than baked into the header padding because it is a property
+   * of the device, not of the design: a phone with no notch adds nothing.
+   */
+  const insets = useSafeAreaInsets();
 
   // Close first: each of these opens something else, and two sheets stacked in
   // one context leaves the one underneath visible and tappable.
@@ -75,7 +84,7 @@ export function TableMenu({
       */}
       <View style={styles.sheet}>
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={styles.drawer}>
+        <View style={[styles.drawer, { paddingTop: insets.top }]}>
         <Text style={styles.title}>{t('table.menuTitle')}</Text>
         <ScrollView bounces={false}>
           <Row label={t('table.menuShare')} onPress={act(onShare)} />
@@ -171,7 +180,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     fontFamily: weight('700'),
     paddingHorizontal: space.lg,
-    paddingTop: space.xl,
+    paddingTop: space.md,
     paddingBottom: space.sm,
   },
   row: {

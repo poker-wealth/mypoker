@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { radius, space, theme } from '../../theme';
 
@@ -40,6 +41,8 @@ export function BuyInSheet({
   seatIndex,
   onConfirm,
 }: BuyInSheetProps) {
+  const insets = useSafeAreaInsets();
+
   // The most you could bring: the table's ceiling or your balance, whichever bites first.
   const ceiling = Math.min(max, available);
   const [amount, setAmount] = useState(min);
@@ -55,7 +58,7 @@ export function BuyInSheet({
   return (
     <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={styles.sheet}>
+      <View style={[styles.sheet, { paddingBottom: insets.bottom + space.lg }]}>
         <View style={styles.grabber} />
         <Text style={styles.title}>
           {seatIndex === null ? 'Add chips' : `Take seat ${seatIndex + 1}`}

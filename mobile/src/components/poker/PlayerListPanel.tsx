@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { space, theme, weight } from '../../theme';
 import type { LiveSeat } from '../../lib/liveTable';
@@ -45,6 +46,14 @@ export function PlayerListPanel({
   onPlayer?: (playerId: string) => void;
 }) {
   const { t } = useTranslation();
+  /*
+   * SAFE AREA. This drawer starts at y=0, so without the top inset its first
+   * row sits UNDER the status bar — the table id and the clock were being
+   * covered by the carrier and battery icons. The inset is applied to the
+   * panel rather than baked into the header padding because it is a property
+   * of the device, not of the design: a phone with no notch adds nothing.
+   */
+  const insets = useSafeAreaInsets();
 
   /**
    * How long the TABLE has been running, as HH:MM:SS.
@@ -75,7 +84,7 @@ export function PlayerListPanel({
     <Modal visible={open} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.sheet}>
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={styles.panel}>
+        <View style={[styles.panel, { paddingTop: insets.top }]}>
           <View style={styles.header}>
             <Text style={styles.tableId} numberOfLines={1}>
               {tableId ? `#${tableId}` : t('table.playerList')}
@@ -164,7 +173,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: space.sm,
     paddingHorizontal: space.lg,
-    paddingTop: space.xl,
+    paddingTop: space.md,
     paddingBottom: space.sm,
   },
   tableId: { flex: 1, color: theme.brand, fontSize: 12, fontFamily: weight('600') },

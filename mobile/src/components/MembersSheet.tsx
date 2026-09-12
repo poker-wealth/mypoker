@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { api } from '../api';
@@ -43,6 +44,7 @@ export function MembersSheet({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
 
   const roster = useQuery({
     queryKey: ['league', leagueId, 'members'],
@@ -56,7 +58,7 @@ export function MembersSheet({
     <Modal visible={leagueId !== null} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.sheet}>
         <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={styles.panel}>
+        <View style={[styles.panel, { paddingBottom: insets.bottom + space.lg }]}>
           <View style={styles.header}>
             <Text style={styles.title} numberOfLines={1}>
               {leagueName ?? t('alliance.title')}
