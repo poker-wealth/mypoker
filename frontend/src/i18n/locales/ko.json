@@ -285,6 +285,13 @@
     }
   },
   "table": {
+    "handHistory": "핸드 기록",
+    "anonymous": "익명",
+    "anonymousSoon": "익명 착석은 아직 지원되지 않습니다",
+    "noHandHistory": "기록된 핸드가 없습니다. 이 플랫폼은 핸드 기록을 보관하지 않습니다.",
+    "previousHand": "이전 핸드",
+    "favourite": "즐겨찾기",
+    "favouritesSoon": "즐겨찾기 테이블은 아직 지원되지 않습니다",
     "commentPlaceholder": "댓글을 입력하세요.",
     "history": "기록",
     "noComments": "아직 댓글이 없습니다",

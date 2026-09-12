@@ -285,6 +285,13 @@
     }
   },
   "table": {
+    "handHistory": "हैंड इतिहास",
+    "anonymous": "गुमनाम",
+    "anonymousSoon": "गुमनाम बैठक अभी समर्थित नहीं है",
+    "noHandHistory": "अभी कोई हैंड दर्ज नहीं है। यह प्लेटफ़ॉर्म हैंड इतिहास नहीं रखता।",
+    "previousHand": "पिछला हैंड",
+    "favourite": "पसंदीदा",
+    "favouritesSoon": "पसंदीदा टेबल अभी उपलब्ध नहीं",
     "commentPlaceholder": "कृपया अपनी टिप्पणी लिखें।",
     "history": "इतिहास",
     "noComments": "अभी कोई टिप्पणी नहीं",

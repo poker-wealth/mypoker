@@ -285,6 +285,13 @@
     }
   },
   "table": {
+    "handHistory": "牌局记录",
+    "anonymous": "匿名",
+    "anonymousSoon": "暂不支持匿名入座",
+    "noHandHistory": "暂无牌局记录。本平台不保存牌局历史。",
+    "previousHand": "上一局",
+    "favourite": "收藏",
+    "favouritesSoon": "暂不支持收藏牌桌",
     "commentPlaceholder": "请输入你的评论。",
     "history": "历史",
     "noComments": "暂无评论",

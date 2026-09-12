@@ -285,6 +285,13 @@
     }
   },
   "table": {
+    "handHistory": "ハンド履歴",
+    "anonymous": "匿名",
+    "anonymousSoon": "匿名での着席は未対応です",
+    "noHandHistory": "記録されたハンドはありません。このプラットフォームはハンド履歴を保存していません。",
+    "previousHand": "前のハンド",
+    "favourite": "お気に入り",
+    "favouritesSoon": "お気に入りテーブルは未対応です",
     "commentPlaceholder": "コメントを入力してください。",
     "history": "履歴",
     "noComments": "まだコメントはありません",

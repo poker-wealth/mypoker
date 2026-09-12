@@ -32,6 +32,7 @@ import { useSoundSetting } from '@/hooks/useSoundSetting';
 import { play } from '@/lib/sound';
 import { ChatBox } from '@/components/poker/ChatBox';
 import { CommentSheet } from '@/components/poker/CommentSheet';
+import { HandHistoryPanel } from '@/components/poker/HandHistoryPanel';
 import { useTableChat } from '@/hooks/useTableChat';
 import { ChallengeModal } from '@/components/poker/ChallengeModal';
 import { unlockTableApi } from '@/api/tables';
@@ -212,6 +213,7 @@ function LiveTable({ tableId }: { tableId: string }) {
   const [rankingsOpen, setRankingsOpen] = useState(false);
   const [playersOpen, setPlayersOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   /** Whose card is open, by playerId. The seat is looked up fresh each render
    *  so the figures on it track the table rather than freezing at open time. */
   const [profileFor, setProfileFor] = useState<string | null>(null);
@@ -341,6 +343,7 @@ function LiveTable({ tableId }: { tableId: string }) {
             }
           : {})}
         onRankings={() => setRankingsOpen(true)}
+        onHistory={() => setHistoryOpen(true)}
         onFairness={() => navigate('/fairness')}
         onOptions={() => setDesignsOpen(true)}
         onExit={() => navigate(-1)}
@@ -355,6 +358,19 @@ function LiveTable({ tableId }: { tableId: string }) {
         {...(snapshot?.spectators !== undefined ? { spectators: snapshot.spectators } : {})}
         {...(snapshot?.openedAt !== undefined ? { openedAt: snapshot.openedAt } : {})}
       />
+
+      {snapshot && (
+        <HandHistoryPanel
+          open={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+          name={snapshot.name}
+          tableId={snapshot.tableId}
+          smallBlind={snapshot.smallBlind}
+          bigBlind={snapshot.bigBlind}
+          seated={snapshot.seats.length}
+          onShare={shareInvite}
+        />
+      )}
 
       <CommentSheet
         open={commentsOpen}

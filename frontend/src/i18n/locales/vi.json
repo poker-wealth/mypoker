@@ -285,6 +285,13 @@
     }
   },
   "table": {
+    "handHistory": "Lịch sử ván bài",
+    "anonymous": "Ẩn danh",
+    "anonymousSoon": "Chưa hỗ trợ ngồi ẩn danh",
+    "noHandHistory": "Chưa có ván nào được ghi lại. Nền tảng này không lưu lịch sử ván bài.",
+    "previousHand": "Ván trước",
+    "favourite": "Yêu thích",
+    "favouritesSoon": "Chưa hỗ trợ bàn yêu thích",
     "commentPlaceholder": "Nhập bình luận của bạn.",
     "history": "Lịch sử",
     "noComments": "Chưa có bình luận",

@@ -285,6 +285,13 @@
     }
   },
   "table": {
+    "handHistory": "Riwayat Ronde",
+    "anonymous": "Anonim",
+    "anonymousSoon": "Duduk anonim belum didukung",
+    "noHandHistory": "Belum ada ronde tercatat. Platform ini tidak menyimpan riwayat ronde.",
+    "previousHand": "Ronde sebelumnya",
+    "favourite": "Favorit",
+    "favouritesSoon": "Meja favorit belum tersedia",
     "commentPlaceholder": "Masukkan komentar Anda.",
     "history": "Riwayat",
     "noComments": "Belum ada komentar",
