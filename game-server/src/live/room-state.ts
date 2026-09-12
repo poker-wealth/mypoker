@@ -398,6 +398,17 @@ export const tableCommandSchema = z.discriminatedUnion('kind', [
    * standing up does.
    */
   z.object({ kind: z.literal('kick'), targetId: z.string().min(1).max(64) }),
+  /**
+   * Owner stops or resumes dealing. A hand already running is unaffected —
+   * see `maybeStartHand` for why pausing the clock would be worse.
+   */
+  z.object({ kind: z.literal('pause'), paused: z.boolean() }),
+  /**
+   * Owner closes the table. Queued: the current hand finishes, then every
+   * remaining stack is returned. Carries nothing — there is no variant of this
+   * that keeps anyone's chips.
+   */
+  z.object({ kind: z.literal('close_table') }),
 ]);
 
 export type TableCommand = z.infer<typeof tableCommandSchema>;

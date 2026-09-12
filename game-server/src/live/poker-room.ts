@@ -328,6 +328,12 @@ export class PokerRoom implements LiveRoom {
    */
   private readonly turnSeen = new Set<string>();
   /** A manual-start (autoStartPlayers: 0) table: has the owner said go yet? */
+  /** Owner has stopped new hands. A hand in progress is unaffected. */
+  private paused = false;
+  /** Close requested; the table deals no more and settles when the hand ends. */
+  private closing = false;
+  /** finishClose has run. Guards against a double release of the same seat. */
+  private closed = false;
   private manualStarted = false;
 
   // The last reserve read that succeeded, and when. Null until the first one
@@ -613,6 +619,12 @@ export class PokerRoom implements LiveRoom {
       case 'set_client_seed':
         this.setClientSeed(playerId, cmd.seed);
         break;
+      case 'pause':
+        this.setPaused(playerId, cmd.paused);
+        break;
+      case 'close_table':
+        this.close(playerId);
+        break;
       case 'kick':
         await this.kick(playerId, cmd.targetId);
         break;
@@ -737,6 +749,85 @@ export class PokerRoom implements LiveRoom {
    * The owner cannot kick themselves — that is standing up, and routing it here
    * would skip the seat checks `stand` does for the leaver.
    */
+  /** The owner alone may run these. Identity comes from the socket, never the body. */
+  private requireOwner(actorId: string, what: string): void {
+    if (this.config.ownerId !== actorId) {
+      throw new RoomError(`only the table creator can ${what}`);
+    }
+  }
+
+  /**
+   * Stop dealing new hands, or start again.
+   *
+   * MONEY-ADJACENT: it decides whether hands happen, not where chips go.
+   *
+   * A hand already in progress is untouched and finishes normally — see the
+   * note in `maybeStartHand` for why pausing the clock instead would either
+   * fold people while they wait or let one player stall the table forever.
+   *
+   * Players may still stand up and take their chips while paused. A pause that
+   * also trapped stacks on a table nobody was dealing at would be the owner
+   * holding other people's money, which is not a feature.
+   */
+  private setPaused(actorId: string, value: boolean): void {
+    this.requireOwner(actorId, value ? 'pause the table' : 'resume the table');
+    if (this.paused === value) return;
+    this.paused = value;
+    this.push();
+    if (!value) this.maybeStartHand();
+  }
+
+  /**
+   * Close the table for good.
+   *
+   * MONEY-TOUCHING — senior review before merge (root CLAUDE.md).
+   *
+   * Queued, never immediate. A live hand has money in its pot that belongs to
+   * whoever wins it, so closing mid-hand would have to either void the pot or
+   * decide it without a showdown; both are the owner taking a decision that is
+   * the cards' to make. The table stops dealing, the current hand finishes, and
+   * `finishClose` then returns every remaining stack.
+   */
+  private close(actorId: string): void {
+    this.requireOwner(actorId, 'close the table');
+    if (this.closing) return;
+    this.closing = true;
+    this.push();
+    // Nothing in flight → close now. Otherwise the hand's end reaches
+    // maybeStartHand, which picks this up.
+    if (this.phase === 'WAITING') void this.finishClose();
+  }
+
+  /**
+   * Give every remaining stack back, then stop.
+   *
+   * Seats are released through the SAME path a voluntary departure uses, one at
+   * a time through the room's queue. Reusing `releaseSeat` rather than writing
+   * a bulk refund keeps this off its own money path — there is one way chips
+   * leave a table and this is not a second one.
+   *
+   * Guarded against re-entry: `maybeStartHand` runs on several edges and this
+   * must not start twice and double-release a seat.
+   */
+  private async finishClose(): Promise<void> {
+    if (this.closed) return;
+    this.closed = true;
+
+    // A copy: releaseSeat mutates the seat list as it goes. Empty chairs are
+    // `null` here, not seats with no player, so they are filtered by identity.
+    const occupied = [...this.seats].filter((s): s is NonNullable<typeof s> => s !== null);
+    for (const seat of occupied) {
+      try {
+        await this.releaseSeat(seat.index);
+      } catch (err) {
+        // One seat failing must not strand the rest — every other player still
+        // gets their chips, and the failure is loud rather than silent.
+        console.error(`[poker-room] close: seat ${seat.index} failed to release:`, err);
+      }
+    }
+    this.push();
+  }
+
   private async kick(actorId: string, targetId: string): Promise<void> {
     if (this.config.ownerId !== actorId) {
       throw new RoomError('only the table creator can remove a player');
@@ -1045,6 +1136,26 @@ export class PokerRoom implements LiveRoom {
   /** Deal as soon as enough players with chips are ready — the table runs itself. */
   private maybeStartHand(): void {
     if (this.disposed || this.phase !== 'WAITING' || this.startTimer) return;
+
+    /*
+     * PAUSE AND CLOSE BOTH LAND HERE, and only here, on purpose.
+     *
+     * Neither touches a hand in progress. Pausing by freezing the action clock
+     * was the obvious design and is the wrong one: the turn timer is what folds
+     * a player who does not act, so a "paused" table that still runs its clock
+     * folds people while they wait, and one that stops its clock lets a player
+     * stall the table forever by never acting. Blocking the NEXT hand has
+     * neither failure — the current hand plays out under exactly the rules it
+     * started with, and nothing new begins.
+     *
+     * Close is the same shape plus a settlement: the table stops dealing, and
+     * once the last hand is done every remaining stack goes home.
+     */
+    if (this.closing) {
+      void this.finishClose();
+      return;
+    }
+    if (this.paused) return;
     // The creator's auto-start count gates the FIRST deal of the session; after
     // that the table plays on at the 2-player floor like any other, so one
     // departure from a "start at 5" table doesn't freeze the remaining four.
