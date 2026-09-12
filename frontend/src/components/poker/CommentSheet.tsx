@@ -93,7 +93,7 @@ export function CommentSheet({
             transition={{ type: 'spring', damping: 30, stiffness: 280 }}
             role="dialog"
             aria-label={t('table.comment')}
-            className="fixed inset-x-0 bottom-0 z-[61] flex max-h-[70vh] flex-col rounded-t-2xl border-t border-border bg-surface/95 pb-[env(safe-area-inset-bottom)] shadow-2xl backdrop-blur-md"
+            className="fixed inset-x-0 bottom-0 z-[61] flex max-h-[70vh] flex-col rounded-t-2xl border-t border-border bg-[#141013]/97 pb-[env(safe-area-inset-bottom)] shadow-2xl backdrop-blur-md"
           >
             {/* Paid tiers. Disabled, and the reason is right under them. */}
             <div className="flex items-center gap-2 px-3 pt-3">
@@ -103,10 +103,10 @@ export function CommentSheet({
                   type="button"
                   disabled
                   title={t('table.paidCommentSoon')}
-                  className="flex flex-1 cursor-not-allowed items-center justify-center gap-1 rounded-full border border-border bg-black/40 py-1.5 text-[0.66rem] font-bold text-dim opacity-70"
+                  className="flex flex-1 cursor-not-allowed items-center justify-center gap-1 rounded-full border border-white/15 bg-black/55 py-1.5 text-[0.66rem] font-bold text-white/80 opacity-80"
                 >
                   {t('table.comment')}
-                  <span className="text-jackpot">{cost}</span>
+                  <span className="text-coin-gold">{cost} ●</span>
                 </button>
               ))}
             </div>
@@ -161,7 +161,7 @@ export function CommentSheet({
                         onClick={() => send(t(key))}
                         className="flex w-full items-center gap-2 border-b border-border/40 py-2.5 text-left text-[0.76rem] text-text last:border-b-0 disabled:opacity-50"
                       >
-                        <span className="text-jackpot">•</span>
+                        <span className="text-coin-gold">•</span>
                         {t(key)}
                       </button>
                     </li>
@@ -200,7 +200,7 @@ export function CommentSheet({
                   className={cn(
                     'flex-1 border-b-2 py-2.5 text-[0.74rem] font-semibold transition-colors',
                     tab === which
-                      ? 'border-jackpot text-jackpot'
+                      ? 'border-coin-gold text-coin-gold'
                       : 'border-transparent text-dim',
                   )}
                 >
