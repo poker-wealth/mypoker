@@ -163,15 +163,77 @@ export function periodStart(period: StatsPeriod, now: Date = new Date()): Date |
   }
 }
 
+/**
+ * One specific calendar day, as a `[since, before)` pair — or null if `day` is
+ * absent or not a real date.
+ *
+ * UTC, matching `periodStart` above, which defines "today" in UTC because the
+ * server has no reliable timezone for a player. A day boundary that moved per
+ * request would make two identical queries disagree.
+ *
+ * `YYYY-MM-DD` only. An unparseable string returns null rather than throwing,
+ * so a malformed query parameter falls back to the period window instead of
+ * failing the whole stats request — but note it does NOT silently become
+ * "today": `Date.parse` rejects it and the caller's `period` applies.
+ *
+ * Half-open on purpose: `$gte` midnight, `$lt` the NEXT midnight. Using `$lte`
+ * on the same day's end would double-count any round landing exactly on the
+ * boundary into both adjacent days.
+ */
+function dayWindow(day?: string): { since: Date; before: Date } | null {
+  if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const since = new Date(`${day}T00:00:00.000Z`);
+  if (Number.isNaN(since.getTime())) return null;
+  const before = new Date(since.getTime() + 86_400_000);
+  return { since, before };
+}
+
+/**
+ * An arbitrary `[from, to)` window of whole UTC days.
+ *
+ * Exists for the Data page's period-over-period deltas: "this week against the
+ * week before" needs a window that is not anchored to now, which neither
+ * `period` (rolling from now) nor `day` (exactly one date) can express.
+ *
+ * `to` is EXCLUSIVE and is itself a date — `from=2026-09-01&to=2026-09-08` is
+ * the seven days of September 1st–7th. Exclusive so consecutive windows can be
+ * written back-to-back without the caller doing arithmetic to avoid
+ * double-counting the shared boundary day.
+ *
+ * Both bounds required: a half-specified range is a caller mistake, and
+ * quietly filling in the other end would answer a different question.
+ */
+function rangeWindow(from?: string, to?: string): { since: Date; before: Date } | null {
+  const ISO = /^\d{4}-\d{2}-\d{2}$/;
+  if (!from || !to || !ISO.test(from) || !ISO.test(to)) return null;
+  const since = new Date(`${from}T00:00:00.000Z`);
+  const before = new Date(`${to}T00:00:00.000Z`);
+  if (Number.isNaN(since.getTime()) || Number.isNaN(before.getTime())) return null;
+  // An inverted or empty range reports nothing rather than silently swapping
+  // the bounds — a swap would return data for a window nobody asked for.
+  if (before.getTime() <= since.getTime()) return null;
+  return { since, before };
+}
+
 export async function getPlayerStats(
   playerId: string,
-  options: { period?: StatsPeriod; now?: Date } = {},
+  options: { period?: StatsPeriod; now?: Date; day?: string; from?: string; to?: string } = {},
 ): Promise<PlayerStats> {
   const account = await getOrCreatePlayerAccount(playerId);
   // Clock is injected rather than mocked: jest's fake timers freeze the ones
   // Mongo's driver depends on, and the query never returns.
-  const since = periodStart(options.period ?? 'all', options.now ?? new Date());
-  const rounds = await roundsFor(account._id, since ? { since } : {});
+  //
+  // Precedence, narrowest first: an explicit range, then one day, then the
+  // rolling period. A caller naming exact bounds has asked a more specific
+  // question than a window anchored to now, and widening it back out would
+  // answer a question they did not ask.
+  const window = rangeWindow(options.from, options.to) ?? dayWindow(options.day);
+  const rounds = window
+    ? await roundsFor(account._id, window)
+    : await (async () => {
+        const since = periodStart(options.period ?? 'all', options.now ?? new Date());
+        return roundsFor(account._id, since ? { since } : {});
+      })();
 
   let netProfit = Money.ZERO;
   let biggestWin = Money.ZERO;

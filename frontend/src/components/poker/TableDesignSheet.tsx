@@ -2,15 +2,18 @@ import { Check } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Sheet } from '@/components/ui/Sheet';
 import { useTranslation } from 'react-i18next';
-import { PICKABLE_DESIGNS, type TableDesign } from '@/lib/tableDesigns';
+import { PICKABLE_DESIGNS, groundFor, type TableDesign } from '@/lib/tableDesigns';
 import { useTableDesign } from '@/store/tableDesign';
 import { cn } from '@/lib/cn';
 
 /**
- * Pick a table.
+ * Pick a table COLOUR.
  *
- * Each option shows the actual felt rather than a swatch — the whole reason to offer a choice is
- * how the table looks, so the choice is made by looking at it. The pick is saved, so the felt you
+ * Each option is a plain swatch of the ground colour, painted with the same
+ * `groundFor` the table uses — there is no felt to preview any more. The felts
+ * were removed (owner: "all table design goes... just the colour na but no
+ * tables on it") and this sheet was left showing artwork for tables that are
+ * no longer drawn. The pick is saved, so the colour you
  * chose is the one waiting next time you sit down.
  *
  * Only the PICKABLE felts are listed. Each landscape table is reached by
@@ -54,40 +57,36 @@ export function TableDesignSheet({ open, onClose }: { open: boolean; onClose: ()
                 </motion.div>
               )}
             </div>
+            {/* The name alone. `design.blurb` described the felt — "casino
+                green felt on a tournament rail", "burgundy cloth and gold
+                fittings" — and every one of those describes something that is
+                no longer drawn. */}
             <div className="mt-2 text-[0.8rem] font-bold">{design.name}</div>
-            <div className="text-[0.65rem] leading-tight text-dim">{design.blurb}</div>
           </button>
         ))}
       </div>
-      <p className="px-4 pt-4 text-center text-[0.68rem] text-dim">
-        Only the felt changes — the seats, the cards and the hand stay exactly where they are.
-      </p>
+      <p className="px-4 pt-4 text-center text-[0.68rem] text-dim">{t('table.designBlurb')}</p>
     </Sheet>
   );
 }
 
-/** A small likeness of the table: the artwork itself, or a miniature of the CSS felt. */
+/**
+ * A plain swatch of the GROUND COLOUR — no table on it.
+ *
+ * This used to render the design's felt artwork, or a miniature oval of the
+ * CSS felt. Both were left advertising tables that are no longer drawn: the
+ * felts were removed and a design now selects only the colour behind the
+ * seats. A picker showing a green tournament rail, for a choice that produces
+ * no rail at all, is a promise the table cannot keep.
+ *
+ * Exactly `groundFor` — the same function the table paints with — so the
+ * swatch and the felt can never disagree about what a colour looks like.
+ */
 function DesignThumb({ design }: { design: TableDesign }) {
-  if (design.artUrl) {
-    return (
-      <img
-        src={design.artUrl}
-        alt={design.name}
-        draggable={false}
-        className="h-full w-full object-contain"
-      />
-    );
-  }
   return (
     <div
-      className="h-[92%] rounded-[50%] border-2"
-      style={{
-        aspectRatio: design.aspect,
-        borderColor: 'var(--brand-2)',
-        background:
-          'radial-gradient(ellipse at 50% 42%, #1e3f74 0%, var(--felt) 45%, #0a162c 80%, #060d1c 100%)',
-        boxShadow: '0 0 14px color-mix(in srgb, var(--brand-2) 55%, transparent)',
-      }}
+      className="h-full w-full rounded-lg"
+      style={{ background: groundFor(design) }}
     />
   );
 }

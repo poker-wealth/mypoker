@@ -77,7 +77,9 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
   /** Which jackpot this viewer has already watched, so a re-render cannot replay it. */
   const [jackpotSeen, setJackpotSeen] = useState<string | null>(null);
   const [designOpen, setDesignOpen] = useState(false);
-  const Felt = feltFor(tableId);
+  // By table id for the fixed tables; by the snapshot's game for created
+  // `t-…` ones, whose id is in no registry. Same resolution as the Mini App.
+  const Felt = feltFor(tableId) ?? (snapshot?.game ? feltFor(snapshot.game) : undefined);
   /**
    * Only the poker family draws the configurable table, so only it offers the picker. Derived from
    * the registry rather than a second list of table ids — one of those would eventually disagree

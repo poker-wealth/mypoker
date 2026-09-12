@@ -1,5 +1,6 @@
 import { motion } from 'motion/react';
 import { rankOf, suitOf, isRedSuit, type Card } from '@/lib/cards';
+import { useTablePrefs } from '@/store/tablePrefs';
 import { cn } from '@/lib/cn';
 
 type Size = 'sm' | 'md' | 'lg';
@@ -24,6 +25,17 @@ interface PlayingCardProps {
 export function PlayingCard({ card, faceDown, size = 'md', className, index = 0 }: PlayingCardProps) {
   const down = faceDown || !card;
   const red = card ? isRedSuit(card) : false;
+  const suit = card ? suitOf(card) : '';
+  /**
+   * Four-colour deck: diamonds blue, clubs green, hearts and spades unchanged.
+   * The point is telling the two reds and the two blacks apart at a glance.
+   *
+   * This preference was being SAVED and never read — the setting moved and the
+   * cards did not. Read from the store here rather than threaded down as a
+   * prop: every card on every felt needs it, and a prop would have to cross
+   * seats, the board, the rankings chart and the demo table to arrive.
+   */
+  const fourColour = useTablePrefs((s) => s.fourColour);
 
   return (
     <motion.div
@@ -45,7 +57,22 @@ export function PlayingCard({ card, faceDown, size = 'md', className, index = 0 
       {down ? (
         <span className="text-lg font-black text-white/85">♠</span>
       ) : (
-        <div className={cn('flex h-full w-full flex-col justify-between p-1', red ? 'text-[#e11d48]' : 'text-[#0d0d1a]')}>
+        <div
+          className={cn(
+            'flex h-full w-full flex-col justify-between p-1',
+            fourColour
+              ? suit === '♦'
+                ? 'text-[#2563eb]'
+                : suit === '♣'
+                  ? 'text-[#15803d]'
+                  : red
+                    ? 'text-[#e11d48]'
+                    : 'text-[#0d0d1a]'
+              : red
+                ? 'text-[#e11d48]'
+                : 'text-[#0d0d1a]',
+          )}
+        >
           <span className="text-left font-bold leading-none">{rankOf(card!)}</span>
           <span className="text-center text-[1.4em] leading-none">{suitOf(card!)}</span>
           <span className="rotate-180 text-left font-bold leading-none">{rankOf(card!)}</span>

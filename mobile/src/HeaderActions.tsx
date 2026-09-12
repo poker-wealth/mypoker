@@ -24,9 +24,12 @@ import { BellIcon, GearIcon, HelpIcon, ShieldIcon } from './icons';
  *   Data      a settings gear
  *   Account   a settings gear
  *
- * The bell sits to the LEFT of all of them and, as on the web, appears ONLY
- * when there is something unread. A permanently visible bell with no badge is
- * a button that usually does nothing; the web hides it and so does this.
+ * The bell sits to the LEFT of all of them and is ALWAYS shown, carrying a
+ * badge only when something is unread. It used to be hidden at zero, on both
+ * clients, on the reasoning that a bell with no badge is a button that usually
+ * does nothing — but that also made the notifications screen unreachable, and
+ * the one time it mattered (a deposit that had not landed) there was no way in
+ * to check. Changed on both clients together, Sep 2026.
  */
 
 /**
@@ -65,8 +68,11 @@ function Bell() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const unread = useUnread();
 
-  if (unread <= 0) return null;
-
+  // ALWAYS shown, badge or not — matching the web header, which changed for the
+  // same reason. This used to `return null` at zero unread, on the reasoning
+  // that a bell with no badge is a button that usually does nothing. In
+  // practice it made notifications unreachable exactly when they mattered:
+  // Victor deposited, saw no balance AND no bell, and had no way in to check.
   return (
     <Pressable
       onPress={() => navigation.navigate('Notifications')}
@@ -75,11 +81,13 @@ function Bell() {
       style={styles.iconButton}
     >
       <BellIcon color={theme.dim} size={18} />
-      <View style={styles.badge}>
-        {/* 9+ rather than a wide number: the web caps it the same way, and a
-            three-digit badge overruns the icon. */}
-        <Text style={styles.badgeText}>{unread > 9 ? '9+' : String(unread)}</Text>
-      </View>
+      {unread > 0 && (
+        <View style={styles.badge}>
+          {/* 9+ rather than a wide number: the web caps it the same way, and a
+              three-digit badge overruns the icon. */}
+          <Text style={styles.badgeText}>{unread > 9 ? '9+' : String(unread)}</Text>
+        </View>
+      )}
     </Pressable>
   );
 }

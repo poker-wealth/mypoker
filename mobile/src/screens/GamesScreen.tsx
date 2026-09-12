@@ -241,6 +241,10 @@ function GameTile({
       onPress={onPress}
       style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
     >
+      {/* The art gets its own panel filling the top of the tile, rather than a
+          40px strip floating in the middle of a 130px box. That strip was the
+          whole problem: a small glyph centred in a tall card reads as a card
+          that failed to load its image. */}
       <View style={styles.tileArt}>
         {art ? (
           <Image source={art} style={styles.tileImage} resizeMode="contain" />
@@ -248,15 +252,21 @@ function GameTile({
           <Text style={styles.tileGlyph}>{game.glyph}</Text>
         )}
       </View>
-      <Text style={styles.tileName} numberOfLines={1}>
-        {t(`gameNames.${game.id}`, { defaultValue: game.name })}
-      </Text>
-      <Text style={styles.tileTables}>
-        {tables === undefined ? '—' : t('games.tableCount', { count: tables })}
-      </Text>
-      {jackpot !== undefined && jackpot > 0 && (
-        <Text style={styles.tileJackpot}>{money(jackpot, { decimals: 2 })}</Text>
-      )}
+      {/* Name and counts sit together in a footer band, so the text is anchored
+          instead of drifting in the middle of the empty space. */}
+      <View style={styles.tileFooter}>
+        <Text style={styles.tileName} numberOfLines={1}>
+          {t(`gameNames.${game.id}`, { defaultValue: game.name })}
+        </Text>
+        <Text style={styles.tileTables} numberOfLines={1}>
+          {tables === undefined ? '—' : t('games.tableCount', { count: tables })}
+        </Text>
+        {jackpot !== undefined && jackpot > 0 && (
+          <Text style={styles.tileJackpot} numberOfLines={1}>
+            {money(jackpot, { decimals: 2 })}
+          </Text>
+        )}
+      </View>
     </Pressable>
   );
 }
@@ -313,17 +323,43 @@ const styles = StyleSheet.create({
     borderColor: theme.border,
     backgroundColor: theme.surface,
     overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
+    // Art on top, text band below — NOT everything centred in the middle with
+    // `justifyContent: 'center'`, which is what left the wide empty margins.
+    justifyContent: 'flex-start',
     paddingHorizontal: 8,
     paddingVertical: 12,
   },
   tilePressed: { opacity: 0.85 },
-  tileArt: { height: 40, width: '100%', alignItems: 'center', justifyContent: 'center' },
+  // Takes the space the footer does not, so the art scales with the tile
+  // instead of being pinned at 40px however tall the card is.
+  tileArt: {
+    flex: 1,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: space.sm,
+    paddingHorizontal: space.sm,
+    // A faint lift behind the art so the icon sits ON something. Without it a
+    // small glyph on the card's own background reads as a missing image.
+    backgroundColor: 'rgba(255,255,255,0.022)',
+  },
   tileImage: { height: '100%', width: '100%' },
-  tileGlyph: { fontSize: 30, lineHeight: 34, fontFamily: weight('400') },
-  tileName: { width: '100%', textAlign: 'center', color: theme.text, fontSize: 11.5, fontFamily: weight('700') },
+  tileGlyph: { fontSize: 34, lineHeight: 40, fontFamily: weight('400') },
+  tileFooter: {
+    width: '100%',
+    alignItems: 'center',
+    gap: 1,
+    paddingHorizontal: 4,
+    paddingTop: 6,
+    paddingBottom: space.sm,
+  },
+  tileName: {
+    width: '100%',
+    textAlign: 'center',
+    color: theme.text,
+    fontSize: 11.5,
+    fontFamily: weight('700'),
+  },
   tileTables: { color: theme.dim, fontSize: 9.5, fontFamily: weight('400') },
   tileJackpot: { color: theme.jackpot, fontSize: 10, fontFamily: weight('800') },
   comingSoon: { marginTop: space.xs, gap: space.sm },

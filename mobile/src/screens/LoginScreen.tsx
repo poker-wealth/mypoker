@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { api, ApiError, forgotPasswordApi, resetPasswordApi } from '../api';
+import { api, ApiError, checkResetCodeApi, forgotPasswordApi, resetPasswordApi } from '../api';
 import { ApiUrlField } from '../ApiUrlField';
 import { useAuth } from '../auth';
 import { GOOGLE_ENABLED } from '../googleAuth';
@@ -28,6 +28,7 @@ import {
 } from '../icons';
 import { radius, space, theme, weight } from '../theme';
 import { Button, Card, ErrorState } from '../ui';
+import { CodeBoxes } from '../components/CodeBoxes';
 import appJson from '../../app.json';
 
 /**
@@ -71,7 +72,15 @@ function secondsUntil(iso: string | null): number {
   return Number.isFinite(ms) && ms > 0 ? Math.ceil(ms / 1000) : 0;
 }
 
-type Mode = 'signIn' | 'signUp' | 'confirm' | 'forgotRequest' | 'forgotReset';
+type Mode =
+  | 'signIn'
+  | 'signUp'
+  | 'confirm'
+  | 'forgotRequest'
+  /** Enter the mailed code. Confirmed here before any password is asked for. */
+  | 'forgotReset'
+  /** Choose the new password — reached only with a code already confirmed. */
+  | 'forgotNewPassword';
 
 export function LoginScreen() {
   const { t } = useTranslation();
@@ -97,6 +106,11 @@ export function LoginScreen() {
   // calls bypass useAuth — they neither create nor destroy a session.
   const [resetCode, setResetCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  /** Step one's own spinner — separate from `resetBusy`, which is the save. */
+  const [checkBusy, setCheckBusy] = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
 
@@ -253,11 +267,49 @@ export function LoginScreen() {
     })();
   };
 
-  /** Reset, step 2: the mailed code + the new password. Ends at sign-in with
-   *  the email prefilled — the fresh password's first use is the player's. */
+  /**
+   * Both passwords typed, matching, and long enough. The button's whole
+   * condition in one place so the disabled state and the guard below cannot
+   * drift apart.
+   */
+  const passwordsReady =
+    newPassword.length >= 8 && confirmPassword === newPassword && resetCode.length === CODE_LENGTH;
+
+  /**
+   * Reset, step 2: confirm the code — WITHOUT spending it.
+   *
+   * On success this only advances the screen; the actual password change still
+   * presents the same code to `/auth/reset-password`, which verifies it again.
+   * So this step is a courtesy to the player, not a security boundary, and
+   * skipping it would change nothing about what the server will accept.
+   */
+  const submitCheckCode = (): void => {
+    if (resetCode.length !== CODE_LENGTH || checkBusy || inFlight.current) return;
+    inFlight.current = true;
+    setCheckBusy(true);
+    setResetError(null);
+
+    void (async () => {
+      try {
+        await checkResetCodeApi(email.trim().toLowerCase(), resetCode);
+        // Clear any password left from a previous attempt so the next screen
+        // never opens with a half-typed secret in it.
+        setNewPassword('');
+        setConfirmPassword('');
+        setMode('forgotNewPassword');
+      } catch (err) {
+        setResetError(err instanceof ApiError ? err.message : t('auth.resetPasswordFailed'));
+      } finally {
+        setCheckBusy(false);
+        inFlight.current = false;
+      }
+    })();
+  };
+
+  /** Reset, step 3: save the new password. Ends at sign-in with the email
+   *  prefilled — the fresh password's first use is the player's. */
   const submitForgotReset = (): void => {
-    if (resetCode.length !== CODE_LENGTH || newPassword.length < 8 || resetBusy || inFlight.current)
-      return;
+    if (!passwordsReady || resetBusy || inFlight.current) return;
     inFlight.current = true;
     setResetBusy(true);
     setResetError(null);
@@ -270,7 +322,14 @@ export function LoginScreen() {
         setMode('signIn');
       } catch (err) {
         setResetError(err instanceof ApiError ? err.message : t('auth.resetPasswordFailed'));
+        // The code is cleared, so go BACK to the step that asks for one.
+        // Staying here would leave the player on a password form whose code no
+        // longer exists — every further attempt failing for a reason shown on
+        // a screen that cannot fix it. The code can genuinely die between the
+        // two steps: it expires on a timer, not on our navigation.
         setResetCode('');
+        setConfirmPassword('');
+        setMode('forgotReset');
       } finally {
         setResetBusy(false);
         inFlight.current = false;
@@ -462,21 +521,63 @@ export function LoginScreen() {
           </Card>
         ) : mode === 'forgotReset' ? (
           <Card style={styles.card}>
+            {/* STEP ONE: the code, on its own.
+                It used to sit above the password field on one form, so a
+                mistyped code was only reported after the player had chosen a
+                password — and the code is what fails most often. Confirming it
+                first means the password is only ever asked for once, and only
+                when it can actually be saved. */}
             <View style={styles.field}>
               <Text style={styles.label}>{t('auth.resetCode')}</Text>
-              <TextInput
-                style={[styles.codeBox, styles.codeInput]}
+              <CodeBoxes
                 value={resetCode}
-                onChangeText={(v) => setResetCode(v.replace(/\D/g, '').slice(0, CODE_LENGTH))}
-                textContentType="oneTimeCode"
-                autoComplete="one-time-code"
-                keyboardType="number-pad"
-                maxLength={CODE_LENGTH}
+                onChange={(v) => {
+                  setResetCode(v);
+                  // Clear a stale "that code is not correct" the moment they
+                  // start correcting it — an error about the previous guess
+                  // sitting under the new one reads as the new one failing.
+                  if (resetError !== null) setResetError(null);
+                }}
+                length={CODE_LENGTH}
                 autoFocus
-                placeholder="000000"
-                placeholderTextColor={theme.dim}
+                editable={!checkBusy}
               />
             </View>
+
+            {resetError !== null && (
+              <ErrorState message={resetError} retryLabel={t('common.retry')} />
+            )}
+
+            <Pressable
+              onPress={submitCheckCode}
+              disabled={resetCode.length !== CODE_LENGTH || checkBusy}
+              style={[
+                styles.loginBtn,
+                (resetCode.length !== CODE_LENGTH || checkBusy) && styles.btnDim,
+              ]}
+            >
+              <Text style={styles.loginBtnText}>
+                {checkBusy ? t('common.loading') : t('auth.verifyCode')}
+              </Text>
+            </Pressable>
+
+            <Button
+              style={{ borderRadius: 6 }}
+              variant="ghost"
+              onPress={() => {
+                setResetError(null);
+                setMode('forgotRequest');
+              }}
+            >
+              {t('auth.confirmBack')}
+            </Button>
+          </Card>
+        ) : mode === 'forgotNewPassword' ? (
+          // STEP TWO: reached only once the code has been confirmed. The code
+          // itself is NOT re-shown or re-asked — it is already held in state and
+          // still live, because the check deliberately did not spend it.
+          <Card style={styles.card}>
+            <Text style={styles.verifiedNote}>{t('auth.codeVerified')}</Text>
 
             <View style={styles.inputRow}>
               <LockIcon color={theme.dim} size={16} />
@@ -486,11 +587,59 @@ export function LoginScreen() {
                 placeholderTextColor={theme.dim}
                 value={newPassword}
                 onChangeText={setNewPassword}
-                secureTextEntry
+                secureTextEntry={!showNewPassword}
+                textContentType="newPassword"
+                autoComplete="new-password"
+                autoFocus
+              />
+              {/* The eye this screen never had. Choosing a password you cannot
+                  see, twice, on a phone keyboard, is how people end up locked
+                  out of an account they just reset. */}
+              <Pressable
+                onPress={() => setShowNewPassword((v) => !v)}
+                accessibilityRole="button"
+                accessibilityLabel={t('auth.newPassword')}
+                hitSlop={8}
+              >
+                {showNewPassword ? (
+                  <EyeOffIcon color={theme.dim} size={16} />
+                ) : (
+                  <EyeIcon color={theme.dim} size={16} />
+                )}
+              </Pressable>
+            </View>
+
+            <View style={styles.inputRow}>
+              <LockIcon color={theme.dim} size={16} />
+              <TextInput
+                style={styles.inputFlat}
+                placeholder={t('auth.confirmPassword')}
+                placeholderTextColor={theme.dim}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry={!showConfirmPassword}
                 textContentType="newPassword"
                 autoComplete="new-password"
               />
+              <Pressable
+                onPress={() => setShowConfirmPassword((v) => !v)}
+                accessibilityRole="button"
+                accessibilityLabel={t('auth.confirmPassword')}
+                hitSlop={8}
+              >
+                {showConfirmPassword ? (
+                  <EyeOffIcon color={theme.dim} size={16} />
+                ) : (
+                  <EyeIcon color={theme.dim} size={16} />
+                )}
+              </Pressable>
             </View>
+
+            {/* Only once they have typed something in the second box — warning
+                about a mismatch against an empty field is just nagging. */}
+            {confirmPassword.length > 0 && confirmPassword !== newPassword && (
+              <Text style={styles.mismatch}>{t('auth.passwordsDoNotMatch')}</Text>
+            )}
 
             {resetError !== null && (
               <ErrorState message={resetError} retryLabel={t('common.retry')} />
@@ -498,12 +647,8 @@ export function LoginScreen() {
 
             <Pressable
               onPress={submitForgotReset}
-              disabled={resetCode.length !== CODE_LENGTH || newPassword.length < 8 || resetBusy}
-              style={[
-                styles.loginBtn,
-                (resetCode.length !== CODE_LENGTH || newPassword.length < 8 || resetBusy) &&
-                  styles.btnDim,
-              ]}
+              disabled={!passwordsReady || resetBusy}
+              style={[styles.loginBtn, (!passwordsReady || resetBusy) && styles.btnDim]}
             >
               <Text style={styles.loginBtnText}>
                 {resetBusy ? t('common.loading') : t('auth.resetPasswordSubmit')}
@@ -515,7 +660,7 @@ export function LoginScreen() {
               variant="ghost"
               onPress={() => {
                 setResetError(null);
-                setMode('forgotRequest');
+                setMode('forgotReset');
               }}
             >
               {t('auth.confirmBack')}
@@ -738,6 +883,10 @@ const styles = StyleSheet.create({
   label: { color: theme.dim, fontSize: 11, textTransform: 'uppercase', fontFamily: weight('800') },
 
   // The reference's hairline fields: a leading mark, the text, one thin line.
+  /** The confirmation line at the top of the new-password step. */
+  verifiedNote: { color: theme.success, fontSize: 12, fontFamily: weight('600') },
+  /** Shown under the two password boxes while they disagree. */
+  mismatch: { color: theme.danger, fontSize: 12, fontFamily: weight('600') },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',

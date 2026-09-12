@@ -10,16 +10,17 @@ import { useAuth } from '../auth';
 import type { RootStackParamList } from '../navigation';
 import { space, theme, weight } from '../theme';
 import { Button, Card, ListRow, Screen, Toggle } from '../ui';
+import { DEFAULT_LANGUAGE, LANGUAGES, setLanguage } from '../i18n';
 
 /**
  * Settings — account-scoped preferences, ported from frontend/src/pages/Settings.tsx.
  *
  * Left out of this port, deliberately, because the pieces they depend on do
  * not exist in the shell yet: the web page's Appearance section (theme is
- * dark-only here, see theme.ts) and its language picker (LanguageSheet is a
- * web component; mobile's i18n.ts reads the device language once at start and
- * says switching languages "belongs with [Settings], not here" — a picker for
- * a future change, not this one). The web's About section (frontend/src/pages/Settings.tsx
+ * dark-only here, see theme.ts). The language picker WAS also left out, on the
+ * reasoning that the app followed the phone and there was nothing to choose;
+ * it is here now because the app no longer does — it opens in 中文, and a
+ * player who cannot read Chinese needs a way out of it. The web's About section (frontend/src/pages/Settings.tsx
  * ~181-198) is here, minus its Support row — that row opens SUPPORT_URL
  * (frontend/src/config.ts), built from env that has no mobile-side
  * equivalent (no config.ts, no VITE_SUPPORT_URL/VITE_TELEGRAM_BOT_NAME
@@ -33,6 +34,8 @@ import { Button, Card, ListRow, Screen, Toggle } from '../ui';
  */
 
 interface PlayerSettings {
+  /** BCP-47 code, or null while the account has never chosen one. */
+  language: string | null;
   sound: boolean;
   haptics: boolean;
   notifyResults: boolean;
@@ -92,6 +95,38 @@ export function SettingsScreen() {
                 label={t('settings.haptics')}
                 right={<Toggle value={data.haptics} onChange={(v) => set({ haptics: v })} />}
               />
+            </Section>
+
+            {/* THE LANGUAGE PICKER.
+                This screen deliberately shipped without one, back when the app
+                simply followed the phone's language — there was nothing to
+                choose, so a picker would have been furniture. That reasoning
+                died the moment the app started opening in 中文 for everyone
+                (see i18n.ts): without this row, a player who does not read
+                Chinese has no way out of it, on a screen they cannot read.
+
+                The choice is saved to the ACCOUNT, the same field the Mini App
+                writes, so picking English on the phone means English in
+                Telegram too. */}
+            <Section title={t('settings.language')}>
+              {LANGUAGES.map((lang) => {
+                const active = (data.language ?? DEFAULT_LANGUAGE) === lang.code;
+                return (
+                  <ListRow
+                    key={lang.code}
+                    label={lang.label}
+                    onPress={() => {
+                      // Applied immediately, then persisted — waiting for the
+                      // round trip makes the tap feel broken on a slow link.
+                      setLanguage(lang.code);
+                      set({ language: lang.code });
+                    }}
+                    right={
+                      active ? <Text style={styles.languageTick}>✓</Text> : null
+                    }
+                  />
+                );
+              })}
             </Section>
 
             <Section title={t('settings.notifications')}>
@@ -156,6 +191,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 const styles = StyleSheet.create({
+  /** The check beside the active language. Gold, matching every other active state. */
+  languageTick: { color: theme.brand, fontSize: 15, fontFamily: weight('700') },
   container: { flex: 1, backgroundColor: theme.bg },
   section: { gap: space.sm },
   sectionTitle: { paddingHorizontal: space.xs, color: theme.dim, fontSize: 11, textTransform: 'uppercase', fontFamily: weight('800') },

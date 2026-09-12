@@ -45,6 +45,8 @@ export interface TableState {
   toCall: number; // amount the hero must call
   currentBet: number; // highest bet this street
   minRaise: number; // minimum raise increment
+  /** This table's big blind — the unit a custom default raise is expressed in. */
+  bigBlind?: number;
   message?: string;
   handOver?: boolean;
 }

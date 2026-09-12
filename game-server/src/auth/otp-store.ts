@@ -58,7 +58,16 @@ export type IssueResult =
 
 export type VerifyResult =
   | { ok: true; playerId: string; pending?: OtpChallenge['pending'] }
-  | { ok: false; reason: 'no_challenge' | 'expired' | 'too_many_attempts' | 'incorrect' };
+  | { ok: false; reason: OtpFailure };
+
+export type OtpFailure = 'no_challenge' | 'expired' | 'too_many_attempts' | 'incorrect';
+
+/**
+ * The answer to "is this code right", with nothing else attached.
+ *
+ * Deliberately carries no playerId and no pending credentials — see `check`.
+ */
+export type CheckResult = { ok: true } | { ok: false; reason: OtpFailure };
 
 export interface OtpStore {
   issue(
@@ -70,6 +79,8 @@ export interface OtpStore {
   verify(identifier: string, code: string, now?: number): Promise<VerifyResult>;
   peek(identifier: string): Promise<{ playerId: string; expiresAt: number } | null>;
   discard(identifier: string): Promise<void>;
+  /** Is this code right, without spending it? See the implementation. */
+  check(identifier: string, code: string, now?: number): Promise<CheckResult>;
 }
 
 /** Lowercased and trimmed everywhere, so one address is one challenge. */
@@ -179,6 +190,48 @@ export function createOtpStore(persistence: OtpPersistence): OtpStore {
         playerId: existing.playerId,
         ...(existing.pending ? { pending: existing.pending } : {}),
       };
+    },
+
+    /**
+     * Is this code right — WITHOUT spending it?
+     *
+     * The reset screen asks for the code and the new password on one form, so a
+     * wrong code was only discovered after the player had chosen and typed a
+     * password twice, and they lost both. Victor asked for the code to be
+     * confirmed first. That needs a check that does not consume, because
+     * `verify` deletes the challenge on success and the reset immediately after
+     * would then fail with `no_challenge` — the check would break the very
+     * flow it exists to smooth.
+     *
+     * WHAT IS DELIBERATELY KEPT from `verify`:
+     *
+     *  - A wrong guess still costs an attempt. Without that this is an
+     *    unlimited oracle for guessing six digits, which is strictly worse than
+     *    having no check at all — the five-attempt cap is the only thing
+     *    standing between a stranger and someone else's password reset.
+     *  - Expiry and the attempt ceiling are enforced first, by the same
+     *    `canAttempt` the real verify uses. One rule, one implementation.
+     *
+     * WHAT IS DELIBERATELY DROPPED: the playerId and the pending credentials.
+     * A correctness check has no business handing either out; it answers yes or
+     * no and nothing else.
+     */
+    async check(identifier: string, code: string, now: number = Date.now()): Promise<CheckResult> {
+      const key = keyFor(identifier);
+      const existing = await persistence.get(key);
+      if (!existing) return { ok: false, reason: 'no_challenge' };
+
+      const state = canAttempt(existing, now);
+      if (!state.ok) return { ok: false, reason: state.reason };
+
+      const matches = looksLikeCode(code) && (await bcrypt.compare(code, existing.codeHash));
+      if (!matches) {
+        await persistence.incrementAttempts(key);
+        return { ok: false, reason: 'incorrect' };
+      }
+
+      // NOT deleted. The caller still has to spend it on the real reset.
+      return { ok: true };
     },
 
     /** The live challenge for an address, or null. Resend must not mint one blindly. */

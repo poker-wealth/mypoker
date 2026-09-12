@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'motion/react';
 import { PlayerSeat } from './PlayerSeat';
@@ -39,8 +39,55 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
   const design = override ?? chosen;
   const positions = ringFor(design, Math.max(2, state.seats.length));
 
-  const [failed, setFailed] = useState<string | null>(null);
-  const useArt = Boolean(design.artUrl) && failed !== design.artUrl;
+
+  // Whose turn it is, read off the seat the feed already marks — no new prop,
+  // and no second opinion about who is to act. Rendered on the felt below.
+  const toActSeat = state.seats.find((s) => s.status === 'toact');
+  const turnName = toActSeat?.name ?? null;
+  const heroToAct = Boolean(toActSeat?.isHero);
+
+  /**
+   * Where a seat falls in the DEALING order — first seat after the button, and
+   * round from there.
+   *
+   * Hole cards already animated in, but every seat animated at the same
+   * instant, so a deal read as "the cards were simply there". Victor: "it
+   * didn't even show how the cards were shuffled among players, it just gave
+   * card." Offsetting each seat by its distance from the button makes the deal
+   * travel round the table the way a live one does.
+   *
+   * Falls back to raw seat order when no button is set (the demo engine, and
+   * any feed that has not sent one yet) — a deal in table order still looks
+   * dealt, which is the point.
+   */
+  /**
+   * Seconds left on the acting player's clock, ticking once a second.
+   *
+   * The seat avatar already draws a draining ring, but it is a hairline on a
+   * 44px circle and Victor's reading of it was "it doesn't even give me time
+   * to play" — the clock was there and unreadable, which for a 20s decision is
+   * the same as not having one. This puts the number itself on the felt.
+   *
+   * The ticker only runs while somebody is actually on the clock, so an idle
+   * table is not re-rendering every second for nothing.
+   */
+  const deadline = toActSeat?.deadline ?? null;
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!deadline) return;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [deadline]);
+  const secondsLeft = deadline ? Math.max(0, Math.ceil((deadline - now) / 1000)) : null;
+
+  const buttonSeat = state.seats.findIndex((s) => s.isDealer);
+  const dealOrder = (i: number): number => {
+    const n = state.seats.length;
+    if (n === 0) return 0;
+    if (buttonSeat < 0) return i;
+    return (i - buttonSeat - 1 + n * 2) % n;
+  };
 
   // "1672 / 941" → wider than tall. Short Deck is landscape; everything else is
   // portrait, and the two want different width ceilings.
@@ -89,25 +136,45 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
           className="absolute inset-0 size-full pointer-events-none rounded-[50%] z-0"
         />
 
-        {/* The table surface */}
-        {useArt ? (
-          <img
-            src={design.artUrl!}
-            alt=""
-            aria-hidden
-            draggable={false}
-            onError={() => setFailed(design.artUrl)}
-            className="absolute inset-0 h-full w-full select-none object-contain"
-          />
-        ) : (
-          <CssTable design={design} />
-        )}
+        {/* NO TABLE SURFACE.
+            Owner's call (11 Sep 2026): "remove the table, leave it plain
+            background... and just put the sit here around it like an oval but
+            no table on it", and when asked whether that meant one new plain
+            design or all of them: "all table design goes".
+
+            So neither the artwork nor the CSS felt is drawn. The seats keep
+            their ring — those positions were MEASURED against the artwork, and
+            they are what makes the oval an oval — but nothing is rendered
+            behind them. The screen's own background shows through.
+
+            `ringFor(design, …)` above is therefore now the only thing the
+            design object is consulted for: geometry, not appearance.
+
+            What IS drawn is the reference's deep red ground. Removing the felt
+            first left the app's near-black background showing through —
+            Victor: "why is it blaclk instead of red". It is a plain gradient,
+            not a table: no rail, no edge, no oval. The seats make the oval. */}
+        {/* RED. Desaturating this toward the reference screenshot's dusty
+            rose-brown was tried once and reverted — on screen it read as
+            washed-out grey-mauve with the red gone ("what is this change it
+            back to red"). The screenshot's muted look is the phone's own
+            rendering; sampling it literally loses the colour. */}
+        {/* NO GROUND HERE ANY MORE. The SCREEN paints it (see Table.tsx), so
+            painting it again inside the felt's box drew a second radial
+            gradient inside the first — a visible ellipse floating on the page's
+            own. Victor: "it should be one whole back ground complete". One
+            surface, painted once, at the top. */}
 
         {/* The brand across the felt, as on the reference table. Always there,
             faint, under the board — a watermark, not a message. */}
         <div className="pointer-events-none absolute inset-0 z-[5] flex flex-col items-center justify-center">
+          {/* WHITE, not black, here and on the wordmark below. Both were
+              `text-black/…`, which was right while a bright felt sat behind
+              them and is invisible now the felt is gone — the table renders on
+              the app's near-black background. The reference shows this block as
+              faint LIGHT type on a dark ground. */}
           {info && state.board.length === 0 && (
-            <div className="mb-[2cqmin] text-center text-[3.2cqmin] leading-relaxed text-black/35">
+            <div className="mb-[2cqmin] text-center text-[3.2cqmin] leading-relaxed text-white/30">
               {/* The reference's centre block, ours: the name between asterisks,
                   the table number (which IS the invitation code here — the
                   share link is /table/<id>), the blinds, and OUR host — read
@@ -123,7 +190,12 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
               <div>www.{PERMANENT_DOMAIN}</div>
             </div>
           )}
-          <div className="select-none text-[10cqmin] font-black tracking-[0.06em] text-black/25">
+          {/* Faded DARK, not light — the reference's wordmark is a dark grey
+              pressed into the red ground, not a pale watermark over it. It sits
+              at z-[5] under the board (z-10) and is pointer-events-none, so it
+              can neither cover a card nor swallow a tap: the cards deal over
+              the top of it. */}
+          <div className="select-none text-[10cqmin] font-black tracking-[0.06em] text-[#1a1012]/45">
             MYPOKER
           </div>
         </div>
@@ -177,6 +249,47 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
             crowded part of the screen. Here it lands where the player is
             already looking when the hand resolves.
           */}
+          {/*
+            Whose turn it is, on the felt.
+
+            This used to live ONLY in the status line under the table, next to
+            Rebuy / Sit out / Leave — dim, small, and in the one part of the
+            screen nobody watches while a hand is running. Victor's words: "this
+            is showing where no one will see it". Same fix, and same reasoning,
+            as the winner banner directly below: the line explaining what the
+            table is waiting for belongs where the player is already looking.
+
+            Hidden once the hand is over, so it cannot argue with that banner —
+            they occupy the same spot, and "X's turn" under a finished hand is
+            just wrong.
+          */}
+          <AnimatePresence>
+            {!state.handOver && turnName && (
+              <motion.div
+                key="turn"
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.16 }}
+                className="max-w-[85%] truncate rounded-full border border-white/15 bg-black/60 px-3 py-0.5 text-center text-[0.68rem] font-bold tracking-wide text-white/90 shadow backdrop-blur-sm"
+              >
+                {heroToAct ? t('table.yourTurn') : t('table.playerTurn', { name: turnName })}
+                {secondsLeft !== null && (
+                  // Amber under 5s. The colour is the only warning a player
+                  // glancing at the felt will register in time.
+                  <span
+                    className={cn(
+                      'ml-1.5 tabular-nums',
+                      secondsLeft <= 5 ? 'text-warn' : 'text-white/55',
+                    )}
+                  >
+                    {secondsLeft}s
+                  </span>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <AnimatePresence>
             {state.handOver && state.message && (
               <motion.div
@@ -225,6 +338,7 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
                 seat={seat}
                 align={pos.align}
                 accent={design.accent}
+                dealOrder={dealOrder(i)}
                 onSit={onSit ? () => onSit(i) : undefined}
                 onClick={() => {
                   if (seat.status !== 'empty' && onChallenge && seat.playerId && !seat.isHero) {
@@ -249,70 +363,3 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
  * `cssFelt` keeps exactly the colours this used to hardcode, so Neon is
  * untouched.
  */
-function CssTable({ design }: { design: TableDesign }) {
-  const felt = design.cssFelt;
-  const glow = felt?.glow ?? 'var(--brand-2)';
-  const rail: [string, string, string] = felt?.rail ?? [
-    'var(--brand)',
-    'var(--brand-2)',
-    'var(--accent)',
-  ];
-  return (
-    <>
-      {/* Outer glow — the light the rail throws onto the background */}
-      <div
-        className="pointer-events-none absolute -inset-6 rounded-[50%] opacity-70 blur-2xl"
-        style={{
-          background: `radial-gradient(closest-side, color-mix(in srgb, ${glow} 45%, transparent), transparent 75%)`,
-        }}
-      />
-
-      {/* Outer rail ring */}
-      <div
-        className="absolute inset-0 rounded-[50%]"
-        style={{
-          background: `linear-gradient(160deg, ${rail[0]} 0%, ${rail[1]} 45%, ${rail[2]} 100%)`,
-          padding: '2px',
-          boxShadow:
-            `0 0 24px color-mix(in srgb, ${glow} 55%, transparent), 0 0 60px color-mix(in srgb, ${rail[0]} 25%, transparent)`,
-        }}
-      >
-        <div className="h-full w-full rounded-[50%]" style={{ background: 'var(--bg)' }} />
-      </div>
-
-      {/* Inner rail ring */}
-      <div
-        className="absolute inset-[3.5%] rounded-[50%]"
-        style={{
-          background: `linear-gradient(200deg, ${rail[2]} 0%, ${rail[1]} 50%, ${rail[0]} 100%)`,
-          padding: '2px',
-          boxShadow: `0 0 18px color-mix(in srgb, ${rail[2]} 40%, transparent)`,
-        }}
-      >
-        <div
-          className="relative h-full w-full overflow-hidden rounded-[50%]"
-          style={{
-            background:
-              `radial-gradient(ellipse at 50% 42%, ${felt?.centre ?? '#1e3f74'} 0%, ${felt?.mid ?? 'var(--felt)'} 45%, ${felt?.edge ?? '#0a162c'} 78%, ${felt?.outer ?? '#060d1c'} 100%)`,
-            boxShadow: 'inset 0 0 60px rgba(0,0,0,0.75), inset 0 2px 20px rgba(255,255,255,0.06)',
-          }}
-        >
-          <div
-            className="pointer-events-none absolute inset-0 opacity-[0.14] mix-blend-overlay"
-            style={{
-              backgroundImage: 'radial-gradient(#9fd0ff 0.5px, transparent 0.5px)',
-              backgroundSize: '4px 4px',
-            }}
-          />
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <span className="translate-y-[22%] text-2xl font-black tracking-[0.35em] sm:text-3xl"
-              style={{ color: felt?.wordmark ?? 'rgba(255,255,255,0.06)' }}>
-              FAIRPLAY
-            </span>
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-

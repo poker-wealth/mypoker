@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, Volume2, VolumeX, Settings2, Wifi, WifiOff, MessageSquare, List as ListIcon, Spade, Mic } from 'lucide-react';
+import { ChevronLeft, Menu, Wifi, WifiOff, MessageSquare, List as ListIcon, Spade, Mic } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { PokerTable } from '@/components/poker/PokerTable';
 import { ActionBar } from '@/components/poker/ActionBar';
@@ -11,21 +11,29 @@ import { chips } from '@/lib/money';
 import { useTranslation } from 'react-i18next';
 import { BuyInSheet } from '@/components/poker/BuyInSheet';
 import { TableDesignSheet } from '@/components/poker/TableDesignSheet';
+import { TableMenu } from '@/components/poker/TableMenu';
+import { HandRankings } from '@/components/poker/HandRankings';
+import { PlayerListPanel } from '@/components/poker/PlayerListPanel';
+import { PlayerProfileCard } from '@/components/poker/PlayerProfileCard';
+import { TableSettingsSheet } from '@/components/poker/TableSettingsSheet';
+import { toast } from '@/lib/toast';
+import { inviteUrl } from '@/lib/tableInvite';
+import { TELEGRAM_BOT_NAME } from '@/config';
 import { Button } from '@/components/ui/Button';
 import { GAMES } from '@/lib/games';
 import { isOpenableTableId } from '@/config';
 import { useDemoHand } from '@/hooks/useDemoHand';
 import { useLiveTable } from '@/hooks/useLiveTable';
 import type { TableSnapshot } from '@/lib/liveTable';
-import { designForGame } from '@/lib/tableDesigns';
+import { designForGame, groundFor } from '@/lib/tableDesigns';
 import { useTableDesign } from '@/store/tableDesign';
 import { cn } from '@/lib/cn';
 import { useSoundSetting } from '@/hooks/useSoundSetting';
 import { play } from '@/lib/sound';
 import { ChatBox } from '@/components/poker/ChatBox';
+import { CommentSheet } from '@/components/poker/CommentSheet';
+import { HandHistoryPanel } from '@/components/poker/HandHistoryPanel';
 import { useTableChat } from '@/hooks/useTableChat';
-import { useSettings, useUpdateSettings } from '@/api/hooks';
-import { haptic } from '@/lib/telegram';
 import { ChallengeModal } from '@/components/poker/ChallengeModal';
 import { unlockTableApi } from '@/api/tables';
 
@@ -201,6 +209,40 @@ function LiveTable({ tableId }: { tableId: string }) {
   // replay the celebration.
   const [jackpotSeen, setJackpotSeen] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [rankingsOpen, setRankingsOpen] = useState(false);
+  const [playersOpen, setPlayersOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  /** Whose card is open, by playerId. The seat is looked up fresh each render
+   *  so the figures on it track the table rather than freezing at open time. */
+  const [profileFor, setProfileFor] = useState<string | null>(null);
+
+  /**
+   * Copy this table's invite link.
+   *
+   * The SAME link the create dialog hands out — `inviteUrl`, the Telegram deep
+   * link — not `window.location.href`. A web URL pasted into Telegram opens the
+   * phone's browser, where the recipient meets a sign-in page instead of the
+   * table they were invited to.
+   *
+   * The private join code is not carried here: this is shared from inside a
+   * table by anyone sitting at it, including someone who was let in by a
+   * creator who may not want the code passed on. The creator's own dialog is
+   * where the code-bearing link comes from.
+   */
+  const shareInvite = (): void => {
+    if (!tableId) return;
+    const url = inviteUrl({ tableId }, TELEGRAM_BOT_NAME);
+    void navigator.clipboard
+      ?.writeText(url)
+      .then(() => toast.success(t('tableEntry.copied')))
+      .catch(() => {
+        // Clipboard can be unavailable in a locked-down WebView. A failed copy
+        // is a nuisance, not a dead end — say so rather than failing silently.
+        toast.error(t('states.error'));
+      });
+  };
   const [challengePrompt, setChallengePrompt] = useState<string | null>(null);
 
   const { messages, sendChat, sendVoice, unread, markRead } = useTableChat(
@@ -251,9 +293,14 @@ function LiveTable({ tableId }: { tableId: string }) {
   const Felt = feltFor(tableId) ?? (snapshot?.game ? feltFor(snapshot.game) : undefined);
 
   return (
+    /* THE GROUND IS THE WHOLE SCREEN, not a box in the middle of a black one.
+       This was hardcoded #000, so the chosen colour was painted only inside
+       the felt aspect box and everything around it — top bar, dock, footer —
+       stayed black. The reference is one continuous surface with the controls
+       sitting directly on it. */
     <div
       className="flex min-h-full flex-col"
-      style={{ background: '#000' }}
+      style={{ background: groundFor(chosenDesign) }}
     >
       <TopBar
         subtitle={
@@ -263,7 +310,85 @@ function LiveTable({ tableId }: { tableId: string }) {
         }
         onBack={() => navigate(-1)}
         status={status}
-        onOpenDesigns={() => setDesignsOpen(true)}
+        onOpenMenu={() => setMenuOpen(true)}
+      />
+
+      {/*
+        The table menu. Wired to what exists and nothing else.
+
+        `onStandUp` is the `stand` command — give up the seat, keep watching —
+        and is DELIBERATELY not `sitOut`, which keeps your seat and skips hands.
+        Confusing the two would take a player's seat away when they meant to sit
+        out a hand, at a table they might not be able to rejoin.
+
+        `onRankings` is omitted because the chart does not exist yet; the row
+        disables itself with a reason rather than opening nothing.
+
+        `onExit` leaves the screen. It does NOT stand first — leaving the page
+        while seated is the same as closing the app, and the server's own
+        disconnect handling owns a seat's fate from there. Standing on the way
+        out would forfeit a seat the player may be about to return to.
+      */}
+      <TableMenu
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onShare={shareInvite}
+        {...(seated
+          ? {
+              onStandUp: () => live.command({ kind: 'stand' }),
+              // The table's own buy-in sheet, for this seat — not a second
+              // implementation of buying in.
+              onBuyIn: () => setBuyInFor(snapshot?.yourSeat ?? null),
+              onSitOut: () => live.command({ kind: 'sitOut' }),
+            }
+          : {})}
+        onRankings={() => setRankingsOpen(true)}
+        onHistory={() => setHistoryOpen(true)}
+        onFairness={() => navigate('/fairness')}
+        onOptions={() => setDesignsOpen(true)}
+        onExit={() => navigate(-1)}
+      />
+
+      <PlayerListPanel
+        open={playersOpen}
+        onClose={() => setPlayersOpen(false)}
+        seats={snapshot?.seats ?? []}
+        tableId={tableId}
+        onPlayer={(playerId) => setProfileFor(playerId)}
+        {...(snapshot?.spectators !== undefined ? { spectators: snapshot.spectators } : {})}
+        {...(snapshot?.openedAt !== undefined ? { openedAt: snapshot.openedAt } : {})}
+      />
+
+      {snapshot && (
+        <HandHistoryPanel
+          open={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+          name={snapshot.name}
+          tableId={snapshot.tableId}
+          smallBlind={snapshot.smallBlind}
+          bigBlind={snapshot.bigBlind}
+          seated={snapshot.seats.length}
+          onShare={shareInvite}
+        />
+      )}
+
+      <CommentSheet
+        open={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        onSend={sendChat}
+        messages={messages}
+        disabled={!seated}
+      />
+
+      <PlayerProfileCard
+        seat={snapshot?.seats.find((s) => s.playerId === profileFor) ?? null}
+        onClose={() => setProfileFor(null)}
+      />
+
+      <HandRankings
+        open={rankingsOpen}
+        onClose={() => setRankingsOpen(false)}
+        {...(snapshot?.game ? { game: snapshot.game } : {})}
       />
 
       {/* A wide felt loses more to gutters than a tall one — it is short enough
@@ -368,7 +493,7 @@ function LiveTable({ tableId }: { tableId: string }) {
       />
 
       {/* Action dock */}
-      <div className="border-t border-border bg-surface/80 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 backdrop-blur">
+      <div className="px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3">
         {live.heroToAct ? (
           <>
             {/* Above the buttons, and only while it is your turn — an opponent's
@@ -377,6 +502,7 @@ function LiveTable({ tableId }: { tableId: string }) {
               timeBankMs={snapshot?.timeBankMs ?? 0}
               usingTimeBank={snapshot?.usingTimeBank ?? false}
               autoTimeBank={snapshot?.autoTimeBank ?? false}
+              deadline={snapshot?.actionDeadline ?? null}
               onUse={() => live.command({ kind: 'useTimeBank' })}
               onToggleAuto={(on) => live.command({ kind: 'autoTimeBank', on })}
             />
@@ -458,11 +584,22 @@ function LiveTable({ tableId }: { tableId: string }) {
         {/* The reference app's bottom toolbar: table options, fairness, voice,
             chat. Every icon does something real — the mic and the bubble both
             reach the chat drawer, where the recorder lives. */}
-        <div className="mt-1 flex items-center justify-between border-t border-border/50 pt-1.5">
-          <ToolbarIcon label={t('table.tableDesign')} onClick={() => setDesignsOpen(true)}>
+        <div className="mt-1 flex items-center justify-between pt-1.5">
+          {/* The list icon opens the PLAYER LIST, as in the reference — it
+              used to open the settings sheet, which the menu drawer's Options
+              row already reaches. Two ways to the same sheet left the one
+              thing the icon looks like it does with no way in at all. */}
+          <ToolbarIcon label={t('table.playerList')} onClick={() => setPlayersOpen(true)}>
             <ListIcon size={19} />
           </ToolbarIcon>
-          <ToolbarIcon label={t('table.fairness')} onClick={() => navigate('/fairness')}>
+          {/* The spade is the PAID COMMENT button — owner's placement. It opens
+              the comment panel, where the 10/50/100 tiers live.
+
+              It used to go to Fairness, which is the provably-fair screen and
+              not something to orphan: that moved into the menu drawer in the
+              same change, so it is still one tap from here. Losing the way to
+              it would be a quiet cost of a cosmetic decision. */}
+          <ToolbarIcon label={t('table.comment')} onClick={() => setCommentsOpen(true)}>
             <Spade size={19} />
           </ToolbarIcon>
           <ToolbarIcon label={t('table.voice')} onClick={() => setChatOpen(true)}>
@@ -510,7 +647,24 @@ function LiveTable({ tableId }: { tableId: string }) {
         }}
       />
 
-      <TableDesignSheet open={designsOpen} onClose={() => setDesignsOpen(false)} />
+      <TableSettingsSheet
+        open={designsOpen}
+        onClose={() => setDesignsOpen(false)}
+        tableId={tableId}
+        isOwner={Boolean(snapshot?.isOwner)}
+        seats={(snapshot?.seats ?? []).map((s) => ({
+          playerId: s.playerId,
+          name: s.name,
+          isYou: Boolean(s.isYou),
+        }))}
+        canStart={Boolean(snapshot?.awaitingStart)}
+        onStart={() => live.command({ kind: 'start_game' })}
+        onKick={(playerId) => live.command({ kind: 'kick', targetId: playerId })}
+        paused={Boolean(snapshot?.paused)}
+        closing={Boolean(snapshot?.closing)}
+        onPause={(next) => live.command({ kind: 'pause', paused: next })}
+        onCloseTable={() => live.command({ kind: 'close_table' })}
+      />
     </div>
   );
 }
@@ -616,23 +770,35 @@ function TopBar({
   subtitle,
   onBack,
   status,
-  onOpenDesigns,
+  onOpenMenu,
 }: {
   subtitle: string;
   onBack: () => void;
   status?: string;
-  /** Opens the table-design picker. */
-  onOpenDesigns?: () => void;
+  /** Opens the table menu drawer. */
+  onOpenMenu?: () => void;
 }) {
   const { t } = useTranslation();
   return (
     <div className="flex items-center justify-between px-4 py-3">
-      <button
-        onClick={onBack}
-        className="grid size-9 place-items-center rounded-full border border-border bg-surface active:scale-95"
-      >
-        <ChevronLeft size={18} />
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={onBack}
+          className="grid size-9 place-items-center rounded-full border border-border bg-surface active:scale-95"
+        >
+          <ChevronLeft size={18} />
+        </button>
+        {/* The menu, top-left beside Back, where the reference app puts it. */}
+        {onOpenMenu && (
+          <button
+            onClick={onOpenMenu}
+            aria-label={t('table.menuTitle')}
+            className="grid size-9 place-items-center rounded-full border border-border bg-surface active:scale-95"
+          >
+            <Menu size={18} />
+          </button>
+        )}
+      </div>
       <div className="text-center">
         <div className="text-[0.66rem] text-dim">{subtitle}</div>
       </div>
@@ -650,14 +816,11 @@ function TopBar({
           </div>
         )}
 
-        <SoundToggle />
-        <button
-          onClick={onOpenDesigns}
-          title={t('table.tableDesign')}
-          className="grid size-9 place-items-center rounded-full border border-border bg-surface text-dim active:scale-95"
-        >
-          <Settings2 size={16} />
-        </button>
+        {/* The sound toggle and the design button used to sit here. Both are
+            reachable from the menu drawer now — Options opens the design
+            picker, and sound is a setting rather than something you reach for
+            mid-hand. Two buttons doing what one menu row does is clutter on a
+            bar that has to share a phone's width with the table's name. */}
       </div>
     </div>
   );
@@ -733,7 +896,6 @@ function DemoTable() {
           blinds: `${chips(10)}/${chips(20)}`,
         })}
         onBack={() => navigate(-1)}
-        onOpenDesigns={() => setDesignsOpen(true)}
       />
 
       <div className="flex flex-1 items-center px-3">
@@ -743,7 +905,7 @@ function DemoTable() {
       {/* The result now renders under the board, inside PokerTable — it belongs
           next to the cards it is describing, not down here with the controls. */}
 
-      <div className="border-t border-border bg-surface/80 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 backdrop-blur">
+      <div className="px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3">
         {heroToAct ? (
           <ActionBar state={view} onAction={heroAct} />
         ) : (
@@ -773,29 +935,3 @@ function DemoTable() {
  * exists — and once the sound layer lands (blocked on licensing, SAMUEL.md
  * task 2), this already governs it with nothing more to wire.
  */
-function SoundToggle() {
-  const { t } = useTranslation();
-  const settings = useSettings();
-  const update = useUpdateSettings();
-
-  // Hidden rather than shown inert while unknown: a mute button whose state is
-  // a guess is the problem this is fixing.
-  if (!settings.isSuccess) return null;
-
-  const on = settings.data.sound;
-
-  return (
-    <button
-      onClick={() => {
-        haptic('light');
-        update.mutate({ sound: !on });
-      }}
-      disabled={update.isPending}
-      aria-pressed={on}
-      title={on ? t('settings.soundOn') : t('settings.soundOff')}
-      className="grid size-9 place-items-center rounded-full border border-border bg-surface text-dim active:scale-95 disabled:opacity-60"
-    >
-      {on ? <Volume2 size={16} /> : <VolumeX size={16} className="text-dim/60" />}
-    </button>
-  );
-}

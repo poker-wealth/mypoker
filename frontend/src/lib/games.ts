@@ -48,7 +48,7 @@ export const GAMES: GameDef[] = [
   { id: 'short-deck', name: 'Short Deck', category: 'poker', image: '/brand/cards.png', glyph: '♦', gradient: ['#bb5cf6', '#00d4ff'], minBuy: '20' },
   { id: 'omaha', name: 'Omaha', category: 'poker', image: '/brand/cards.png', glyph: '♥', gradient: ['#f85677', '#bb5cf6'], minBuy: '20' },
   
-  { id: 'dou-di-zhu', name: 'Dou Di Zhu', category: 'card', image: '/brand/dou_di_zhu.png', glyph: '👑', gradient: ['#6366f1', '#00d4ff'], minBuy: '5' },
+  { id: 'dou-di-zhu', name: 'Dou Di Zhu', category: 'card', image: '/brand/cards.png', glyph: '👑', gradient: ['#6366f1', '#00d4ff'], minBuy: '5' },
   { id: 'niu-niu', name: 'Niu Niu', category: 'card', image: '/brand/bull.png', glyph: '🐮', gradient: ['#00d4ff', '#3fd07a'], minBuy: '5' },
   { id: 'san-zhang', name: 'Zha Jin Hua', category: 'card', image: '/brand/cards.png', glyph: '🃏', gradient: ['#3fd07a', '#00d4ff'], minBuy: '5' },
   { id: 'baccarat', name: 'Baccarat', category: 'card', image: '/brand/cards.png', glyph: '🎴', gradient: ['#bb5cf6', '#f85677'], minBuy: '10' },
