@@ -285,6 +285,12 @@
     }
   },
   "table": {
+    "pauseDealing": "暂停发牌",
+    "resumeDealing": "继续发牌",
+    "pauseHint": "当前牌局仍会打完",
+    "closeTable": "关闭牌桌",
+    "closeBlurb": "当前牌局结束后停止发牌并退回所有筹码。此操作无法撤销。",
+    "closingBlurb": "正在关闭 — 本局结束后退回筹码。",
     "hostOptions": "房主设置",
     "removePlayer": "移除玩家",
     "remove": "移除",

@@ -285,6 +285,12 @@
     }
   },
   "table": {
+    "pauseDealing": "딜링 일시중지",
+    "resumeDealing": "딜링 재개",
+    "pauseHint": "진행 중인 핸드는 끝까지 진행됩니다",
+    "closeTable": "테이블 닫기",
+    "closeBlurb": "진행 중인 핸드가 끝나면 딜링을 멈추고 모든 스택을 반환합니다. 되돌릴 수 없습니다.",
+    "closingBlurb": "닫는 중 — 이 핸드가 끝나면 스택이 반환됩니다.",
     "hostOptions": "호스트 옵션",
     "removePlayer": "플레이어 내보내기",
     "remove": "내보내기",

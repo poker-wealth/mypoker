@@ -596,6 +596,10 @@ function LiveTable({ tableId }: { tableId: string }) {
         canStart={Boolean(snapshot?.awaitingStart)}
         onStart={() => live.command({ kind: 'start_game' })}
         onKick={(playerId) => live.command({ kind: 'kick', targetId: playerId })}
+        paused={Boolean(snapshot?.paused)}
+        closing={Boolean(snapshot?.closing)}
+        onPause={(next) => live.command({ kind: 'pause', paused: next })}
+        onCloseTable={() => live.command({ kind: 'close_table' })}
       />
     </div>
   );

@@ -285,6 +285,12 @@
     }
   },
   "table": {
+    "pauseDealing": "Jeda pembagian",
+    "resumeDealing": "Lanjutkan pembagian",
+    "pauseHint": "Ronde berjalan tetap selesai",
+    "closeTable": "Tutup meja",
+    "closeBlurb": "Pembagian berhenti dan semua chip dikembalikan setelah ronde berjalan selesai. Tidak dapat dibatalkan.",
+    "closingBlurb": "Menutup — chip dikembalikan setelah ronde ini selesai.",
     "hostOptions": "Opsi Host",
     "removePlayer": "Keluarkan pemain",
     "remove": "Keluarkan",

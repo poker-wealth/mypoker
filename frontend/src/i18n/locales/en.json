@@ -285,6 +285,12 @@
     }
   },
   "table": {
+    "pauseDealing": "Pause dealing",
+    "resumeDealing": "Resume dealing",
+    "pauseHint": "The current hand still finishes",
+    "closeTable": "Close table",
+    "closeBlurb": "Dealing stops and every stack is returned once the current hand ends. This cannot be undone.",
+    "closingBlurb": "Closing — stacks are returned when this hand ends.",
     "hostOptions": "Host Options",
     "removePlayer": "Remove a player",
     "remove": "Remove",

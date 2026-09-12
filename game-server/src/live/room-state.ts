@@ -176,7 +176,16 @@ export interface TableSnapshot {
    * viewer who can press the button knows it is theirs.
    */
   awaitingStart?: boolean;
+  /**
+   * You created this table. Sent on EVERY snapshot, not only before the first
+   * hand — the owner can pause, close and remove players for as long as the
+   * table exists, so the client must not forget who they are once it deals.
+   */
   isOwner?: boolean;
+  /** The owner has stopped new hands. A hand in progress is unaffected. */
+  paused?: boolean;
+  /** A close is queued: no more hands, and stacks are returned when this one ends. */
+  closing?: boolean;
   /** This table bans same-GPS seating: attach a location to the sit command. */
   gpsRequired?: boolean;
 

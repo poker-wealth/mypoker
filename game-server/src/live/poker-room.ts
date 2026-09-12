@@ -1819,8 +1819,22 @@ export class PokerRoom implements LiveRoom {
       this.handNumber === 0 &&
       (this.config.autoStartPlayers ?? 2) === 0 &&
       !this.manualStarted
-        ? { awaitingStart: true, isOwner: this.config.ownerId === playerId }
+        ? { awaitingStart: true }
         : {}),
+      /*
+       * OWNERSHIP IS NOT CONDITIONAL ON THE TABLE BEING UNSTARTED.
+       *
+       * This used to ride along inside the `awaitingStart` block, so the client
+       * was told "you are the owner" only until the first hand was dealt and
+       * then never again. That was harmless while start_game was the only thing
+       * an owner could do — it is the one command that stops mattering once the
+       * table is running. It stopped being harmless the moment the owner could
+       * also pause, close and remove players: the Host Options tab would appear
+       * on an idle table and vanish the moment it dealt.
+       */
+      isOwner: this.config.ownerId === playerId,
+      paused: this.paused,
+      closing: this.closing,
       // Tables with the same-GPS rule: the client should attach a location to
       // its sit command. A flag, not the rule itself — enforcement stays in
       // assertNetRulesAllow either way.

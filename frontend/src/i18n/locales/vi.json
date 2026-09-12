@@ -285,6 +285,12 @@
     }
   },
   "table": {
+    "pauseDealing": "Tạm dừng chia bài",
+    "resumeDealing": "Tiếp tục chia bài",
+    "pauseHint": "Ván hiện tại vẫn kết thúc",
+    "closeTable": "Đóng bàn",
+    "closeBlurb": "Ngừng chia bài và hoàn lại toàn bộ chip khi ván hiện tại kết thúc. Không thể hoàn tác.",
+    "closingBlurb": "Đang đóng — chip sẽ được hoàn khi ván này kết thúc.",
     "hostOptions": "Tùy chọn chủ bàn",
     "removePlayer": "Xóa người chơi",
     "remove": "Xóa",

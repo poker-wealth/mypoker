@@ -71,6 +71,10 @@ export interface TableSnapshot {
   /** Manual-start table still waiting for its owner; `isOwner` marks who may press go. */
   awaitingStart?: boolean;
   isOwner?: boolean;
+  /** Owner has stopped new hands. A hand in progress still runs. */
+  paused?: boolean;
+  /** A close is queued — no more hands, stacks returned when this one ends. */
+  closing?: boolean;
   /** This table bans same-GPS seating — attach a location to the sit command. */
   gpsRequired?: boolean;
   variant: string;
@@ -188,6 +192,10 @@ export type TableCommand =
    * who is sending it.
    */
   | { kind: 'kick'; targetId: string }
+  /** Owner stops or resumes dealing. A hand in progress is unaffected. */
+  | { kind: 'pause'; paused: boolean }
+  /** Owner closes the table. Queued: the current hand finishes, then stacks go home. */
+  | { kind: 'close_table' }
   | { kind: 'act'; action: TableAction }
   | { kind: 'sitOut' }
   | { kind: 'sitIn' }

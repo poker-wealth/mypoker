@@ -285,6 +285,12 @@
     }
   },
   "table": {
+    "pauseDealing": "配牌を一時停止",
+    "resumeDealing": "配牌を再開",
+    "pauseHint": "進行中のハンドは最後まで続きます",
+    "closeTable": "テーブルを閉じる",
+    "closeBlurb": "進行中のハンド終了後に配牌を止め、全スタックを返却します。取り消せません。",
+    "closingBlurb": "クローズ中 — このハンド終了後にスタックを返却します。",
     "hostOptions": "ホスト設定",
     "removePlayer": "プレイヤーを退席させる",
     "remove": "退席",

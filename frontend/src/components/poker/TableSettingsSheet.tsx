@@ -39,8 +39,12 @@ export function TableSettingsSheet({
   isOwner = false,
   seats = [],
   canStart = false,
+  paused = false,
+  closing = false,
   onStart,
   onKick,
+  onPause,
+  onCloseTable,
 }: {
   open: boolean;
   onClose: () => void;
@@ -52,8 +56,14 @@ export function TableSettingsSheet({
   seats?: { playerId: string; name: string; isYou: boolean }[];
   /** The manual-start button is live only before the first hand. */
   canStart?: boolean;
+  /** Owner has stopped new hands. */
+  paused?: boolean;
+  /** A close is already queued. */
+  closing?: boolean;
   onStart?: () => void;
   onKick?: (playerId: string) => void;
+  onPause?: (next: boolean) => void;
+  onCloseTable?: () => void;
 }) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<'personal' | 'host'>('personal');
@@ -115,6 +125,10 @@ export function TableSettingsSheet({
               <HostOptions
                 seats={seats}
                 canStart={canStart}
+                paused={paused}
+                closing={closing}
+                onPause={(next) => onPause?.(next)}
+                onCloseTable={() => onCloseTable?.()}
                 onStart={() => {
                   onStart?.();
                   onClose();
@@ -373,13 +387,21 @@ function TabButton({
 function HostOptions({
   seats,
   canStart,
+  paused,
+  closing,
   onStart,
   onKick,
+  onPause,
+  onCloseTable,
 }: {
   seats: { playerId: string; name: string; isYou: boolean }[];
   canStart: boolean;
+  paused: boolean;
+  closing: boolean;
   onStart: () => void;
   onKick: (playerId: string) => void;
+  onPause: (next: boolean) => void;
+  onCloseTable: () => void;
 }) {
   const { t } = useTranslation();
   const others = seats.filter((s) => !s.isYou);
@@ -397,6 +419,15 @@ function HostOptions({
           {t('table.startGame')}
         </button>
       )}
+
+      {/* Pause. The label says what it actually does — "no new hands" rather
+          than "pause", which would suggest the hand on the table freezes. */}
+      <Switch
+        label={paused ? t('table.resumeDealing') : t('table.pauseDealing')}
+        hint={t('table.pauseHint')}
+        value={paused}
+        onChange={onPause}
+      />
 
       <div>
         <Label>{t('table.removePlayer')}</Label>
@@ -424,6 +455,28 @@ function HostOptions({
         {/* Says what a removal does, because the alternative is a player
             guessing whether it costs them their chips. */}
         <p className="mt-2 text-[0.62rem] leading-snug text-dim">{t('table.removeBlurb')}</p>
+      </div>
+
+      {/* Close, last and in danger red — it ends the table for everyone.
+          Once requested it cannot be taken back, so the button reports the
+          queued state rather than offering itself again. */}
+      <div className="border-t border-border/60 pt-3">
+        {closing ? (
+          <p className="text-center text-[0.7rem] font-semibold text-warn">
+            {t('table.closingBlurb')}
+          </p>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={onCloseTable}
+              className="w-full rounded-(--radius-app) border border-danger/60 py-2.5 text-sm font-bold text-danger active:scale-[0.98]"
+            >
+              {t('table.closeTable')}
+            </button>
+            <p className="mt-2 text-[0.62rem] leading-snug text-dim">{t('table.closeBlurb')}</p>
+          </>
+        )}
       </div>
     </div>
   );
