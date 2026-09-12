@@ -159,7 +159,10 @@
     "tableNotAdmin": "Only the alliance owner or an admin can open a table.",
     "tableNotMember": "That alliance is not available to you.",
     "tableInvalid": "Those table settings were refused. Check the blinds and the seat count.",
-    "tableClosed": "Alliance tables are temporarily closed."
+    "tableClosed": "Alliance tables are temporarily closed.",
+    "title": "Alliance",
+    "noMembers": "No members yet",
+    "roster": "Members"
   },
   "data": {
     "deltaNew": "new",

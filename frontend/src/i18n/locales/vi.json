@@ -159,7 +159,10 @@
     "tableNotAdmin": "Chỉ chủ liên minh hoặc quản trị viên mới mở được bàn.",
     "tableNotMember": "Bạn không dùng được liên minh đó.",
     "tableInvalid": "Thiết lập bàn bị từ chối. Hãy kiểm tra blind và số ghế.",
-    "tableClosed": "Bàn của liên minh tạm thời đóng."
+    "tableClosed": "Bàn của liên minh tạm thời đóng.",
+    "title": "Liên minh",
+    "noMembers": "Chưa có thành viên",
+    "roster": "Thành viên"
   },
   "data": {
     "deltaNew": "mới",

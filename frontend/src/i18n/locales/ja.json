@@ -159,7 +159,10 @@
     "tableNotAdmin": "テーブルを開設できるのは同盟のオーナーまたは管理者だけです。",
     "tableNotMember": "その同盟は利用できません。",
     "tableInvalid": "テーブル設定が拒否されました。ブラインドと座席数をご確認ください。",
-    "tableClosed": "同盟テーブルは一時的に閉鎖しています。"
+    "tableClosed": "同盟テーブルは一時的に閉鎖しています。",
+    "title": "アライアンス",
+    "noMembers": "メンバーはいません",
+    "roster": "メンバー"
   },
   "data": {
     "deltaNew": "新規",

@@ -159,7 +159,10 @@
     "tableNotAdmin": "只有联盟盟主或管理员可以开设牌桌。",
     "tableNotMember": "你无法使用该联盟。",
     "tableInvalid": "牌桌设置被拒绝，请检查盲注与座位数。",
-    "tableClosed": "联盟牌桌暂时关闭。"
+    "tableClosed": "联盟牌桌暂时关闭。",
+    "title": "联盟",
+    "noMembers": "暂无成员",
+    "roster": "成员"
   },
   "data": {
     "deltaNew": "新增",
