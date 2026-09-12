@@ -389,6 +389,15 @@ export const tableCommandSchema = z.discriminatedUnion('kind', [
    * nothing a client should get to say about it.
    */
   z.object({ kind: z.literal('start_game') }),
+  /**
+   * The owner removes another player from the table. Owner-only, checked in the
+   * room against `ownerId` — never from anything the client claims.
+   *
+   * Carries only the target. There is no "and forfeit their chips" variant and
+   * there must not be: a kick returns the player's stack by the same path
+   * standing up does.
+   */
+  z.object({ kind: z.literal('kick'), targetId: z.string().min(1).max(64) }),
 ]);
 
 export type TableCommand = z.infer<typeof tableCommandSchema>;

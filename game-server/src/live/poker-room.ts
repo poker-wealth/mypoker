@@ -613,6 +613,9 @@ export class PokerRoom implements LiveRoom {
       case 'set_client_seed':
         this.setClientSeed(playerId, cmd.seed);
         break;
+      case 'kick':
+        await this.kick(playerId, cmd.targetId);
+        break;
       case 'start_game':
         this.startGame(playerId);
         break;
@@ -711,6 +714,48 @@ export class PokerRoom implements LiveRoom {
         throw new RoomError('this table does not seat two players at the same GPS point');
       }
     }
+  }
+
+  /**
+   * The owner removes another player from the table.
+   *
+   * MONEY-TOUCHING — senior review before merge (root CLAUDE.md).
+   *
+   * Deliberately built on `stand()` rather than a second removal path: the
+   * kicked player's chips must come off the table by exactly the route a
+   * voluntary departure uses, which is already the tested one. A bespoke
+   * "remove player" that touched the stack itself would be a second money path
+   * to keep correct forever.
+   *
+   * IT NEVER FOLDS A LIVE HAND. `stand()` folds the departing player when it is
+   * their turn, which is right when THEY chose to leave — they have decided the
+   * hand is over for them. It is wrong here: an owner could otherwise fold a
+   * player who is holding the best hand and has money in the pot, which is
+   * indistinguishable from theft. Mid-hand, the kick is queued and takes effect
+   * when the hand ends, so the player keeps the hand they paid into.
+   *
+   * The owner cannot kick themselves — that is standing up, and routing it here
+   * would skip the seat checks `stand` does for the leaver.
+   */
+  private async kick(actorId: string, targetId: string): Promise<void> {
+    if (this.config.ownerId !== actorId) {
+      throw new RoomError('only the table creator can remove a player');
+    }
+    if (actorId === targetId) throw new RoomError('use stand up to leave your own seat');
+
+    const seat = this.requireSeat(targetId);
+
+    // Mid-hand: queue it, do NOT fold. Same fields `stand` sets for a player
+    // who asked to leave during a hand — minus the forced fold.
+    if (seat.inHand && this.phase === 'IN_HAND') {
+      seat.leaveAfterHand = true;
+      seat.sittingOut = true;
+      this.push();
+      return;
+    }
+
+    await this.releaseSeat(seat.index);
+    this.push();
   }
 
   private async stand(playerId: string): Promise<void> {
