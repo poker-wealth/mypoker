@@ -120,9 +120,13 @@ export function TableSettingsSheet({
                   type="button"
                   onClick={() => prefs.setFourColour(four)}
                   aria-pressed={prefs.fourColour === four}
+                  // NO BOX. The cards sit bare on the panel; only the chosen
+                  // option is ringed. A filled, bordered square around each
+                  // pair made two heavy containers compete with the cards that
+                  // are the actual choice.
                   className={cn(
-                    'flex flex-1 items-center justify-center gap-1 rounded-lg border-2 bg-surface-2 py-2.5 transition-colors',
-                    prefs.fourColour === four ? 'border-brand' : 'border-border',
+                    'flex flex-1 items-center justify-center gap-1 rounded-lg border-2 py-2.5 transition-colors',
+                    prefs.fourColour === four ? 'border-brand' : 'border-transparent',
                   )}
                 >
                   {/* Four miniature cards, in the suit colours that option
@@ -151,7 +155,20 @@ export function TableSettingsSheet({
 
             {/* ── Default raise ────────────────────────────────────────── */}
             <Label>{t('table.defaultRaise')}</Label>
-            <div className="mb-3 flex items-center gap-2">
+            {/* CIRCLES, and a `+` at BOTH ends, as the reference has it. These
+                were wide pills with a single trailing `+`; the row reads as a
+                set of equal choices, and a stretched pill next to a round
+                button does not. Fixed-size so they stay circular whatever the
+                panel width — `flex-1` is what made them ovals. */}
+            <div className="mb-3 flex items-center justify-center gap-2.5">
+              <RaiseCircle
+                onClick={() => setCustomOpen((v) => !v)}
+                label={t('table.customRaise')}
+                expanded={customOpen}
+              >
+                <Plus size={15} />
+              </RaiseCircle>
+
               {RAISE_PRESETS.map((preset) => (
                 <button
                   key={preset.id}
@@ -159,7 +176,7 @@ export function TableSettingsSheet({
                   onClick={() => prefs.setDefaultRaise(preset.id)}
                   aria-pressed={prefs.defaultRaise === preset.id}
                   className={cn(
-                    'h-10 flex-1 rounded-full border text-[0.72rem] font-bold transition-colors',
+                    'grid size-11 shrink-0 place-items-center rounded-full border text-[0.72rem] font-bold transition-colors',
                     prefs.defaultRaise === preset.id
                       ? 'border-brand bg-brand/15 text-brand'
                       : 'border-border bg-surface-2 text-dim',
@@ -168,15 +185,14 @@ export function TableSettingsSheet({
                   {preset.label}
                 </button>
               ))}
-              <button
-                type="button"
+
+              <RaiseCircle
                 onClick={() => setCustomOpen((v) => !v)}
-                aria-label={t('table.customRaise')}
-                aria-expanded={customOpen}
-                className="grid size-10 shrink-0 place-items-center rounded-full border border-border bg-surface-2 text-dim active:scale-95"
+                label={t('table.customRaise')}
+                expanded={customOpen}
               >
                 <Plus size={15} />
-              </button>
+              </RaiseCircle>
             </div>
 
             <div className="mb-4 rounded-(--radius-app) bg-surface-2 p-3 text-center">
@@ -245,6 +261,37 @@ export function TableSettingsSheet({
         </>
       )}
     </AnimatePresence>
+  );
+}
+
+/**
+ * The `+` at either end of the raise row.
+ *
+ * Both open the same custom-amount field — the reference puts one on each side
+ * and they are the same control, not two different ones. Shared rather than
+ * written twice so they cannot drift apart.
+ */
+function RaiseCircle({
+  onClick,
+  label,
+  expanded,
+  children,
+}: {
+  onClick: () => void;
+  label: string;
+  expanded: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-expanded={expanded}
+      className="grid size-11 shrink-0 place-items-center rounded-full border border-border bg-surface-2 text-dim transition-colors active:scale-95"
+    >
+      {children}
+    </button>
   );
 }
 
