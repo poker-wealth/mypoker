@@ -101,6 +101,35 @@ export const TABLE_DESIGNS: TableDesign[] = [
   },
 ];
 
+/**
+ * GROUND COLOURS — what a "table design" means now.
+ *
+ * The felts are gone on both clients: a design no longer selects artwork or a
+ * rail, it selects the colour of the plain ground the seats sit on. The seats
+ * make the oval; nothing is drawn behind them.
+ *
+ * THE SAME TRIPLES AS THE MINI APP (`frontend/src/lib/tableDesigns.ts`), to the
+ * hex. The two clients are one product and a player moving between them must
+ * not find their green table is a different green — that is the whole reason
+ * these are duplicated rather than each side picking its own.
+ *
+ * Inner, mid, outer: the radial stops, lightest at the centre.
+ */
+export const GROUNDS: Record<string, readonly [string, string, string]> = {
+  midnight: ['#3a3f4a', '#262a33', '#14161b'],
+  emerald: ['#1f5f4a', '#14402f', '#0a1f18'],
+  neon: ['#1e4a8a', '#143363', '#0a1a33'],
+  'house-maroon': ['#6d2230', '#4a1622', '#2a0d14'],
+};
+
+/** The red ground, for any design with no colour of its own. */
+const DEFAULT_GROUND = GROUNDS['house-maroon']!;
+
+/** The three radial stops for a design's ground. */
+export function groundFor(design: TableDesign): readonly [string, string, string] {
+  return GROUNDS[design.id] ?? DEFAULT_GROUND;
+}
+
 export const DEFAULT_DESIGN_ID = 'emerald';
 
 export function designById(id: string): TableDesign {

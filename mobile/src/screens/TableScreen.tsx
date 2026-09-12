@@ -16,6 +16,7 @@ import { HoldemFelt } from '../components/games/HoldemFelt';
 import { BuyInSheet } from '../components/poker/BuyInSheet';
 import { JackpotBurst } from '../components/poker/JackpotBurst';
 import { TableDesignSheet } from '../components/poker/TableDesignSheet';
+import { TableGround } from '../components/poker/TableGround';
 import { ChatBox } from '../components/poker/ChatBox';
 import { ChallengeModal } from '../components/poker/ChallengeModal';
 import { useTableChat } from '../table/useTableChat';
@@ -153,6 +154,12 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
 
   return (
     <View style={styles.screen}>
+      {/* The ground, behind everything — the whole screen, not a box in the
+          middle of a black one. Matches the Mini App, which paints the same
+          colour across the top bar, the dock and the toolbar rather than
+          leaving them on the app's near-black surface. */}
+      <TableGround />
+
       {disconnected ? (
         <View style={styles.connectionBanner} pointerEvents="box-none">
           <View style={styles.connectionBannerInner}>
@@ -389,7 +396,7 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: theme.bg },
+  screen: { flex: 1 },
   content: { padding: space.md, gap: space.md },
   centre: {
     flex: 1,
