@@ -94,12 +94,12 @@ export function PokerTable({ snapshot, onSit, design: override }: PokerTableProp
 
   return (
     <View style={[styles.stage, { width: tableWidth, height: tableHeight }]}>
-      {design.art ? (
-        <Image source={design.art} style={styles.art} resizeMode="contain" />
-      ) : (
-        // The brand-palette fallback, matching the web's CSS table.
-        <View style={styles.cssTable} />
-      )}
+      {/* NO TABLE SURFACE — neither the artwork nor the CSS fallback.
+          Mirrors the Mini App, where the felts were removed entirely: a design
+          now selects the colour of the GROUND and nothing else, and the ground
+          is painted once behind the whole screen (TableGround). The seats keep
+          their ring — those positions were measured against the old artwork and
+          are what make the oval — but nothing is drawn behind them. */}
 
       {/* The middle of the felt: pot above the board, as the web lays it out. */}
       <View
@@ -113,10 +113,16 @@ export function PokerTable({ snapshot, onSit, design: override }: PokerTableProp
         )}
 
         <View style={styles.board}>
-          {/* Streets still to come stay as backs, so the board keeps its shape as it fills. */}
+          {/* A street still to come is an EMPTY SLOT, not a card back.
+              This drew five face-down cards, so an undealt board looked like
+              five real cards nobody could see — and once the backs were
+              repaletted elsewhere it read as five gold rectangles across the
+              felt. The Mini App draws a dashed outline for each street not yet
+              dealt, which is the honest shape: there is no card there. */}
           {Array.from({ length: 5 }, (_, i) => {
             const card = board[i];
-            return <PlayingCard key={i} {...(card ? { card } : {})} size="md" />;
+            if (card) return <PlayingCard key={i} card={card} size="md" />;
+            return <View key={i} style={styles.boardSlot} />;
           })}
         </View>
 
@@ -174,11 +180,14 @@ export function PokerTable({ snapshot, onSit, design: override }: PokerTableProp
                 style={({ pressed }) => [
                   styles.emptyAvatar,
                   styles.emptyOpen,
-                  { borderColor: design.accent },
+                  // NOT design.accent: that was chosen to read against a
+                  // felt that no longer exists, and on Midnight it is blue on
+                  // a red ground. Faded white, like the Mini App.
+                  { borderColor: 'rgba(255,255,255,0.22)' },
                   pressed && styles.pressed,
                 ]}
               >
-                <Text style={[styles.sitText, { color: design.accent }]}>+ SIT</Text>
+                <Text style={[styles.sitText, { color: 'rgba(255,255,255,0.34)' }]}>+ SIT</Text>
               </Pressable>
             ) : (
               <View style={[styles.emptyAvatar, styles.emptyInert]} />
@@ -226,6 +235,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)',
   },
   potText: { fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+  /* An undealt street: a dashed outline the size of a card, mirroring the
+     Mini App. Faint enough to read as absence rather than as a card. */
+  boardSlot: {
+    width: 44,
+    height: 64,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
   board: { flexDirection: 'row', gap: 3 },
   message: {
     color: theme.text,
@@ -257,7 +277,8 @@ const styles = StyleSheet.create({
   // Matches PlayerSeat's own AVATAR / emptyOpen / emptyInert / sitText treatment for an
   // unoccupied chair, so a ring slot with no `LiveSeat` still looks like the rest of the rail.
   emptyAvatar: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center' },
-  emptyOpen: { borderWidth: 2, borderStyle: 'dashed', backgroundColor: 'rgba(0,0,0,0.55)' },
+  // Hairline, and NO fill — a dark disc made an empty chair read as occupied.
+  emptyOpen: { borderWidth: 1, borderStyle: 'dashed' },
   emptyInert: {
     borderWidth: 1,
     borderStyle: 'dashed',

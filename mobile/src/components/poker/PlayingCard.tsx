@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { useTablePrefs } from '../../table/tablePrefs';
 
 /**
  * A single playing card.
@@ -50,6 +51,29 @@ export function PlayingCard({ card, faceDown, size = 'md' }: PlayingCardProps) {
   const glyph = SUIT_GLYPH[suitKey] ?? '';
   const red = isJoker ? card === 'jb' : RED_SUITS.has(suitKey);
 
+  /**
+   * FOUR-COLOUR DECK, when the player has chosen one in table settings.
+   * Diamonds blue, clubs green; hearts and spades unchanged. The point is
+   * telling the two reds and the two blacks apart at a glance.
+   *
+   * Read from the store here rather than threaded down as a prop: every card on
+   * every felt needs it, and a prop would have to cross seats, the board and
+   * every game's felt to arrive. Same shape as the Mini App, where this
+   * preference was also being SAVED and never read.
+   */
+  const fourColour = useTablePrefs((st) => st.fourColour);
+  const ink = fourColour
+    ? suitKey === 'd'
+      ? '#2563eb'
+      : suitKey === 'c'
+        ? '#15803d'
+        : red
+          ? '#dc2626'
+          : '#111827'
+    : red
+      ? '#dc2626'
+      : '#111827';
+
   // Unparseable rather than merely unusual: draw the back instead of a card reading "undefined".
   if (!isJoker && !glyph) {
     return (
@@ -62,12 +86,12 @@ export function PlayingCard({ card, faceDown, size = 'md' }: PlayingCardProps) {
   return (
     <View style={[styles.card, styles.face, { width: s.width, height: s.height }]}>
       <Text
-        style={[styles.rank, { fontSize: s.rank, color: red ? '#dc2626' : '#111827' }]}
+        style={[styles.rank, { fontSize: s.rank, color: ink }]}
         numberOfLines={1}
       >
         {rank}
       </Text>
-      <Text style={[styles.suit, { fontSize: s.suit, color: red ? '#dc2626' : '#111827' }]}>
+      <Text style={[styles.suit, { fontSize: s.suit, color: ink }]}>
         {glyph}
       </Text>
     </View>
@@ -89,17 +113,27 @@ const styles = StyleSheet.create({
   },
   face: { backgroundColor: '#fff', borderWidth: 1, borderColor: 'rgba(0,0,0,0.12)' },
   back: {
-    backgroundColor: '#1e1b4b',
+    /*
+     * GOLD, not indigo. This was `#1e1b4b` with a `#312e81` inner — the purple
+     * brand from before the Sep 2026 repalette to the HHPoker reference. The
+     * Mini App's back is the gold brand gradient; mobile kept the old colour,
+     * so a face-down card was a blue rectangle on a green table. Two clients,
+     * one deck.
+     *
+     * Flat gold rather than a gradient: RN has no CSS gradient, and a card back
+     * does not justify a dependency. The inner panel gives the layered look.
+     */
+    backgroundColor: '#8a6a28',
     borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.35)',
+    borderColor: 'rgba(235,211,160,0.45)',
     padding: 4,
   },
   backInner: {
     flex: 1,
     borderRadius: 3,
     borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.25)',
-    backgroundColor: '#312e81',
+    borderColor: 'rgba(235,211,160,0.30)',
+    backgroundColor: '#b8934f',
   },
   rank: { fontWeight: '800', lineHeight: undefined },
   suit: { alignSelf: 'flex-end', lineHeight: undefined },

@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../api';
 import { getToken } from '../session';
 import { Badge, Button, Sheet } from '../ui';
-import { ChatIcon } from '../icons';
+import { ChatIcon, ListIcon, MicIcon, SpadeIcon } from '../icons';
 import { radius, space, theme } from '../theme';
 import { useLiveTable } from '../table/useLiveTable';
 import { ActionBar } from '../components/poker/ActionBar';
@@ -15,7 +15,13 @@ import { feltFor } from '../components/games/registry';
 import { HoldemFelt } from '../components/games/HoldemFelt';
 import { BuyInSheet } from '../components/poker/BuyInSheet';
 import { JackpotBurst } from '../components/poker/JackpotBurst';
-import { TableDesignSheet } from '../components/poker/TableDesignSheet';
+import { TableSettingsSheet } from '../components/poker/TableSettingsSheet';
+import { TableGround } from '../components/poker/TableGround';
+import { TableMenu } from '../components/poker/TableMenu';
+import { PlayerListPanel } from '../components/poker/PlayerListPanel';
+import { CommentSheet } from '../components/poker/CommentSheet';
+import { inviteLinkFor } from '../lib/tableInvite';
+import * as Clipboard from 'expo-clipboard';
 import { ChatBox } from '../components/poker/ChatBox';
 import { ChallengeModal } from '../components/poker/ChallengeModal';
 import { useTableChat } from '../table/useTableChat';
@@ -68,7 +74,9 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
    * the server ever sends an empty name.
    */
   useEffect(() => {
-    navigation.setOptions({ title: snapshot?.name || tableId });
+    navigation.setOptions({
+      title: snapshot?.name || tableId,
+    });
   }, [navigation, snapshot?.name, tableId]);
   const { messages, sendChat, sendVoice } = useTableChat(socket);
   const { challengerId, clear: clearChallenge } = useChallengePrompt(socket);
@@ -77,6 +85,28 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
   /** Which jackpot this viewer has already watched, so a re-render cannot replay it. */
   const [jackpotSeen, setJackpotSeen] = useState<string | null>(null);
   const [designOpen, setDesignOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [playersOpen, setPlayersOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+
+  /**
+   * Copy this table's invite link.
+   *
+   * The SAME Telegram deep link the create sheet hands out — not a web URL,
+   * which pasted into Telegram opens the phone's browser and shows the
+   * recipient a sign-in page instead of the table.
+   *
+   * No join code: this is shared from INSIDE a table by whoever is sitting
+   * there, who may have been let in by a creator that did not mean the code to
+   * travel on. The creator's own dialog is where the code-bearing link comes
+   * from.
+   */
+  const shareInvite = (): void => {
+    void Clipboard.setStringAsync(inviteLinkFor(tableId)).catch(() => {
+      // Clipboard can fail on a locked device. A failed copy is a nuisance,
+      // not a dead end — and silently pretending it worked is worse.
+    });
+  };
   // By table id for the fixed tables; by the snapshot's game for created
   // `t-…` ones, whose id is in no registry. Same resolution as the Mini App.
   const Felt = feltFor(tableId) ?? (snapshot?.game ? feltFor(snapshot.game) : undefined);
@@ -153,6 +183,27 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
 
   return (
     <View style={styles.screen}>
+      {/* The ground, behind everything — the whole screen, not a box in the
+          middle of a black one. Matches the Mini App, which paints the same
+          colour across the top bar, the dock and the toolbar rather than
+          leaving them on the app's near-black surface. */}
+      <TableGround />
+
+      {/* THE MENU, floating on the table just under the header — where the
+          reference puts it. Not a header control: the header keeps its own back
+          button, and `headerLeft` would have replaced that rather than sitting
+          beside it. Not under the felt either, which is where it started and
+          where nobody looks for it. */}
+      <Pressable
+        onPress={() => setMenuOpen(true)}
+        hitSlop={12}
+        accessibilityRole="button"
+        accessibilityLabel={t('table.menuTitle')}
+        style={styles.menuFab}
+      >
+        <Text style={styles.menuGlyph}>☰</Text>
+      </Pressable>
+
       {disconnected ? (
         <View style={styles.connectionBanner} pointerEvents="box-none">
           <View style={styles.connectionBannerInner}>
@@ -249,41 +300,66 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
           </View>
         ) : null}
 
-        {/* Chat is no longer a pill in this row — it is the floating icon button below, matching
-            the Mini App. Only the design picker remains inline. */}
-        {designable ? (
-          <View style={styles.tableTools}>
-            <Pressable onPress={() => setDesignOpen(true)} style={styles.toolButton}>
-              <Text style={styles.toolText}>Table design</Text>
-            </Pressable>
-          </View>
-        ) : null}
+        {/* The menu button used to be here, under the felt. It now lives in the
+            HEADER beside Back (see `navigation.setOptions` above), and leaving
+            this one behind meant two hamburgers on one screen — one where the
+            reference puts it and one where it used to be. */}
       </ScrollView>
 
-      {/*
-        Chat is a FLOATING button, bottom-right, with an icon — the Mini App's own arrangement
-        (frontend/src/pages/Table.tsx: `absolute bottom-[4.5rem] right-4`, size-12, rounded-full,
-        MessageSquare, brand-coloured while open). It was an inline pill labelled "Chat" in a row
-        under the felt, which is a different control in a different place.
+      <PlayerListPanel
+        open={playersOpen}
+        onClose={() => setPlayersOpen(false)}
+        seats={snapshot.seats}
+        tableId={tableId}
+        {...(snapshot.spectators !== undefined ? { spectators: snapshot.spectators } : {})}
+        {...(snapshot.openedAt !== undefined ? { openedAt: snapshot.openedAt } : {})}
+      />
 
-        Unread count rides on the button rather than in the label, so the button stays a circle.
-      */}
-      <Pressable
-        onPress={() => setChatOpen((o) => !o)}
-        style={[styles.chatFab, chatOpen && styles.chatFabOn]}
-        accessibilityLabel="Table chat"
-      >
-        <ChatIcon color={chatOpen ? '#fff' : theme.dim} size={20} />
-        {messages.length > 0 && !chatOpen ? (
-          <View style={styles.chatBadge}>
-            <Text style={styles.chatBadgeText}>
-              {messages.length > 99 ? '99+' : messages.length}
-            </Text>
-          </View>
-        ) : null}
-      </Pressable>
+      <CommentSheet
+        open={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        onSend={sendChat}
+        messages={messages}
+        disabled={!you}
+      />
 
-      <TableDesignSheet open={designOpen} onClose={() => setDesignOpen(false)} />
+      <TableMenu
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onShare={shareInvite}
+        {...(you
+          ? {
+              // `stand` gives the seat up and keeps you watching — NOT
+              // `sitOut`, which keeps the seat and skips hands. Wiring the
+              // wrong one takes a player's seat away when they meant to sit
+              // out a single hand, at a table they may not get back into.
+              onStandUp: () => command({ kind: 'stand' }),
+              onBuyIn: () => setBuyInFor(you.index),
+              onSitOut: () => command({ kind: 'sitOut' }),
+            }
+          : {})}
+        onOptions={() => setDesignOpen(true)}
+        onExit={() => navigation.goBack()}
+      />
+
+      <TableSettingsSheet
+        open={designOpen}
+        onClose={() => setDesignOpen(false)}
+        tableId={tableId}
+        isOwner={Boolean(snapshot.isOwner)}
+        seats={snapshot.seats.map((s) => ({
+          playerId: s.playerId,
+          name: s.name,
+          isYou: Boolean(s.isYou),
+        }))}
+        canStart={Boolean(snapshot.awaitingStart)}
+        paused={Boolean(snapshot.paused)}
+        closing={Boolean(snapshot.closing)}
+        onStart={() => command({ kind: 'start_game' })}
+        onKick={(playerId) => command({ kind: 'kick', targetId: playerId })}
+        onPause={(next) => command({ kind: 'pause', paused: next })}
+        onCloseTable={() => command({ kind: 'close_table' })}
+      />
 
       {chatOpen && (
         <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, flexDirection: 'row', zIndex: 100 }}>
@@ -358,14 +434,16 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
         />
       ) : null}
 
-      {/* Bottom-inset wrapper, not padding inside ActionBar (out of scope, see ActionBar.tsx):
-          on a home-indicator iPhone the Fold/Call/Raise row would otherwise sit inside the
-          system swipe-up zone, where a swipe-to-home during your turn risks a fold-by-timeout. */}
+      {/* The bottom inset moved to the TOOLBAR below, which is now the lowest thing on the
+          screen and always present. Keeping it here as well would pad twice: a gap of the
+          home-indicator height between the Fold/Call/Raise row and the toolbar. The reason
+          for the inset is unchanged — on a home-indicator iPhone nothing interactive may sit
+          in the system swipe-up zone, where a swipe-to-home during your turn risks a
+          fold-by-timeout — it is just carried by whatever is actually at the bottom. */}
       {yourTurn && snapshot.legal ? (
-        // Background matches ActionBar's own bar colour (`#14142a`, ActionBar.tsx) so the inset
-        // padding reads as the bar extending under the home indicator, not a mismatched stripe
-        // of the screen background (`theme.bg`, `#0d0d1a`) beneath it.
-        <View style={[styles.actionBarInset, { paddingBottom: insets.bottom }]}>
+        // Background matches ActionBar's own bar colour (`#14142a`, ActionBar.tsx) so it does
+        // not read as a mismatched stripe against the screen background beneath it.
+        <View style={styles.actionBarInset}>
           {/* ActionBar itself (out of scope here — see ActionBar.tsx) has no disabled prop, so
               disconnected is enforced from outside: dim it and swallow every touch so a tap
               during a reconnect cannot look like it did something. `sendInner` in tableSocket.ts
@@ -384,12 +462,78 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
           </View>
         </View>
       ) : null}
+
+      {/*
+        THE TABLE TOOLBAR, as the reference draws it: players, comments, voice,
+        chat. It replaces a single floating chat button, which was the only
+        control down here and left the other three with no way in at all.
+
+        EVERY ICON OPENS SOMETHING THAT EXISTS. The bar was deliberately not
+        built until the player list and the comment sheet were ported — four
+        icons where two open nothing is the dead-control fault this project
+        keeps removing.
+
+        Voice and chat both reach the chat drawer, because the recorder lives
+        inside it. That is the Mini App's arrangement too, and it is honest: the
+        mic is a shortcut to the thing that records, not a separate screen.
+      */}
+      <View style={[styles.toolbar, { paddingBottom: insets.bottom || space.sm }]}>
+        <ToolIcon label={t('table.playerList')} onPress={() => setPlayersOpen(true)}>
+          <ListIcon color={theme.dim} size={22} />
+        </ToolIcon>
+        <ToolIcon label={t('table.comment')} onPress={() => setCommentsOpen(true)}>
+          <SpadeIcon color={theme.dim} size={22} />
+        </ToolIcon>
+        <ToolIcon label={t('table.voice')} onPress={() => setChatOpen(true)}>
+          <MicIcon color={theme.dim} size={22} />
+        </ToolIcon>
+        <ToolIcon label={t('table.chat')} onPress={() => setChatOpen((o) => !o)}>
+          <ChatIcon color={chatOpen ? theme.brand : theme.dim} size={22} />
+          {messages.length > 0 && !chatOpen ? (
+            <View style={styles.chatBadge}>
+              <Text style={styles.chatBadgeText}>
+                {messages.length > 99 ? '99+' : messages.length}
+              </Text>
+            </View>
+          ) : null}
+        </ToolIcon>
+      </View>
     </View>
   );
 }
 
+/**
+ * One icon in the table toolbar.
+ *
+ * The label is not drawn — it is the accessibility name. Four unlabelled
+ * glyphs are readable to sighted players and silent to everyone else, so the
+ * text still has to exist somewhere; here it goes where a screen reader can
+ * reach it rather than nowhere at all.
+ */
+function ToolIcon({
+  label,
+  onPress,
+  children,
+}: {
+  label: string;
+  onPress: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => [styles.tool, pressed && styles.toolPressed]}
+      hitSlop={8}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: theme.bg },
+  screen: { flex: 1 },
   content: { padding: space.md, gap: space.md },
   centre: {
     flex: 1,
@@ -399,22 +543,23 @@ const styles = StyleSheet.create({
     padding: space.xl,
     backgroundColor: theme.bg,
   },
-  // Floating, bottom-right, clear of the ActionBar that appears on your turn.
-  chatFab: {
-    position: 'absolute',
-    right: 16,
-    bottom: 72,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: theme.border,
-    backgroundColor: theme.surface,
+  /*
+   * The toolbar sits at the very bottom, across the full width, under the felt
+   * rather than floating over it — so it never covers a seat, and the ActionBar
+   * that appears on your turn stacks above it instead of fighting it for the
+   * same corner.
+   */
+  toolbar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
     alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 50,
+    paddingTop: space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.border,
+    backgroundColor: theme.bg,
   },
-  chatFabOn: { backgroundColor: theme.brand, borderColor: theme.brand },
+  tool: { paddingHorizontal: space.lg, paddingVertical: space.sm },
+  toolPressed: { opacity: 0.55 },
   chatBadge: {
     position: 'absolute',
     top: -2,
@@ -466,6 +611,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg,
     paddingVertical: 7,
   },
+  /** The hamburger. Sized up from the pill text so it reads as an icon. */
+  /* Top-left, on the table, just below the header. Absolute so it floats over
+     the felt rather than taking a row of its own. */
+  menuFab: { position: 'absolute', top: space.sm, left: space.md, zIndex: 20, padding: space.sm },
+  menuGlyph: { color: theme.text, fontSize: 30, lineHeight: 32 },
+  /* Back and the menu, side by side — headerLeft replaces the back button, so
+     the chevron is drawn here rather than lost. */
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingLeft: space.sm },
+  headerGlyph: { color: theme.text, fontSize: 30, lineHeight: 32 },
+  headerBurger: { color: theme.text, fontSize: 19, lineHeight: 21 },
   toolText: { color: theme.dim, fontSize: 12, fontWeight: '600' },
   // The sheet sizes to its content, and ChatBox is `flex: 1` — without a height it collapses to
   // nothing and the composer sits under the title with no log above it.

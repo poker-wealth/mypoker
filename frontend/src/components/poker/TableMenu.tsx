@@ -108,6 +108,13 @@ export function TableMenu({
                the last row. The reference ends after "Exit game" and lets the
                table show beneath. `max-h` keeps it scrollable on a short
                screen rather than running off the bottom. */
+            /* SAFE AREA. `fixed` is viewport-relative, so the safe-area padding
+               on `body` (index.css) does not reach it — a drawer pinned to
+               `top-0` puts its first row under the status bar and Telegram's
+               own header. Reported on a device screenshot: the table id and
+               the clock were sitting behind the carrier and battery icons.
+               The native app had the identical fault. */
+            style={{ paddingTop: 'env(safe-area-inset-top)' }}
             className="fixed left-0 top-0 z-50 flex max-h-[88vh] w-[min(68vw,17rem)] flex-col overflow-y-auto rounded-br-2xl border-b border-r border-border bg-surface/95 shadow-2xl backdrop-blur-md"
           >
             <h2 className="px-4 pb-2 pt-5 text-[0.7rem] font-bold uppercase tracking-wider text-dim">

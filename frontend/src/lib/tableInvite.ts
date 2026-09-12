@@ -56,7 +56,24 @@ export function invitePath(invite: TableInvite): string {
  * launches the phone's browser — a fresh session, so the friend you invited
  * meets a sign-in page instead of your table. This opens the Mini App as
  * them, routed to the table by the token above.
+ *
+ * NO `/app` SEGMENT. It used to be `t.me/<bot>/app?startapp=…`, and every link
+ * anyone shared answered **"Bot application not found"** — reported 12 Sep 2026
+ * with a real link that did it. That path segment is not the word "app": it is
+ * the SHORT NAME of a Mini App registered against the bot in BotFather, and
+ * this bot has none by that name. Telegram looked up an app called `app`, found
+ * nothing, and said so.
+ *
+ * `t.me/<bot>?startapp=<token>` opens the bot's MAIN Mini App instead — the one
+ * configured on the bot itself, which is the one players already open from the
+ * chat, so it is known to exist. The token arrives the same way (`start_param`,
+ * see AppShell) and routing is unchanged.
+ *
+ * If a named Mini App is ever registered, set `VITE_TELEGRAM_APP_NAME` and the
+ * named form comes back. It is deliberately EMPTY by default: a wrong short
+ * name here does not degrade, it breaks every invite in the product.
  */
-export function inviteUrl(invite: TableInvite, botName: string): string {
-  return `https://t.me/${botName}/app?startapp=${encodeInvite(invite)}`;
+export function inviteUrl(invite: TableInvite, botName: string, appName = ''): string {
+  const path = appName ? `/${appName}` : '';
+  return `https://t.me/${botName}${path}?startapp=${encodeInvite(invite)}`;
 }

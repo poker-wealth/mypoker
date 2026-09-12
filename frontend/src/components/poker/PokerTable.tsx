@@ -94,13 +94,37 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
   const [aw = '1', ah = '1'] = design.aspect.split('/').map((n) => n.trim());
   const isWide = Number(aw) > Number(ah);
 
+  /**
+   * The felt's width when HEIGHT is the binding constraint.
+   *
+   * The table was sized by width alone: it took the full width of the screen
+   * and derived its height from the aspect ratio, which on a 3/4 portrait felt
+   * is a third taller than it is wide. On a phone that is taller than the space
+   * between the top bar and the dock, so the page scrolled — you could not see
+   * the seats at the top and the controls at the bottom at the same time.
+   * Reported 12 Sep 2026: "the board should fit into the screen so we don't
+   * need to scroll down to see the tabs at the bottom nor scroll up to see the
+   * tabs at the top."
+   *
+   * `100cqh` is the height this container actually has (the flex row between
+   * the bar and the dock, which is a size container). Multiplied by the aspect
+   * ratio it gives the width at which the table exactly fills that height;
+   * `min()` with 100% keeps the old width-driven behaviour whenever width is
+   * the tighter of the two. So the felt now fits the smaller dimension, which
+   * is what "fits the screen" means, and nothing changes on a wide screen
+   * where height was never the problem.
+   */
+  const fitWidth = `min(100%, calc(100cqh * ${Number(aw) / Number(ah)}))`;
+
   // Mobile keeps the 440px felt; desktop scales it up so the table fills the
   // screen instead of sitting as a small oval in a sea of empty space. The felt
   // is aspect-ratio + %-positioned, so the whole table (seats) scales together.
   return (
     <div
       className={cn(
-        'relative mx-auto flex w-full items-center justify-center',
+        // `h-full` + a size container: the box the felt must fit INSIDE. Its
+        // height is what `100cqh` reads in `fitWidth` above.
+        'relative mx-auto flex h-full w-full items-center justify-center',
         // A LANDSCAPE felt is short, so it can afford to be much wider — capping
         // it at the portrait width leaves a cramped strip with the seats
         // crowding each other. A portrait felt keeps the original ceiling,
@@ -114,6 +138,7 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
           ? 'px-0 max-w-none md:max-w-[1100px] lg:max-w-[1400px]'
           : 'px-5 max-w-[440px] md:max-w-[620px] lg:max-w-[780px]',
       )}
+      style={{ containerType: 'size' }}
     >
       {/*
         `container-type: size` makes this box the reference for the seats.
@@ -126,8 +151,8 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
         any felt, in either orientation.
       */}
       <div
-        className="relative w-full"
-        style={{ aspectRatio: design.aspect, containerType: 'size' }}
+        className="relative"
+        style={{ aspectRatio: design.aspect, containerType: 'size', width: fitWidth }}
       >
 
         {/* Embedded HTML5 Canvas Element for inspection */}

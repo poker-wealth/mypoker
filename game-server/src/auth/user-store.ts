@@ -701,6 +701,76 @@ export const userStore = {
    * — so they are reachable by exact id only, which the admin route says out
    * loud rather than returning a silently short list.
    */
+  /**
+   * Display names for a set of players, as `{ playerId: name }`.
+   *
+   * Exists for the league roster. `financial-core` owns membership and returns
+   * `{ playerId, role, joinedAt }` — correctly, because identity is not its to
+   * hold (root CLAUDE.md, facts vs rules). So the gateway, which does own
+   * identity, puts the names on as the roster passes through.
+   *
+   * ONE QUERY for the whole roster rather than one per member: a fifty-member
+   * league would otherwise be fifty round trips to render a list.
+   *
+   * A player with no name is simply absent from the result rather than given a
+   * placeholder — the caller decides what to show for someone it cannot name,
+   * and inventing "Player 1234" here would put a fabricated name in a database
+   * result.
+   */
+  async namesFor(playerIds: readonly string[]): Promise<Record<string, string>> {
+    if (playerIds.length === 0) return {};
+    const docs = await UserModel.find({ _id: { $in: playerIds } })
+      .select({ displayName: 1 })
+      .lean();
+
+    const names: Record<string, string> = {};
+    for (const d of docs) {
+      const name = (d as { displayName?: string }).displayName;
+      if (name) names[String(d._id)] = name;
+    }
+    return names;
+  },
+
+  /**
+   * Remember what a Telegram player is called.
+   *
+   * WHY THIS EXISTS. A Telegram player's name arrives in `initData` at every
+   * sign-in and was never written down, so the moment the request finished,
+   * nothing on the server could name them again. The alliance roster showed it
+   * first — six members listed as `tg-1030053323` and `player-c8c97c9f-…`,
+   * which is the raw key, readable by nobody. The player list at a table, and
+   * anything else that has an id and needs a name, had the same hole.
+   *
+   * WHAT IS STORED is the name and the picture and nothing else: no email, no
+   * password, no phone. Telegram holds those and this is a cache of what they
+   * tell us, not an account we are opening on someone's behalf.
+   *
+   * REWRITTEN ON EVERY SIGN-IN, deliberately. A player who changes their name
+   * on Telegram has changed their name; a cache that keeps the old one is worse
+   * than no cache, because it is confidently wrong. The cost is one upsert per
+   * sign-in, which is not a hot path.
+   *
+   * NEVER FAILS A SIGN-IN. The caller ignores the outcome — being unable to
+   * cache a name is not a reason to refuse someone entry to the app, and the
+   * fallbacks that existed before this (show the id) still hold.
+   */
+  async rememberTelegramProfile(
+    playerId: string,
+    displayName: string,
+    photoUrl?: string | null,
+  ): Promise<void> {
+    await UserModel.updateOne(
+      { _id: playerId },
+      {
+        $set: {
+          displayName,
+          ...(photoUrl ? { photoUrl } : {}),
+        },
+      },
+      { upsert: true },
+    );
+  },
+
   async search(pattern: RegExp, limit: number): Promise<(StoredIdentity & { createdAt: string })[]> {
     const docs = await UserModel.find({
       $or: [

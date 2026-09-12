@@ -18,7 +18,7 @@ import { PlayerProfileCard } from '@/components/poker/PlayerProfileCard';
 import { TableSettingsSheet } from '@/components/poker/TableSettingsSheet';
 import { toast } from '@/lib/toast';
 import { inviteUrl } from '@/lib/tableInvite';
-import { TELEGRAM_BOT_NAME } from '@/config';
+import { TELEGRAM_APP_NAME, TELEGRAM_BOT_NAME } from '@/config';
 import { Button } from '@/components/ui/Button';
 import { GAMES } from '@/lib/games';
 import { isOpenableTableId } from '@/config';
@@ -233,7 +233,7 @@ function LiveTable({ tableId }: { tableId: string }) {
    */
   const shareInvite = (): void => {
     if (!tableId) return;
-    const url = inviteUrl({ tableId }, TELEGRAM_BOT_NAME);
+    const url = inviteUrl({ tableId }, TELEGRAM_BOT_NAME, TELEGRAM_APP_NAME);
     void navigator.clipboard
       ?.writeText(url)
       .then(() => toast.success(t('tableEntry.copied')))
@@ -298,8 +298,18 @@ function LiveTable({ tableId }: { tableId: string }) {
        the felt aspect box and everything around it — top bar, dock, footer —
        stayed black. The reference is one continuous surface with the controls
        sitting directly on it. */
+    /* THE SCREEN, EXACTLY — `h-dvh`, not `min-h-full`, when the shared table is
+       what renders. `min-h-full` let the page grow to whatever the felt wanted
+       and the table was sized by width alone, so on a phone it ran off the
+       bottom: you scrolled to see the seats, scrolled back for the controls.
+       A definite height here is also what makes the felt able to measure the
+       room it has (PokerTable's `100cqh`).
+
+       A game with its OWN felt keeps `min-h-full`: several of those are lists
+       and panels that are meant to scroll, and clamping them to the viewport
+       would cut them off instead of fitting them. */
     <div
-      className="flex min-h-full flex-col"
+      className={cn('flex flex-col', Felt ? 'min-h-full' : 'h-dvh overflow-hidden')}
       style={{ background: groundFor(chosenDesign) }}
     >
       <TopBar
@@ -414,6 +424,15 @@ function LiveTable({ tableId }: { tableId: string }) {
           'relative flex flex-1',
           Felt ? 'items-stretch' : 'items-center',
           gameDesign ? 'px-0' : 'px-3',
+          /* MIN-H-0 is what lets this row be SMALLER than the felt inside it.
+             A flex item's default `min-height: auto` refuses to shrink below
+             its content, so the table's aspect-derived height pushed the row
+             past the screen and the page scrolled — the seats at the top and
+             the dock at the bottom could not both be visible. With this, the
+             row takes the space left over and the table fits itself into it
+             (see `fitWidth` in PokerTable.tsx). Only for the shared table:
+             a game's own felt scrolls on purpose where it is taller. */
+          Felt ? '' : 'min-h-0',
         )}
       >
         {Felt ? (

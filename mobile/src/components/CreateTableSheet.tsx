@@ -1,34 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import * as Clipboard from 'expo-clipboard';
+import { inviteLinkFor } from '../lib/tableInvite';
 
-/**
- * Where a shared table link points.
- *
- * The APP host. It was `mypoker777.com`, which is the MARKETING domain — a
- * friend who tapped an invite got the landing page instead of the table.
- * Override with EXPO_PUBLIC_WEB_URL if the host ever moves.
- */
-const TABLE_LINK_BASE = process.env.EXPO_PUBLIC_WEB_URL ?? 'https://app.mypoker777.com';
-
-/** The bot the Mini App lives behind. Mirrors the web's TELEGRAM_BOT_NAME. */
-const TELEGRAM_BOT = process.env.EXPO_PUBLIC_TELEGRAM_BOT ?? 'mypoker777_bot';
-
-/**
- * The link a creator shares.
- *
- * A plain web URL opens the phone's BROWSER — a fresh session, so the friend
- * you invited meets a sign-in page rather than your table. This opens the
- * Telegram Mini App instead: already authenticated as them, and routed to the
- * table by the `startapp` token.
- *
- * The token packs the id and the private code as `<id>__<code>`, which is what
- * `frontend/src/lib/tableInvite.ts` parses. Telegram allows only A-Za-z0-9_-
- * in `startapp`, up to 64 characters; a packed pair is about 21.
- */
-function inviteLinkFor(tableId: string, joinCode?: string | null): string {
-  const token = joinCode ? `${tableId}__${joinCode}` : tableId;
-  return `https://t.me/${TELEGRAM_BOT}/app?startapp=${token}`;
-}
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';

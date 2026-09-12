@@ -159,7 +159,10 @@
     "tableNotAdmin": "Hanya pemilik aliansi atau admin yang bisa membuka meja.",
     "tableNotMember": "Aliansi itu tidak tersedia untuk Anda.",
     "tableInvalid": "Setelan meja ditolak. Periksa blind dan jumlah kursi.",
-    "tableClosed": "Meja aliansi ditutup sementara."
+    "tableClosed": "Meja aliansi ditutup sementara.",
+    "title": "Aliansi",
+    "noMembers": "Belum ada anggota",
+    "roster": "Anggota"
   },
   "data": {
     "deltaNew": "baru",

@@ -293,3 +293,40 @@ export function GiftIcon(p: IconProps) {
     </Frame>
   );
 }
+
+/**
+ * The table toolbar's three missing glyphs.
+ *
+ * Drawn here rather than pulled from a pack so they carry the same stroke
+ * weight as the rest of the set — a 2px icon beside a 1.8px one reads as a
+ * mistake even when nobody can say why.
+ */
+
+/** Player list. Rows with leading dots, as the reference draws it. */
+export function ListIcon(p: IconProps) {
+  return (
+    <Frame {...p}>
+      <Path d="M8 6h13M8 12h13M8 18h13" />
+      <Path d="M3 6h.01M3 12h.01M3 18h.01" />
+    </Frame>
+  );
+}
+
+/** Spade — the comment sheet, per the owner's placement. */
+export function SpadeIcon(p: IconProps) {
+  return (
+    <Frame {...p}>
+      <Path d="M12 3c-2.5 3-7 5.5-7 9a3.5 3.5 0 0 0 6 2.5c0 2-.7 3.5-2 4.5h6c-1.3-1-2-2.5-2-4.5A3.5 3.5 0 0 0 19 12c0-3.5-4.5-6-7-9Z" />
+    </Frame>
+  );
+}
+
+/** Microphone — voice notes, which live in the chat drawer. */
+export function MicIcon(p: IconProps) {
+  return (
+    <Frame {...p}>
+      <Path d="M12 3a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3Z" />
+      <Path d="M19 11a7 7 0 0 1-14 0M12 18v3" />
+    </Frame>
+  );
+}

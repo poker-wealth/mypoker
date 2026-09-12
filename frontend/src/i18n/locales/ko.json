@@ -159,7 +159,10 @@
     "tableNotAdmin": "얼라이언스 소유자 또는 관리자만 테이블을 개설할 수 있습니다.",
     "tableNotMember": "해당 얼라이언스를 이용할 수 없습니다.",
     "tableInvalid": "테이블 설정이 거부되었습니다. 블라인드와 좌석 수를 확인하세요.",
-    "tableClosed": "얼라이언스 테이블이 일시적으로 닫혀 있습니다."
+    "tableClosed": "얼라이언스 테이블이 일시적으로 닫혀 있습니다.",
+    "title": "얼라이언스",
+    "noMembers": "아직 멤버가 없습니다",
+    "roster": "멤버"
   },
   "data": {
     "deltaNew": "신규",
