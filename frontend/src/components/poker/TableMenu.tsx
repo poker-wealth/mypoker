@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { ChevronRight, Share2, Eye, Layers, SlidersHorizontal, Coins, PauseCircle, Store, LogOut } from 'lucide-react';
+import { ChevronRight, Share2, Eye, Layers, SlidersHorizontal, Coins, PauseCircle, Store, ShieldCheck, LogOut } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { cn } from '@/lib/cn';
 
@@ -50,6 +50,8 @@ export interface TableMenuProps {
   onBuyIn?: () => void;
   /** Keep your seat, skip hands. Absent when not seated. */
   onSitOut?: () => void;
+  /** Open the provably-fair screen. */
+  onFairness?: () => void;
   /** Leave the table entirely. */
   onExit: () => void;
 }
@@ -63,6 +65,7 @@ export function TableMenu({
   onOptions,
   onBuyIn,
   onSitOut,
+  onFairness,
   onExit,
 }: TableMenuProps) {
   const { t } = useTranslation();
@@ -158,6 +161,16 @@ export function TableMenu({
                   but it is disabled and says why rather than opening an empty
                   screen or pretending to sell something. */}
               <Row icon={Store} label={t('table.menuStore')} reason={t('table.menuSoon')} />
+
+              {/* Fairness. Not in the reference's list, and here anyway: the
+                  spade in the toolbar that used to reach it is now the paid
+                  comment button, and the provably-fair screen is the last
+                  thing a poker app should make hard to find. */}
+              <Row
+                icon={ShieldCheck}
+                label={t('table.fairness')}
+                onClick={onFairness ? act(onFairness) : undefined}
+              />
 
               <Row icon={LogOut} label={t('table.menuExit')} onClick={act(onExit)} tone="danger" />
             </div>

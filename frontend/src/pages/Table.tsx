@@ -339,6 +339,7 @@ function LiveTable({ tableId }: { tableId: string }) {
             }
           : {})}
         onRankings={() => setRankingsOpen(true)}
+        onFairness={() => navigate('/fairness')}
         onOptions={() => setDesignsOpen(true)}
         onExit={() => navigate(-1)}
       />
@@ -565,7 +566,14 @@ function LiveTable({ tableId }: { tableId: string }) {
           <ToolbarIcon label={t('table.playerList')} onClick={() => setPlayersOpen(true)}>
             <ListIcon size={19} />
           </ToolbarIcon>
-          <ToolbarIcon label={t('table.fairness')} onClick={() => navigate('/fairness')}>
+          {/* The spade is the PAID COMMENT button — owner's placement. It opens
+              the comment panel, where the 10/50/100 tiers live.
+
+              It used to go to Fairness, which is the provably-fair screen and
+              not something to orphan: that moved into the menu drawer in the
+              same change, so it is still one tap from here. Losing the way to
+              it would be a quiet cost of a cosmetic decision. */}
+          <ToolbarIcon label={t('table.comment')} onClick={() => setChatOpen(true)}>
             <Spade size={19} />
           </ToolbarIcon>
           <ToolbarIcon label={t('table.voice')} onClick={() => setChatOpen(true)}>
