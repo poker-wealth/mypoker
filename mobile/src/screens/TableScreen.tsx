@@ -7,7 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '../api';
 import { getToken } from '../session';
 import { Badge, Button, Sheet } from '../ui';
-import { ChatIcon } from '../icons';
+import { ChatIcon, ListIcon, MicIcon, SpadeIcon } from '../icons';
 import { radius, space, theme } from '../theme';
 import { useLiveTable } from '../table/useLiveTable';
 import { ActionBar } from '../components/poker/ActionBar';
@@ -18,6 +18,8 @@ import { JackpotBurst } from '../components/poker/JackpotBurst';
 import { TableSettingsSheet } from '../components/poker/TableSettingsSheet';
 import { TableGround } from '../components/poker/TableGround';
 import { TableMenu } from '../components/poker/TableMenu';
+import { PlayerListPanel } from '../components/poker/PlayerListPanel';
+import { CommentSheet } from '../components/poker/CommentSheet';
 import { inviteLinkFor } from '../lib/tableInvite';
 import * as Clipboard from 'expo-clipboard';
 import { ChatBox } from '../components/poker/ChatBox';
@@ -84,6 +86,8 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
   const [jackpotSeen, setJackpotSeen] = useState<string | null>(null);
   const [designOpen, setDesignOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [playersOpen, setPlayersOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
 
   /**
    * Copy this table's invite link.
@@ -302,28 +306,22 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
             reference puts it and one where it used to be. */}
       </ScrollView>
 
-      {/*
-        Chat is a FLOATING button, bottom-right, with an icon — the Mini App's own arrangement
-        (frontend/src/pages/Table.tsx: `absolute bottom-[4.5rem] right-4`, size-12, rounded-full,
-        MessageSquare, brand-coloured while open). It was an inline pill labelled "Chat" in a row
-        under the felt, which is a different control in a different place.
+      <PlayerListPanel
+        open={playersOpen}
+        onClose={() => setPlayersOpen(false)}
+        seats={snapshot.seats}
+        tableId={tableId}
+        {...(snapshot.spectators !== undefined ? { spectators: snapshot.spectators } : {})}
+        {...(snapshot.openedAt !== undefined ? { openedAt: snapshot.openedAt } : {})}
+      />
 
-        Unread count rides on the button rather than in the label, so the button stays a circle.
-      */}
-      <Pressable
-        onPress={() => setChatOpen((o) => !o)}
-        style={[styles.chatFab, chatOpen && styles.chatFabOn]}
-        accessibilityLabel="Table chat"
-      >
-        <ChatIcon color={chatOpen ? '#fff' : theme.dim} size={20} />
-        {messages.length > 0 && !chatOpen ? (
-          <View style={styles.chatBadge}>
-            <Text style={styles.chatBadgeText}>
-              {messages.length > 99 ? '99+' : messages.length}
-            </Text>
-          </View>
-        ) : null}
-      </Pressable>
+      <CommentSheet
+        open={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        onSend={sendChat}
+        messages={messages}
+        disabled={!you}
+      />
 
       <TableMenu
         open={menuOpen}
@@ -436,14 +434,16 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
         />
       ) : null}
 
-      {/* Bottom-inset wrapper, not padding inside ActionBar (out of scope, see ActionBar.tsx):
-          on a home-indicator iPhone the Fold/Call/Raise row would otherwise sit inside the
-          system swipe-up zone, where a swipe-to-home during your turn risks a fold-by-timeout. */}
+      {/* The bottom inset moved to the TOOLBAR below, which is now the lowest thing on the
+          screen and always present. Keeping it here as well would pad twice: a gap of the
+          home-indicator height between the Fold/Call/Raise row and the toolbar. The reason
+          for the inset is unchanged — on a home-indicator iPhone nothing interactive may sit
+          in the system swipe-up zone, where a swipe-to-home during your turn risks a
+          fold-by-timeout — it is just carried by whatever is actually at the bottom. */}
       {yourTurn && snapshot.legal ? (
-        // Background matches ActionBar's own bar colour (`#14142a`, ActionBar.tsx) so the inset
-        // padding reads as the bar extending under the home indicator, not a mismatched stripe
-        // of the screen background (`theme.bg`, `#0d0d1a`) beneath it.
-        <View style={[styles.actionBarInset, { paddingBottom: insets.bottom }]}>
+        // Background matches ActionBar's own bar colour (`#14142a`, ActionBar.tsx) so it does
+        // not read as a mismatched stripe against the screen background beneath it.
+        <View style={styles.actionBarInset}>
           {/* ActionBar itself (out of scope here — see ActionBar.tsx) has no disabled prop, so
               disconnected is enforced from outside: dim it and swallow every touch so a tap
               during a reconnect cannot look like it did something. `sendInner` in tableSocket.ts
@@ -462,7 +462,73 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
           </View>
         </View>
       ) : null}
+
+      {/*
+        THE TABLE TOOLBAR, as the reference draws it: players, comments, voice,
+        chat. It replaces a single floating chat button, which was the only
+        control down here and left the other three with no way in at all.
+
+        EVERY ICON OPENS SOMETHING THAT EXISTS. The bar was deliberately not
+        built until the player list and the comment sheet were ported — four
+        icons where two open nothing is the dead-control fault this project
+        keeps removing.
+
+        Voice and chat both reach the chat drawer, because the recorder lives
+        inside it. That is the Mini App's arrangement too, and it is honest: the
+        mic is a shortcut to the thing that records, not a separate screen.
+      */}
+      <View style={[styles.toolbar, { paddingBottom: insets.bottom || space.sm }]}>
+        <ToolIcon label={t('table.playerList')} onPress={() => setPlayersOpen(true)}>
+          <ListIcon color={theme.dim} size={22} />
+        </ToolIcon>
+        <ToolIcon label={t('table.comment')} onPress={() => setCommentsOpen(true)}>
+          <SpadeIcon color={theme.dim} size={22} />
+        </ToolIcon>
+        <ToolIcon label={t('table.voice')} onPress={() => setChatOpen(true)}>
+          <MicIcon color={theme.dim} size={22} />
+        </ToolIcon>
+        <ToolIcon label={t('table.chat')} onPress={() => setChatOpen((o) => !o)}>
+          <ChatIcon color={chatOpen ? theme.brand : theme.dim} size={22} />
+          {messages.length > 0 && !chatOpen ? (
+            <View style={styles.chatBadge}>
+              <Text style={styles.chatBadgeText}>
+                {messages.length > 99 ? '99+' : messages.length}
+              </Text>
+            </View>
+          ) : null}
+        </ToolIcon>
+      </View>
     </View>
+  );
+}
+
+/**
+ * One icon in the table toolbar.
+ *
+ * The label is not drawn — it is the accessibility name. Four unlabelled
+ * glyphs are readable to sighted players and silent to everyone else, so the
+ * text still has to exist somewhere; here it goes where a screen reader can
+ * reach it rather than nowhere at all.
+ */
+function ToolIcon({
+  label,
+  onPress,
+  children,
+}: {
+  label: string;
+  onPress: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => [styles.tool, pressed && styles.toolPressed]}
+      hitSlop={8}
+    >
+      {children}
+    </Pressable>
   );
 }
 
@@ -477,22 +543,23 @@ const styles = StyleSheet.create({
     padding: space.xl,
     backgroundColor: theme.bg,
   },
-  // Floating, bottom-right, clear of the ActionBar that appears on your turn.
-  chatFab: {
-    position: 'absolute',
-    right: 16,
-    bottom: 72,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: theme.border,
-    backgroundColor: theme.surface,
+  /*
+   * The toolbar sits at the very bottom, across the full width, under the felt
+   * rather than floating over it — so it never covers a seat, and the ActionBar
+   * that appears on your turn stacks above it instead of fighting it for the
+   * same corner.
+   */
+  toolbar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
     alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 50,
+    paddingTop: space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.border,
+    backgroundColor: theme.bg,
   },
-  chatFabOn: { backgroundColor: theme.brand, borderColor: theme.brand },
+  tool: { paddingHorizontal: space.lg, paddingVertical: space.sm },
+  toolPressed: { opacity: 0.55 },
   chatBadge: {
     position: 'absolute',
     top: -2,
