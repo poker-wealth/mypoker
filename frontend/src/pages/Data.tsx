@@ -2,6 +2,13 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BarChart3 } from 'lucide-react';
 import { Segmented } from '@/components/ui/Segmented';
+import {
+  FairnessBar,
+  HandTypesCard,
+  KeyStats,
+  PositionCard,
+  StatsRadar,
+} from './data/AnalysisCards';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -261,50 +268,51 @@ export function Data() {
                 />
               }
             />
-            <Tile
-              label={t('data.netProfit')}
-              value={moneyFromDecimal(stats.data.netProfit, { sign: true })}
-              tone={Number(stats.data.netProfit) >= 0 ? 'success' : 'danger'}
-              delta={
-                <Delta
-                  current={Number(stats.data.netProfit)}
-                  previous={Number(prevStats.data?.netProfit ?? 0)}
-                  hadPrior={prevWindow !== null && prevStats.isSuccess}
-                />
-              }
-            />
-            {/* VPIP and PFR are not here on purpose. They need preflop ACTION
-                data — did the player voluntarily put money in, did they raise —
-                and the ledger records only a round's net movement. The mockup
-                shows 23.1% and 38.7%; those are design-document numbers, and
-                printing them next to real figures makes all six look real. */}
-            <Tile
-              label={t('account.statBiggestWin')}
-              value={moneyFromDecimal(stats.data.biggestWin)}
-              tone="accent"
-              delta={
-                <Delta
-                  current={Number(stats.data.biggestWin)}
-                  previous={Number(prevStats.data?.biggestWin ?? 0)}
-                  hadPrior={prevWindow !== null && prevStats.isSuccess}
-                />
-              }
-            />
+            {/*
+              VPIP AND PFR hold the reference's third and fourth slots, and they
+              are EMPTY.
+
+              They need preflop ACTION — did this player voluntarily put money
+              in, did they raise — and the ledger records only a round's net
+              movement. The reference shows 24.6% and 19.3%; those are
+              design-document numbers, and printing them beside two real figures
+              would make the real ones unbelievable too.
+
+              Net profit is not a tile any more because it is the headline
+              above, and biggest win moved into Key Stats, where it is still a
+              real figure on a card of mostly-pending ones.
+            */}
+            <Tile label={t('data.vpip')} value="—" />
+            <Tile label={t('data.pfr')} value="—" />
           </div>
         )}
       </section>
 
-      {/* Time of day — real, and computed the same way the trend is: from the
-          rounds actually loaded, so it can never disagree with the list below.
-          Each round carries its own timestamp, which is the whole of what this
-          needs. Nothing here is estimated. */}
-      <TimeOfDay rounds={rounds} />
+      {/*
+        THE ANALYSIS HALF, in the reference's order and at its sizes: the radar
+        beside Key Stats, then Position / Hand Types / Time of Day / Game Type
+        across, then the fairness bar.
 
-      {/* Play distribution — real, from the VIP volume tracker, which records
-          per-game rounds at settlement. The mockup's fixed 65/20/10/5 split is
-          replaced rather than kept: a pie chart of invented percentages is a
-          claim about how this player spends their time. */}
-      <PlayDistribution />
+        Two of those four are REAL — Time of Day is computed from the rounds
+        actually loaded (so it can never disagree with the list below it), and
+        Game Type comes from the VIP volume tracker, which records per-game
+        rounds at settlement. The other two, and the radar, and Key Stats, are
+        waiting on hand recording; they say so rather than showing the
+        reference's design-document numbers. See AnalysisCards.tsx.
+      */}
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        <StatsRadar />
+        <KeyStats />
+      </div>
+
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        <PositionCard />
+        <HandTypesCard />
+        <TimeOfDay rounds={rounds} />
+        <PlayDistribution />
+      </div>
+
+      <FairnessBar />
 
         </>
       )}
