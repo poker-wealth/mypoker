@@ -285,6 +285,11 @@
     }
   },
   "table": {
+    "hostOptions": "Opsi Host",
+    "removePlayer": "Keluarkan pemain",
+    "remove": "Keluarkan",
+    "noOtherPlayers": "Belum ada pemain lain",
+    "removeBlurb": "Seluruh chip dikembalikan. Pemain dalam ronde berjalan dikeluarkan setelah ronde itu selesai.",
     "personalSettings": "Pengaturan Pribadi",
     "tableColour": "Warna Meja",
     "deckStyle": "Gaya Kartu",

@@ -285,6 +285,11 @@
     }
   },
   "table": {
+    "hostOptions": "호스트 옵션",
+    "removePlayer": "플레이어 내보내기",
+    "remove": "내보내기",
+    "noOtherPlayers": "다른 착석자가 없습니다",
+    "removeBlurb": "스택은 전액 반환됩니다. 진행 중인 핸드의 플레이어는 핸드가 끝난 뒤 내보내집니다.",
     "personalSettings": "개인 설정",
     "tableColour": "테이블 색상",
     "deckStyle": "카드 덱",

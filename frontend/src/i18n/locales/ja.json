@@ -285,6 +285,11 @@
     }
   },
   "table": {
+    "hostOptions": "ホスト設定",
+    "removePlayer": "プレイヤーを退席させる",
+    "remove": "退席",
+    "noOtherPlayers": "他に着席者はいません",
+    "removeBlurb": "スタックは全額返却されます。ハンド中のプレイヤーはそのハンド終了後に退席します。",
     "personalSettings": "個人設定",
     "tableColour": "テーブルの色",
     "deckStyle": "デッキ",

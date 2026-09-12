@@ -182,6 +182,12 @@ export type TableCommand =
   | { kind: 'stand' }
   /** Owner of a manual-start table says go. The server checks who is asking. */
   | { kind: 'start_game' }
+  /**
+   * Owner removes another player. The server checks who is asking against the
+   * table's `ownerId` — this carries only the target, never any claim about
+   * who is sending it.
+   */
+  | { kind: 'kick'; targetId: string }
   | { kind: 'act'; action: TableAction }
   | { kind: 'sitOut' }
   | { kind: 'sitIn' }

@@ -583,7 +583,20 @@ function LiveTable({ tableId }: { tableId: string }) {
         }}
       />
 
-      <TableSettingsSheet open={designsOpen} onClose={() => setDesignsOpen(false)} tableId={tableId} />
+      <TableSettingsSheet
+        open={designsOpen}
+        onClose={() => setDesignsOpen(false)}
+        tableId={tableId}
+        isOwner={Boolean(snapshot?.isOwner)}
+        seats={(snapshot?.seats ?? []).map((s) => ({
+          playerId: s.playerId,
+          name: s.name,
+          isYou: Boolean(s.isYou),
+        }))}
+        canStart={Boolean(snapshot?.awaitingStart)}
+        onStart={() => live.command({ kind: 'start_game' })}
+        onKick={(playerId) => live.command({ kind: 'kick', targetId: playerId })}
+      />
     </div>
   );
 }

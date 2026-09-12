@@ -285,6 +285,11 @@
     }
   },
   "table": {
+    "hostOptions": "Tùy chọn chủ bàn",
+    "removePlayer": "Xóa người chơi",
+    "remove": "Xóa",
+    "noOtherPlayers": "Chưa có ai khác ngồi",
+    "removeBlurb": "Toàn bộ chip được hoàn lại. Người chơi đang trong ván sẽ bị xóa khi ván kết thúc.",
     "personalSettings": "Cài đặt cá nhân",
     "tableColour": "Màu bàn",
     "deckStyle": "Bộ bài",

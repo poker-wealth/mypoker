@@ -285,6 +285,11 @@
     }
   },
   "table": {
+    "hostOptions": "Host Options",
+    "removePlayer": "Remove a player",
+    "remove": "Remove",
+    "noOtherPlayers": "No one else is seated",
+    "removeBlurb": "Their full stack is returned. A player in a live hand is removed when that hand ends.",
     "personalSettings": "Personal settings",
     "tableColour": "Table Colour",
     "deckStyle": "Card Deck",

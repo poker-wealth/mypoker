@@ -411,8 +411,23 @@ const GROUNDS: Record<string, readonly [string, string, string]> = {
   midnight: ['#3a3f4a', '#262a33', '#14161b'],
   emerald: ['#1f5f4a', '#14402f', '#0a1f18'],
   'house-maroon': ['#6d2230', '#4a1622', '#2a0d14'],
-  'neon-violet': ['#5b3570', '#3c2249', '#1f1226'],
+  // The id is `neon`, NOT `neon-violet`. Keyed wrongly it matched nothing and
+  // fell through to the red default, so the picker showed two identical red
+  // swatches — Victor: "two red can one be blue". Blue, and keyed correctly.
+  neon: ['#1e4a8a', '#143363', '#0a1a33'],
 };
+
+/**
+ * Every id in GROUNDS must be a real design id, or that design silently
+ * inherits the red default and two swatches look the same. Cheap to assert at
+ * module load, and it fails loudly the next time an id is renamed.
+ */
+if (process.env.NODE_ENV !== 'production') {
+  const known = new Set(TABLE_DESIGNS.map((d) => d.id));
+  for (const id of Object.keys(GROUNDS)) {
+    if (!known.has(id)) console.warn(`[tableDesigns] GROUNDS has no design "${id}"`);
+  }
+}
 
 /** The red ground, for any design with no colour of its own. */
 const DEFAULT_GROUND = GROUNDS['house-maroon']!;

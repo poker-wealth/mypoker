@@ -285,6 +285,11 @@
     }
   },
   "table": {
+    "hostOptions": "房主设置",
+    "removePlayer": "移除玩家",
+    "remove": "移除",
+    "noOtherPlayers": "暂无其他玩家入座",
+    "removeBlurb": "其筹码将全额退回。正在牌局中的玩家将在该局结束后移除。",
     "personalSettings": "个人设置",
     "tableColour": "牌桌颜色",
     "deckStyle": "牌面样式",

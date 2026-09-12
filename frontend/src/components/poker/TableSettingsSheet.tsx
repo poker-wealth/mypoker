@@ -36,13 +36,27 @@ export function TableSettingsSheet({
   open,
   onClose,
   tableId,
+  isOwner = false,
+  seats = [],
+  canStart = false,
+  onStart,
+  onKick,
 }: {
   open: boolean;
   onClose: () => void;
   /** Scopes the per-table preferences. */
   tableId: string;
+  /** Whether this player created the table. Gates the Host Options tab. */
+  isOwner?: boolean;
+  /** Seated players, for the host's remove list. */
+  seats?: { playerId: string; name: string; isYou: boolean }[];
+  /** The manual-start button is live only before the first hand. */
+  canStart?: boolean;
+  onStart?: () => void;
+  onKick?: (playerId: string) => void;
 }) {
   const { t } = useTranslation();
+  const [tab, setTab] = useState<'personal' | 'host'>('personal');
   const design = useTableDesign((s) => s.design);
   const setDesign = useTableDesign((s) => s.setDesign);
 
@@ -74,18 +88,44 @@ export function TableSettingsSheet({
             aria-label={t('table.personalSettings')}
             className="fixed inset-x-3 top-1/2 z-[61] max-h-[88vh] -translate-y-1/2 overflow-y-auto rounded-(--radius-app) border border-border bg-surface p-4 shadow-2xl sm:mx-auto sm:max-w-sm"
           >
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-sm font-bold text-text">{t('table.personalSettings')}</h2>
+            {/* Two tabs, as the reference has. Host Options is shown ONLY to
+                the table's owner — to everyone else it is not a greyed tab but
+                no tab at all, because "you are not the host" is not a state a
+                player needs a disabled control to learn. */}
+            <div className="mb-4 flex items-center gap-4">
+              <TabButton active={tab === 'personal'} onClick={() => setTab('personal')}>
+                {t('table.personalSettings')}
+              </TabButton>
+              {isOwner && (
+                <TabButton active={tab === 'host'} onClick={() => setTab('host')}>
+                  {t('table.hostOptions')}
+                </TabButton>
+              )}
               <button
                 type="button"
                 onClick={onClose}
                 aria-label={t('common.close')}
-                className="grid size-8 shrink-0 place-items-center rounded-full text-dim active:scale-95"
+                className="ml-auto grid size-8 shrink-0 place-items-center rounded-full text-dim active:scale-95"
               >
                 <X size={17} />
               </button>
             </div>
 
+            {tab === 'host' && isOwner && (
+              <HostOptions
+                seats={seats}
+                canStart={canStart}
+                onStart={() => {
+                  onStart?.();
+                  onClose();
+                }}
+                onKick={(id) => onKick?.(id)}
+              />
+            )}
+
+
+            {tab === 'personal' && (
+              <>
             {/* ── Table colour ─────────────────────────────────────────── */}
             <Label>{t('table.tableColour')}</Label>
             <div className="mb-4 flex gap-2">
@@ -257,6 +297,8 @@ export function TableSettingsSheet({
                 onChange={prefs.setConfirmBets}
               />
             </div>
+              </>
+            )}
           </motion.div>
         </>
       )}
@@ -292,6 +334,98 @@ function RaiseCircle({
     >
       {children}
     </button>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'text-sm font-bold transition-colors',
+        active ? 'text-text' : 'text-dim hover:text-text',
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * What a host can actually do — and it is short, deliberately.
+ *
+ * The server gates exactly two things on `ownerId`: starting a manual table,
+ * and removing a player. There is no pause, no mid-game settings change and no
+ * close-table command, so there are no controls for them here. The reference
+ * app's tab has more; ours shows what exists rather than switches that would
+ * do nothing to a live table with other people's money on it.
+ */
+function HostOptions({
+  seats,
+  canStart,
+  onStart,
+  onKick,
+}: {
+  seats: { playerId: string; name: string; isYou: boolean }[];
+  canStart: boolean;
+  onStart: () => void;
+  onKick: (playerId: string) => void;
+}) {
+  const { t } = useTranslation();
+  const others = seats.filter((s) => !s.isYou);
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Start is only meaningful before the first hand; after that the server
+          treats it as a no-op, so the button goes rather than lying. */}
+      {canStart && (
+        <button
+          type="button"
+          onClick={onStart}
+          className="w-full rounded-(--radius-app) bg-gold py-2.5 text-sm font-bold text-bg active:scale-[0.98]"
+        >
+          {t('table.startGame')}
+        </button>
+      )}
+
+      <div>
+        <Label>{t('table.removePlayer')}</Label>
+        {others.length === 0 ? (
+          <p className="py-3 text-center text-[0.7rem] text-dim">{t('table.noOtherPlayers')}</p>
+        ) : (
+          <ul className="flex flex-col">
+            {others.map((seat) => (
+              <li
+                key={seat.playerId}
+                className="flex items-center justify-between gap-3 border-b border-border/50 py-2.5 last:border-b-0"
+              >
+                <span className="min-w-0 flex-1 truncate text-[0.76rem] text-text">{seat.name}</span>
+                <button
+                  type="button"
+                  onClick={() => onKick(seat.playerId)}
+                  className="shrink-0 rounded-full border border-danger/50 px-3 py-1 text-[0.66rem] font-bold text-danger active:scale-95"
+                >
+                  {t('table.remove')}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {/* Says what a removal does, because the alternative is a player
+            guessing whether it costs them their chips. */}
+        <p className="mt-2 text-[0.62rem] leading-snug text-dim">{t('table.removeBlurb')}</p>
+      </div>
+    </div>
   );
 }
 
