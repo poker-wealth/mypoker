@@ -285,6 +285,8 @@
     }
   },
   "table": {
+    "profileChips": "칩",
+    "profileStatsSoon": "핸드 기록이 저장되면 상세 통계가 표시됩니다.",
     "insuranceNotLive": "보험은 아직 제공되지 않습니다",
     "confirmRaise": "{{amount}} 확인",
     "playerList": "플레이어",

@@ -285,6 +285,8 @@
     }
   },
   "table": {
+    "profileChips": "チップ",
+    "profileStatsSoon": "ハンド履歴の記録開始後に詳細な統計を表示します。",
     "insuranceNotLive": "保険は未提供です",
     "confirmRaise": "{{amount}} を確定",
     "playerList": "プレイヤー",

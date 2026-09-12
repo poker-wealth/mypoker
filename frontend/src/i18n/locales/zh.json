@@ -285,6 +285,8 @@
     }
   },
   "table": {
+    "profileChips": "筹码",
+    "profileStatsSoon": "记录手牌历史后将显示详细统计。",
     "insuranceNotLive": "暂未提供保险",
     "confirmRaise": "确认 {{amount}}",
     "playerList": "玩家",

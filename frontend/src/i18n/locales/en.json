@@ -285,6 +285,8 @@
     }
   },
   "table": {
+    "profileChips": "Chips",
+    "profileStatsSoon": "Detailed statistics arrive once hand histories are recorded.",
     "insuranceNotLive": "Insurance is not offered yet",
     "confirmRaise": "Confirm {{amount}}",
     "playerList": "Players",

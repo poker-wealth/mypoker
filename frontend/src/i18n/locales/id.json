@@ -285,6 +285,8 @@
     }
   },
   "table": {
+    "profileChips": "Chip",
+    "profileStatsSoon": "Statistik rinci tersedia setelah riwayat ronde dicatat.",
     "insuranceNotLive": "Asuransi belum tersedia",
     "confirmRaise": "Konfirmasi {{amount}}",
     "playerList": "Pemain",

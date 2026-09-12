@@ -14,6 +14,7 @@ import { TableDesignSheet } from '@/components/poker/TableDesignSheet';
 import { TableMenu } from '@/components/poker/TableMenu';
 import { HandRankings } from '@/components/poker/HandRankings';
 import { PlayerListPanel } from '@/components/poker/PlayerListPanel';
+import { PlayerProfileCard } from '@/components/poker/PlayerProfileCard';
 import { TableSettingsSheet } from '@/components/poker/TableSettingsSheet';
 import { toast } from '@/lib/toast';
 import { inviteUrl } from '@/lib/tableInvite';
@@ -209,6 +210,9 @@ function LiveTable({ tableId }: { tableId: string }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [rankingsOpen, setRankingsOpen] = useState(false);
   const [playersOpen, setPlayersOpen] = useState(false);
+  /** Whose card is open, by playerId. The seat is looked up fresh each render
+   *  so the figures on it track the table rather than freezing at open time. */
+  const [profileFor, setProfileFor] = useState<string | null>(null);
 
   /**
    * Copy this table's invite link.
@@ -344,8 +348,14 @@ function LiveTable({ tableId }: { tableId: string }) {
         onClose={() => setPlayersOpen(false)}
         seats={snapshot?.seats ?? []}
         tableId={tableId}
+        onPlayer={(playerId) => setProfileFor(playerId)}
         {...(snapshot?.spectators !== undefined ? { spectators: snapshot.spectators } : {})}
         {...(snapshot?.openedAt !== undefined ? { openedAt: snapshot.openedAt } : {})}
+      />
+
+      <PlayerProfileCard
+        seat={snapshot?.seats.find((s) => s.playerId === profileFor) ?? null}
+        onClose={() => setProfileFor(null)}
       />
 
       <HandRankings

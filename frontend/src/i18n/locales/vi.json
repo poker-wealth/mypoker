@@ -285,6 +285,8 @@
     }
   },
   "table": {
+    "profileChips": "Chip",
+    "profileStatsSoon": "Thống kê chi tiết sẽ có khi lịch sử ván bài được ghi lại.",
     "insuranceNotLive": "Chưa có bảo hiểm",
     "confirmRaise": "Xác nhận {{amount}}",
     "playerList": "Người chơi",

@@ -285,6 +285,8 @@
     }
   },
   "table": {
+    "profileChips": "ชิป",
+    "profileStatsSoon": "สถิติโดยละเอียดจะแสดงเมื่อเริ่มบันทึกประวัติมือ",
     "insuranceNotLive": "ยังไม่มีบริการประกัน",
     "confirmRaise": "ยืนยัน {{amount}}",
     "playerList": "ผู้เล่น",

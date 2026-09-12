@@ -285,6 +285,8 @@
     }
   },
   "table": {
+    "profileChips": "चिप्स",
+    "profileStatsSoon": "हैंड इतिहास दर्ज होने पर विस्तृत आँकड़े दिखेंगे।",
     "insuranceNotLive": "बीमा अभी उपलब्ध नहीं है",
     "confirmRaise": "{{amount}} की पुष्टि करें",
     "playerList": "खिलाड़ी",
