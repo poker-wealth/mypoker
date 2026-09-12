@@ -107,18 +107,23 @@ export function TexasCowboyFelt({
   };
 
   return (
-    /* The outer ground goes, like every other felt — the screen paints the
-       player's chosen colour. The greens INSIDE are kept on purpose: the
-       bordered betting strip and its lanes are this game's artwork, not a
-       background it happens to sit on, and stripping those would take the
-       design with them. */
+    /* NO GREEN GROUND ANYWHERE, including inside.
+       An earlier pass took only the outer colour off and kept the greens
+       within, on the reasoning that the betting strip and its lanes were this
+       game's artwork rather than a background. That was wrong in practice: the
+       strip and the scene panel are most of the screen, so the top bar showed
+       the player's ground and everything beneath it was green. Victor saw it
+       and asked what it was.
+       They are translucent black now — the grid, its borders and its type are
+       untouched, and the player's colour shows through and tints them, so this
+       board reads as the same table on any ground. */
     <div className="relative flex min-h-[40rem] w-full flex-col self-stretch overflow-hidden text-white select-none">
       {/*
         The scene: the two of them facing each other, the community cards dealt between them, the
         clock above. It is the top of the screen and the board is everything below, because that is
         the order the game is read in — watch the hands, then back a market.
       */}
-      <div className="relative h-52 shrink-0 overflow-hidden bg-[radial-gradient(ellipse_at_center,#1b6b47_0%,#0a3a25_75%)]">
+      <div className="relative h-52 shrink-0 overflow-hidden bg-[radial-gradient(ellipse_at_center,rgba(0,0,0,0.18)_0%,rgba(0,0,0,0.42)_75%)]">
         <Duelist
           side="left"
           title="COWBOY"
@@ -208,13 +213,13 @@ export function TexasCowboyFelt({
         left block, and every cell carries the chips already riding on it, so a glance tells you
         where the table's money is.
       */}
-      <div className="relative z-10 flex-1 border-y-2 border-amber-900/60 bg-[#0d5236]">
+      <div className="relative z-10 flex-1 border-y-2 border-amber-900/60 bg-black/30">
         {ROWS.map((row) => (
           <div
             key={row.label}
             className="flex items-stretch border-b border-emerald-900/70 last:border-b-0"
           >
-            <div className="grid w-20 shrink-0 place-items-center border-r border-emerald-900/70 bg-[#0a4229] px-1 text-center text-[0.68rem] leading-tight font-black tracking-wide text-amber-300">
+            <div className="grid w-20 shrink-0 place-items-center border-r border-white/10 bg-black/35 px-1 text-center text-[0.68rem] leading-tight font-black tracking-wide text-amber-300">
               {row.label}
             </div>
             <div className="flex flex-1">
@@ -253,7 +258,7 @@ export function TexasCowboyFelt({
                   className={`h-12 w-12 rounded-full border-[3px] text-[0.7rem] font-black shadow-lg transition ${
                     chip === amt
                       ? 'border-amber-300 bg-amber-500 text-black'
-                      : 'border-emerald-700 bg-emerald-900 text-emerald-200'
+                      : 'border-white/15 bg-black/30 text-white/70'
                   }`}
                 >
                   {amt >= 1_000 ? `${amt / 1_000}k` : amt}
