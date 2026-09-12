@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { useTablePrefs } from '../../table/tablePrefs';
 
 /**
  * A single playing card.
@@ -50,6 +51,29 @@ export function PlayingCard({ card, faceDown, size = 'md' }: PlayingCardProps) {
   const glyph = SUIT_GLYPH[suitKey] ?? '';
   const red = isJoker ? card === 'jb' : RED_SUITS.has(suitKey);
 
+  /**
+   * FOUR-COLOUR DECK, when the player has chosen one in table settings.
+   * Diamonds blue, clubs green; hearts and spades unchanged. The point is
+   * telling the two reds and the two blacks apart at a glance.
+   *
+   * Read from the store here rather than threaded down as a prop: every card on
+   * every felt needs it, and a prop would have to cross seats, the board and
+   * every game's felt to arrive. Same shape as the Mini App, where this
+   * preference was also being SAVED and never read.
+   */
+  const fourColour = useTablePrefs((st) => st.fourColour);
+  const ink = fourColour
+    ? suitKey === 'd'
+      ? '#2563eb'
+      : suitKey === 'c'
+        ? '#15803d'
+        : red
+          ? '#dc2626'
+          : '#111827'
+    : red
+      ? '#dc2626'
+      : '#111827';
+
   // Unparseable rather than merely unusual: draw the back instead of a card reading "undefined".
   if (!isJoker && !glyph) {
     return (
@@ -62,12 +86,12 @@ export function PlayingCard({ card, faceDown, size = 'md' }: PlayingCardProps) {
   return (
     <View style={[styles.card, styles.face, { width: s.width, height: s.height }]}>
       <Text
-        style={[styles.rank, { fontSize: s.rank, color: red ? '#dc2626' : '#111827' }]}
+        style={[styles.rank, { fontSize: s.rank, color: ink }]}
         numberOfLines={1}
       >
         {rank}
       </Text>
-      <Text style={[styles.suit, { fontSize: s.suit, color: red ? '#dc2626' : '#111827' }]}>
+      <Text style={[styles.suit, { fontSize: s.suit, color: ink }]}>
         {glyph}
       </Text>
     </View>
