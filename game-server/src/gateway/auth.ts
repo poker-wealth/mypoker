@@ -1136,6 +1136,24 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
       config.jwtSecret,
       config.jwtTtlSeconds,
     );
+
+    /*
+     * CACHE THE NAME. Telegram tells us what this player is called on every
+     * sign-in and we were throwing it away, so afterwards nothing on the server
+     * could name them: the alliance roster listed its members as
+     * `tg-1030053323`, and the table's player list had the same hole.
+     *
+     * Deliberately not awaited and deliberately not fatal. A player signing in
+     * must not wait on a write that only affects how OTHER screens read later,
+     * and must not be refused entry because it failed. Everything that reads a
+     * name already copes with not finding one.
+     */
+    void userStore
+      .rememberTelegramProfile(player.playerId, player.displayName, player.photoUrl)
+      .catch((err: unknown) => {
+        console.error('[auth] could not cache telegram profile:', err);
+      });
+
     res.json({ token, player });
   });
 

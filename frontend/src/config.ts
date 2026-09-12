@@ -41,6 +41,19 @@ export const TABLES_WS_URL =
 export const TELEGRAM_BOT_NAME = import.meta.env.VITE_TELEGRAM_BOT_NAME ?? 'mypoker777_bot';
 
 /**
+ * The SHORT NAME of a Mini App registered against the bot, if there is one.
+ *
+ * EMPTY by default, and that is the working configuration. Invites used to be
+ * built as `t.me/<bot>/app?startapp=…`, where `app` was read by Telegram as a
+ * registered short name — one this bot does not have — so every shared link
+ * answered "Bot application not found". Left empty, the link opens the bot's
+ * MAIN Mini App, which is the one players already open from the chat.
+ *
+ * Only ever set this to a short name actually registered in BotFather.
+ */
+export const TELEGRAM_APP_NAME = import.meta.env.VITE_TELEGRAM_APP_NAME ?? '';
+
+/**
  * The permanent public domain players are told to remember (the landing
  * banner, the felt's centre print). Deliberately NOT window.location.host:
  * the whole point of the line is to name the canonical home whatever host —

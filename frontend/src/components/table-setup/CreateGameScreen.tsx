@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Gem } from 'lucide-react';
 import { FullScreenModal } from '@/components/ui/FullScreenModal';
 import { Segmented } from '@/components/ui/Segmented';
-import { chips } from '@/lib/money';
+import { chips, moneyFromDecimal } from '@/lib/money';
 import { cn } from '@/lib/cn';
 import { visibleGames } from '@/lib/games';
 import { seatCapFor } from '@/lib/tableDesigns';
@@ -399,8 +399,12 @@ export function CreateGameScreen({
             <div className="flex items-center gap-1">
               {t('createGame.balance')}
               <Gem size={11} className="text-accent" />
+              {/* THROUGH THE FORMATTER. Interpolated raw, this printed
+                  "$61.040000" — the ledger's six-decimal string, straight onto
+                  the screen. Every other balance in the app goes through
+                  `moneyFromDecimal` (Profile, Wallet); this one did not. */}
               <span className="tabular-nums text-text">
-                {balance.data ? `$${balance.data.available}` : '—'}
+                {balance.data ? `$${moneyFromDecimal(balance.data.available, { decimals: 2 })}` : '—'}
               </span>
             </div>
             <div className="flex items-center gap-1">

@@ -98,7 +98,15 @@ export function verifyInitData(
  *
  * Deliberately deterministic: the Telegram user id *is* the identity, so there's
  * no mapping table to keep, and financial-core creates the matching account
- * lazily on first use. No identity storage exists on the game server as a result.
+ * lazily on first use. No identity is AUTHORED here as a result — nothing about
+ * a Telegram player is decided on this server.
+ *
+ * A name and picture ARE now cached, written on each sign-in from the initData
+ * Telegram sends (`userStore.rememberTelegramProfile`). That is a copy of what
+ * Telegram tells us, kept so that other screens can put a name to an id after
+ * the sign-in request is over — the alliance roster listed its members as
+ * `tg-1030053323` until it existed. It is not an account and carries no
+ * credentials.
  */
 export function playerIdForTelegramUser(telegramUserId: number): string {
   return `tg-${telegramUserId}`;

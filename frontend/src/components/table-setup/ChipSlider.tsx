@@ -25,6 +25,32 @@ export interface SliderStop {
 /** Shared geometry: where stop i sits, as a CSS % along the track. */
 const pct = (i: number, n: number): number => (n <= 1 ? 0 : (i / (n - 1)) * 100);
 
+/**
+ * Half the chip thumb, in pixels. The track is inset by this on both sides so
+ * a thumb sitting on the FIRST or LAST stop is still drawn inside the control
+ * instead of hanging half of itself over the edge of the screen.
+ *
+ * Reported 12 Sep 2026: the create screen scrolled sideways and the seat chip
+ * at "8" was clipped by the right edge. Everything positioned at `left: 0%` or
+ * `left: 100%` with `-translate-x-1/2` — the thumb, the end dots, the end
+ * labels — was overflowing by half its own width, and the page grew to fit.
+ */
+const EDGE = 13;
+
+/**
+ * How a stop's label or dot is pulled back over its own position.
+ *
+ * Centred, except at the two ends, where centring is exactly what pushed it
+ * outside. The first stop hangs off its left edge, the last off its right, so
+ * both stay inside the control; the dot underneath is clamped the same way, so
+ * label and dot still agree.
+ */
+function anchor(i: number, n: number): string {
+  if (i === 0) return 'translate-x-0';
+  if (i === n - 1) return '-translate-x-full';
+  return '-translate-x-1/2';
+}
+
 /** The nearest stop index for a pointer at `clientX` over track `rect`. */
 function indexAt(clientX: number, rect: DOMRect, n: number): number {
   const fraction = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
@@ -74,14 +100,20 @@ export function ChipSlider({
   };
 
   return (
-    <div className={cn('select-none', disabled && 'opacity-45')}>
-      {/* Stop labels, each centred over its dot. */}
+    /* The inset is what keeps a thumb on an end stop inside the control — see
+       EDGE. Both rows carry it so the labels stay over their own dots. */
+    <div
+      className={cn('select-none', disabled && 'opacity-45')}
+      style={{ paddingLeft: EDGE, paddingRight: EDGE }}
+    >
+      {/* Stop labels, each centred over its dot — except at the ends. */}
       <div className="relative mb-1.5 h-4 text-[0.66rem] font-medium text-dim">
         {stops.map((stop, i) => (
           <span
             key={stop.value}
             className={cn(
-              'absolute -translate-x-1/2 whitespace-nowrap tabular-nums',
+              'absolute whitespace-nowrap tabular-nums',
+              anchor(i, n),
               i === index && 'font-bold text-text',
             )}
             style={{ left: `${pct(i, n)}%` }}
@@ -193,13 +225,17 @@ export function ChipRangeSlider({
     };
 
   return (
-    <div className="select-none">
+    /* Inset by half a thumb at each end, same as ChipSlider — otherwise the low
+       thumb at the first stop and the high thumb at the last each hang half of
+       themselves outside, and the screen scrolls sideways to fit them. */
+    <div className="select-none" style={{ paddingLeft: EDGE, paddingRight: EDGE }}>
       <div className="relative mb-1.5 h-4 text-[0.66rem] font-medium text-dim">
         {stops.map((stop, i) => (
           <span
             key={stop.value}
             className={cn(
-              'absolute -translate-x-1/2 whitespace-nowrap tabular-nums',
+              'absolute whitespace-nowrap tabular-nums',
+              anchor(i, n),
               (i === li || i === hi) && 'font-bold text-text',
             )}
             style={{ left: `${pct(i, n)}%` }}

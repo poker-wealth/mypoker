@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { CreateGameScreen } from '@/components/table-setup/CreateGameScreen';
 import { cn } from '@/lib/cn';
 import { toast } from '@/lib/toast';
-import { DEFAULT_TABLE_ID, TELEGRAM_BOT_NAME } from '@/config';
+import { DEFAULT_TABLE_ID, TELEGRAM_APP_NAME, TELEGRAM_BOT_NAME } from '@/config';
 import { inviteUrl } from '@/lib/tableInvite';
 
 /**
@@ -58,6 +58,7 @@ export function TableEntryModal({ open, onClose }: { open: boolean; onClose: () 
     ? inviteUrl(
         { tableId: createdId, ...(createdCode ? { code: createdCode } : {}) },
         TELEGRAM_BOT_NAME,
+        TELEGRAM_APP_NAME,
       )
     : '';
 

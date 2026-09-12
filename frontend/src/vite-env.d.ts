@@ -16,6 +16,8 @@ interface ImportMetaEnv {
   readonly VITE_TABLES_WS_URL?: string;
   /** Bot username (without @) — used only to derive the default Support chat link. */
   readonly VITE_TELEGRAM_BOT_NAME?: string;
+  /** Short name of a Mini App registered in BotFather. Leave unset unless one exists. */
+  readonly VITE_TELEGRAM_APP_NAME?: string;
 }
 
 interface ImportMeta {
