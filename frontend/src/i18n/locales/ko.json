@@ -216,7 +216,9 @@
     "needsHands": "핸드 기록이 시작되면 제공됩니다",
     "fairnessTitle": "공정성 검증",
     "fairnessBlurb": "모든 라운드가 서버 시드에 커밋되어 검증 가능합니다",
-    "verifyHands": "검증"
+    "verifyHands": "검증",
+    "tabTables": "테이블",
+    "tabAnalysis": "분석"
   },
   "account": {
     "guest": "게스트",

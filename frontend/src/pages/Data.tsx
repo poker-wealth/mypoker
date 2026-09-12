@@ -58,7 +58,7 @@ const PERIODS: { value: StatsPeriod; key: string }[] = [
 export function Data() {
   const { t } = useTranslation();
   const [period, setPeriod] = useState<StatsPeriod>('today');
-  const [tab, setTab] = useState<'overview' | 'hands'>('overview');
+  const [tab, setTab] = useState<'overview' | 'hands' | 'tables' | 'analysis'>('overview');
   /**
    * One specific day, or '' for the rolling period.
    *
@@ -130,27 +130,48 @@ export function Data() {
       )}
 
       {/*
-        TWO TABS, not the reference's four.
+        THE REFERENCE'S FOUR TABS: Overview / Hands / Tables / Analysis.
 
-        The reference has Overview / Hands / Tables / Analysis. Only the first
-        two have anything to show. "Tables" would list the tables a player has
-        sat at, which is not recorded — the ledger stores a round's net movement
-        and no table identity. "Analysis" is the radar and its six stats, which
-        need preflop action data that is not recorded either.
-
-        Drawing four tabs where two open an empty screen is the same mistake as
-        a greyed control with no reason: it reads as a feature that exists and
-        is merely quiet. Two honest tabs beat four with nothing behind them, and
-        the other two arrive on their own when hand histories do.
+        This carried two for a while, on the reasoning that four tabs where two
+        open an empty screen reads as a feature that exists and is merely quiet.
+        The owner has since asked for the reference exactly, twice, so all four
+        are here — and the two that have no data behind them SAY what they are
+        waiting for instead of opening a blank screen. That is the version of
+        "exactly this" that does not lie: the navigation is the reference's, and
+        no figure is invented to fill it.
       */}
       <Segmented
         options={[
           { value: 'overview' as const, label: t('data.tabOverview') },
           { value: 'hands' as const, label: t('data.tabHands') },
+          { value: 'tables' as const, label: t('data.tabTables') },
+          { value: 'analysis' as const, label: t('data.tabAnalysis') },
         ]}
         value={tab}
         onChange={setTab}
       />
+
+      {/* TABLES — the tables this player has sat at. Not recorded: settlement
+          writes a round's net movement and carries no table identity, so there
+          is nothing to list. It arrives with hand recording. */}
+      {tab === 'tables' && (
+        <div className="rounded-(--radius-app) border border-border bg-surface px-4 py-10 text-center">
+          <p className="text-[0.75rem] font-bold">{t('data.tabTables')}</p>
+          <p className="mt-1 text-[0.68rem] text-dim">{t('data.needsHands')}</p>
+        </div>
+      )}
+
+      {/* ANALYSIS — the same radar and key stats the Overview carries, which is
+          where the reference puts them too. Shown here rather than duplicated:
+          one set of cards, reachable from both places. */}
+      {tab === 'analysis' && (
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          <StatsRadar />
+          <KeyStats />
+          <PositionCard />
+          <HandTypesCard />
+        </div>
+      )}
 
       {tab === 'overview' && (
         <>

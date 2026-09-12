@@ -216,7 +216,9 @@
     "needsHands": "Available once hand recording is live",
     "fairnessTitle": "Fairness Verification",
     "fairnessBlurb": "Every round is committed to a server seed and verifiable on-chain",
-    "verifyHands": "Verify"
+    "verifyHands": "Verify",
+    "tabTables": "Tables",
+    "tabAnalysis": "Analysis"
   },
   "account": {
     "guest": "Guest Player",

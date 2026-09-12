@@ -216,7 +216,9 @@
     "needsHands": "Có sau khi bật ghi lại ván bài",
     "fairnessTitle": "Xác minh công bằng",
     "fairnessBlurb": "Mỗi ván đều cam kết theo server seed và kiểm chứng được",
-    "verifyHands": "Kiểm chứng"
+    "verifyHands": "Kiểm chứng",
+    "tabTables": "Bàn",
+    "tabAnalysis": "Phân tích"
   },
   "account": {
     "guest": "Khách",

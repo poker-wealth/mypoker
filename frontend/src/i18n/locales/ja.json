@@ -216,7 +216,9 @@
     "needsHands": "ハンド記録の開始後に利用できます",
     "fairnessTitle": "公平性の検証",
     "fairnessBlurb": "全ラウンドがサーバーシードにコミットされ検証可能です",
-    "verifyHands": "検証"
+    "verifyHands": "検証",
+    "tabTables": "テーブル",
+    "tabAnalysis": "分析"
   },
   "account": {
     "guest": "ゲスト",

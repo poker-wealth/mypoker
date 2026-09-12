@@ -216,7 +216,9 @@
     "needsHands": "हैंड रिकॉर्डिंग शुरू होने पर उपलब्ध",
     "fairnessTitle": "निष्पक्षता सत्यापन",
     "fairnessBlurb": "हर राउंड सर्वर सीड से प्रतिबद्ध और सत्यापन योग्य है",
-    "verifyHands": "सत्यापित करें"
+    "verifyHands": "सत्यापित करें",
+    "tabTables": "टेबल",
+    "tabAnalysis": "विश्लेषण"
   },
   "account": {
     "guest": "अतिथि",

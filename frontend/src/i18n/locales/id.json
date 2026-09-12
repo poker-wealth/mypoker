@@ -216,7 +216,9 @@
     "needsHands": "Tersedia setelah perekaman hand aktif",
     "fairnessTitle": "Verifikasi Keadilan",
     "fairnessBlurb": "Setiap ronde terikat server seed dan dapat diverifikasi",
-    "verifyHands": "Verifikasi"
+    "verifyHands": "Verifikasi",
+    "tabTables": "Meja",
+    "tabAnalysis": "Analisis"
   },
   "account": {
     "guest": "Tamu",

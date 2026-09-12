@@ -216,7 +216,9 @@
     "needsHands": "พร้อมใช้งานเมื่อเริ่มบันทึกมือไพ่",
     "fairnessTitle": "การตรวจสอบความยุติธรรม",
     "fairnessBlurb": "ทุกรอบผูกกับ server seed และตรวจสอบได้",
-    "verifyHands": "ตรวจสอบ"
+    "verifyHands": "ตรวจสอบ",
+    "tabTables": "โต๊ะ",
+    "tabAnalysis": "วิเคราะห์"
   },
   "account": {
     "guest": "ผู้เยี่ยมชม",
