@@ -15,7 +15,7 @@ import { feltFor } from '../components/games/registry';
 import { HoldemFelt } from '../components/games/HoldemFelt';
 import { BuyInSheet } from '../components/poker/BuyInSheet';
 import { JackpotBurst } from '../components/poker/JackpotBurst';
-import { TableDesignSheet } from '../components/poker/TableDesignSheet';
+import { TableSettingsSheet } from '../components/poker/TableSettingsSheet';
 import { TableGround } from '../components/poker/TableGround';
 import { TableMenu } from '../components/poker/TableMenu';
 import { inviteLinkFor } from '../lib/tableInvite';
@@ -344,7 +344,24 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
         onExit={() => navigation.goBack()}
       />
 
-      <TableDesignSheet open={designOpen} onClose={() => setDesignOpen(false)} />
+      <TableSettingsSheet
+        open={designOpen}
+        onClose={() => setDesignOpen(false)}
+        tableId={tableId}
+        isOwner={Boolean(snapshot.isOwner)}
+        seats={snapshot.seats.map((s) => ({
+          playerId: s.playerId,
+          name: s.name,
+          isYou: Boolean(s.isYou),
+        }))}
+        canStart={Boolean(snapshot.awaitingStart)}
+        paused={Boolean(snapshot.paused)}
+        closing={Boolean(snapshot.closing)}
+        onStart={() => command({ kind: 'start_game' })}
+        onKick={(playerId) => command({ kind: 'kick', targetId: playerId })}
+        onPause={(next) => command({ kind: 'pause', paused: next })}
+        onCloseTable={() => command({ kind: 'close_table' })}
+      />
 
       {chatOpen && (
         <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, flexDirection: 'row', zIndex: 100 }}>

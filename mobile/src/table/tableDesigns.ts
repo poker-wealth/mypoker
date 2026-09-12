@@ -99,6 +99,24 @@ export const TABLE_DESIGNS: TableDesign[] = [
     accent: '#bb5cf6',
     rings: stadiumRings({ x: 16, yTop: 10, yBottom: 90, yMid: 50 }),
   },
+  {
+    /*
+     * THE RED ONE. The Mini App offers four colours and this client only had
+     * three, so the swatch row was missing the red the reference table uses —
+     * a player could not pick on their phone the table they had in Telegram.
+     *
+     * Same id as the web's, so the two share `GROUNDS` and a choice made on one
+     * client means the same colour on the other.
+     */
+    id: 'house-maroon',
+    name: 'House Maroon',
+    blurb: 'Burgundy and gold, after the reference table',
+    art: null,
+    aspect: 3 / 4,
+    boardTop: 50,
+    accent: '#d9b87c',
+    rings: stadiumRings({ x: 16, yTop: 10, yBottom: 90, yMid: 50 }),
+  },
 ];
 
 /**

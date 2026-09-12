@@ -207,6 +207,8 @@ export type TableCommand =
   | { kind: 'sit'; seat: number; buyIn: number }
   | { kind: 'stand' }
   /** Owner removes another player. The server checks who is asking. */
+  /** Owner of a manual-start table says go. The server checks who is asking. */
+  | { kind: 'start_game' }
   | { kind: 'kick'; targetId: string }
   /** Owner stops or resumes dealing. A hand in progress is unaffected. */
   | { kind: 'pause'; paused: boolean }
