@@ -72,8 +72,40 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
    * the server ever sends an empty name.
    */
   useEffect(() => {
-    navigation.setOptions({ title: snapshot?.name || tableId });
-  }, [navigation, snapshot?.name, tableId]);
+    navigation.setOptions({
+      title: snapshot?.name || tableId,
+      /*
+       * THE MENU LIVES IN THE HEADER, top-left beside Back — where the Mini App
+       * puts it. It was a pill under the felt, bottom-centre, which is both a
+       * different place and the hardest one to reach one-handed on a tall
+       * phone.
+       *
+       * `headerLeft` REPLACES the back button rather than sitting beside it, so
+       * the chevron is rendered here too; dropping it would leave the screen
+       * with no way back except the system gesture.
+       */
+      headerLeft: () => (
+        <View style={styles.headerLeft}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.back')}
+          >
+            <Text style={styles.headerGlyph}>‹</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setMenuOpen(true)}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={t('table.menuTitle')}
+          >
+            <Text style={styles.headerBurger}>☰</Text>
+          </Pressable>
+        </View>
+      ),
+    });
+  }, [navigation, snapshot?.name, tableId, t]);
   const { messages, sendChat, sendVoice } = useTableChat(socket);
   const { challengerId, clear: clearChallenge } = useChallengePrompt(socket);
   const [chatOpen, setChatOpen] = useState(false);
@@ -523,6 +555,11 @@ const styles = StyleSheet.create({
   },
   /** The hamburger. Sized up from the pill text so it reads as an icon. */
   menuGlyph: { color: theme.text, fontSize: 20, lineHeight: 22 },
+  /* Back and the menu, side by side — headerLeft replaces the back button, so
+     the chevron is drawn here rather than lost. */
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingLeft: space.sm },
+  headerGlyph: { color: theme.text, fontSize: 30, lineHeight: 32 },
+  headerBurger: { color: theme.text, fontSize: 19, lineHeight: 21 },
   toolText: { color: theme.dim, fontSize: 12, fontWeight: '600' },
   // The sheet sizes to its content, and ChatBox is `flex: 1` — without a height it collapses to
   // nothing and the composer sits under the title with no log above it.
