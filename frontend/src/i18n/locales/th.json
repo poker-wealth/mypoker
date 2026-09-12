@@ -72,7 +72,10 @@
     "open": "เข้าร่วมได้",
     "onlyOpen": "เฉพาะโต๊ะที่มีที่นั่งว่าง",
     "createPrivateHint": "โต๊ะส่วนตัวเป็นของพันธมิตร เปิดได้จากพันธมิตรของคุณ",
-    "yourSeat": "ที่นั่งของคุณ"
+    "yourSeat": "ที่นั่งของคุณ",
+    "haveInvite": "มีคำเชิญไหม",
+    "invitePlaceholder": "วางลิงก์คำเชิญหรือรหัสโต๊ะ",
+    "inviteNotRecognised": "ดูเหมือนจะไม่ใช่คำเชิญโต๊ะ"
   },
   "games": {
     "searchPlaceholder": "ค้นหาเกม",

@@ -72,7 +72,10 @@
     "open": "खुला",
     "onlyOpen": "केवल खाली सीट वाली टेबल",
     "createPrivateHint": "निजी टेबल गठबंधन की होती हैं — इन्हें अपने गठबंधन से खोलें।",
-    "yourSeat": "आपकी सीट"
+    "yourSeat": "आपकी सीट",
+    "haveInvite": "निमंत्रण मिला है?",
+    "invitePlaceholder": "निमंत्रण लिंक या टेबल आईडी पेस्ट करें",
+    "inviteNotRecognised": "यह टेबल निमंत्रण नहीं लगता"
   },
   "games": {
     "searchPlaceholder": "गेम खोजें",

@@ -72,7 +72,10 @@
     "open": "参加可",
     "onlyOpen": "空席のあるテーブルのみ",
     "createPrivateHint": "プライベートテーブルは同盟のものです。ご自分の同盟から開設してください。",
-    "yourSeat": "あなたの席"
+    "yourSeat": "あなたの席",
+    "haveInvite": "招待をお持ちですか？",
+    "invitePlaceholder": "招待リンクまたはテーブル ID を貼り付け",
+    "inviteNotRecognised": "テーブルの招待ではないようです"
   },
   "games": {
     "searchPlaceholder": "ゲームを検索",

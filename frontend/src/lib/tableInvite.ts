@@ -73,6 +73,47 @@ export function invitePath(invite: TableInvite): string {
  * named form comes back. It is deliberately EMPTY by default: a wrong short
  * name here does not degrade, it breaks every invite in the product.
  */
+/**
+ * Read an invite out of whatever a player actually pastes.
+ *
+ * WHY THIS EXISTS. A deep link only opens the app if the bot has a Mini App
+ * registered in BotFather, and on 12 Sep 2026 this one had none at all
+ * (`getMe` → `has_main_web_app: false`), so every shared link answered
+ * "Bot application not found" and then BOT_INVALID. That is a switch only the
+ * bot's owner can throw, and until they do, an invited player is holding a
+ * link nothing will open. This gives them a way in that depends on no Telegram
+ * configuration whatsoever: paste it, and the app reads the table out of it.
+ *
+ * ACCEPTS, in order of what people actually have in their clipboard:
+ *   - a Telegram deep link, either form, `?startapp=<token>`
+ *   - a web URL, `…/table/<id>?code=<code>`
+ *   - the bare token a link carries, `t-abc123__4821`
+ *   - the table id on its own
+ *
+ * Returns null for anything that does not contain a table id in a shape the
+ * server would recognise — better to say "that isn't a table link" than to
+ * navigate to a table that cannot exist.
+ */
+export function parseInviteInput(raw: string): TableInvite | null {
+  const text = raw.trim();
+  if (!text) return null;
+
+  // Both link shapes carry the whole invite in one query parameter.
+  const startapp = /[?&]startapp=([A-Za-z0-9_-]+)/.exec(text);
+  if (startapp) return decodeInvite(startapp[1]);
+
+  // A web URL: the id is a path segment and the code its own parameter.
+  const path = /\/table\/([A-Za-z0-9_-]+)/.exec(text);
+  if (path?.[1] && TABLE_TOKEN.test(path[1])) {
+    const code = /[?&]code=([A-Za-z0-9_-]+)/.exec(text);
+    return code?.[1] ? { tableId: path[1], code: code[1] } : { tableId: path[1] };
+  }
+
+  // A bare token, or a bare id — the same thing `decodeInvite` reads, which is
+  // also what someone gets if they copy only part of a link.
+  return decodeInvite(text);
+}
+
 export function inviteUrl(invite: TableInvite, botName: string, appName = ''): string {
   const path = appName ? `/${appName}` : '';
   return `https://t.me/${botName}${path}?startapp=${encodeInvite(invite)}`;

@@ -72,7 +72,10 @@
     "open": "BUKA",
     "onlyOpen": "Hanya meja dengan kursi kosong",
     "createPrivateHint": "Meja pribadi milik aliansi — buka dari aliansi Anda.",
-    "yourSeat": "Kursi Anda"
+    "yourSeat": "Kursi Anda",
+    "haveInvite": "Punya undangan?",
+    "invitePlaceholder": "Tempel tautan undangan atau ID meja",
+    "inviteNotRecognised": "Ini sepertinya bukan undangan meja"
   },
   "games": {
     "searchPlaceholder": "Cari game",

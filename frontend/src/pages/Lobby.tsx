@@ -11,6 +11,8 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { GAMES } from '@/lib/games';
 import { cn } from '@/lib/cn';
 import { haptic } from '@/lib/telegram';
+import { Input } from '@/components/ui/Input';
+import { invitePath, parseInviteInput } from '@/lib/tableInvite';
 
 /**
  * The promo banners, mirroring `PROMO_SLIDES` in
@@ -478,6 +480,17 @@ export function Lobby() {
         </button>
       </div>
 
+      {/* PASTE AN INVITE.
+          A deep link only opens the app if the bot has a Mini App registered
+          in BotFather, and on 12 Sep 2026 this one had none — every shared
+          link answered "Bot application not found", then BOT_INVALID. That is
+          the bot owner's switch to throw, not code, so until it is thrown an
+          invited player is holding a link nothing will open. This takes the
+          link itself (or the bare table id) and goes to the table, which needs
+          no Telegram configuration at all. It stays useful afterwards: it is
+          also the way in for a link pasted from outside Telegram. */}
+      <InviteBox />
+
       {/* My Games — OUR catalogue, translated, with the fire mark only on the
           games the catalogue actually flags hot. */}
       <div>
@@ -528,3 +541,61 @@ export function Lobby() {
 }
 
 
+
+/**
+ * Join a table from a pasted invite.
+ *
+ * Exists because a Telegram deep link is not self-sufficient: it only opens
+ * the app if the bot has a Mini App registered in BotFather, and on
+ * 12 Sep 2026 this bot had none (`getMe` → `has_main_web_app: false`), so
+ * every invite anyone shared was a dead link. Whether that switch is thrown is
+ * outside this codebase, and an invited player should not be stranded by it.
+ *
+ * Takes the whole link, either Telegram form or a web URL, or the bare table
+ * id — whatever ends up in someone's clipboard. `parseInviteInput` does the
+ * reading; this only reports when it finds nothing, because navigating to a
+ * table id the server cannot mint would swap a clear message for a 404 screen.
+ */
+function InviteBox() {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const [text, setText] = useState('');
+  const [bad, setBad] = useState(false);
+
+  const go = (): void => {
+    const invite = parseInviteInput(text);
+    if (!invite) {
+      setBad(true);
+      return;
+    }
+    haptic('light');
+    navigate(invitePath(invite));
+  };
+
+  return (
+    <div>
+      <div className="mb-2 text-base font-black">{t('lobby.haveInvite')}</div>
+      <div className="flex gap-2">
+        <Input
+          value={text}
+          onChange={(v) => {
+            setText(v);
+            setBad(false);
+          }}
+          placeholder={t('lobby.invitePlaceholder')}
+          className="flex-1 py-2.5 text-[0.85rem]"
+        />
+        <button
+          type="button"
+          disabled={text.trim().length === 0}
+          onClick={go}
+          className="shrink-0 rounded-(--radius-app) bg-gold px-5 text-sm font-black text-bg transition active:scale-[0.98] disabled:opacity-40"
+        >
+          {t('lobby.join')}
+        </button>
+      </div>
+      {/* Only after a real attempt. Typing half a link is not an error yet. */}
+      {bad && <div className="mt-1.5 text-[0.75rem] text-danger">{t('lobby.inviteNotRecognised')}</div>}
+    </div>
+  );
+}

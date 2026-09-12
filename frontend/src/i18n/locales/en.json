@@ -72,7 +72,10 @@
     "open": "OPEN",
     "onlyOpen": "Only tables with a free seat",
     "createPrivateHint": "Private tables belong to an alliance — open one from your alliance.",
-    "yourSeat": "Your seat"
+    "yourSeat": "Your seat",
+    "haveInvite": "Have an invite?",
+    "invitePlaceholder": "Paste an invite link or table ID",
+    "inviteNotRecognised": "That doesn't look like a table invite"
   },
   "games": {
     "searchPlaceholder": "Search games",
