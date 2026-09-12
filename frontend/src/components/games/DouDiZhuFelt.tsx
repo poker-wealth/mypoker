@@ -68,7 +68,13 @@ export function DouDiZhuFelt({ snapshot, onCommand }: DouDiZhuFeltProps) {
   };
 
   return (
-    <div className="relative flex h-full w-full flex-col justify-between overflow-hidden bg-emerald-950 p-4 text-white select-none">
+    /* TRANSPARENT, so the table's chosen ground shows through.
+       This was `bg-emerald-950`, a hard green that ignored the colour picker
+       entirely — the poker felt follows the player's choice and this one sat in
+       its own green regardless. Victor: "other games must alot fit the
+       background too". The screen behind paints the ground; a game felt paints
+       its own game and nothing else. */
+    <div className="relative flex h-full w-full flex-col justify-between overflow-hidden p-4 text-white select-none">
       {/* Background felt gradient */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#064e3b_0%,#022c22_100%)] opacity-90" />
 

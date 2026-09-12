@@ -90,7 +90,7 @@ export function BaccaratFelt({ snapshot, onCommand }: BaccaratFeltProps) {
   ];
 
   return (
-    <div className="relative flex min-h-[32rem] w-full flex-col self-stretch overflow-hidden bg-slate-950 p-4 text-white select-none">
+    <div className="relative flex min-h-[32rem] w-full flex-col self-stretch overflow-hidden p-4 text-white select-none">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,#1e1b4b_0%,#0f172a_75%)]" />
 
       <div className="relative z-10 flex items-center justify-between border-b border-indigo-800/40 pb-2">

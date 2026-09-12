@@ -250,7 +250,7 @@ export function DouDiZhuSimulatorFelt() {
   const table = state.lastCombination;
 
   return (
-    <div className="relative flex min-h-screen flex-col justify-between overflow-hidden bg-emerald-950 p-4 text-white select-none">
+    <div className="relative flex min-h-screen flex-col justify-between overflow-hidden p-4 text-white select-none">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#064e3b_0%,#022c22_100%)] opacity-90" />
 
       {/* Header */}
