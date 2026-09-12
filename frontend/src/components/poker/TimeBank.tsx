@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'motion/react';
 import { haptic } from '@/lib/telegram';
@@ -21,17 +22,37 @@ export function TimeBank({
   timeBankMs,
   usingTimeBank,
   autoTimeBank,
+  deadline,
   onUse,
   onToggleAuto,
 }: {
   timeBankMs: number;
   usingTimeBank: boolean;
   autoTimeBank: boolean;
+  /** Epoch ms this player's clock expires, while the reserve is running. */
+  deadline?: number | null;
   onUse: () => void;
   onToggleAuto: (on: boolean) => void;
 }) {
   const { t } = useTranslation();
   const seconds = Math.ceil(timeBankMs / 1000);
+
+  /**
+   * The reserve, ticking down once it is actually running.
+   *
+   * It used to read "Time bank running" — true, but it does not say how long
+   * is left, which is the one thing a player who just spent their reserve
+   * needs. Victor: "its not even counting down". The ticker only runs while
+   * the clock does, so an idle table is not re-rendering for nothing.
+   */
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!usingTimeBank || !deadline) return;
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [usingTimeBank, deadline]);
+  const left = deadline ? Math.max(0, Math.ceil((deadline - now) / 1000)) : null;
 
   // Nothing left to offer, and nothing running: say nothing rather than show a
   // dead control. A disabled button with no explanation is worse than absence.
@@ -47,9 +68,16 @@ export function TimeBank({
           transition={{ duration: 1.2, repeat: Infinity }}
           className="rounded-full border border-warn/40 bg-warn/15 px-2.5 py-0.5 text-[0.66rem] font-black tracking-wide text-warn"
         >
-          {t('table.timeBankRunning')}
+          {/* The number, not just the fact. Falls back to the old wording only
+              when the server has sent no deadline to count against — better a
+              vague truth than an invented figure. */}
+          {left === null ? t('table.timeBankRunning') : t('table.timeBankLeft', { seconds: left })}
         </motion.span>
       ) : (
+        // "Use 60s", not "Time Bank: 60s". The old label read as a countdown
+        // that was mysteriously stuck — Victor's first reading of it was "its
+        // not even counting down". It is a BUTTON offering the reserve, and
+        // saying "Use" is what makes that legible at a glance.
         <button
           type="button"
           onClick={() => {
@@ -58,7 +86,7 @@ export function TimeBank({
           }}
           className="rounded-full border border-accent/40 bg-accent/15 px-2.5 py-0.5 text-[0.66rem] font-black tracking-wide text-accent active:scale-95"
         >
-          {t('table.timeBank', { seconds })}
+          {t('table.timeBankUse', { seconds })}
         </button>
       )}
 

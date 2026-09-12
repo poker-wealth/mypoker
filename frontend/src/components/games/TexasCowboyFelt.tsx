@@ -107,7 +107,12 @@ export function TexasCowboyFelt({
   };
 
   return (
-    <div className="relative flex min-h-[40rem] w-full flex-col self-stretch overflow-hidden bg-[#07301f] text-white select-none">
+    /* The outer ground goes, like every other felt — the screen paints the
+       player's chosen colour. The greens INSIDE are kept on purpose: the
+       bordered betting strip and its lanes are this game's artwork, not a
+       background it happens to sit on, and stripping those would take the
+       design with them. */
+    <div className="relative flex min-h-[40rem] w-full flex-col self-stretch overflow-hidden text-white select-none">
       {/*
         The scene: the two of them facing each other, the community cards dealt between them, the
         clock above. It is the top of the screen and the board is everything below, because that is

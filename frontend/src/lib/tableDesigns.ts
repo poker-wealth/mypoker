@@ -392,6 +392,71 @@ export const TABLE_DESIGNS: TableDesign[] = [
  * they had. To see this one on an existing browser, pick it once in the picker
  * or clear `fp-table-design`.
  */
+/**
+ * GROUND COLOURS — what a "table design" now means.
+ *
+ * The felts are gone (owner: "all table design goes"), but the colour choice
+ * came back on its own terms: "just the colour na but no tables on it". So a
+ * design no longer selects artwork or a rail — it selects the colour of the
+ * plain ground the seats sit on, and nothing else.
+ *
+ * Keyed off the existing design ids so the picker, the store and every saved
+ * preference keep working untouched. `artUrl`, `felt` and `accent` on those
+ * entries are now DEAD for rendering purposes — only `rings` (the seat
+ * geometry) and this map are still read.
+ *
+ * Four, matching the reference's swatch row: graphite, red, purple, teal.
+ */
+const GROUNDS: Record<string, readonly [string, string, string]> = {
+  midnight: ['#3a3f4a', '#262a33', '#14161b'],
+  emerald: ['#1f5f4a', '#14402f', '#0a1f18'],
+  'house-maroon': ['#6d2230', '#4a1622', '#2a0d14'],
+  // The id is `neon`, NOT `neon-violet`. Keyed wrongly it matched nothing and
+  // fell through to the red default, so the picker showed two identical red
+  // swatches — Victor: "two red can one be blue". Blue, and keyed correctly.
+  neon: ['#1e4a8a', '#143363', '#0a1a33'],
+
+  /*
+   * THE WIDE SIBLINGS need their own entries.
+   *
+   * A wide game (Short Deck) swaps the player's design for its `wideId`
+   * counterpart — `wide-green`, `wide-blue`, `wide-maroon`. None of those were
+   * keyed here, so every one fell through to the red default and the colour
+   * picker did nothing at all on those tables, whichever swatch was chosen.
+   *
+   * Same colours as the portrait design each is the wide form of: picking green
+   * must stay green when the table changes shape.
+   */
+  'wide-green': ['#1f5f4a', '#14402f', '#0a1f18'],
+  'wide-blue': ['#1e4a8a', '#143363', '#0a1a33'],
+  'wide-maroon': ['#6d2230', '#4a1622', '#2a0d14'],
+};
+
+/**
+ * Every id in GROUNDS must be a real design id, or that design silently
+ * inherits the red default and two swatches look the same. Cheap to assert at
+ * module load, and it fails loudly the next time an id is renamed.
+ */
+if (process.env.NODE_ENV !== 'production') {
+  const known = new Set(TABLE_DESIGNS.map((d) => d.id));
+  for (const id of Object.keys(GROUNDS)) {
+    if (!known.has(id)) console.warn(`[tableDesigns] GROUNDS has no design "${id}"`);
+  }
+}
+
+/** The red ground, for any design with no colour of its own. */
+const DEFAULT_GROUND = GROUNDS['house-maroon']!;
+
+/**
+ * The CSS gradient for a design's ground. A radial ellipse, lightest at the
+ * centre — a GROUND, not a table: no rail, no edge, no oval of its own. The
+ * oval is made entirely by where the seats sit.
+ */
+export function groundFor(design: TableDesign): string {
+  const [inner, mid, outer] = GROUNDS[design.id] ?? DEFAULT_GROUND;
+  return `radial-gradient(ellipse at center, ${inner} 0%, ${mid} 45%, ${outer} 100%)`;
+}
+
 export const DEFAULT_DESIGN_ID = 'emerald';
 
 export function designById(id: string | null | undefined): TableDesign {

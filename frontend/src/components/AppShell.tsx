@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { Header } from './Header';
 import { BottomNav } from './BottomNav';
@@ -9,12 +9,35 @@ import { useSession } from '@/store/session';
 import { useTranslation } from 'react-i18next';
 import { useSettings } from '@/api/hooks';
 import { setLanguage } from '@/i18n';
-import { initData } from '@/lib/telegram';
+import { initData, telegramStartParam } from '@/lib/telegram';
+import { decodeInvite, invitePath } from '@/lib/tableInvite';
 import { Login } from '@/pages/Login';
 import { Landing } from '@/pages/Landing';
 
 export function AppShell() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  /**
+   * An invite that launched the Mini App.
+   *
+   * Telegram hands `t.me/<bot>/app?startapp=<token>` to us as `start_param`.
+   * Without this the deep link opened the lobby and the invite was lost — the
+   * player had been sent to a specific table and arrived nowhere in
+   * particular. Runs once, and only from the root, so it cannot fight a player
+   * who has since navigated somewhere else.
+   *
+   * `decodeInvite` returns null for anything that is not a table token, so the
+   * referral ids that share this parameter pass through untouched.
+   */
+  const invited = useRef(false);
+  useEffect(() => {
+    if (invited.current) return;
+    const invite = decodeInvite(telegramStartParam());
+    if (!invite) return;
+    invited.current = true;
+    navigate(invitePath(invite), { replace: true });
+  }, [navigate]);
   useTelegramBackButton();
 
   const status = useSession((s) => s.status);

@@ -31,8 +31,8 @@ export function SlotsFelt({ snapshot, onCommand }: SlotsFeltProps) {
   };
 
   return (
-    <div className="relative flex h-full w-full flex-col justify-between overflow-hidden bg-indigo-950 p-4 text-white select-none">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#312e81_0%,#1e1b4b_100%)] opacity-90" />
+    <div className="relative flex h-full w-full flex-col justify-between overflow-hidden p-4 text-white select-none">
+      {/* No ground layer — the screen paints the player's chosen table colour. */}
 
       <div className="relative z-10 flex items-center justify-between border-b border-indigo-800/40 pb-2">
         <div className="flex items-center gap-3">

@@ -261,6 +261,7 @@ export function toView(snapshot: TableSnapshot): TableState {
     toCall: snapshot.legal?.callAmount ?? 0,
     currentBet,
     minRaise,
+    bigBlind: snapshot.bigBlind,
     ...(snapshot.message ? { message: snapshot.message } : {}),
     handOver: snapshot.phase === 'SHOWDOWN',
   };

@@ -53,6 +53,19 @@ export interface LobbyTable {
    */
   buyInBB: number | null;
   /**
+   * THIS TABLE'S seat count, when it sets its own.
+   *
+   * Not the game's ceiling — the number the creator chose. The lobby used to
+   * report `spec.maxPlayers` for every row, so a table created for 2 players
+   * advertised "0 / 8" and its status was computed against 8 seats it did not
+   * have. The room already knows the real figure (`summary().maxSeats`); this
+   * is the field that carries it as far as the row.
+   *
+   * Optional because the house tables and the non-poker rooms genuinely have
+   * no per-table override — those still fall back to the catalogue.
+   */
+  seats?: number;
+  /**
    * Which system this table belongs to (§2, §3.10).
    *
    * PLATFORM tables are the public lobby. LEAGUE tables are private rooms:
@@ -139,7 +152,9 @@ export class LobbyService {
   /** Keep the lobby in step with the live table (seat counts, jackpot growth). */
   updateTable(
     tableId: string,
-    patch: Partial<Pick<LobbyTable, 'players' | 'jackpot' | 'stakes' | 'smallBlind' | 'name'>>,
+    patch: Partial<
+      Pick<LobbyTable, 'players' | 'jackpot' | 'stakes' | 'smallBlind' | 'name' | 'seats'>
+    >,
   ): void {
     const t = this.tables.get(tableId);
     if (!t) throw new RangeError(`unknown table: ${tableId}`);
@@ -157,10 +172,23 @@ export class LobbyService {
     return !this.unavailable.has(gameId);
   }
 
+  /**
+   * The seats this table actually has: its own count when it set one, the
+   * game's ceiling otherwise. Clamped to the ceiling so a bad row cannot
+   * advertise more seats than the engine will ever deal to.
+   */
+  private seatsOf(t: LobbyTable): number {
+    const spec = gameSpec(t.gameId);
+    if (t.seats === undefined) return spec.maxPlayers;
+    return Math.min(t.seats, spec.maxPlayers);
+  }
+
   private statusOf(t: LobbyTable): TableStatus {
     const spec = gameSpec(t.gameId);
     if (!this.isAvailable(t.gameId)) return 'UNAVAILABLE';
-    if (t.players >= spec.maxPlayers) return 'FULL';
+    // Against the TABLE's seats, not the game's — a 2-seat table with 2 players
+    // is FULL, and used to read OPEN right up until the engine refused the sit.
+    if (t.players >= this.seatsOf(t)) return 'FULL';
     if (t.players < spec.minPlayers) return 'WAITING';
     return 'OPEN';
   }
@@ -168,6 +196,7 @@ export class LobbyService {
   private viewOf(t: LobbyTable): TableView {
     const spec = gameSpec(t.gameId);
     const status = this.statusOf(t);
+    const seats = this.seatsOf(t);
     return {
       ...t,
       // The table's own name wins; the game's is the fallback for rows that
@@ -175,10 +204,10 @@ export class LobbyService {
       name: t.name ?? spec.name,
       status,
       minPlayers: spec.minPlayers,
-      maxPlayers: spec.maxPlayers,
+      maxPlayers: seats,
       fairness: spec.fairness,
       ...(spec.vendor ? { vendor: spec.vendor } : {}),
-      seatsFree: Math.max(0, spec.maxPlayers - t.players),
+      seatsFree: Math.max(0, seats - t.players),
       ...(status === 'WAITING' ? { waitingFor: spec.minPlayers - t.players } : {}),
     };
   }

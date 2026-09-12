@@ -154,6 +154,14 @@ export function Lobby() {
   // ── Promo carousel ────────────────────────────────────────────────────────
   const [slide, setSlide] = useState(0);
   const [paused, setPaused] = useState(false);
+  /**
+   * Which banners have actually decoded.
+   *
+   * Per index rather than a single flag: the slides load independently (only
+   * the first is eager), so one shared boolean would either hide the shimmer
+   * on a slide still loading or keep it over one already painted.
+   */
+  const [loaded, setLoaded] = useState<ReadonlySet<number>>(() => new Set());
   const trackRef = useRef<HTMLDivElement>(null);
 
   /**
@@ -247,15 +255,22 @@ export function Lobby() {
         </div>
 
         {/* Table List Grid */}
-        <div className="overflow-hidden rounded-xl border border-border/80 bg-surface/90 shadow-sm">
+        {/* `overflow-x-auto`, NOT `overflow-hidden`.
+            Five columns do not always fit the 520px shell — a long table id
+            (`t-9281a78425c9`) plus the "your seat" badge is enough to push past
+            it. Clipping meant the Status column, which holds the ONLY control
+            in the row, was cut off the right edge and unreachable. Scrolling
+            keeps it reachable; `whitespace-nowrap` below stops the cells
+            collapsing into two-line stacks ("100 / BB") on the way there. */}
+        <div className="overflow-x-auto no-scrollbar rounded-xl border border-border/80 bg-surface/90 shadow-sm">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-border/60 text-[0.65rem] text-dim uppercase tracking-wider">
-                <th className="px-3 py-2.5 font-bold">Table</th>
-                <th className="px-3 py-2.5 font-bold">Blinds</th>
-                <th className="px-3 py-2.5 font-bold">Players</th>
-                <th className="px-3 py-2.5 font-bold">Buy-in</th>
-                <th className="px-3 py-2.5 text-right font-bold">Status</th>
+                <th className="px-2.5 py-2.5 font-bold">Table</th>
+                <th className="px-2.5 py-2.5 font-bold whitespace-nowrap">Blinds</th>
+                <th className="px-2.5 py-2.5 font-bold whitespace-nowrap">Players</th>
+                <th className="px-2.5 py-2.5 font-bold whitespace-nowrap">Buy-in</th>
+                <th className="px-2.5 py-2.5 text-right font-bold">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border/40">
@@ -292,7 +307,7 @@ export function Lobby() {
                     {/* The table's real id. It used to render `T-00${index}`, a
                         label invented per render that matched nothing a player
                         could be told over support. */}
-                    <td className="px-3 py-3 font-bold text-[#eab308]">
+                    <td className="px-2.5 py-3 font-bold whitespace-nowrap text-[#eab308]">
                       {tbl.id}
                       {/* The row holding this player's seat. It is the reason every
                           other table is refusing them, and the only row that can
@@ -304,10 +319,16 @@ export function Lobby() {
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-3 tabular-nums text-dim font-medium">{tbl.blinds}</td>
-                    <td className="px-3 py-3 tabular-nums font-semibold text-text">{tbl.players}</td>
-                    <td className="px-3 py-3 tabular-nums text-dim font-medium">{tbl.buyIn}</td>
-                    <td className="px-3 py-3 text-right">
+                    <td className="px-2.5 py-3 tabular-nums whitespace-nowrap text-dim font-medium">
+                      {tbl.blinds}
+                    </td>
+                    <td className="px-2.5 py-3 tabular-nums whitespace-nowrap font-semibold text-text">
+                      {tbl.players}
+                    </td>
+                    <td className="px-2.5 py-3 tabular-nums whitespace-nowrap text-dim font-medium">
+                      {tbl.buyIn}
+                    </td>
+                    <td className="px-2.5 py-3 text-right">
                       {tbl.isFull ? (
                         <span className="inline-block min-w-16 rounded-md border border-border bg-surface-2 px-2.5 py-1 text-center text-[0.7rem] font-bold text-dim">
                           {t('lobby.wait')}
@@ -364,15 +385,28 @@ export function Lobby() {
           and nothing else: the art already carries its own headline and CTA,
           so any text here would print the words twice. */}
       <div
-        className="relative overflow-hidden rounded-2xl"
+        // The banner's own shape, held from first paint so the page never
+        // reflows when the art lands. 1536x658 is promo-1; the others are
+        // within a few percent and are covered into this box.
+        className="relative aspect-[1536/658] overflow-hidden rounded-2xl"
         onMouseEnter={() => setPaused(true)}
         onMouseLeave={() => setPaused(false)}
         onTouchStart={() => setPaused(true)}
         onTouchEnd={() => setPaused(false)}
       >
+        {/* The skeleton, UNDER the track.
+            The banners carried no reserved height, so this whole block was 0px
+            tall until the first file arrived and then snapped open — Victor's
+            words: "the image appearing all of a sudden from no way after
+            looking like nothing is there". The container now holds the
+            banner's shape from first paint, a shimmer fills it while the file
+            is in flight, and the art fades in over the top. Nothing moves. */}
+        {!loaded.has(slide) && (
+          <div className="absolute inset-0 animate-pulse rounded-2xl bg-surface-2" />
+        )}
         <div
           ref={trackRef}
-          className="flex transition-transform duration-500 ease-out"
+          className="flex h-full transition-transform duration-500 ease-out"
           style={{ transform: `translateX(-${slide * 100}%)` }}
         >
           {PROMO_SLIDES.map((src, i) => (
@@ -386,7 +420,14 @@ export function Lobby() {
               // can wait until the carousel reaches them.
               loading={i === 0 ? 'eager' : 'lazy'}
               decoding="async"
-              className="w-full shrink-0 select-none rounded-2xl"
+              onLoad={() => setLoaded((prev) => (prev.has(i) ? prev : new Set(prev).add(i)))}
+              // `object-cover` because the four banners are not all the same
+              // shape (2.23 to 2.33); the box is one ratio, so the odd ones are
+              // cropped a hair rather than letterboxed or resizing the block.
+              className={cn(
+                'h-full w-full shrink-0 select-none rounded-2xl object-cover transition-opacity duration-300',
+                loaded.has(i) ? 'opacity-100' : 'opacity-0',
+              )}
             />
           ))}
         </div>

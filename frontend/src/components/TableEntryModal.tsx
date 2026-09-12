@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/Button';
 import { CreateGameScreen } from '@/components/table-setup/CreateGameScreen';
 import { cn } from '@/lib/cn';
 import { toast } from '@/lib/toast';
-import { DEFAULT_TABLE_ID } from '@/config';
+import { DEFAULT_TABLE_ID, TELEGRAM_BOT_NAME } from '@/config';
+import { inviteUrl } from '@/lib/tableInvite';
 
 /**
  * Tapping Hold'em opens this (owner-approved; not in the FairPlay doc): join the
@@ -54,7 +55,10 @@ export function TableEntryModal({ open, onClose }: { open: boolean; onClose: () 
    * shown separately below, for reading aloud when a link cannot be pasted.
    */
   const inviteLink = createdId
-    ? `${window.location.origin}/table/${createdId}${createdCode ? `?code=${createdCode}` : ''}`
+    ? inviteUrl(
+        { tableId: createdId, ...(createdCode ? { code: createdCode } : {}) },
+        TELEGRAM_BOT_NAME,
+      )
     : '';
 
   const join = (): void => {

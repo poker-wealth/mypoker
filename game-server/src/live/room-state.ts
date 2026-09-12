@@ -23,6 +23,14 @@ export interface SeatSnapshot {
   avatarUrl?: string;
   /** Chips in front of them. */
   stack: number;
+  /**
+   * Every chip brought to this table — first buy-in plus each top-up. With
+   * `stack` it gives a session RESULT (`stack - boughtIn`) without needing hand
+   * histories, which this platform does not keep.
+   */
+  boughtIn?: number;
+  /** Hands this seat has been dealt into at this table. */
+  handsPlayed?: number;
   /** Chips pushed forward on the current street. */
   bet: number;
   status: SeatStatus;
@@ -176,7 +184,23 @@ export interface TableSnapshot {
    * viewer who can press the button knows it is theirs.
    */
   awaitingStart?: boolean;
+  /**
+   * You created this table. Sent on EVERY snapshot, not only before the first
+   * hand — the owner can pause, close and remove players for as long as the
+   * table exists, so the client must not forget who they are once it deals.
+   */
   isOwner?: boolean;
+  /** The owner has stopped new hands. A hand in progress is unaffected. */
+  paused?: boolean;
+  /** A close is queued: no more hands, and stacks are returned when this one ends. */
+  closing?: boolean;
+  /**
+   * People watching who hold no seat. A COUNT, never a list: who is watching is
+   * not the room's to tell the people at the table.
+   */
+  spectators?: number;
+  /** Epoch ms this table opened. The client renders elapsed time from it. */
+  openedAt?: number;
   /** This table bans same-GPS seating: attach a location to the sit command. */
   gpsRequired?: boolean;
 
@@ -389,6 +413,26 @@ export const tableCommandSchema = z.discriminatedUnion('kind', [
    * nothing a client should get to say about it.
    */
   z.object({ kind: z.literal('start_game') }),
+  /**
+   * The owner removes another player from the table. Owner-only, checked in the
+   * room against `ownerId` — never from anything the client claims.
+   *
+   * Carries only the target. There is no "and forfeit their chips" variant and
+   * there must not be: a kick returns the player's stack by the same path
+   * standing up does.
+   */
+  z.object({ kind: z.literal('kick'), targetId: z.string().min(1).max(64) }),
+  /**
+   * Owner stops or resumes dealing. A hand already running is unaffected —
+   * see `maybeStartHand` for why pausing the clock would be worse.
+   */
+  z.object({ kind: z.literal('pause'), paused: z.boolean() }),
+  /**
+   * Owner closes the table. Queued: the current hand finishes, then every
+   * remaining stack is returned. Carries nothing — there is no variant of this
+   * that keeps anyone's chips.
+   */
+  z.object({ kind: z.literal('close_table') }),
 ]);
 
 export type TableCommand = z.infer<typeof tableCommandSchema>;

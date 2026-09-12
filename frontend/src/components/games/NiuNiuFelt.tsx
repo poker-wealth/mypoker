@@ -101,18 +101,13 @@ export function NiuNiuFelt({ snapshot, onCommand }: NiuNiuFeltProps) {
   return (
     <div className="mx-auto flex w-full max-w-[440px] flex-col items-center px-5 text-white select-none">
       <div className="relative w-full" style={{ aspectRatio: design.aspect }}>
-        {/* The table surface, exactly as the Hold'em felt draws it. */}
-        {design.artUrl ? (
-          <img
-            src={design.artUrl}
-            alt=""
-            aria-hidden
-            draggable={false}
-            className="absolute inset-0 h-full w-full select-none object-contain"
-          />
-        ) : (
-          <div className="absolute inset-0 rounded-[50%] border-8 border-black/70 bg-[radial-gradient(ellipse_at_center,#0c7a4a_0%,#04301e_100%)]" />
-        )}
+        {/* NO TABLE SURFACE — neither artwork nor a drawn oval.
+            This used to render the design's felt image, or failing that a green
+            ellipse with an eight-pixel black rail: an actual table, which is
+            the one thing the Hold'em felt had removed and which this one kept.
+            Victor: "nui niu is a card game so it should also have the effect
+            like other card game no tables". The seats and the board make the
+            shape; the screen paints the ground behind them. */}
 
         {/* The middle of the felt: the clock, and what the table is waiting for. */}
         <div

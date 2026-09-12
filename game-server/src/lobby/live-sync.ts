@@ -73,7 +73,17 @@ export function syncLobbyWithLiveTables(
 
     const existing = lobby.getTable(s.tableId);
     if (existing) {
-      lobby.updateTable(s.tableId, { players: s.seated, stakes, smallBlind, name: s.name });
+      // `seats` is patched too, not just set at creation: this resync is what
+      // rebuilds every row, so a row that predates the seat count (or was
+      // listed by a path that did not send one) would otherwise keep reporting
+      // the game's ceiling forever.
+      lobby.updateTable(s.tableId, {
+        players: s.seated,
+        stakes,
+        smallBlind,
+        name: s.name,
+        seats: s.maxSeats,
+      });
       continue;
     }
 
@@ -91,6 +101,9 @@ export function syncLobbyWithLiveTables(
       // exactly the habit this change exists to end.
       jackpot: 0,
       buyInBB,
+      // The seats the creator actually chose. Straight off the room, so the row
+      // cannot disagree with the engine about how many people fit.
+      seats: s.maxSeats,
     });
   }
 

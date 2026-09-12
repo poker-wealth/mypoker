@@ -250,8 +250,8 @@ export function DouDiZhuSimulatorFelt() {
   const table = state.lastCombination;
 
   return (
-    <div className="relative flex min-h-screen flex-col justify-between overflow-hidden bg-emerald-950 p-4 text-white select-none">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,#064e3b_0%,#022c22_100%)] opacity-90" />
+    <div className="relative flex min-h-screen flex-col justify-between overflow-hidden p-4 text-white select-none">
+      {/* No ground layer — the screen paints the player's chosen table colour. */}
 
       {/* Header */}
       <div className="relative z-10 flex flex-wrap items-center gap-3 border-b border-emerald-800/40 pb-3">
