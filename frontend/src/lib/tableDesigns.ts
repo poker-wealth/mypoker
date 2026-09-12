@@ -415,6 +415,21 @@ const GROUNDS: Record<string, readonly [string, string, string]> = {
   // fell through to the red default, so the picker showed two identical red
   // swatches — Victor: "two red can one be blue". Blue, and keyed correctly.
   neon: ['#1e4a8a', '#143363', '#0a1a33'],
+
+  /*
+   * THE WIDE SIBLINGS need their own entries.
+   *
+   * A wide game (Short Deck) swaps the player's design for its `wideId`
+   * counterpart — `wide-green`, `wide-blue`, `wide-maroon`. None of those were
+   * keyed here, so every one fell through to the red default and the colour
+   * picker did nothing at all on those tables, whichever swatch was chosen.
+   *
+   * Same colours as the portrait design each is the wide form of: picking green
+   * must stay green when the table changes shape.
+   */
+  'wide-green': ['#1f5f4a', '#14402f', '#0a1f18'],
+  'wide-blue': ['#1e4a8a', '#143363', '#0a1a33'],
+  'wide-maroon': ['#6d2230', '#4a1622', '#2a0d14'],
 };
 
 /**
