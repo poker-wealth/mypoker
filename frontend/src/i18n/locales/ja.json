@@ -285,6 +285,10 @@
     }
   },
   "table": {
+    "commentPlaceholder": "コメントを入力してください。",
+    "history": "履歴",
+    "noComments": "まだコメントはありません",
+    "voiceNote": "ボイスメモ",
     "comment": "コメント",
     "paidCommentSoon": "有料コメントは未対応です",
     "phraseShowChips": "チップを見せろ！",

@@ -285,6 +285,10 @@
     }
   },
   "table": {
+    "commentPlaceholder": "กรุณาใส่ความคิดเห็น",
+    "history": "ประวัติ",
+    "noComments": "ยังไม่มีความคิดเห็น",
+    "voiceNote": "ข้อความเสียง",
     "comment": "คอมเมนต์",
     "paidCommentSoon": "คอมเมนต์แบบเสียชิปยังไม่เปิดให้ใช้",
     "phraseShowChips": "โชว์ชิปหน่อย!",

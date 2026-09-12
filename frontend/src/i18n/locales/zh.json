@@ -285,6 +285,10 @@
     }
   },
   "table": {
+    "commentPlaceholder": "请输入你的评论。",
+    "history": "历史",
+    "noComments": "暂无评论",
+    "voiceNote": "语音消息",
     "comment": "评论",
     "paidCommentSoon": "付费评论暂未开放",
     "phraseShowChips": "亮筹码！",

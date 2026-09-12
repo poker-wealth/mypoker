@@ -285,6 +285,10 @@
     }
   },
   "table": {
+    "commentPlaceholder": "Masukkan komentar Anda.",
+    "history": "Riwayat",
+    "noComments": "Belum ada komentar",
+    "voiceNote": "Pesan suara",
     "comment": "Komentar",
     "paidCommentSoon": "Komentar berbayar belum tersedia",
     "phraseShowChips": "Tunjukkan chipmu!",

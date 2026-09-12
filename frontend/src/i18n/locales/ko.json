@@ -285,6 +285,10 @@
     }
   },
   "table": {
+    "commentPlaceholder": "댓글을 입력하세요.",
+    "history": "기록",
+    "noComments": "아직 댓글이 없습니다",
+    "voiceNote": "음성 메시지",
     "comment": "댓글",
     "paidCommentSoon": "유료 댓글은 아직 지원되지 않습니다",
     "phraseShowChips": "칩을 보여줘!",

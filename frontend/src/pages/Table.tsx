@@ -31,6 +31,7 @@ import { cn } from '@/lib/cn';
 import { useSoundSetting } from '@/hooks/useSoundSetting';
 import { play } from '@/lib/sound';
 import { ChatBox } from '@/components/poker/ChatBox';
+import { CommentSheet } from '@/components/poker/CommentSheet';
 import { useTableChat } from '@/hooks/useTableChat';
 import { ChallengeModal } from '@/components/poker/ChallengeModal';
 import { unlockTableApi } from '@/api/tables';
@@ -210,6 +211,7 @@ function LiveTable({ tableId }: { tableId: string }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [rankingsOpen, setRankingsOpen] = useState(false);
   const [playersOpen, setPlayersOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
   /** Whose card is open, by playerId. The seat is looked up fresh each render
    *  so the figures on it track the table rather than freezing at open time. */
   const [profileFor, setProfileFor] = useState<string | null>(null);
@@ -352,6 +354,14 @@ function LiveTable({ tableId }: { tableId: string }) {
         onPlayer={(playerId) => setProfileFor(playerId)}
         {...(snapshot?.spectators !== undefined ? { spectators: snapshot.spectators } : {})}
         {...(snapshot?.openedAt !== undefined ? { openedAt: snapshot.openedAt } : {})}
+      />
+
+      <CommentSheet
+        open={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        onSend={sendChat}
+        messages={messages}
+        disabled={!seated}
       />
 
       <PlayerProfileCard
@@ -573,7 +583,7 @@ function LiveTable({ tableId }: { tableId: string }) {
               not something to orphan: that moved into the menu drawer in the
               same change, so it is still one tap from here. Losing the way to
               it would be a quiet cost of a cosmetic decision. */}
-          <ToolbarIcon label={t('table.comment')} onClick={() => setChatOpen(true)}>
+          <ToolbarIcon label={t('table.comment')} onClick={() => setCommentsOpen(true)}>
             <Spade size={19} />
           </ToolbarIcon>
           <ToolbarIcon label={t('table.voice')} onClick={() => setChatOpen(true)}>

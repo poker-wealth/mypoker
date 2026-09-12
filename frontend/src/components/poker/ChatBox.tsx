@@ -8,26 +8,6 @@ import { VoiceNote } from './VoiceNote';
 import { useSession } from '@/store/session';
 import { toast } from '@/store/toast';
 
-/**
- * Canned table talk, after the reference's list.
- *
- * KEYS, not sentences — each is translated like any other string. A canned
- * phrase hardcoded in English on a Chinese table is precisely the mistake the
- * eight-locale rule exists to prevent, and these are the one kind of message a
- * player sends without typing it.
- *
- * Each sends itself as an ordinary chat message, so the server needs nothing
- * new: a quick phrase IS a chat message, just one nobody had to type.
- */
-const QUICK_PHRASES = [
-  'table.phraseShowChips',
-  'table.phraseNotLuck',
-  'table.phraseNeverSayDie',
-  'table.phraseNothingSeek',
-  'table.phraseWheelTurns',
-  'table.phraseCardsAreWar',
-] as const;
-
 export function ChatBox({
   messages,
   onSend,
@@ -137,58 +117,6 @@ export function ChatBox({
           })
         )}
       </div>
-
-      {/*
-        PAID COMMENTS — present, disabled, and honest about why.
-
-        The reference offers three tiers that cost 10 / 50 / 100 chips. That is
-        real money leaving a player's balance, so it has to move through
-        `transfer()` in financial-core and be senior-reviewed (root CLAUDE.md
-        iron rules 1 and 5). No such command exists on the table socket and no
-        ledger entry type covers it, so these cannot be wired from here.
-
-        Drawn rather than omitted because the tiers are the owner's design, and
-        disabled with a readable reason rather than greyed in silence — a
-        chip-spending button that quietly does nothing is the worst possible
-        version of this control.
-      */}
-      {!disabled && (
-        <div className="flex items-center gap-1.5 px-2 pt-2">
-          {[10, 50, 100].map((cost) => (
-            <button
-              key={cost}
-              type="button"
-              disabled
-              title={t('table.paidCommentSoon')}
-              className="flex flex-1 cursor-not-allowed items-center justify-center gap-1 rounded-full border border-border bg-surface-2/60 py-1 text-[0.62rem] font-bold text-dim opacity-60"
-            >
-              {t('table.comment')} <span className="text-jackpot">{cost}</span>
-            </button>
-          ))}
-        </div>
-      )}
-      {!disabled && (
-        <p className="px-3 pt-1 text-[0.55rem] text-dim/70">{t('table.paidCommentSoon')}</p>
-      )}
-
-      {/* QUICK PHRASES. Pure client — each one just sends itself as an ordinary
-          chat message, so nothing new is needed on the server. Translated like
-          any other string: a canned phrase in English on a Chinese table is
-          exactly the mistake the locale rule exists for. */}
-      {!disabled && (
-        <div className="flex gap-1.5 overflow-x-auto no-scrollbar px-2 pt-2">
-          {QUICK_PHRASES.map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => onSend(t(key))}
-              className="shrink-0 rounded-full border border-border bg-surface-2 px-2.5 py-1 text-[0.62rem] text-dim active:bg-surface"
-            >
-              {t(key)}
-            </button>
-          ))}
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="flex gap-2 p-2 border-t border-border/50">
         <input

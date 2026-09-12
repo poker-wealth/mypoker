@@ -285,6 +285,10 @@
     }
   },
   "table": {
+    "commentPlaceholder": "Enter your comments please.",
+    "history": "History",
+    "noComments": "No comments yet",
+    "voiceNote": "Voice note",
     "comment": "Comment",
     "paidCommentSoon": "Paid comments are not available yet",
     "phraseShowChips": "Show your chips!",

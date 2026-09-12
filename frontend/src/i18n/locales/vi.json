@@ -285,6 +285,10 @@
     }
   },
   "table": {
+    "commentPlaceholder": "Nhập bình luận của bạn.",
+    "history": "Lịch sử",
+    "noComments": "Chưa có bình luận",
+    "voiceNote": "Tin nhắn thoại",
     "comment": "Bình luận",
     "paidCommentSoon": "Bình luận trả phí chưa khả dụng",
     "phraseShowChips": "Khoe chip đi!",

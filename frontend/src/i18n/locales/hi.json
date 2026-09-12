@@ -285,6 +285,10 @@
     }
   },
   "table": {
+    "commentPlaceholder": "कृपया अपनी टिप्पणी लिखें।",
+    "history": "इतिहास",
+    "noComments": "अभी कोई टिप्पणी नहीं",
+    "voiceNote": "वॉइस नोट",
     "comment": "टिप्पणी",
     "paidCommentSoon": "सशुल्क टिप्पणियाँ अभी उपलब्ध नहीं हैं",
     "phraseShowChips": "अपनी चिप्स दिखाओ!",
