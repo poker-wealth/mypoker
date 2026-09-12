@@ -221,6 +221,21 @@ interface RoomSeat {
   avatarUrl?: string;
   /** Chips in front of them at this table. */
   stack: number;
+  /**
+   * Every chip this player has brought to this table — the initial buy-in plus
+   * each top-up, never decremented.
+   *
+   * Exists so the player list can report a buy-in and a RESULT without hand
+   * histories, which the platform does not keep: result is `stack - boughtIn`,
+   * which is exactly what this session has cost or made them. Bookkeeping only;
+   * it moves no money and is not a balance.
+   */
+  boughtIn: number;
+  /**
+   * Hands this seat has been dealt into at this table. Counted when the hand
+   * starts, so someone who sits down mid-hand is not credited with it.
+   */
+  handsPlayed: number;
   sittingOut: boolean;
   connected: boolean;
   disconnectedAt: number | null;
@@ -687,6 +702,8 @@ export class PokerRoom implements LiveRoom {
       name: player.displayName,
       ...(player.avatarUrl ? { avatarUrl: player.avatarUrl } : {}),
       stack: buyIn,
+      boughtIn: buyIn,
+      handsPlayed: 0,
       sittingOut: false,
       connected: this.viewers.has(playerId),
       disconnectedAt: null,
@@ -874,6 +891,9 @@ export class PokerRoom implements LiveRoom {
 
     await this.fc.buyIn(playerId, String(amount));
     seat.stack += amount;
+    // Counted here too, or a topped-up player reads as winning: their stack
+    // grew without them having won a chip of it.
+    seat.boughtIn += amount;
     if (seat.stack > 0) seat.sittingOut = false;
     this.push();
     this.maybeStartHand();
@@ -1233,6 +1253,7 @@ export class PokerRoom implements LiveRoom {
     this.revealed.clear();
     for (const seat of this.occupied()) {
       seat.inHand = players.includes(seat);
+      if (seat.inHand) seat.handsPlayed += 1;
       delete seat.lastAction;
     }
     this.phase = 'IN_HAND';
@@ -1775,6 +1796,8 @@ export class PokerRoom implements LiveRoom {
         name: seat.name,
         ...(seat.avatarUrl ? { avatarUrl: seat.avatarUrl } : {}),
         stack: seat.stack,
+        boughtIn: seat.boughtIn,
+        handsPlayed: seat.handsPlayed,
         bet: showdown || !detail ? 0 : detail.streetContributed,
         status: this.seatStatus(seat, detail),
         inHand,
@@ -1835,6 +1858,16 @@ export class PokerRoom implements LiveRoom {
       isOwner: this.config.ownerId === playerId,
       paused: this.paused,
       closing: this.closing,
+      /*
+       * How many people are WATCHING — viewers who hold no seat.
+       *
+       * A count, never a list. Who is watching a table is not something the
+       * room tells the people at it: it would turn a spectator into a named
+       * presence and give a seated player information about who is studying
+       * them. The reference shows a "Spectators" row and a number is what that
+       * row can honestly hold.
+       */
+      spectators: [...this.viewers.keys()].filter((id) => !this.seatOf(id)).length,
       // Tables with the same-GPS rule: the client should attach a location to
       // its sit command. A flag, not the rule itself — enforcement stays in
       // assertNetRulesAllow either way.

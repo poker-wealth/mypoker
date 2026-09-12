@@ -285,6 +285,14 @@
     }
   },
   "table": {
+    "playerList": "ผู้เล่น",
+    "colNickname": "ชื่อเล่น",
+    "colHands": "มือ",
+    "colBuyin": "ซื้อชิป",
+    "colResult": "ผลลัพธ์",
+    "you": "(คุณ)",
+    "spectatorCount_one": "ผู้ชม 1 คน",
+    "spectatorCount_other": "ผู้ชม {{count}} คน",
     "pauseDealing": "หยุดแจกไพ่",
     "resumeDealing": "แจกไพ่ต่อ",
     "pauseHint": "มือปัจจุบันจะเล่นจนจบ",

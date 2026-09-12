@@ -285,6 +285,14 @@
     }
   },
   "table": {
+    "playerList": "Players",
+    "colNickname": "Nickname",
+    "colHands": "Hands",
+    "colBuyin": "Buy-in",
+    "colResult": "Result",
+    "you": "(you)",
+    "spectatorCount_one": "1 spectator",
+    "spectatorCount_other": "{{count}} spectators",
     "pauseDealing": "Pause dealing",
     "resumeDealing": "Resume dealing",
     "pauseHint": "The current hand still finishes",

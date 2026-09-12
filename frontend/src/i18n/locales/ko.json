@@ -285,6 +285,14 @@
     }
   },
   "table": {
+    "playerList": "플레이어",
+    "colNickname": "닉네임",
+    "colHands": "핸드",
+    "colBuyin": "바이인",
+    "colResult": "수익",
+    "you": "(나)",
+    "spectatorCount_one": "관전자 1명",
+    "spectatorCount_other": "관전자 {{count}}명",
     "pauseDealing": "딜링 일시중지",
     "resumeDealing": "딜링 재개",
     "pauseHint": "진행 중인 핸드는 끝까지 진행됩니다",

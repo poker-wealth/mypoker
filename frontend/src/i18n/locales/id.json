@@ -285,6 +285,14 @@
     }
   },
   "table": {
+    "playerList": "Pemain",
+    "colNickname": "Nama",
+    "colHands": "Ronde",
+    "colBuyin": "Buy-in",
+    "colResult": "Hasil",
+    "you": "(Anda)",
+    "spectatorCount_one": "1 penonton",
+    "spectatorCount_other": "{{count}} penonton",
     "pauseDealing": "Jeda pembagian",
     "resumeDealing": "Lanjutkan pembagian",
     "pauseHint": "Ronde berjalan tetap selesai",

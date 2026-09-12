@@ -285,6 +285,14 @@
     }
   },
   "table": {
+    "playerList": "खिलाड़ी",
+    "colNickname": "उपनाम",
+    "colHands": "हैंड",
+    "colBuyin": "बाय-इन",
+    "colResult": "परिणाम",
+    "you": "(आप)",
+    "spectatorCount_one": "1 दर्शक",
+    "spectatorCount_other": "{{count}} दर्शक",
     "pauseDealing": "डीलिंग रोकें",
     "resumeDealing": "डीलिंग फिर शुरू करें",
     "pauseHint": "चालू हैंड पूरा होगा",

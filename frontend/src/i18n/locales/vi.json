@@ -285,6 +285,14 @@
     }
   },
   "table": {
+    "playerList": "Người chơi",
+    "colNickname": "Biệt danh",
+    "colHands": "Ván",
+    "colBuyin": "Mua vào",
+    "colResult": "Kết quả",
+    "you": "(bạn)",
+    "spectatorCount_one": "1 người xem",
+    "spectatorCount_other": "{{count}} người xem",
     "pauseDealing": "Tạm dừng chia bài",
     "resumeDealing": "Tiếp tục chia bài",
     "pauseHint": "Ván hiện tại vẫn kết thúc",

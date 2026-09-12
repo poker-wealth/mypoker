@@ -23,6 +23,14 @@ export interface SeatSnapshot {
   avatarUrl?: string;
   /** Chips in front of them. */
   stack: number;
+  /**
+   * Every chip brought to this table — first buy-in plus each top-up. With
+   * `stack` it gives a session RESULT (`stack - boughtIn`) without needing hand
+   * histories, which this platform does not keep.
+   */
+  boughtIn?: number;
+  /** Hands this seat has been dealt into at this table. */
+  handsPlayed?: number;
   /** Chips pushed forward on the current street. */
   bet: number;
   status: SeatStatus;
@@ -186,6 +194,11 @@ export interface TableSnapshot {
   paused?: boolean;
   /** A close is queued: no more hands, and stacks are returned when this one ends. */
   closing?: boolean;
+  /**
+   * People watching who hold no seat. A COUNT, never a list: who is watching is
+   * not the room's to tell the people at the table.
+   */
+  spectators?: number;
   /** This table bans same-GPS seating: attach a location to the sit command. */
   gpsRequired?: boolean;
 

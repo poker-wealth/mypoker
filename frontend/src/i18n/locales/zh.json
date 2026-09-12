@@ -285,6 +285,14 @@
     }
   },
   "table": {
+    "playerList": "玩家",
+    "colNickname": "昵称",
+    "colHands": "手数",
+    "colBuyin": "买入",
+    "colResult": "盈亏",
+    "you": "（你）",
+    "spectatorCount_one": "1 位观战者",
+    "spectatorCount_other": "{{count}} 位观战者",
     "pauseDealing": "暂停发牌",
     "resumeDealing": "继续发牌",
     "pauseHint": "当前牌局仍会打完",

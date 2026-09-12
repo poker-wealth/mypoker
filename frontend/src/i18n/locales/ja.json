@@ -285,6 +285,14 @@
     }
   },
   "table": {
+    "playerList": "プレイヤー",
+    "colNickname": "ニックネーム",
+    "colHands": "ハンド",
+    "colBuyin": "バイイン",
+    "colResult": "収支",
+    "you": "（あなた）",
+    "spectatorCount_one": "観戦者 1 人",
+    "spectatorCount_other": "観戦者 {{count}} 人",
     "pauseDealing": "配牌を一時停止",
     "resumeDealing": "配牌を再開",
     "pauseHint": "進行中のハンドは最後まで続きます",

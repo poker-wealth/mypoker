@@ -40,6 +40,10 @@ export interface LiveSeat {
   name: string;
   avatarUrl?: string;
   stack: number;
+  /** Every chip brought to this table — first buy-in plus each top-up. */
+  boughtIn?: number;
+  /** Hands this seat has been dealt into here. */
+  handsPlayed?: number;
   bet: number;
   status: LiveSeatStatus;
   inHand: boolean;
@@ -75,6 +79,8 @@ export interface TableSnapshot {
   paused?: boolean;
   /** A close is queued — no more hands, stacks returned when this one ends. */
   closing?: boolean;
+  /** People watching who hold no seat. A count, never a list. */
+  spectators?: number;
   /** This table bans same-GPS seating — attach a location to the sit command. */
   gpsRequired?: boolean;
   variant: string;

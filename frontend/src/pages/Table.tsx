@@ -13,6 +13,7 @@ import { BuyInSheet } from '@/components/poker/BuyInSheet';
 import { TableDesignSheet } from '@/components/poker/TableDesignSheet';
 import { TableMenu } from '@/components/poker/TableMenu';
 import { HandRankings } from '@/components/poker/HandRankings';
+import { PlayerListPanel } from '@/components/poker/PlayerListPanel';
 import { TableSettingsSheet } from '@/components/poker/TableSettingsSheet';
 import { toast } from '@/lib/toast';
 import { inviteUrl } from '@/lib/tableInvite';
@@ -207,6 +208,7 @@ function LiveTable({ tableId }: { tableId: string }) {
   const [chatOpen, setChatOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [rankingsOpen, setRankingsOpen] = useState(false);
+  const [playersOpen, setPlayersOpen] = useState(false);
 
   /**
    * Copy this table's invite link.
@@ -330,6 +332,13 @@ function LiveTable({ tableId }: { tableId: string }) {
         onRankings={() => setRankingsOpen(true)}
         onOptions={() => setDesignsOpen(true)}
         onExit={() => navigate(-1)}
+      />
+
+      <PlayerListPanel
+        open={playersOpen}
+        onClose={() => setPlayersOpen(false)}
+        seats={snapshot?.seats ?? []}
+        {...(snapshot?.spectators !== undefined ? { spectators: snapshot.spectators } : {})}
       />
 
       <HandRankings
@@ -532,7 +541,11 @@ function LiveTable({ tableId }: { tableId: string }) {
             chat. Every icon does something real — the mic and the bubble both
             reach the chat drawer, where the recorder lives. */}
         <div className="mt-1 flex items-center justify-between border-t border-border/50 pt-1.5">
-          <ToolbarIcon label={t('table.tableDesign')} onClick={() => setDesignsOpen(true)}>
+          {/* The list icon opens the PLAYER LIST, as in the reference — it
+              used to open the settings sheet, which the menu drawer's Options
+              row already reaches. Two ways to the same sheet left the one
+              thing the icon looks like it does with no way in at all. */}
+          <ToolbarIcon label={t('table.playerList')} onClick={() => setPlayersOpen(true)}>
             <ListIcon size={19} />
           </ToolbarIcon>
           <ToolbarIcon label={t('table.fairness')} onClick={() => navigate('/fairness')}>
