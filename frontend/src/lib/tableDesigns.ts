@@ -125,6 +125,33 @@ function stadiumRings(edge: { x: number; yTop: number; yBottom: number; yMid: nu
     { left: `${right}%`, top: `${yMid}%`, align: 'right' }, // 6 right middle
     { left: `${right}%`, top: `${yMid + 22}%`, align: 'right' }, // 7 right lower
   ];
+
+  /**
+   * NINE — the HHPoker portrait ring, and the reason this exists.
+   *
+   * A nine-handed table had NO entry here, so it fell through to the generic
+   * ellipse in `ringFor`: nine seats spaced evenly around a CIRCLE, on a screen
+   * far taller than it is wide. That reads exactly as it sounds — Victor,
+   * 12 Sep 2026: "the seating arrangement looks quite chaotic."
+   *
+   * The reference's shape is a stadium, not a circle: the hero alone on the
+   * bottom curve, three chairs down each straight rail, and TWO across the top
+   * straddling the centre rather than one in the middle of it. That top pair is
+   * what makes nine sit evenly — a single seat at top centre forces four down
+   * one rail and three down the other.
+   */
+  const nine: SeatPos[] = [
+    { left: '50%', top: `${yBottom}%`, align: 'bottom' }, // 0 bottom centre — hero
+    { left: `${x + 2}%`, top: `${yMid + 20}%`, align: 'left' }, // 1 left lower
+    { left: `${x}%`, top: `${yMid}%`, align: 'left' }, // 2 left middle
+    { left: `${x + 2}%`, top: `${yMid - 20}%`, align: 'left' }, // 3 left upper
+    { left: '34%', top: `${yTop}%`, align: 'top' }, // 4 top, left of centre
+    { left: '66%', top: `${yTop}%`, align: 'top' }, // 5 top, right of centre
+    { left: `${right - 2}%`, top: `${yMid - 20}%`, align: 'right' }, // 6 right upper
+    { left: `${right}%`, top: `${yMid}%`, align: 'right' }, // 7 right middle
+    { left: `${right - 2}%`, top: `${yMid + 20}%`, align: 'right' }, // 8 right lower
+  ];
+
   const pick = (...i: number[]): SeatPos[] => i.map((n) => eight[n]!);
 
   return {
@@ -137,6 +164,7 @@ function stadiumRings(edge: { x: number; yTop: number; yBottom: number; yMid: nu
     // middle rather than bunching the extra player down one rail.
     7: pick(0, 1, 2, 3, 4, 5, 7),
     8: pick(0, 1, 2, 3, 4, 5, 6, 7),
+    9: nine,
   };
 }
 
@@ -564,11 +592,48 @@ export function seatCapFor(gameOrVariant: string | null | undefined): number {
 export function ringFor(design: TableDesign, count: number): SeatPos[] {
   const ring = design.rings[count];
   if (ring) return ring;
-  return Array.from({ length: count }, (_, i) => {
-    const angle = Math.PI / 2 + (i * 2 * Math.PI) / count; // start at the bottom, run clockwise
-    const left = 50 + 36 * Math.cos(angle);
-    const top = 50 + 41 * Math.sin(angle);
-    const align: SeatAlign = top > 72 ? 'bottom' : top < 28 ? 'top' : left < 50 ? 'left' : 'right';
-    return { left: `${left}%`, top: `${top}%`, align };
-  });
+
+  /*
+   * A SIZE NOBODY MEASURED — laid out on the same stadium the measured rings
+   * use, rather than on a circle.
+   *
+   * This used to place seats evenly around an ELLIPSE, which is a fine shape
+   * for a table seen from above and the wrong one for a felt that is much
+   * taller than it is wide: on a phone, the "circle" stretched and the chairs
+   * ended up at angles no rail passes through. That is what a nine-handed
+   * table looked like before nine had a ring of its own, and it was reported as
+   * exactly that — chaotic.
+   *
+   * The stadium version puts the hero at the bottom, one seat on the top curve
+   * (or two, straddling, when the remainder needs it), and splits the rest
+   * evenly down the two straight rails. It is not measured artwork, but it is
+   * always a table.
+   */
+  const hero: SeatPos = { left: '50%', top: '90%', align: 'bottom' };
+  if (count <= 1) return [hero];
+
+  const sides = count - 1; // everyone who is not the hero
+  const perRail = Math.floor((sides - (sides % 2 === 0 ? 2 : 1)) / 2);
+  const topCount = sides - perRail * 2;
+
+  const rail = (side: 'left' | 'right'): SeatPos[] =>
+    Array.from({ length: perRail }, (_, i) => {
+      // Spread down the rail between 30% and 76% of the height.
+      const top = perRail === 1 ? 53 : 30 + (i * 46) / (perRail - 1);
+      return {
+        left: side === 'left' ? '11%' : '89%',
+        top: `${side === 'left' ? 76 - (top - 30) : top}%`,
+        align: side,
+      };
+    });
+
+  const tops: SeatPos[] = Array.from({ length: topCount }, (_, i) => ({
+    left: topCount === 1 ? '50%' : `${34 + i * (32 / (topCount - 1))}%`,
+    top: '11%',
+    align: 'top' as SeatAlign,
+  }));
+
+  // Bottom, up the left, across the top, down the right — the same order every
+  // measured ring uses, so a seat index means the same thing at any size.
+  return [hero, ...rail('left'), ...tops, ...rail('right')];
 }
