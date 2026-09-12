@@ -43,7 +43,12 @@ import {
   grantToMemberApi,
 } from './leagues';
 import { createPlayerTableApi } from './tables';
-import { fetchNotifications, markNotificationsRead, type NotificationPage } from './notifications';
+import {
+  fetchNotifications,
+  markNotificationsRead,
+  type NotificationKind,
+  type NotificationPage,
+} from './notifications';
 import { fetchRtp } from './fairnessFeed';
 import {
   fetchAgent,
@@ -504,14 +509,25 @@ export function useJoinLeague() {
 
 // ── Notifications ───────────────────────────────────────────────────────────
 
-export function useNotifications(pageSize = 20) {
+/**
+ * A page of notifications, optionally filtered to a Messages tab.
+ *
+ * `kinds` is part of the query key, so each tab keeps its own pages and its
+ * own cursor and switching back does not refetch from the top. It is also
+ * sent to the SERVER rather than filtered here: the list pages with a cursor,
+ * so a tab filtering what happened to be fetched would read as empty when the
+ * reader simply had not scrolled far enough.
+ */
+export function useNotifications(kinds?: readonly NotificationKind[], pageSize = 20) {
   const playerId = useSession((s) => s.player?.playerId);
+  const kindKey = kinds ? [...kinds].join(',') : 'all';
 
   return useInfiniteQuery<NotificationPage>({
-    queryKey: ['notifications', playerId, pageSize],
+    queryKey: ['notifications', playerId, pageSize, kindKey],
     queryFn: ({ pageParam }) =>
       fetchNotifications({
         limit: pageSize,
+        ...(kinds ? { kinds } : {}),
         ...(pageParam ? { cursor: String(pageParam) } : {}),
       }),
     initialPageParam: undefined as string | undefined,

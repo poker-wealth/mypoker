@@ -24,9 +24,14 @@ import { Button, Card, Screen } from '../ui';
  *
  * ── Which kinds sit in which tab ───────────────────────────────────────────
  *
- * Four tabs, like the reference, but over our own five kinds rather than its
+ * Four tabs, like the reference, but over our own six kinds rather than its
  * categories: it offers Tournament and Interactions, and we have neither
  * tournaments nor a social graph to put in them.
+ *
+ * Money covers BOTH directions. Withdrawals were raised as SYSTEM until
+ * recently, which filed them next to "your address was changed" rather than
+ * with the player's money — they now have their own kind, still
+ * non-suppressible, so the alarm survives the re-filing.
  *
  * JACKPOT sits under Results because the SERVER already decided that —
  * financial-core's GOVERNED_BY groups it with `notifyResults`, on the grounds
@@ -39,7 +44,13 @@ import { Button, Card, Screen } from '../ui';
  * server shows something rather than throwing.
  */
 
-type NotificationKind = 'RESULT' | 'DEPOSIT' | 'PROMO' | 'JACKPOT' | 'SYSTEM';
+type NotificationKind =
+  | 'RESULT'
+  | 'DEPOSIT'
+  | 'WITHDRAWAL'
+  | 'PROMO'
+  | 'JACKPOT'
+  | 'SYSTEM';
 
 interface NotificationRow {
   id: string;
@@ -67,7 +78,7 @@ const TABS: { id: string; kinds: NotificationKind[]; Icon: (p: IconProps) => Rea
   [
     { id: 'system', kinds: ['SYSTEM'], Icon: SystemIcon },
     { id: 'results', kinds: ['RESULT', 'JACKPOT'], Icon: DataIcon },
-    { id: 'deposits', kinds: ['DEPOSIT'], Icon: WalletIcon },
+    { id: 'money', kinds: ['DEPOSIT', 'WITHDRAWAL'], Icon: WalletIcon },
     { id: 'promos', kinds: ['PROMO'], Icon: GiftIcon },
   ];
 
@@ -77,6 +88,8 @@ const TABS: { id: string; kinds: NotificationKind[]; Icon: (p: IconProps) => Rea
 const KIND_COLOR: Record<NotificationKind, string> = {
   RESULT: theme.brand,
   DEPOSIT: theme.success,
+  // Money leaving, so not the same green as money arriving.
+  WITHDRAWAL: theme.accent,
   PROMO: theme.accent,
   JACKPOT: theme.jackpot,
   SYSTEM: theme.dim,

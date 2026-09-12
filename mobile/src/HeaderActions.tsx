@@ -43,6 +43,21 @@ function useUnread(): number {
     queryKey: ['notifications', 'unread'],
     queryFn: () => api.get<{ unread: number }>('/me/notifications?limit=1').then((p) => p.unread),
     staleTime: 30_000,
+    /*
+     * The poll lives HERE, with the bell, because the bell is on every screen.
+     *
+     * It used to sit on ProfileScreen's own copy of this query — same key, so
+     * React Query applied that observer's interval to the shared query and the
+     * header got the refresh as a side effect. Rebuilding Profile dropped that
+     * query and took the poll with it, silently: the badge still refreshed on
+     * mount and on foreground (App.tsx wires focusManager to AppState), so
+     * nothing looked broken, it just stopped updating while you sat in the app.
+     *
+     * A deposit is the case that matters. There is no push on the native app,
+     * so this badge is the ONLY way a player learns their money arrived without
+     * leaving and re-entering.
+     */
+    refetchInterval: 60_000,
     retry: 1,
   });
   return q.data ?? 0;
@@ -110,7 +125,9 @@ export const headerRightFor = (screen: 'Alliance' | 'Games' | 'Tables' | 'Data' 
         <Bell />
         {screen === 'Alliance' && <HelpIcon color={theme.dim} size={18} />}
         {screen === 'Tables' && <FairSecureBadge />}
-        {(screen === 'Data' || screen === 'Account') && <SettingsButton />}
+        {/* Data only. Account's own grid carries a Settings tile, and two
+            controls opening one screen from one view read as two places. */}
+        {screen === 'Data' && <SettingsButton />}
       </View>
     );
   };

@@ -18,7 +18,13 @@ import { getSettings } from '../settings/player-settings';
  * a balance and must never be the only record of one — the ledger is that.
  */
 
-export type NotificationKind = 'RESULT' | 'DEPOSIT' | 'PROMO' | 'JACKPOT' | 'SYSTEM';
+export type NotificationKind =
+  | 'RESULT'
+  | 'DEPOSIT'
+  | 'WITHDRAWAL'
+  | 'PROMO'
+  | 'JACKPOT'
+  | 'SYSTEM';
 
 /**
  * Which Settings toggle governs each kind. SYSTEM is never suppressible.
@@ -35,6 +41,21 @@ export const GOVERNED_BY: Record<NotificationKind, 'notifyResults' | 'notifyDepo
   // A jackpot win is a result the player would be furious to miss, and is
   // grouped with results rather than given a toggle nobody would think to find.
   JACKPOT: 'notifyResults',
+  /*
+   * Money OUT, and never suppressible - the null is the whole point.
+   *
+   * These used to be SYSTEM, which got the suppressibility right and the
+   * filing wrong: a player hunting for their withdrawal found it next to
+   * "your address was changed" instead of with their money. Splitting it
+   * out lets the Messages screen file it under Money while keeping the
+   * guarantee that matters - "your withdrawal was sent" is how somebody
+   * notices their account being drained, so it cannot be behind a toggle.
+   *
+   * Which is why this is a new kind rather than a move to DEPOSIT: DEPOSIT
+   * answers to notifyDeposits, and that would have quietly made the alarm
+   * mutable.
+   */
+  WITHDRAWAL: null,
   // Security and account notices. Deliberately not suppressible: "your
   // withdrawal address changed" is not marketing.
   SYSTEM: null,
@@ -94,7 +115,14 @@ export interface NotificationPage {
 }
 
 /** Every kind, so callers can rely on the key being present rather than optional. */
-const ALL_KINDS: NotificationKind[] = ['RESULT', 'DEPOSIT', 'PROMO', 'JACKPOT', 'SYSTEM'];
+const ALL_KINDS: NotificationKind[] = [
+  'RESULT',
+  'DEPOSIT',
+  'WITHDRAWAL',
+  'PROMO',
+  'JACKPOT',
+  'SYSTEM',
+];
 
 /**
  * Raise a notification, honouring the player's preferences.

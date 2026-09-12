@@ -602,7 +602,7 @@
     "tab": {
       "system": "系统消息",
       "results": "战绩",
-      "deposits": "存款",
+      "money": "资金",
       "promos": "优惠活动"
     },
     "handWon": "您赢得 ${{amount}}",

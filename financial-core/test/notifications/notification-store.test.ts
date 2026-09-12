@@ -268,7 +268,7 @@ describe('unread per kind, for the tab badges', () => {
     expect(unreadByKind.DEPOSIT).toBe(0);
     expect(unreadByKind.JACKPOT).toBe(0);
     expect(Object.keys(unreadByKind).sort()).toEqual(
-      ['DEPOSIT', 'JACKPOT', 'PROMO', 'RESULT', 'SYSTEM'],
+      ['DEPOSIT', 'JACKPOT', 'PROMO', 'RESULT', 'SYSTEM', 'WITHDRAWAL'],
     );
   });
 

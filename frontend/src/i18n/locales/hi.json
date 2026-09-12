@@ -602,7 +602,7 @@
     "tab": {
       "system": "सिस्टम",
       "results": "परिणाम",
-      "deposits": "जमा",
+      "money": "पैसा",
       "promos": "प्रोमो"
     },
     "handWon": "आपने ${{amount}} जीते",

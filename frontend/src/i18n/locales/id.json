@@ -602,7 +602,7 @@
     "tab": {
       "system": "Sistem",
       "results": "Hasil",
-      "deposits": "Deposit",
+      "money": "Dana",
       "promos": "Promosi"
     },
     "handWon": "Anda memenangkan ${{amount}}",

@@ -221,9 +221,20 @@ export const useSession = create<SessionState>((set, get) => {
       persist(token, player);
       set({ token, player, status: 'authenticated', error: null });
       bindReferralIfLaunchedFromOne();
-      // i18n.t(), not the hook — this runs outside React, and a raw key would
-      // surface on screen as literal `toasts.signedIn`.
-      toast.success(i18n.t('toasts.signedIn', { name: player.displayName }));
+      /*
+       * NO 'signed in' toast on this path, and that is the difference between
+       * it and `settle` below.
+       *
+       * This is the automatic one: inside Telegram the Mini App exchanges
+       * initData for a session on open, without the player doing anything or
+       * asking for anything. Announcing it tells them something they did not
+       * do and cannot act on, every single time the app opens. `settle`
+       * keeps its toast because somebody there typed a password and pressed
+       * a button, and a deliberate act deserves an acknowledgement.
+       *
+       * The failure below still speaks. A silent failed sign-in is a Mini
+       * App that looks merely broken.
+       */
     } catch (e) {
       const message = e instanceof ApiError ? e.message : i18n.t('toasts.signInFailed');
       set({ status: 'error', error: message });
@@ -328,7 +339,8 @@ export const useSession = create<SessionState>((set, get) => {
     // would have the app log straight back in and make Sign out a no-op. Signing
     // back in stays possible, but only by tapping the button.
     set({ token: null, player: null, status: 'anonymous', error: null });
-    toast.info(i18n.t('toasts.signedOut'));
+    // No toast. Signing out replaces the whole screen with Login, which says
+    // it louder and sooner than a message sliding over the top of it.
   },
   };
 });

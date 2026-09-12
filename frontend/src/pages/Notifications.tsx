@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { amountOnly } from '@/lib/money';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Trophy, Wallet, Megaphone, Crown, Info, ChevronRight } from 'lucide-react';
+import { Bell, Trophy, Wallet, Megaphone, Crown, Info, ChevronRight, ArrowUpRight } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -13,6 +13,7 @@ import { errorKey } from '@/api/errors';
 import { useSession } from '@/store/session';
 import { cn } from '@/lib/cn';
 import { txnRefFromEventId } from '@/lib/notificationLink';
+import { MESSAGE_TABS } from '@/api/notifications';
 import type { NotificationKind } from '@/api/notifications';
 
 /**
@@ -31,6 +32,8 @@ import type { NotificationKind } from '@/api/notifications';
 const ICONS: Record<NotificationKind, { icon: LucideIcon; tone: string }> = {
   RESULT: { icon: Trophy, tone: 'text-brand' },
   DEPOSIT: { icon: Wallet, tone: 'text-success' },
+  // Money leaving, so not the same green as money arriving.
+  WITHDRAWAL: { icon: ArrowUpRight, tone: 'text-accent' },
   PROMO: { icon: Megaphone, tone: 'text-accent' },
   JACKPOT: { icon: Crown, tone: 'text-jackpot' },
   SYSTEM: { icon: Info, tone: 'text-dim' },
@@ -57,18 +60,30 @@ export function Notifications() {
   const signedIn = useSession((s) => s.status === 'authenticated');
   const navigate = useNavigate();
 
-  const list = useNotifications();
+  const [tabId, setTabId] = useState<string>(MESSAGE_TABS[0].id);
+  const tab = MESSAGE_TABS.find((x) => x.id === tabId) ?? MESSAGE_TABS[0];
+  const list = useNotifications(tab.kinds);
   const markRead = useMarkNotificationsRead();
 
-  const unread = list.data?.pages[0]?.unread ?? 0;
   const rows = list.data?.pages.flatMap((p) => p.notifications) ?? [];
+  const unreadByKind = list.data?.pages[0]?.unreadByKind;
 
-  // Once, on arrival, and only when there is something to clear — re-running it
-  // on every render would fire a write per refetch.
+  /*
+   * Mark read by id, not the whole account.
+   *
+   * This passed `undefined`, which marks EVERYTHING. With tabs that is wrong
+   * twice over: it clears the badges for tabs the reader never opened, and
+   * those badges are the only reason the strip is worth having. Only the
+   * rows actually on screen in the open tab are cleared.
+   */
+  const unreadHere = rows.filter((n) => !n.read).map((n) => n.id);
+  const unreadKey = unreadHere.join(',');
   useEffect(() => {
-    if (signedIn && unread > 0 && !markRead.isPending) markRead.mutate(undefined);
+    if (signedIn && unreadKey.length > 0 && !markRead.isPending) {
+      markRead.mutate(unreadKey.split(','));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signedIn, unread > 0]);
+  }, [signedIn, unreadKey]);
 
   if (!signedIn) {
     return (
@@ -80,6 +95,44 @@ export function Notifications() {
 
   return (
     <div className="space-y-4">
+      {/*
+        The tab strip sits ABOVE the query's own states, never inside them.
+        Rendered within the list it would vanish the moment you picked a tab
+        that happened to be empty, leaving the reader on a blank screen with no
+        way back to the other tabs — the affordance destroyed by the state it
+        exists to escape.
+      */}
+      <div className="flex gap-1.5" role="tablist">
+        {MESSAGE_TABS.map(({ id, kinds }) => {
+          const active = id === tabId;
+          const count = unreadByKind
+            ? kinds.reduce((sum, k) => sum + (unreadByKind[k] ?? 0), 0)
+            : 0;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setTabId(id)}
+              className={cn(
+                'flex flex-1 items-center justify-center gap-1.5 rounded-(--radius-app) border px-2 py-2 text-xs font-bold transition',
+                active
+                  ? 'border-brand/40 bg-brand/10 text-brand'
+                  : 'border-border bg-surface text-dim hover:text-text',
+              )}
+            >
+              {t(`notifications.tab.${id}`)}
+              {count > 0 && (
+                <span className="grid min-w-4 place-items-center rounded-full bg-danger px-1 text-[0.55rem] font-bold text-white">
+                  {count > 9 ? '9+' : count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
       {list.isPending && (
         <div className="divide-y divide-border overflow-hidden rounded-(--radius-app) border border-border bg-surface">
           {[0, 1, 2, 3].map((i) => (
