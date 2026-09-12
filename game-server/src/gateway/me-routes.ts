@@ -387,13 +387,18 @@ interface VolumeFactsShape {
   breakdown: unknown[];
 }
 
-type UpstreamResult<T> = { ok: true; body: T } | { ok: false; status: number; error: string };
+export type UpstreamResult<T> = { ok: true; body: T } | { ok: false; status: number; error: string };
 
 /**
  * Fetch JSON from financial-core with the caller's token, for routes that shape
  * the response rather than pipe it. Same timeout discipline as forwardTo.
  */
-async function upstreamJson<T>(
+/**
+ * Shared with league-routes, which enriches the roster it forwards. Exported
+ * rather than copied: a second implementation would be a second timeout policy
+ * and a second idea of what "unavailable" means.
+ */
+export async function upstreamJson<T>(
   config: GatewayConfig,
   req: Request,
   path: string,

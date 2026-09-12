@@ -701,6 +701,36 @@ export const userStore = {
    * — so they are reachable by exact id only, which the admin route says out
    * loud rather than returning a silently short list.
    */
+  /**
+   * Display names for a set of players, as `{ playerId: name }`.
+   *
+   * Exists for the league roster. `financial-core` owns membership and returns
+   * `{ playerId, role, joinedAt }` — correctly, because identity is not its to
+   * hold (root CLAUDE.md, facts vs rules). So the gateway, which does own
+   * identity, puts the names on as the roster passes through.
+   *
+   * ONE QUERY for the whole roster rather than one per member: a fifty-member
+   * league would otherwise be fifty round trips to render a list.
+   *
+   * A player with no name is simply absent from the result rather than given a
+   * placeholder — the caller decides what to show for someone it cannot name,
+   * and inventing "Player 1234" here would put a fabricated name in a database
+   * result.
+   */
+  async namesFor(playerIds: readonly string[]): Promise<Record<string, string>> {
+    if (playerIds.length === 0) return {};
+    const docs = await UserModel.find({ _id: { $in: playerIds } })
+      .select({ displayName: 1 })
+      .lean();
+
+    const names: Record<string, string> = {};
+    for (const d of docs) {
+      const name = (d as { displayName?: string }).displayName;
+      if (name) names[String(d._id)] = name;
+    }
+    return names;
+  },
+
   async search(pattern: RegExp, limit: number): Promise<(StoredIdentity & { createdAt: string })[]> {
     const docs = await UserModel.find({
       $or: [

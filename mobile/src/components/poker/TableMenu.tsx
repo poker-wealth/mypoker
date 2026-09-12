@@ -81,7 +81,7 @@ export function TableMenu({
           <Row label={t('table.menuShare')} onPress={act(onShare)} />
           <Row
             label={t('table.menuStandUp')}
-            {...(onStandUp ? { onPress: act(onStandUp) } : { reason: t('table.menuNeedSeat') })}
+            {...(onStandUp ? { onPress: act(onStandUp) } : {})}
           />
           <Row
             label={t('table.menuRankings')}
@@ -90,14 +90,15 @@ export function TableMenu({
           <Row label={t('table.menuOptions')} onPress={act(onOptions)} chevron />
           <Row
             label={t('table.rebuy')}
-            {...(onBuyIn ? { onPress: act(onBuyIn) } : { reason: t('table.menuNeedSeat') })}
+            {...(onBuyIn ? { onPress: act(onBuyIn) } : {})}
+            chevron
           />
           <Row
             label={t('table.sitOut')}
-            {...(onSitOut ? { onPress: act(onSitOut) } : { reason: t('table.menuNeedSeat') })}
+            {...(onSitOut ? { onPress: act(onSitOut) } : {})}
           />
           {/* No store exists — no catalogue, no purchase path, no backend. */}
-          <Row label={t('table.menuStore')} reason={t('table.menuSoon')} />
+          <Row label={t('table.menuStore')} reason={t('table.menuSoon')} chevron />
           {onFairness ? <Row label={t('table.fairness')} onPress={act(onFairness)} /> : null}
           <Row label={t('table.menuExit')} onPress={act(onExit)} danger />
         </ScrollView>
@@ -135,7 +136,12 @@ function Row({
         {label}
       </Text>
       {reason ? <Text style={styles.reason}>{reason}</Text> : null}
-      {chevron && !disabled ? <Text style={styles.chevron}>›</Text> : null}
+      {/* Drawn even when the row is disabled, as the reference has it: the
+          chevron says "this leads somewhere", which stays true of a row you
+          cannot use yet. The row's own dimming is what says it is unavailable. */}
+      {chevron ? (
+        <Text style={[styles.chevron, disabled && styles.rowDisabled]}>›</Text>
+      ) : null}
     </Pressable>
   );
 }
@@ -155,10 +161,9 @@ const styles = StyleSheet.create({
     paddingBottom: space.sm,
   },
   title: {
-    color: theme.dim,
-    fontSize: 11,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    color: theme.brand,
+    fontSize: 15,
+    letterSpacing: 0,
     fontFamily: weight('700'),
     paddingHorizontal: space.lg,
     paddingTop: space.xl,
@@ -169,14 +174,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.sm,
     paddingHorizontal: space.lg,
-    paddingVertical: 14,
+    paddingVertical: 17,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: theme.border,
   },
   rowPressed: { backgroundColor: theme.surface2 },
-  rowText: { flex: 1, color: theme.text, fontSize: 14 },
+  rowText: { flex: 1, color: theme.text, fontSize: 16 },
   rowDanger: { color: theme.danger },
   rowDisabled: { color: theme.dim, opacity: 0.6 },
   reason: { color: theme.dim, fontSize: 10 },
-  chevron: { color: theme.dim, fontSize: 18, lineHeight: 18 },
+  chevron: { color: theme.dim, fontSize: 24, lineHeight: 24 },
 });

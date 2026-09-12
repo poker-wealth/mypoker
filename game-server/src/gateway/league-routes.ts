@@ -1,7 +1,8 @@
 import { Router, type Request, type Response } from 'express';
 import { requireAuth } from './auth';
 import type { GatewayConfig } from './config';
-import { forwardTo } from './me-routes';
+import { forwardTo, upstreamJson } from './me-routes';
+import { userStore } from '../auth/user-store';
 
 /**
  * Alliance routes.
@@ -31,7 +32,46 @@ export function buildLeagueRouter(config: GatewayConfig): Router {
   // financial-core decides that from the caller's identity. Forwarding it
   // without requireAuth would send an anonymous request and always 404.
   r.get('/:leagueId/members', requireAuth(config), (req: Request, res: Response) =>
-    void forwardTo(config, req, res, `${leaguePath(req)}/members`),
+    void (async (): Promise<void> => {
+      /*
+       * The roster, WITH NAMES ON IT.
+       *
+       * financial-core returns `{ playerId, role, joinedAt }` and is right to:
+       * identity is not its to hold (root CLAUDE.md, facts vs rules). So this
+       * gateway — which does own identity — puts the display names on as the
+       * roster passes through. A list of raw player ids is not a list of
+       * people, which is the whole point of the screen it feeds.
+       *
+       * ONE directory lookup for the whole roster, not one per member: a
+       * fifty-member league would otherwise be fifty round trips to draw a
+       * list.
+       *
+       * A member the directory cannot name keeps their id and gains no
+       * `displayName` field, rather than being handed an invented one. The
+       * client decides what to show for somebody it cannot name.
+       */
+      const upstream = await upstreamJson<{ members: { playerId: string }[] }>(
+        config,
+        req,
+        `${leaguePath(req)}/members`,
+      );
+      if (!upstream.ok) {
+        res.status(upstream.status).json({ error: upstream.error });
+        return;
+      }
+
+      const members = upstream.body.members ?? [];
+      const names = await userStore.namesFor(members.map((m) => m.playerId));
+      res.json({
+        members: members.map((m) => ({
+          ...m,
+          ...(names[m.playerId] ? { displayName: names[m.playerId] } : {}),
+        })),
+      });
+    })().catch((err: unknown) => {
+      console.error('[gateway] league members failed:', err);
+      res.status(500).json({ error: 'internal error' });
+    }),
   );
 
   r.post('/', requireAuth(config), (req: Request, res: Response) =>
