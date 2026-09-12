@@ -42,7 +42,7 @@
     "jackpotBlurb": "MYPOKER でプレイされるすべてのハンドで増えていきます。",
     "provablyFair": "証明可能な公正性 · オンチェーンで検証可能",
     "hotNow": "人気のゲーム",
-    "moreGames": "その他のゲーム",
+    "moreGames": "すべてのゲーム",
     "grandJackpot": "グランドジャックポット",
     "fairSecure": "公正・安全",
     "colTable": "テーブル",
@@ -75,7 +75,8 @@
     "yourSeat": "あなたの席",
     "haveInvite": "招待をお持ちですか？",
     "invitePlaceholder": "招待リンクまたはテーブル ID を貼り付け",
-    "inviteNotRecognised": "テーブルの招待ではないようです"
+    "inviteNotRecognised": "テーブルの招待ではないようです",
+    "moreGamesBlurb": "カードゲーム、クイックゲーム、スロット"
   },
   "games": {
     "searchPlaceholder": "ゲームを検索",
@@ -956,5 +957,23 @@
     "videoDownload": "ダウンロード",
     "prevSlide": "前へ",
     "nextSlide": "次へ"
+  },
+  "redPacket": {
+    "total": "合計",
+    "packets": "個数",
+    "mineNumber": "雷番号",
+    "countdown": "カウントダウン…",
+    "revealed": "公開",
+    "waiting": "次のお年玉を待っています",
+    "tapMe": "タップ",
+    "sweepers": "参加者",
+    "applyBank": "親に申請",
+    "applied": "申請済み",
+    "noBanker": "親がいません",
+    "join": "参加する",
+    "mineRule": "末尾が {{digit}} の袋は {{multiplier}} 倍の支払い",
+    "you": "私",
+    "grabbed": "お年玉をゲット！",
+    "hitMine": "地雷を踏みました！"
   }
 }

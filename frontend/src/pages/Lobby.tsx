@@ -8,7 +8,6 @@ import { formatMicros } from '@/api/lobby';
 
 import { ContextBanner } from '@/components/ContextBanner';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { GAMES } from '@/lib/games';
 import { cn } from '@/lib/cn';
 import { haptic } from '@/lib/telegram';
 import { Input } from '@/components/ui/Input';
@@ -53,12 +52,6 @@ interface DisplayTable {
   stakes: number | null;
 }
 
-const VARIANTS = [
-  { id: 'dezhou', label: 'DEZHOU' },
-  { id: 'ausha', label: 'AUSHA' },
-  { id: 'others', label: 'OTHERS' },
-];
-
 /**
  * The blind filters, in TABLE CHIPS — the unit the server filters in.
  *
@@ -100,7 +93,6 @@ function formatBlinds(stakes: number | null, smallBlind?: number | null): string
 
 export function Lobby() {
   const navigate = useNavigate();
-  const [variant, setVariant] = useState('dezhou');
   const [blinds, setBlinds] = useState('all');
   const [onlyOpen, setOnlyOpen] = useState(false);
   /** 'home' is the lobby; 'tables' is the Live Tables screen JOIN opens. */
@@ -109,16 +101,22 @@ export function Lobby() {
 
   const targetStakes = STAKES_OPTIONS.find((s) => s.id === blinds)?.minStakes;
 
-  // DEZHOU and AUSHA are single games and filter server-side. OTHERS means
-  // "every table that is not one of those tabs" — a set the server has no
-  // filter parameter for, and sending `gameId: 'others'` is a 400: the filter
-  // parser rejects unknown game ids by design. (It always did; the sample-table
-  // fallback used to swallow the error and show fake tables instead, which is
-  // how a permanently broken tab went unnoticed.) So OTHERS fetches unfiltered
-  // and excludes the named tabs' games client-side.
-  const TAB_GAME: Record<string, string | undefined> = { dezhou: 'texas', ausha: 'omaha' };
+  /*
+   * THE LOBBY IS TEXAS HOLD'EM. Owner's instruction, 12 Sep 2026: "The lobby
+   * only needs to play Texas Hold'em. Put all other games into the Games
+   * category."
+   *
+   * Filtered SERVER-SIDE, so the rows and the counts on them agree: asking for
+   * everything and hiding the rest here would show "12 tables" over a list of
+   * three.
+   *
+   * The tab row that used to sit above this (DEZHOU / AUSHA / OTHERS) is gone
+   * with it — two of those tabs selected games that no longer belong here, and
+   * the third was every game at once. Every other game is reachable from Games,
+   * where they are grouped by kind.
+   */
   const tables = useTables({
-    ...(TAB_GAME[variant] ? { gameId: TAB_GAME[variant] } : {}),
+    gameId: 'texas',
     minStakes: targetStakes,
     maxStakes: targetStakes,
     // Stakes and seat filters stay server-side, so the count the lobby shows
@@ -126,10 +124,7 @@ export function Lobby() {
     ...(onlyOpen ? { hasSeats: true } : {}),
   });
 
-  const rawTables =
-    variant === 'others'
-      ? (tables.data?.tables ?? []).filter((tb) => !Object.values(TAB_GAME).includes(tb.gameId))
-      : (tables.data?.tables ?? []);
+  const rawTables = tables.data?.tables ?? [];
 
   // Null while the lobby has not answered. '$ 0.00' is a claim about the pools
   // and it is the wrong one — the hero shows a skeleton instead.
@@ -193,26 +188,11 @@ export function Lobby() {
    */
   const tablesSection = (
     <>
-        {/* Game Type Filter Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-          {VARIANTS.map((v) => {
-            const active = variant === v.id;
-            return (
-              <button
-                key={v.id}
-                onClick={() => setVariant(v.id)}
-                className={cn(
-                  'px-3.5 py-2 text-xs font-black tracking-wider transition-all rounded-lg shrink-0',
-                  active
-                    ? 'border border-gold bg-[color-mix(in_srgb,var(--gold)_16%,transparent)] text-gold shadow-[0_0_12px_color-mix(in_srgb,var(--gold)_28%,transparent)]'
-                    : 'bg-surface-2/60 text-dim border border-transparent hover:text-text',
-                )}
-              >
-                {v.label}
-              </button>
-            );
-          })}
-        </div>
+        {/* The DEZHOU / AUSHA / OTHERS tab row stood here. It is gone with the
+            lobby's narrowing to Texas Hold'em: two of its tabs selected games
+            that now live in Games, and the third was every game at once. The
+            stakes pills below still filter, because a Texas lobby still has
+            stake levels to choose between. */}
 
         {/* Stakes Filter Pills */}
         <div className="flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar">
@@ -491,31 +471,28 @@ export function Lobby() {
           also the way in for a link pasted from outside Telegram. */}
       <InviteBox />
 
-      {/* My Games — OUR catalogue, translated, with the fire mark only on the
-          games the catalogue actually flags hot. */}
-      <div>
-        <div className="mb-2 text-base font-black">{t('lobby.myGames')}</div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <button
-            type="button"
-            onClick={() => setVariant('dezhou')}
-            className="rounded-full bg-gold px-3 py-1 text-xs font-black text-bg"
-          >
-            {t('games.filterAll')}
-          </button>
-          {GAMES.map((g) => (
-            <button
-              key={g.id}
-              type="button"
-              onClick={() => navigate(`/table/${g.id}`)}
-              className="text-[0.8rem] font-semibold text-dim transition-colors hover:text-text"
-            >
-              {g.hot ? '🔥' : ''}
-              {t(`gameNames.${g.id}`)}
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* MY GAMES USED TO LIST EVERY GAME HERE, as a row of text links straight
+          into a table. Owner's instruction, 12 Sep 2026: the lobby plays Texas
+          Hold'em, and every other game belongs in Games — where they are
+          grouped by kind and carry their artwork, rather than being a row of
+          names competing with the lobby's own tables.
+
+          What stays is the way THERE. One link, not a second catalogue: two
+          places listing the same games is how they drift apart. */}
+      <button
+        type="button"
+        onClick={() => {
+          haptic('light');
+          navigate('/games');
+        }}
+        className="flex w-full items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3 text-left transition active:scale-[0.99]"
+      >
+        <span>
+          <span className="block text-base font-black">{t('lobby.moreGames')}</span>
+          <span className="block text-[0.72rem] text-dim">{t('lobby.moreGamesBlurb')}</span>
+        </span>
+        <ChevronRight size={18} className="shrink-0 text-dim" />
+      </button>
 
       {/* Tournament — the section the app carries, with the truth in it.
           There is NO tournament backend: no route, no engine, nothing on the

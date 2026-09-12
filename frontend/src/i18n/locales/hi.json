@@ -42,7 +42,7 @@
     "jackpotBlurb": "MYPOKER पर खेले गए हर हाथ के साथ बढ़ता है।",
     "provablyFair": "प्रमाणित निष्पक्ष · ऑन-चेन सत्यापन योग्य",
     "hotNow": "अभी लोकप्रिय",
-    "moreGames": "और गेम्स",
+    "moreGames": "सभी गेम",
     "grandJackpot": "ग्रैंड जैकपॉट",
     "fairSecure": "निष्पक्ष और सुरक्षित",
     "colTable": "टेबल",
@@ -75,7 +75,8 @@
     "yourSeat": "आपकी सीट",
     "haveInvite": "निमंत्रण मिला है?",
     "invitePlaceholder": "निमंत्रण लिंक या टेबल आईडी पेस्ट करें",
-    "inviteNotRecognised": "यह टेबल निमंत्रण नहीं लगता"
+    "inviteNotRecognised": "यह टेबल निमंत्रण नहीं लगता",
+    "moreGamesBlurb": "कार्ड गेम, क्विक गेम और स्लॉट"
   },
   "games": {
     "searchPlaceholder": "गेम खोजें",
@@ -956,5 +957,23 @@
     "videoDownload": "डाउनलोड",
     "prevSlide": "पिछला",
     "nextSlide": "अगला"
+  },
+  "redPacket": {
+    "total": "कुल",
+    "packets": "पैकेट",
+    "mineNumber": "माइन अंक",
+    "countdown": "उलटी गिनती…",
+    "revealed": "खुल गया",
+    "waiting": "अगले लिफ़ाफ़े की प्रतीक्षा",
+    "tapMe": "टैप करें",
+    "sweepers": "खिलाड़ी",
+    "applyBank": "बैंकर बनने का आवेदन",
+    "applied": "आवेदन किया",
+    "noBanker": "अभी कोई बैंकर नहीं",
+    "join": "गेम जॉइन करें",
+    "mineRule": "{{digit}} पर ख़त्म होने वाले पैकेट पर {{multiplier}} गुना देना होगा",
+    "you": "मैं",
+    "grabbed": "आपने पैकेट पा लिया!",
+    "hitMine": "आप माइन पर पड़ गए!"
   }
 }

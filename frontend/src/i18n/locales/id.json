@@ -42,7 +42,7 @@
     "jackpotBlurb": "Bertambah setiap kali satu ronde dimainkan di MYPOKER.",
     "provablyFair": "Terbukti adil · dapat diverifikasi on-chain",
     "hotNow": "Sedang populer",
-    "moreGames": "Game lainnya",
+    "moreGames": "Semua game",
     "grandJackpot": "Jackpot utama",
     "fairSecure": "Adil & aman",
     "colTable": "Meja",
@@ -75,7 +75,8 @@
     "yourSeat": "Kursi Anda",
     "haveInvite": "Punya undangan?",
     "invitePlaceholder": "Tempel tautan undangan atau ID meja",
-    "inviteNotRecognised": "Ini sepertinya bukan undangan meja"
+    "inviteNotRecognised": "Ini sepertinya bukan undangan meja",
+    "moreGamesBlurb": "Game kartu, game cepat, dan slot"
   },
   "games": {
     "searchPlaceholder": "Cari game",
@@ -956,5 +957,23 @@
     "videoDownload": "Unduh",
     "prevSlide": "Sebelumnya",
     "nextSlide": "Berikutnya"
+  },
+  "redPacket": {
+    "total": "Total",
+    "packets": "Jumlah paket",
+    "mineNumber": "Angka ranjau",
+    "countdown": "Hitung mundur…",
+    "revealed": "Terbuka",
+    "waiting": "Menunggu amplop berikutnya",
+    "tapMe": "KETUK",
+    "sweepers": "PEMAIN",
+    "applyBank": "Ajukan jadi bandar",
+    "applied": "Diajukan",
+    "noBanker": "Belum ada bandar",
+    "join": "Gabung",
+    "mineRule": "Paket berakhiran {{digit}} membayar {{multiplier}}x",
+    "you": "SAYA",
+    "grabbed": "Kamu dapat paketnya!",
+    "hitMine": "Kamu kena ranjau!"
   }
 }

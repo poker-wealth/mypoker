@@ -42,7 +42,7 @@
     "jackpotBlurb": "MYPOKER에서 진행되는 모든 핸드마다 잭팟이 쌓입니다.",
     "provablyFair": "증명 가능한 공정성 · 온체인 검증",
     "hotNow": "인기 게임",
-    "moreGames": "더 많은 게임",
+    "moreGames": "전체 게임",
     "grandJackpot": "그랜드 잭팟",
     "fairSecure": "공정 · 안전",
     "colTable": "테이블",
@@ -75,7 +75,8 @@
     "yourSeat": "내 자리",
     "haveInvite": "초대를 받으셨나요?",
     "invitePlaceholder": "초대 링크 또는 테이블 ID 붙여넣기",
-    "inviteNotRecognised": "테이블 초대가 아닌 것 같습니다"
+    "inviteNotRecognised": "테이블 초대가 아닌 것 같습니다",
+    "moreGamesBlurb": "카드 게임, 퀵 게임, 슬롯"
   },
   "games": {
     "searchPlaceholder": "게임 검색",
@@ -956,5 +957,23 @@
     "videoDownload": "다운로드",
     "prevSlide": "이전",
     "nextSlide": "다음"
+  },
+  "redPacket": {
+    "total": "총액",
+    "packets": "개수",
+    "mineNumber": "지뢰 번호",
+    "countdown": "카운트다운…",
+    "revealed": "공개됨",
+    "waiting": "다음 봉투를 기다리는 중",
+    "tapMe": "누르기",
+    "sweepers": "참가자",
+    "applyBank": "뱅커 신청",
+    "applied": "신청함",
+    "noBanker": "뱅커 없음",
+    "join": "게임 참가",
+    "mineRule": "끝자리가 {{digit}}인 봉투는 {{multiplier}}배를 물어냅니다",
+    "you": "나",
+    "grabbed": "봉투를 잡았습니다!",
+    "hitMine": "지뢰를 밟았습니다!"
   }
 }

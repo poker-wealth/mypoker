@@ -42,7 +42,7 @@
     "jackpotBlurb": "Grows with every hand played across MYPOKER.",
     "provablyFair": "Provably fair · verifiable on-chain",
     "hotNow": "Hot right now",
-    "moreGames": "More games",
+    "moreGames": "All games",
     "grandJackpot": "Grand jackpot",
     "fairSecure": "Fair & secure",
     "colTable": "Table",
@@ -75,7 +75,8 @@
     "yourSeat": "Your seat",
     "haveInvite": "Have an invite?",
     "invitePlaceholder": "Paste an invite link or table ID",
-    "inviteNotRecognised": "That doesn't look like a table invite"
+    "inviteNotRecognised": "That doesn't look like a table invite",
+    "moreGamesBlurb": "Card games, quick games and slots"
   },
   "games": {
     "searchPlaceholder": "Search games",
@@ -956,5 +957,23 @@
     "videoDownload": "Download",
     "prevSlide": "Previous",
     "nextSlide": "Next"
+  },
+  "redPacket": {
+    "total": "Total",
+    "packets": "Packets",
+    "mineNumber": "Mine",
+    "countdown": "Counting down…",
+    "revealed": "Revealed",
+    "waiting": "Waiting for the next envelope",
+    "tapMe": "TAP ME",
+    "sweepers": "SWEEPERS",
+    "applyBank": "Apply to bank",
+    "applied": "Applied",
+    "noBanker": "No banker yet",
+    "join": "Join game",
+    "mineRule": "A packet ending in {{digit}} costs {{multiplier}}× what you took",
+    "you": "ME",
+    "grabbed": "You grabbed a packet!",
+    "hitMine": "You hit the mine!"
   }
 }

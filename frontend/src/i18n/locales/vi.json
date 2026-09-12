@@ -42,7 +42,7 @@
     "jackpotBlurb": "Tăng lên theo mỗi ván bài được chơi trên MYPOKER.",
     "provablyFair": "Công bằng minh bạch · xác minh trên chuỗi",
     "hotNow": "Đang hot",
-    "moreGames": "Trò chơi khác",
+    "moreGames": "Tất cả trò chơi",
     "grandJackpot": "Jackpot lớn",
     "fairSecure": "Công bằng & an toàn",
     "colTable": "Bàn",
@@ -75,7 +75,8 @@
     "yourSeat": "Ghế của bạn",
     "haveInvite": "Có lời mời?",
     "invitePlaceholder": "Dán liên kết mời hoặc ID bàn",
-    "inviteNotRecognised": "Đây không giống lời mời vào bàn"
+    "inviteNotRecognised": "Đây không giống lời mời vào bàn",
+    "moreGamesBlurb": "Game bài, game nhanh và slot"
   },
   "games": {
     "searchPlaceholder": "Tìm trò chơi",
@@ -956,5 +957,23 @@
     "videoDownload": "Tải về",
     "prevSlide": "Trước",
     "nextSlide": "Sau"
+  },
+  "redPacket": {
+    "total": "Tổng",
+    "packets": "Số bao",
+    "mineNumber": "Số mìn",
+    "countdown": "Đếm ngược…",
+    "revealed": "Đã mở",
+    "waiting": "Đang chờ bao tiếp theo",
+    "tapMe": "CHẠM VÀO",
+    "sweepers": "NGƯỜI CHƠI",
+    "applyBank": "Xin làm cái",
+    "applied": "Đã xin",
+    "noBanker": "Chưa có nhà cái",
+    "join": "Vào chơi",
+    "mineRule": "Bao kết thúc bằng {{digit}} phải trả {{multiplier}} lần",
+    "you": "TÔI",
+    "grabbed": "Bạn đã cướp được bao!",
+    "hitMine": "Bạn đã trúng mìn!"
   }
 }

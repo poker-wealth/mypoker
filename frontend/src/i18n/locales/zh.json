@@ -42,7 +42,7 @@
     "jackpotBlurb": "MYPOKER 每一手牌都会让彩池增长。",
     "provablyFair": "公平可验证 · 链上可查",
     "hotNow": "热门推荐",
-    "moreGames": "更多游戏",
+    "moreGames": "全部游戏",
     "grandJackpot": "大奖池",
     "fairSecure": "公平安全",
     "colTable": "牌桌",
@@ -75,7 +75,8 @@
     "yourSeat": "您的座位",
     "haveInvite": "收到邀请？",
     "invitePlaceholder": "粘贴邀请链接或牌桌 ID",
-    "inviteNotRecognised": "这不像是牌桌邀请"
+    "inviteNotRecognised": "这不像是牌桌邀请",
+    "moreGamesBlurb": "棋牌、快速游戏与老虎机"
   },
   "games": {
     "searchPlaceholder": "搜索游戏",
@@ -956,5 +957,23 @@
     "videoDownload": "下载",
     "prevSlide": "上一张",
     "nextSlide": "下一张"
+  },
+  "redPacket": {
+    "total": "总金额",
+    "packets": "包数",
+    "mineNumber": "雷号",
+    "countdown": "倒计时…",
+    "revealed": "已开奖",
+    "waiting": "等待下一个红包",
+    "tapMe": "点我",
+    "sweepers": "扫雷玩家",
+    "applyBank": "申请埋雷",
+    "applied": "已申请",
+    "noBanker": "暂无庄家",
+    "join": "加入游戏",
+    "mineRule": "尾数为 {{digit}} 的红包需赔付 {{multiplier}} 倍",
+    "you": "我",
+    "grabbed": "恭喜抢到红包！",
+    "hitMine": "很遗憾，踩雷了！"
   }
 }

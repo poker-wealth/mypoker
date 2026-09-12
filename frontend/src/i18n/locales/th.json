@@ -42,7 +42,7 @@
     "jackpotBlurb": "เพิ่มขึ้นทุกตาที่มีการเล่นบน MYPOKER",
     "provablyFair": "ยุติธรรมพิสูจน์ได้ · ตรวจสอบบนเชนได้",
     "hotNow": "กำลังมาแรง",
-    "moreGames": "เกมเพิ่มเติม",
+    "moreGames": "เกมทั้งหมด",
     "grandJackpot": "แกรนด์แจ็กพอต",
     "fairSecure": "ยุติธรรมและปลอดภัย",
     "colTable": "โต๊ะ",
@@ -75,7 +75,8 @@
     "yourSeat": "ที่นั่งของคุณ",
     "haveInvite": "มีคำเชิญไหม",
     "invitePlaceholder": "วางลิงก์คำเชิญหรือรหัสโต๊ะ",
-    "inviteNotRecognised": "ดูเหมือนจะไม่ใช่คำเชิญโต๊ะ"
+    "inviteNotRecognised": "ดูเหมือนจะไม่ใช่คำเชิญโต๊ะ",
+    "moreGamesBlurb": "เกมไพ่ เกมเร็ว และสล็อต"
   },
   "games": {
     "searchPlaceholder": "ค้นหาเกม",
@@ -956,5 +957,23 @@
     "videoDownload": "ดาวน์โหลด",
     "prevSlide": "ก่อนหน้า",
     "nextSlide": "ถัดไป"
+  },
+  "redPacket": {
+    "total": "ยอดรวม",
+    "packets": "จำนวนซอง",
+    "mineNumber": "เลขระเบิด",
+    "countdown": "นับถอยหลัง…",
+    "revealed": "เปิดแล้ว",
+    "waiting": "รอซองถัดไป",
+    "tapMe": "แตะฉัน",
+    "sweepers": "ผู้เล่น",
+    "applyBank": "ขอเป็นเจ้ามือ",
+    "applied": "ขอแล้ว",
+    "noBanker": "ยังไม่มีเจ้ามือ",
+    "join": "เข้าร่วมเกม",
+    "mineRule": "ซองที่ลงท้ายด้วย {{digit}} ต้องจ่าย {{multiplier}} เท่า",
+    "you": "ฉัน",
+    "grabbed": "คุณคว้าซองได้แล้ว!",
+    "hitMine": "คุณโดนระเบิด!"
   }
 }
