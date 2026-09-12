@@ -113,10 +113,16 @@ export function PokerTable({ snapshot, onSit, design: override }: PokerTableProp
         )}
 
         <View style={styles.board}>
-          {/* Streets still to come stay as backs, so the board keeps its shape as it fills. */}
+          {/* A street still to come is an EMPTY SLOT, not a card back.
+              This drew five face-down cards, so an undealt board looked like
+              five real cards nobody could see — and once the backs were
+              repaletted elsewhere it read as five gold rectangles across the
+              felt. The Mini App draws a dashed outline for each street not yet
+              dealt, which is the honest shape: there is no card there. */}
           {Array.from({ length: 5 }, (_, i) => {
             const card = board[i];
-            return <PlayingCard key={i} {...(card ? { card } : {})} size="md" />;
+            if (card) return <PlayingCard key={i} card={card} size="md" />;
+            return <View key={i} style={styles.boardSlot} />;
           })}
         </View>
 
@@ -229,6 +235,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)',
   },
   potText: { fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+  /* An undealt street: a dashed outline the size of a card, mirroring the
+     Mini App. Faint enough to read as absence rather than as a card. */
+  boardSlot: {
+    width: 44,
+    height: 64,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
   board: { flexDirection: 'row', gap: 3 },
   message: {
     color: theme.text,

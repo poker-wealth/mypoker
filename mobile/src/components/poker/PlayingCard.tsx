@@ -89,17 +89,27 @@ const styles = StyleSheet.create({
   },
   face: { backgroundColor: '#fff', borderWidth: 1, borderColor: 'rgba(0,0,0,0.12)' },
   back: {
-    backgroundColor: '#1e1b4b',
+    /*
+     * GOLD, not indigo. This was `#1e1b4b` with a `#312e81` inner — the purple
+     * brand from before the Sep 2026 repalette to the HHPoker reference. The
+     * Mini App's back is the gold brand gradient; mobile kept the old colour,
+     * so a face-down card was a blue rectangle on a green table. Two clients,
+     * one deck.
+     *
+     * Flat gold rather than a gradient: RN has no CSS gradient, and a card back
+     * does not justify a dependency. The inner panel gives the layered look.
+     */
+    backgroundColor: '#8a6a28',
     borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.35)',
+    borderColor: 'rgba(235,211,160,0.45)',
     padding: 4,
   },
   backInner: {
     flex: 1,
     borderRadius: 3,
     borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.25)',
-    backgroundColor: '#312e81',
+    borderColor: 'rgba(235,211,160,0.30)',
+    backgroundColor: '#b8934f',
   },
   rank: { fontWeight: '800', lineHeight: undefined },
   suit: { alignSelf: 'flex-end', lineHeight: undefined },

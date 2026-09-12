@@ -17,6 +17,9 @@ import { BuyInSheet } from '../components/poker/BuyInSheet';
 import { JackpotBurst } from '../components/poker/JackpotBurst';
 import { TableDesignSheet } from '../components/poker/TableDesignSheet';
 import { TableGround } from '../components/poker/TableGround';
+import { TableMenu } from '../components/poker/TableMenu';
+import { inviteLinkFor } from '../lib/tableInvite';
+import * as Clipboard from 'expo-clipboard';
 import { ChatBox } from '../components/poker/ChatBox';
 import { ChallengeModal } from '../components/poker/ChallengeModal';
 import { useTableChat } from '../table/useTableChat';
@@ -78,6 +81,26 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
   /** Which jackpot this viewer has already watched, so a re-render cannot replay it. */
   const [jackpotSeen, setJackpotSeen] = useState<string | null>(null);
   const [designOpen, setDesignOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  /**
+   * Copy this table's invite link.
+   *
+   * The SAME Telegram deep link the create sheet hands out — not a web URL,
+   * which pasted into Telegram opens the phone's browser and shows the
+   * recipient a sign-in page instead of the table.
+   *
+   * No join code: this is shared from INSIDE a table by whoever is sitting
+   * there, who may have been let in by a creator that did not mean the code to
+   * travel on. The creator's own dialog is where the code-bearing link comes
+   * from.
+   */
+  const shareInvite = (): void => {
+    void Clipboard.setStringAsync(inviteLinkFor(tableId)).catch(() => {
+      // Clipboard can fail on a locked device. A failed copy is a nuisance,
+      // not a dead end — and silently pretending it worked is worse.
+    });
+  };
   // By table id for the fixed tables; by the snapshot's game for created
   // `t-…` ones, whose id is in no registry. Same resolution as the Mini App.
   const Felt = feltFor(tableId) ?? (snapshot?.game ? feltFor(snapshot.game) : undefined);
@@ -256,15 +279,21 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
           </View>
         ) : null}
 
-        {/* Chat is no longer a pill in this row — it is the floating icon button below, matching
-            the Mini App. Only the design picker remains inline. */}
-        {designable ? (
-          <View style={styles.tableTools}>
-            <Pressable onPress={() => setDesignOpen(true)} style={styles.toolButton}>
-              <Text style={styles.toolText}>Table design</Text>
-            </Pressable>
-          </View>
-        ) : null}
+        {/* THE MENU, not a design pill.
+            This said "Table design" and opened the colour picker directly — the
+            only control under the felt, so share, stand up, rebuy, sit out,
+            rankings, fairness and exit had no way in at all. Options reaches
+            the picker from inside the menu, exactly as on the Mini App.
+
+            Shown for EVERY game, not just the designable ones: the picker was
+            poker-only, but sharing a table and leaving one are not. */}
+        <View style={styles.tableTools}>
+          <Pressable onPress={() => setMenuOpen(true)} style={styles.toolButton}>
+            {/* A hamburger, not a word — the Mini App's own control, and it does
+                not need translating. */}
+            <Text style={styles.menuGlyph}>{'☰'}</Text>
+          </Pressable>
+        </View>
       </ScrollView>
 
       {/*
@@ -289,6 +318,25 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
           </View>
         ) : null}
       </Pressable>
+
+      <TableMenu
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        onShare={shareInvite}
+        {...(you
+          ? {
+              // `stand` gives the seat up and keeps you watching — NOT
+              // `sitOut`, which keeps the seat and skips hands. Wiring the
+              // wrong one takes a player's seat away when they meant to sit
+              // out a single hand, at a table they may not get back into.
+              onStandUp: () => command({ kind: 'stand' }),
+              onBuyIn: () => setBuyInFor(you.index),
+              onSitOut: () => command({ kind: 'sitOut' }),
+            }
+          : {})}
+        onOptions={() => setDesignOpen(true)}
+        onExit={() => navigation.goBack()}
+      />
 
       <TableDesignSheet open={designOpen} onClose={() => setDesignOpen(false)} />
 
@@ -473,6 +521,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg,
     paddingVertical: 7,
   },
+  /** The hamburger. Sized up from the pill text so it reads as an icon. */
+  menuGlyph: { color: theme.text, fontSize: 20, lineHeight: 22 },
   toolText: { color: theme.dim, fontSize: 12, fontWeight: '600' },
   // The sheet sizes to its content, and ChatBox is `flex: 1` — without a height it collapses to
   // nothing and the composer sits under the title with no log above it.

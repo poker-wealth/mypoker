@@ -36,6 +36,10 @@ export interface LiveSeat {
   name: string;
   avatarUrl?: string;
   stack: number;
+  /** Every chip brought to this table — first buy-in plus each top-up. */
+  boughtIn?: number;
+  /** Hands this seat has been dealt into here. */
+  handsPlayed?: number;
   bet: number;
   status: LiveSeatStatus;
   inHand: boolean;
@@ -87,6 +91,18 @@ export interface TableSnapshot {
   minBuyIn: number;
   maxBuyIn: number;
   maxSeats: number;
+  /** A manual-start table waiting for its owner. */
+  awaitingStart?: boolean;
+  /** You created this table. Sent on EVERY snapshot, not only before the deal. */
+  isOwner?: boolean;
+  /** Owner has stopped new hands; a hand in progress still runs. */
+  paused?: boolean;
+  /** A close is queued — stacks returned when this hand ends. */
+  closing?: boolean;
+  /** Watchers with no seat. A count, never a list. */
+  spectators?: number;
+  /** Epoch ms this table opened, for the running clock. */
+  openedAt?: number;
 
   phase: RoomPhase;
   handId: string | null;
@@ -190,6 +206,12 @@ export interface TableAction {
 export type TableCommand =
   | { kind: 'sit'; seat: number; buyIn: number }
   | { kind: 'stand' }
+  /** Owner removes another player. The server checks who is asking. */
+  | { kind: 'kick'; targetId: string }
+  /** Owner stops or resumes dealing. A hand in progress is unaffected. */
+  | { kind: 'pause'; paused: boolean }
+  /** Owner closes the table. Queued: the hand finishes, then stacks go home. */
+  | { kind: 'close_table' }
   | { kind: 'act'; action: TableAction }
   | { kind: 'sitOut' }
   | { kind: 'sitIn' }
