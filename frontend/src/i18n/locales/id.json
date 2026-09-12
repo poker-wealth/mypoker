@@ -285,6 +285,14 @@
     }
   },
   "table": {
+    "comment": "Komentar",
+    "paidCommentSoon": "Komentar berbayar belum tersedia",
+    "phraseShowChips": "Tunjukkan chipmu!",
+    "phraseNotLuck": "Ini bukan sekadar keberuntungan.",
+    "phraseNeverSayDie": "Jangan menyerah, coba lagi!",
+    "phraseNothingSeek": "Tak mencari, tak menemukan.",
+    "phraseWheelTurns": "Roda selalu berputar.",
+    "phraseCardsAreWar": "Kartu adalah perang berkedok olahraga.",
     "profileChips": "Chip",
     "profileStatsSoon": "Statistik rinci tersedia setelah riwayat ronde dicatat.",
     "insuranceNotLive": "Asuransi belum tersedia",

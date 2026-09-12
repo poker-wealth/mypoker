@@ -285,6 +285,14 @@
     }
   },
   "table": {
+    "comment": "टिप्पणी",
+    "paidCommentSoon": "सशुल्क टिप्पणियाँ अभी उपलब्ध नहीं हैं",
+    "phraseShowChips": "अपनी चिप्स दिखाओ!",
+    "phraseNotLuck": "यह सिर्फ किस्मत नहीं है।",
+    "phraseNeverSayDie": "हार मत मानो, फिर कोशिश करो!",
+    "phraseNothingSeek": "बिना खोजे कुछ नहीं मिलता।",
+    "phraseWheelTurns": "पहिया हमेशा घूमता है।",
+    "phraseCardsAreWar": "ताश खेल के भेस में युद्ध है।",
     "profileChips": "चिप्स",
     "profileStatsSoon": "हैंड इतिहास दर्ज होने पर विस्तृत आँकड़े दिखेंगे।",
     "insuranceNotLive": "बीमा अभी उपलब्ध नहीं है",

@@ -285,6 +285,14 @@
     }
   },
   "table": {
+    "comment": "评论",
+    "paidCommentSoon": "付费评论暂未开放",
+    "phraseShowChips": "亮筹码！",
+    "phraseNotLuck": "这不只是运气。",
+    "phraseNeverSayDie": "永不言败，再来！",
+    "phraseNothingSeek": "不求则不得。",
+    "phraseWheelTurns": "风水轮流转。",
+    "phraseCardsAreWar": "牌局如战场，只是披着游戏的外衣。",
     "profileChips": "筹码",
     "profileStatsSoon": "记录手牌历史后将显示详细统计。",
     "insuranceNotLive": "暂未提供保险",

@@ -285,6 +285,14 @@
     }
   },
   "table": {
+    "comment": "댓글",
+    "paidCommentSoon": "유료 댓글은 아직 지원되지 않습니다",
+    "phraseShowChips": "칩을 보여줘!",
+    "phraseNotLuck": "운만은 아니지.",
+    "phraseNeverSayDie": "포기하지 마, 다시 해보자!",
+    "phraseNothingSeek": "구하지 않으면 얻지 못한다.",
+    "phraseWheelTurns": "흐름은 반드시 바뀐다.",
+    "phraseCardsAreWar": "카드는 스포츠를 가장한 전쟁이다.",
     "profileChips": "칩",
     "profileStatsSoon": "핸드 기록이 저장되면 상세 통계가 표시됩니다.",
     "insuranceNotLive": "보험은 아직 제공되지 않습니다",

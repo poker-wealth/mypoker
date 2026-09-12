@@ -285,6 +285,14 @@
     }
   },
   "table": {
+    "comment": "คอมเมนต์",
+    "paidCommentSoon": "คอมเมนต์แบบเสียชิปยังไม่เปิดให้ใช้",
+    "phraseShowChips": "โชว์ชิปหน่อย!",
+    "phraseNotLuck": "ไม่ได้มีแค่โชค",
+    "phraseNeverSayDie": "อย่ายอมแพ้ สู้ต่อ!",
+    "phraseNothingSeek": "ไม่ลอง ไม่รู้",
+    "phraseWheelTurns": "ทุกอย่างหมุนเวียนเสมอ",
+    "phraseCardsAreWar": "ไพ่คือสงครามในคราบกีฬา",
     "profileChips": "ชิป",
     "profileStatsSoon": "สถิติโดยละเอียดจะแสดงเมื่อเริ่มบันทึกประวัติมือ",
     "insuranceNotLive": "ยังไม่มีบริการประกัน",

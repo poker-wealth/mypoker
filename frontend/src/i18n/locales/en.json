@@ -285,6 +285,14 @@
     }
   },
   "table": {
+    "comment": "Comment",
+    "paidCommentSoon": "Paid comments are not available yet",
+    "phraseShowChips": "Show your chips!",
+    "phraseNotLuck": "This is not only luck.",
+    "phraseNeverSayDie": "Never say die! Up man, and try.",
+    "phraseNothingSeek": "Nothing seek, nothing find.",
+    "phraseWheelTurns": "The wheel always turns.",
+    "phraseCardsAreWar": "Cards are war, in disguise of a sport.",
     "profileChips": "Chips",
     "profileStatsSoon": "Detailed statistics arrive once hand histories are recorded.",
     "insuranceNotLive": "Insurance is not offered yet",

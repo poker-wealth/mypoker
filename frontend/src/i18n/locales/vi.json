@@ -285,6 +285,14 @@
     }
   },
   "table": {
+    "comment": "Bình luận",
+    "paidCommentSoon": "Bình luận trả phí chưa khả dụng",
+    "phraseShowChips": "Khoe chip đi!",
+    "phraseNotLuck": "Không chỉ là may mắn.",
+    "phraseNeverSayDie": "Đừng bỏ cuộc, thử lại nào!",
+    "phraseNothingSeek": "Không tìm thì không thấy.",
+    "phraseWheelTurns": "Vận may luôn xoay vần.",
+    "phraseCardsAreWar": "Bài bạc là chiến tranh khoác áo thể thao.",
     "profileChips": "Chip",
     "profileStatsSoon": "Thống kê chi tiết sẽ có khi lịch sử ván bài được ghi lại.",
     "insuranceNotLive": "Chưa có bảo hiểm",

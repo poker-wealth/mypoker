@@ -285,6 +285,14 @@
     }
   },
   "table": {
+    "comment": "コメント",
+    "paidCommentSoon": "有料コメントは未対応です",
+    "phraseShowChips": "チップを見せろ！",
+    "phraseNotLuck": "運だけではない。",
+    "phraseNeverSayDie": "諦めるな、もう一度！",
+    "phraseNothingSeek": "求めなければ得られない。",
+    "phraseWheelTurns": "風向きは必ず変わる。",
+    "phraseCardsAreWar": "カードはスポーツの顔をした戦争だ。",
     "profileChips": "チップ",
     "profileStatsSoon": "ハンド履歴の記録開始後に詳細な統計を表示します。",
     "insuranceNotLive": "保険は未提供です",
