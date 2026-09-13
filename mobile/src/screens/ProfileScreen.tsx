@@ -6,10 +6,19 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { api } from '../api';
 import { Avatar } from '../components/ui/Avatar';
 import { useAuth } from '../auth';
-import { DataIcon, EditIcon, GearIcon, InviteIcon, ShieldIcon, TrophyIcon } from '../icons';
+import {
+  DataIcon,
+  EditIcon,
+  GearIcon,
+  HeadsetIcon,
+  InviteIcon,
+  ShieldIcon,
+  TrophyIcon,
+} from '../icons';
 import type { IconProps } from '../icons';
 import type { RootStackParamList } from '../navigation';
 import { moneyFromDecimal } from '../money';
+import { openSupport } from '../support';
 import { radius, space, theme, weight } from '../theme';
 import { Card, Screen, Skeleton } from '../ui';
 
@@ -28,7 +37,9 @@ import { Card, Screen, Skeleton } from '../ui';
  *
  *   Items            no inventory exists — not an endpoint, not a model
  *   My friends       no friends system
- *   Feedback         no endpoint (the web has SUPPORT_URL; mobile has no config)
+ *   Feedback         no endpoint. NOT the same as Support, which is a tile
+ *                    below and opens the bot chat — a human answers there,
+ *                    which is more than a feedback form with no endpoint does
  *   Guardian Star    no such concept anywhere in the repo
  *   Theme            FeltGalleryScreen is registered under `__DEV__` only
  *                    (App.tsx ~369), so in a release build the route is absent
@@ -149,6 +160,26 @@ export function ProfileScreen() {
       label: t('account.settings'),
       Icon: GearIcon,
       go: () => navigation.navigate('Settings'),
+    },
+    /*
+     * Support, and it is not decoration.
+     *
+     * LoginScreen has had a support door since it was written, so anyone
+     * signed OUT could reach a human — and anyone signed IN could not. That
+     * is backwards: the player with a stuck deposit is by definition signed
+     * in. QA recorded it as "a player with a money problem has no path to a
+     * human" and it stayed true through the Me rebuild, because the rebuild
+     * copied the reference's grid and the reference puts support elsewhere.
+     *
+     * Opens the bot chat rather than a screen: support answers there, and a
+     * Feedback form with no endpoint behind it would be the dead affordance
+     * this grid deliberately has none of.
+     */
+    {
+      key: 'support',
+      label: t('account.support'),
+      Icon: HeadsetIcon,
+      go: openSupport,
     },
   ];
 

@@ -26,6 +26,7 @@ import {
   MailIcon,
   SendIcon,
 } from '../icons';
+import { openSupport } from '../support';
 import { radius, space, theme, weight } from '../theme';
 import { Button, Card, ErrorState } from '../ui';
 import { CodeBoxes } from '../components/CodeBoxes';
@@ -57,13 +58,11 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /** Digits in a confirmation code. Must match OTP_LENGTH on the gateway. */
 const CODE_LENGTH = 6;
 
-/**
- * The other way in: the Telegram Mini App, via the bot. Mirrors the
- * frontend's config default (frontend/src/config.ts TELEGRAM_BOT_NAME) —
- * one bot, two clients. The same door serves as support (the reference's
- * headset icon), because support lives in that chat too.
+/*
+ * The other way in, and the support door, are the same bot chat. The URL
+ * moved to src/support.ts because the Me screen needs it too, and a second
+ * literal beside it is the copy that eventually disagrees with this one.
  */
-const TELEGRAM_URL = 'https://t.me/mypoker777_bot';
 
 /** Seconds until `iso`, floored at zero. Zero for a missing or past date. */
 function secondsUntil(iso: string | null): number {
@@ -337,12 +336,9 @@ export function LoginScreen() {
     })();
   };
 
-  const openTelegram = (): void => {
-    void Linking.openURL(TELEGRAM_URL).catch(() => {
-      // No Telegram and no browser willing to take t.me — nothing useful to
-      // do; the email form is right there.
-    });
-  };
+  // No Telegram, and no browser willing to take t.me, is a no-op rather than
+  // an error — the email form is right there. See openSupport.
+  const openTelegram = openSupport;
 
   const version = appJson.expo.version;
 
