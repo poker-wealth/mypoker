@@ -91,13 +91,29 @@ function stadiumRings(edge: { x: number; yTop: number; yBottom: number; yMid: nu
    * below is a separate array rather than a re-tuning of this one, so adding the
    * bigger sizes cannot move anybody who is already seated.
    */
+  /*
+   * THE SIDE PAIRS SPREAD, 14 Sep 2026: "the sit here circles are too jam
+   * packed make them wider."
+   *
+   * They were `yMid ± 12` — 24% of the table height between the two chairs on
+   * a rail — while the gaps above and below them ran to 25% and 28% of empty
+   * felt. So the middle of each rail was crowded and both ends were bare.
+   *
+   * ±20 opens the pair to 40% apart and uses the space that was already there:
+   * the top chair drops nearer the top curve, the bottom one nearer the hero,
+   * and the felt reads evenly occupied instead of pinched in the middle.
+   *
+   * NOT a change to the seat SIZE. That went up separately (17 → 20 cqmin);
+   * making the circles bigger here would have made the crowding worse, which
+   * is the opposite of what was asked.
+   */
   const six: SeatPos[] = [
     { left: '50%', top: `${yBottom}%`, align: 'bottom' },
-    { left: `${x}%`, top: `${yMid + 12}%`, align: 'left' },
-    { left: `${x}%`, top: `${yMid - 12}%`, align: 'left' },
+    { left: `${x}%`, top: `${yMid + 20}%`, align: 'left' },
+    { left: `${x}%`, top: `${yMid - 20}%`, align: 'left' },
     { left: '50%', top: `${yTop}%`, align: 'top' },
-    { left: `${right}%`, top: `${yMid - 12}%`, align: 'right' },
-    { left: `${right}%`, top: `${yMid + 12}%`, align: 'right' },
+    { left: `${right}%`, top: `${yMid - 20}%`, align: 'right' },
+    { left: `${right}%`, top: `${yMid + 20}%`, align: 'right' },
   ];
 
   /**

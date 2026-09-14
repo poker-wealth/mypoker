@@ -51,13 +51,21 @@ function stadiumRings(edge: {
 }): Record<number, SeatPos[]> {
   const { x, yTop, yBottom, yMid } = edge;
   const right = 100 - x;
+  /*
+   * THE SIDE PAIRS SPREAD — mirror of the web's, same numbers.
+   *
+   * They were `yMid ± 12`: 24% of the table height between the two chairs on a
+   * rail, with a quarter of the felt empty above them and more below. Crowded
+   * in the middle, bare at both ends. ±20 opens the pair to 40% apart and uses
+   * the room that was already there.
+   */
   const six: SeatPos[] = [
     { left: 50, top: yBottom, align: 'bottom' },
-    { left: x, top: yMid + 12, align: 'left' },
-    { left: x, top: yMid - 12, align: 'left' },
+    { left: x, top: yMid + 20, align: 'left' },
+    { left: x, top: yMid - 20, align: 'left' },
     { left: 50, top: yTop, align: 'top' },
-    { left: right, top: yMid - 12, align: 'right' },
-    { left: right, top: yMid + 12, align: 'right' },
+    { left: right, top: yMid - 20, align: 'right' },
+    { left: right, top: yMid + 20, align: 'right' },
   ];
   /**
    * SEVEN AND EIGHT: three chairs down each straight rail, one on each curve.
