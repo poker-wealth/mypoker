@@ -97,22 +97,23 @@ export interface TexasCowboyRound {
  * server actually settles — see the note at the top about not merging them.
  */
 const BANDS: Array<{ labelKey?: string; rows: string[][] }> = [
-  // The duel: three across, like the reference's top band.
+  // The duel: three across, as the reference has it.
   { rows: [['cowboy_win', 'tie', 'cowgirl_win']] },
-  // The reference puts one market across the full width here, then a pair
-  // underneath it. Ours has three markets, so they take the same shape.
+  // Either hand type — the DEALT cards. One market across the full width, then
+  // a pair beneath: the reference's shape exactly, because these are now the
+  // reference's markets.
   {
     labelKey: 'cowboy.eitherHand',
-    rows: [['high_card'], ['one_pair', 'two_pair']],
+    rows: [['suited_connects'], ['pocket_pair', 'pocket_aces']],
   },
-  // The reference is a row of two over a row of three. Ours has seven markets,
-  // so it runs 2-3-2 — the same rhythm, and no row left short.
+  // Winning hand rank — a row of two over a row of three, exactly as the
+  // reference lays it out, now that the hand types are grouped the way it
+  // prices them.
   {
     labelKey: 'cowboy.winningRank',
     rows: [
-      ['three_of_a_kind', 'straight'],
-      ['flush', 'full_house', 'four_of_a_kind'],
-      ['straight_flush', 'royal_flush'],
+      ['high_card_or_pair', 'two_pair'],
+      ['trips_straight_flush', 'full_house', 'quads_or_better'],
     ],
   },
 ];

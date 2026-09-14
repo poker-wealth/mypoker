@@ -172,7 +172,7 @@ describe('Texas Cowboy — the betting window', () => {
   it('lets several users, and one user, hold several bets', () => {
     engine.openBetting(12_000, 1_000);
     bet('u1', 'cowboy_win', 500, 2_000);
-    bet('u1', 'straight', 100, 2_000);
+    bet('u1', 'trips_straight_flush', 100, 2_000);
     bet('u2', 'tie', 200, 2_000);
     expect(engine.getBets()).toHaveLength(3);
     expect(engine.stakedBy('u1')).toBe(600);
@@ -214,7 +214,7 @@ describe('Texas Cowboy — settlement is player-funded', () => {
     // Both win: COWBOY at 2.02 and STRAIGHT_FLUSH at 248, staked the same.
     const engine = openWith([
       ['short-odds', 'cowboy_win', 100],
-      ['long-odds', 'straight_flush', 100],
+      ['long-odds', 'quads_or_better', 100],
       ['loser', 'cowgirl_win', 1_000],
     ]);
     roundTo(engine, COWBOY_RUNAWAY);
@@ -243,7 +243,7 @@ describe('Texas Cowboy — settlement is player-funded', () => {
   it('loses hand-type bets on a tie by default, and voids them when configured to', () => {
     const shared = stackedDeck(['2s', '3d'], ['2c', '3h'], ['As', 'Ks', 'Qs', 'Jh', 'Td']);
 
-    const strict = openWith([['a', 'straight', 100], ['b', 'tie', 100]]);
+    const strict = openWith([['a', 'trips_straight_flush', 100], ['b', 'tie', 100]]);
     roundTo(strict, shared);
     strict.settleBets();
     expect(strict.getBets().find((x) => x.userId === 'a')!.status).toBe('LOST');
@@ -251,7 +251,7 @@ describe('Texas Cowboy — settlement is player-funded', () => {
     const lenient = new TexasCowboyEngine('r2', 1, { tieRule: 'HAND_TYPE_VOIDS' });
     lenient.openBetting(12_000, 1_000);
     lenient.placeBet({
-      userId: 'a', marketId: 'straight', amount: 100, available: 1_000,
+      userId: 'a', marketId: 'trips_straight_flush', amount: 100, available: 1_000,
       serverTime: 2_000, generateId: () => 'x',
     });
     lenient.placeBet({

@@ -31,10 +31,67 @@ export interface BettingWindow {
 export interface BettingMarket {
   id: string;
   name: string;
-  category: 'WINNER' | 'HAND_TYPE' | 'TIE';
-  selection: string;
+  category: 'WINNER' | 'HAND_TYPE' | 'TIE' | 'HOLE';
+  /**
+   * What this market pays on.
+   *
+   * WINNER/TIE: the winner it backs. HAND_TYPE: ONE OR MORE hand types, any of
+   * which wins it — the reference sells "Three of a kind / Straight / Flush" as
+   * a single bet, and so do we. HOLE: the name of a hole-card test below.
+   *
+   * A LIST, not a string, because that difference is the whole of the pricing.
+   * These markets were split one-per-hand-type while keeping the reference's
+   * COMBINED prices, which quietly made every one of them a different bet from
+   * the one the price was set for: 4.5x on three-of-a-kind alone is not 4.5x on
+   * three-of-a-kind-or-straight-or-flush.
+   */
+  selections: string[];
   multiplier: number;
   enabled: boolean;
+}
+
+/**
+ * The hole-card tests the reference's "Either hand type" band sells.
+ *
+ * These look at the two cards DEALT to each side, not at the five-card hand
+ * they end up making — which is why they cannot be expressed as hand types.
+ * Either side qualifying wins the market, hence "either".
+ */
+export type HoleTest = 'SUITED_OR_CONNECTED' | 'POCKET_PAIR' | 'POCKET_ACES';
+
+/** Rank order for connectedness. Ace is high AND low, so A2 and AK both connect. */
+const RANK_SEQUENCE = '23456789TJQKA';
+
+/** `As` → `A`, `Th` → `T`. */
+const rankOf = (card: string): string => card.slice(0, -1);
+const suitOf = (card: string): string => card.slice(-1);
+
+/**
+ * Does this pair of hole cards pass the test?
+ *
+ * Exported for the tests: these three predicates decide real payouts at 1.66x,
+ * 8.5x and 100x, and each is a one-line rule that is easy to get quietly wrong.
+ */
+export function holeQualifies(cards: readonly string[], test: HoleTest): boolean {
+  if (cards.length < 2) return false;
+  const [a, b] = cards as [string, string];
+  const ra = rankOf(a);
+  const rb = rankOf(b);
+
+  if (test === 'POCKET_PAIR') return ra === rb;
+  if (test === 'POCKET_ACES') return ra === 'A' && rb === 'A';
+
+  // SUITED_OR_CONNECTED — either is enough, as the reference's
+  // "Suited/Connects/Suited connects" says on its face.
+  if (suitOf(a) === suitOf(b)) return true;
+  const ia = RANK_SEQUENCE.indexOf(ra);
+  const ib = RANK_SEQUENCE.indexOf(rb);
+  if (ia < 0 || ib < 0) return false;
+  const gap = Math.abs(ia - ib);
+  // A-2 is a connector as well as A-K: the ace plays at both ends of the
+  // sequence, so the wheel counts. Without this, one of the two ways an ace
+  // connects silently never pays.
+  return gap === 1 || (ra === 'A' || rb === 'A' ? gap === RANK_SEQUENCE.length - 1 : false);
 }
 
 /**
@@ -45,21 +102,25 @@ export interface BettingMarket {
  * board while keeping every round funded by the people betting in it.
  */
 export const DEFAULT_MARKETS: BettingMarket[] = [
-  // WINNER
-  { id: 'cowboy_win', name: 'Cowboy Wins', category: 'WINNER', selection: 'COWBOY', multiplier: 2.02, enabled: true },
-  { id: 'cowgirl_win', name: 'Cowgirl Wins', category: 'WINNER', selection: 'COWGIRL', multiplier: 2.02, enabled: true },
-  { id: 'tie', name: 'Tie', category: 'TIE', selection: 'TIE', multiplier: 19.5, enabled: true },
-  // HAND TYPE
-  { id: 'high_card', name: 'High Card', category: 'HAND_TYPE', selection: 'HIGH_CARD', multiplier: 2.2, enabled: true },
-  { id: 'one_pair', name: 'One Pair', category: 'HAND_TYPE', selection: 'ONE_PAIR', multiplier: 2.2, enabled: true },
-  { id: 'two_pair', name: 'Two Pair', category: 'HAND_TYPE', selection: 'TWO_PAIR', multiplier: 3.1, enabled: true },
-  { id: 'three_of_a_kind', name: 'Three of a Kind', category: 'HAND_TYPE', selection: 'THREE_OF_A_KIND', multiplier: 4.5, enabled: true },
-  { id: 'straight', name: 'Straight', category: 'HAND_TYPE', selection: 'STRAIGHT', multiplier: 4.5, enabled: true },
-  { id: 'flush', name: 'Flush', category: 'HAND_TYPE', selection: 'FLUSH', multiplier: 6.0, enabled: true },
-  { id: 'full_house', name: 'Full House', category: 'HAND_TYPE', selection: 'FULL_HOUSE', multiplier: 20.0, enabled: true },
-  { id: 'four_of_a_kind', name: 'Four of a Kind', category: 'HAND_TYPE', selection: 'FOUR_OF_A_KIND', multiplier: 248.0, enabled: true },
-  { id: 'straight_flush', name: 'Straight Flush', category: 'HAND_TYPE', selection: 'STRAIGHT_FLUSH', multiplier: 248.0, enabled: true },
-  { id: 'royal_flush', name: 'Royal Flush', category: 'HAND_TYPE', selection: 'ROYAL_FLUSH', multiplier: 248.0, enabled: true },
+  // ── The duel ──────────────────────────────────────────────────────────────
+  { id: 'cowboy_win', name: 'Cowboy Win', category: 'WINNER', selections: ['COWBOY'], multiplier: 2.02, enabled: true },
+  { id: 'tie', name: 'Push', category: 'TIE', selections: ['TIE'], multiplier: 19.5, enabled: true },
+  { id: 'cowgirl_win', name: 'Cowgirl Win', category: 'WINNER', selections: ['COWGIRL'], multiplier: 2.02, enabled: true },
+
+  // ── Either hand type ──────────────────────────────────────────────────────
+  // On the DEALT cards, not the finished hand. Either side qualifying pays.
+  { id: 'suited_connects', name: 'Suited/Connects/Suited connects', category: 'HOLE', selections: ['SUITED_OR_CONNECTED'], multiplier: 1.66, enabled: true },
+  { id: 'pocket_pair', name: 'Pair', category: 'HOLE', selections: ['POCKET_PAIR'], multiplier: 8.5, enabled: true },
+  { id: 'pocket_aces', name: "Pair A's", category: 'HOLE', selections: ['POCKET_ACES'], multiplier: 100, enabled: true },
+
+  // ── Winning hand rank ─────────────────────────────────────────────────────
+  // COMBINED, as the reference sells them. Each price belongs to the whole
+  // group; pricing one member at the group's odds is a different bet.
+  { id: 'high_card_or_pair', name: 'High card/One pair', category: 'HAND_TYPE', selections: ['HIGH_CARD', 'ONE_PAIR'], multiplier: 2.2, enabled: true },
+  { id: 'two_pair', name: 'Two pairs', category: 'HAND_TYPE', selections: ['TWO_PAIR'], multiplier: 3.1, enabled: true },
+  { id: 'trips_straight_flush', name: 'Three of a kind/Straight/Flush', category: 'HAND_TYPE', selections: ['THREE_OF_A_KIND', 'STRAIGHT', 'FLUSH'], multiplier: 4.5, enabled: true },
+  { id: 'full_house', name: 'Full House', category: 'HAND_TYPE', selections: ['FULL_HOUSE'], multiplier: 20, enabled: true },
+  { id: 'quads_or_better', name: 'Four of a kind/Straight Flush/Royal Flush', category: 'HAND_TYPE', selections: ['FOUR_OF_A_KIND', 'STRAIGHT_FLUSH', 'ROYAL_FLUSH'], multiplier: 248, enabled: true },
 ];
 
 export interface UserBet {
@@ -236,7 +297,9 @@ export class TexasCowboyEngine {
       userId: params.userId,
       roundId: this.state.id,
       marketId: params.marketId,
-      selection: market.selection,
+      // What the bet was placed ON, recorded as it stood. A grouped market
+      // joins its selections so the slip reads the same as the board did.
+      selection: market.selections.join('/'),
       amount: params.amount,
       multiplier: market.multiplier,
       placedAt: serverTime,
@@ -392,9 +455,34 @@ export class TexasCowboyEngine {
   private betWins(bet: UserBet, result: NonNullable<TexasCowboyRound['result']>): boolean {
     const market = this.state.markets.find((m) => m.id === bet.marketId);
     if (!market) return false;
-    if (market.category === 'WINNER') return market.selection === result.winner;
+    if (market.category === 'WINNER') return market.selections.includes(result.winner);
     if (market.category === 'TIE') return result.winner === 'TIE';
-    return result.winner !== 'TIE' && market.selection === result.winningHandType;
+
+    /*
+     * HOLE markets read the cards that were DEALT, and either side qualifying
+     * pays — that is what the reference's "Either hand type" band means.
+     *
+     * They are settled independently of who won, and are NOT voided by a tie:
+     * whether a hand was dealt suited is a fact about the deal, and a tie does
+     * not un-deal it. The tie rule below applies to hand-type markets only,
+     * which is why this returns before reaching it.
+     */
+    if (market.category === 'HOLE') {
+      const test = market.selections[0] as HoleTest | undefined;
+      if (!test) return false;
+      return (
+        holeQualifies(this.state.cowboy.holeCards, test) ||
+        holeQualifies(this.state.cowgirl.holeCards, test)
+      );
+    }
+
+    // HAND_TYPE — ANY of the market's types wins it, because the reference
+    // sells them grouped and the price belongs to the group.
+    return (
+      result.winner !== 'TIE' &&
+      result.winningHandType !== null &&
+      market.selections.includes(result.winningHandType)
+    );
   }
 
   private betVoids(bet: UserBet, result: NonNullable<TexasCowboyRound['result']>): boolean {
