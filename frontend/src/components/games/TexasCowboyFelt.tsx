@@ -289,7 +289,22 @@ export function TexasCowboyFelt({
                       pool={poolOf(id)}
                       yours={yoursOn(id)}
                       onBet={() => bet(id)}
-                      disabled={!isBettingOpen || !you || market?.enabled === false}
+                      /*
+                       * A MARKET THE SERVER HAS NOT QUOTED IS NOT TAPPABLE.
+                       *
+                       * This read `market?.enabled === false`, which is FALSE
+                       * when the market is undefined — so a cell showing "—"
+                       * because the server never sent it was still live, and
+                       * tapping it sent a bet on a market that does not exist.
+                       *
+                       * That state is reachable in normal operation: renaming a
+                       * market id makes the client and server disagree until
+                       * both have deployed, and during that window every
+                       * renamed cell is unknown. The safe behaviour is a dead
+                       * cell showing no price, not a live one betting into the
+                       * dark.
+                       */
+                      disabled={!isBettingOpen || !you || !market || market.enabled === false}
                       won={wonMarket === id}
                       poolLabel={t('cowboy.poolShort')}
                       yoursLabel={t('cowboy.yoursShort')}
