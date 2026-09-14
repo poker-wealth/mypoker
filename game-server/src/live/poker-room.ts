@@ -1226,6 +1226,9 @@ export class PokerRoom implements LiveRoom {
       {
         smallBlind: this.config.smallBlind,
         bigBlind: this.config.bigBlind,
+        // Which of the three Hold'em games this table is. The engine cannot
+        // tell from its variant alone, and VIP volume is counted per game id.
+        gameId: this.config.game,
         // A league table settles its rake to the league's Inventory, not the platform Treasury. The
         // FC decides the destination from (tableType, leagueId); the room must pass what it actually
         // is, not a hardcoded PLATFORM — that was the gap that kept league tables off the floor.

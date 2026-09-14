@@ -151,6 +151,7 @@ export class BaccaratGame extends BaseGame<BaccaratPhase, BaccaratAction, Baccar
     const settlement = settleNet(this.net, { rakeBps: this.cfg.rakeBps });
     const request = toTableSettlementRequest(settlement, {
       roundId: this.roundId,
+      gameId: 'baccarat',
       tableType: this.cfg.tableType,
       ...(this.cfg.leagueId ? { leagueId: this.cfg.leagueId } : {}),
       accountOf: this.cfg.accountOf,

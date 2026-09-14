@@ -144,6 +144,7 @@ export class LotteryGame extends BaseGame<LotteryPhase, LotteryAction, LotteryGa
       const settlement = settleNet(this.net, { rakeBps: this.cfg.rakeBps });
       const request = toTableSettlementRequest(settlement, {
         roundId: this.roundId,
+        gameId: 'lottery',
         tableType: this.cfg.tableType,
         ...(this.cfg.leagueId ? { leagueId: this.cfg.leagueId } : {}),
         accountOf: this.cfg.accountOf,

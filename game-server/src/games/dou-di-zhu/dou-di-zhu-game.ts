@@ -263,6 +263,7 @@ export class DouDiZhuGame extends BaseGame<DdzPhase, DdzAction, DdzGameEvents> {
     const settlement = settleNet(this.net, { rakeBps: this.cfg.rakeBps });
     const request = toTableSettlementRequest(settlement, {
       roundId: this.roundId,
+      gameId: 'dou-di-zhu',
       tableType: this.cfg.tableType,
       ...(this.cfg.leagueId ? { leagueId: this.cfg.leagueId } : {}),
       accountOf: this.cfg.accountOf,

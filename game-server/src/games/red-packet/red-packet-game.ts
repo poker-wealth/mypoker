@@ -116,6 +116,7 @@ export class RedPacketGame extends BaseGame<RedPacketPhase, RedPacketAction, Red
     const settlement = settleNet(this.net, { rakeBps: this.cfg.rakeBps });
     const request = toTableSettlementRequest(settlement, {
       roundId: this.roundId,
+      gameId: 'red-packet',
       tableType: this.cfg.tableType,
       ...(this.cfg.leagueId ? { leagueId: this.cfg.leagueId } : {}),
       accountOf: this.cfg.accountOf,

@@ -221,6 +221,7 @@ export class RedEnvelopeGame extends BaseGame<
 
     const settlement = settleNet(this.net, { rakeBps: this.cfg.rakeBps });
     const request = toTableSettlementRequest(settlement, {
+      gameId: 'red-packet',
       roundId: this.roundId,
       tableType: this.cfg.tableType,
       ...(this.cfg.leagueId ? { leagueId: this.cfg.leagueId } : {}),

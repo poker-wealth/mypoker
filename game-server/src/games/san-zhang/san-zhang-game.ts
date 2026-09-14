@@ -134,6 +134,7 @@ export class SanZhangGame extends BaseGame<SanZhangPhase, SanZhangAction, SanZha
     const settlement = settleNet(this.net, { rakeBps: this.cfg.rakeBps });
     const request = toTableSettlementRequest(settlement, {
       roundId: this.roundId,
+      gameId: 'san-zhang',
       tableType: this.cfg.tableType,
       ...(this.cfg.leagueId ? { leagueId: this.cfg.leagueId } : {}),
       accountOf: this.cfg.accountOf,

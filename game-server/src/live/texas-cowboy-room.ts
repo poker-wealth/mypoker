@@ -207,6 +207,7 @@ export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSea
       const settlement = settleNet(netByUser, { rakeBps: rakeOf(this.config) });
       const request = toTableSettlementRequest(settlement, {
         roundId: `${this.config.id}-tc-${this.handNumber}`,
+        gameId: 'texas-cowboy',
         tableType: 'PLATFORM',
         accountOf: (playerId) => playerId,
         jackpotAccounts: tableJackpotAccounts(this.config.id),

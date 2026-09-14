@@ -160,6 +160,7 @@ export class CowboyBeautyGame extends BaseGame<CowboyPhase, CowboyAction, Cowboy
       const settlement = settleNet(this.net, { rakeBps: this.cfg.rakeBps });
       const request = toTableSettlementRequest(settlement, {
         roundId: this.roundId,
+        gameId: 'cowboy-beauty',
         tableType: this.cfg.tableType,
         ...(this.cfg.leagueId ? { leagueId: this.cfg.leagueId } : {}),
         accountOf: this.cfg.accountOf,

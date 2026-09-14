@@ -172,6 +172,14 @@ export function settleNet(
 export interface TableSettlementContext {
   roundId: string;
   tableType: 'PLATFORM' | 'LEAGUE';
+  /**
+   * Which game this hand was — `texas`, `niu-niu`, and so on.
+   *
+   * Drives VIP volume recording, which is skipped entirely when it is absent.
+   * It was absent everywhere until 14 Sep 2026, so no volume had ever been
+   * recorded; see the note in `toTableSettlementRequest`.
+   */
+  gameId?: string;
   leagueId?: string;
   /** Map a table player id to their Financial Core account id. */
   accountOf: (playerId: string) => string;
@@ -189,6 +197,29 @@ export function toTableSettlementRequest(
   return {
     roundId: ctx.roundId,
     tableType: ctx.tableType,
+    /*
+     * THE GAME THE HAND WAS PLAYED AT.
+     *
+     * `TableSettlementRequest.gameId` has always been optional and NOTHING EVER
+     * SET IT, so the guard in the FC client —
+     *
+     *   if (req.gameId !== undefined) await this.recordHandVolume(...)
+     *
+     * — was false on every hand ever settled, by every game. VIP volume was
+     * therefore never recorded for anybody, which is why the Data page's Play
+     * Distribution donut read "No rounds played yet" over a player with 61
+     * hands. Two cards disagreeing about the same player, because one of them
+     * was fed by a call that never happened.
+     *
+     * It is threaded through here rather than set in each room: every game
+     * builds its request with this function, so doing it once fixes the count
+     * for all of them and leaves no game to be forgotten later.
+     *
+     * Still OPTIONAL. A caller that genuinely has no game id (a test, a
+     * one-off) omits it and simply records no volume, exactly as before —
+     * this widens what works, it does not add a way to fail.
+     */
+    ...(ctx.gameId ? { gameId: ctx.gameId } : {}),
     ...(ctx.leagueId ? { leagueId: ctx.leagueId } : {}),
     losers: s.losers.map((l) => ({ playerAccountId: ctx.accountOf(l.playerId), amount: amt(l.amount) })),
     winners: s.winners.map((w) => ({ playerAccountId: ctx.accountOf(w.playerId), amount: amt(w.amount) })),

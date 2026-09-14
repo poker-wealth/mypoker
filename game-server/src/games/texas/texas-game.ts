@@ -39,6 +39,14 @@ export interface TexasGameConfig {
   bigBlind: number;
   tableType: 'PLATFORM' | 'LEAGUE';
   leagueId?: string;
+  /**
+   * Which catalogue game this table is — `texas`, `short-deck` or `omaha`.
+   *
+   * NOT derivable from `variant`: all three share this engine, and VIP volume
+   * is counted per catalogue id. Threaded from the room, which is the only
+   * place that knows which of the three a table was created as.
+   */
+  gameId?: string;
   rake: RakeConfig;
   jackpotAccounts: JackpotAccounts;
   /** Map a table seat id to its Financial Core account id. */
@@ -197,6 +205,9 @@ export class TexasGame extends BaseGame<TexasPhase, Action, TexasGameEvents> {
     });
     const request = toTableSettlementRequest(settlement, {
       roundId: round.roundId,
+      // Counts the hand toward VIP volume. Without it the FC client's
+      // `if (req.gameId !== undefined)` guard is false and nothing is recorded.
+      ...(this.cfg.gameId ? { gameId: this.cfg.gameId } : {}),
       tableType: this.cfg.tableType,
       ...(this.cfg.leagueId ? { leagueId: this.cfg.leagueId } : {}),
       accountOf: this.cfg.accountOf,
