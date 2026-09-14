@@ -728,9 +728,21 @@ function TrendChart({ rounds }: { rounds: HistoryEntry[] }) {
               data: values,
               borderColor: lineGradient,
               borderWidth: 2,
-              // Monotone keeps the curve smooth without overshooting past the
-              // real cumulative values at the turns.
-              cubicInterpolationMode: 'monotone',
+              /*
+               * STRAIGHT SEGMENTS, not a curve.
+               *
+               * This was `cubicInterpolationMode: 'monotone'`, chosen because
+               * it smooths without overshooting the real values at the turns.
+               * It still draws a shape between them that nobody played: on an
+               * account whose rounds alternate +0.01 and −0.01, the smoothing
+               * rendered six rolling hills, which reads as a volatile session
+               * rather than the flat nothing it was.
+               *
+               * A cumulative profit line only has meaning AT its points — one
+               * per settled round. Joining them straight says "it went from
+               * here to there"; curving them invents a path.
+               */
+              tension: 0,
               fill: 'origin',
               backgroundColor: fillGradient,
               pointRadius: values.map((_, i) => (i === lastIndex ? 4 : 0)),
@@ -763,6 +775,22 @@ function TrendChart({ rounds }: { rounds: HistoryEntry[] }) {
                 color: (ctx) => (ctx.tick.value === 0 ? 'rgba(148, 148, 180, 0.45)' : 'rgba(148, 148, 180, 0.1)'),
               },
               border: { display: false },
+              /*
+               * A FLOOR UNDER THE SCALE, so noise does not render like a result.
+               *
+               * The axis auto-fits the data, which is right until the data is
+               * trivially small: an account whose profit swung by one hundredth
+               * of a chip got that hundredth stretched across the full height of
+               * the card, identical in shape to a real winning session.
+               *
+               * ±1 is the smallest range worth drawing — below a whole chip
+               * there is nothing to see, and a nearly-flat line across a
+               * sensible scale is the honest picture of breaking even. Anything
+               * larger still auto-fits exactly as before; this only stops the
+               * chart zooming into the dust.
+               */
+              suggestedMin: -1,
+              suggestedMax: 1,
               ticks: {
                 ...tick,
                 maxTicksLimit: 5,
