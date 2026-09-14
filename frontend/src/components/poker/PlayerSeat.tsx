@@ -1,4 +1,5 @@
-import { motion } from 'motion/react';
+import { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { PlayingCard } from './PlayingCard';
 import type { Seat } from '@/lib/table';
@@ -63,6 +64,35 @@ export function PlayerSeat({
   dealOrder = 0,
 }: PlayerSeatProps) {
   const { t } = useTranslation();
+
+  /**
+   * THE ACTION BUBBLE FADES. It used to stay for as long as the server kept
+   * `lastAction` set — the whole street — so once three players had acted the
+   * felt carried three bubbles at once, each sitting on somebody's name, stack
+   * or chips. "this all look jampacked … arange it well and time it well."
+   *
+   * It is an ANNOUNCEMENT, not a status: it catches the eye at the moment the
+   * action changes, and what someone did stays readable from their chips
+   * afterwards. Two and a half seconds is long enough to read across the table
+   * and short enough that two seats rarely overlap in time.
+   *
+   * DECLARED ABOVE THE EMPTY-SEAT RETURN, because a hook cannot sit behind one,
+   * and keyed on the RAW action rather than the translated label so it does not
+   * depend on anything computed further down.
+   */
+  const action = seat.lastAction;
+  const actionKey =
+    typeof action === 'object' && action !== null
+      ? `${action.kind}:${action.amount ?? ''}`
+      : String(action ?? '');
+  const [actionVisible, setActionVisible] = useState(true);
+  useEffect(() => {
+    if (!actionKey) return;
+    setActionVisible(true);
+    const timer = setTimeout(() => setActionVisible(false), 2_500);
+    return () => clearTimeout(timer);
+  }, [actionKey]);
+
   if (seat.status === 'empty') {
     // An empty chair only invites you to sit when sitting is actually on offer. Once you are
     // seated (or watching a table you cannot join) `onSit` is absent, and a ring of "+ SIT HERE"
@@ -305,21 +335,42 @@ export function PlayerSeat({
         It pops in slightly oversized and settles, which catches the eye at the
         moment the action changes without animating on every render.
       */}
-      {actionLabel && !folded && (
-        <motion.div
-          key={actionLabel}
-          initial={{ opacity: 0, y: 4, scale: 1.25 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ type: 'spring', damping: 18, stiffness: 420 }}
-          className={cn(
-            'absolute z-30 whitespace-nowrap rounded-full border px-2.5 py-1 text-[0.68rem] font-black tracking-wide shadow-lg backdrop-blur-sm',
-            actionTone(seat.lastAction),
-            isTop ? 'bottom-[-20px]' : 'top-[-18px]',
-          )}
-        >
-          {actionLabel}
-        </motion.div>
-      )}
+      <AnimatePresence>
+        {actionLabel && !folded && actionVisible && (
+          <motion.div
+            key={actionLabel}
+            initial={{ opacity: 0, y: 4, scale: 1.25 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.25 } }}
+            transition={{ type: 'spring', damping: 18, stiffness: 420 }}
+            className={cn(
+              'pointer-events-none absolute z-30 whitespace-nowrap rounded-full border px-2.5 py-1 text-[0.68rem] font-black tracking-wide shadow-lg backdrop-blur-sm',
+              actionTone(seat.lastAction),
+              /*
+               * IT GOES WHERE THE CHIPS DO NOT.
+               *
+               * The bubble was pinned directly above or below the avatar, which
+               * is where the NAME PILL sits — so every announcement landed on
+               * somebody's name and stack — and for a bottom seat that is also
+               * where the chip stack is pushed. Three things, one spot.
+               *
+               * Chips travel INWARD, toward the pot. The bubble now travels
+               * OUTWARD, away from it, on the opposite side of the seat. The
+               * two can never meet, and neither lands on the name.
+               *
+               * Left and right seats are the exception: outward there is the
+               * edge of the felt, where a bubble would be clipped, so theirs
+               * goes above — which on a side seat is empty.
+               */
+              align === 'top' && 'top-[-20px]',
+              align === 'bottom' && 'bottom-[-20px]',
+              (align === 'left' || align === 'right') && 'top-[-20px]',
+            )}
+          >
+            {actionLabel}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Chips pushed toward the middle of the table */}
       {seat.bet > 0 && (
