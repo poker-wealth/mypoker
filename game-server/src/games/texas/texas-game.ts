@@ -219,6 +219,21 @@ export class TexasGame extends BaseGame<TexasPhase, Action, TexasGameEvents> {
   }
 
   /** The most recently settled hand's result (community, showdown, payouts) — undefined before any. */
+  /**
+   * The hand just played, for the history recorder.
+   *
+   * Exposed deliberately narrowly — the recorder needs the action log, the
+   * hole cards and the board, and nothing else here should be reaching into a
+   * live hand. Undefined between hands.
+   *
+   * This does NOT widen what a CLIENT can see: `getPublicState` still hands a
+   * player only their own cards. This is a server-side accessor on the server's
+   * own object, used after the hand is over.
+   */
+  playedHand(): TexasHand | undefined {
+    return this.hand;
+  }
+
   settledResult(): HandResult | undefined {
     return this.lastResult;
   }
