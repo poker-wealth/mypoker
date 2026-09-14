@@ -789,7 +789,43 @@ function PlayDistribution() {
 
   const games = vip.data?.breakdown ?? [];
   const totalRounds = games.reduce((sum, g) => sum + g.rounds, 0);
-  if (totalRounds === 0) return null;
+
+  /*
+   * AN EMPTY DONUT STILL DRAWS ITS CARD.
+   *
+   * This used to `return null` when nobody had played, which took the whole
+   * card off the page — so the row of four became a row of three and the pie
+   * chart the reference shows was simply missing, with nothing saying why.
+   * Reported as "there is a pie chart circle in the picture too".
+   *
+   * The ring is drawn hollow, with the reason in the middle. Nothing is
+   * invented to fill it: an empty ring is the honest picture of no rounds
+   * played, where a full one would be a claim about how someone spends their
+   * time.
+   */
+  if (totalRounds === 0) {
+    return (
+      <section className="rounded-(--radius-app) border border-border bg-surface p-4">
+        <h2 className="mb-3 text-[0.75rem] font-bold tracking-wider text-dim uppercase">
+          {t('data.playDistribution')}
+        </h2>
+        <div className="flex items-center gap-4">
+          <svg viewBox="0 0 100 100" className="size-[90px] shrink-0" aria-hidden="true">
+            <circle
+              cx="50"
+              cy="50"
+              r="40"
+              fill="transparent"
+              stroke="currentColor"
+              strokeWidth="16"
+              className="text-surface-2"
+            />
+          </svg>
+          <p className="text-[0.66rem] leading-snug text-dim">{t('data.noRoundsYet')}</p>
+        </div>
+      </section>
+    );
+  }
 
   // Distinct hues rather than the brand ramp: adjacent segments have to be told
   // apart at 90px, which a single-hue gradient does not manage.
@@ -828,6 +864,19 @@ function PlayDistribution() {
               />
             ))}
           </svg>
+
+          {/* The share of the biggest slice, in the middle of the ring — where
+              the reference puts its "22.6% vs Total". Read off the same
+              segments the ring is drawn from, so the label and the picture
+              cannot disagree. */}
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-[0.8rem] leading-none font-black text-text tabular-nums">
+              {Math.round(Math.max(...segments.map((s) => s.share)) * 100)}%
+            </span>
+            <span className="mt-0.5 text-[0.5rem] leading-none text-dim">
+              {t('data.vsTotal')}
+            </span>
+          </div>
         </div>
         <ul className="flex flex-1 flex-col justify-center gap-2">
           {segments.map((s) => (

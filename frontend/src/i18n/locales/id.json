@@ -218,7 +218,9 @@
     "fairnessBlurb": "Setiap ronde terikat server seed dan dapat diverifikasi",
     "verifyHands": "Verifikasi",
     "tabTables": "Meja",
-    "tabAnalysis": "Analisis"
+    "tabAnalysis": "Analisis",
+    "noRoundsYet": "Belum ada ronde dimainkan",
+    "vsTotal": "dari total"
   },
   "account": {
     "guest": "Tamu",

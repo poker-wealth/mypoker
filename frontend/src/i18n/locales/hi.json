@@ -218,7 +218,9 @@
     "fairnessBlurb": "हर राउंड सर्वर सीड से प्रतिबद्ध और सत्यापन योग्य है",
     "verifyHands": "सत्यापित करें",
     "tabTables": "टेबल",
-    "tabAnalysis": "विश्लेषण"
+    "tabAnalysis": "विश्लेषण",
+    "noRoundsYet": "अभी कोई राउंड नहीं खेला",
+    "vsTotal": "कुल में से"
   },
   "account": {
     "guest": "अतिथि",

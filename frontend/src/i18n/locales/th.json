@@ -218,7 +218,9 @@
     "fairnessBlurb": "ทุกรอบผูกกับ server seed และตรวจสอบได้",
     "verifyHands": "ตรวจสอบ",
     "tabTables": "โต๊ะ",
-    "tabAnalysis": "วิเคราะห์"
+    "tabAnalysis": "วิเคราะห์",
+    "noRoundsYet": "ยังไม่มีรอบที่เล่น",
+    "vsTotal": "จากทั้งหมด"
   },
   "account": {
     "guest": "ผู้เยี่ยมชม",

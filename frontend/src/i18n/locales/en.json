@@ -218,7 +218,9 @@
     "fairnessBlurb": "Every round is committed to a server seed and verifiable on-chain",
     "verifyHands": "Verify",
     "tabTables": "Tables",
-    "tabAnalysis": "Analysis"
+    "tabAnalysis": "Analysis",
+    "noRoundsYet": "No rounds played yet",
+    "vsTotal": "vs Total"
   },
   "account": {
     "guest": "Guest Player",

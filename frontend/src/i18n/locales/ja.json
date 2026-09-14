@@ -218,7 +218,9 @@
     "fairnessBlurb": "全ラウンドがサーバーシードにコミットされ検証可能です",
     "verifyHands": "検証",
     "tabTables": "テーブル",
-    "tabAnalysis": "分析"
+    "tabAnalysis": "分析",
+    "noRoundsYet": "まだプレイ記録がありません",
+    "vsTotal": "全体比"
   },
   "account": {
     "guest": "ゲスト",

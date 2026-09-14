@@ -218,7 +218,9 @@
     "fairnessBlurb": "每一局都基于服务器种子承诺，可上链验证",
     "verifyHands": "验证",
     "tabTables": "牌桌",
-    "tabAnalysis": "分析"
+    "tabAnalysis": "分析",
+    "noRoundsYet": "尚未进行任何牌局",
+    "vsTotal": "占总数"
   },
   "account": {
     "guest": "游客",

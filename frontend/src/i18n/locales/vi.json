@@ -218,7 +218,9 @@
     "fairnessBlurb": "Mỗi ván đều cam kết theo server seed và kiểm chứng được",
     "verifyHands": "Kiểm chứng",
     "tabTables": "Bàn",
-    "tabAnalysis": "Phân tích"
+    "tabAnalysis": "Phân tích",
+    "noRoundsYet": "Chưa chơi ván nào",
+    "vsTotal": "so với tổng"
   },
   "account": {
     "guest": "Khách",

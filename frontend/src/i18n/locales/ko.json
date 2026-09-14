@@ -218,7 +218,9 @@
     "fairnessBlurb": "모든 라운드가 서버 시드에 커밋되어 검증 가능합니다",
     "verifyHands": "검증",
     "tabTables": "테이블",
-    "tabAnalysis": "분석"
+    "tabAnalysis": "분석",
+    "noRoundsYet": "아직 플레이한 라운드가 없습니다",
+    "vsTotal": "전체 대비"
   },
   "account": {
     "guest": "게스트",
