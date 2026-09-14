@@ -220,7 +220,8 @@
     "tabTables": "牌桌",
     "tabAnalysis": "分析",
     "noRoundsYet": "尚未进行任何牌局",
-    "vsTotal": "占总数"
+    "vsTotal": "占总数",
+    "tryAll": "查看全部时间"
   },
   "account": {
     "guest": "游客",

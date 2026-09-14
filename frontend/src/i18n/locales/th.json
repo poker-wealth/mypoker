@@ -220,7 +220,8 @@
     "tabTables": "โต๊ะ",
     "tabAnalysis": "วิเคราะห์",
     "noRoundsYet": "ยังไม่มีรอบที่เล่น",
-    "vsTotal": "จากทั้งหมด"
+    "vsTotal": "จากทั้งหมด",
+    "tryAll": "ดูทั้งหมด"
   },
   "account": {
     "guest": "ผู้เยี่ยมชม",

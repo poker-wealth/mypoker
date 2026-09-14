@@ -220,7 +220,8 @@
     "tabTables": "테이블",
     "tabAnalysis": "분석",
     "noRoundsYet": "아직 플레이한 라운드가 없습니다",
-    "vsTotal": "전체 대비"
+    "vsTotal": "전체 대비",
+    "tryAll": "전체 기간 보기"
   },
   "account": {
     "guest": "게스트",

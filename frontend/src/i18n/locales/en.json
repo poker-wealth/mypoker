@@ -220,7 +220,8 @@
     "tabTables": "Tables",
     "tabAnalysis": "Analysis",
     "noRoundsYet": "No rounds played yet",
-    "vsTotal": "vs Total"
+    "vsTotal": "vs Total",
+    "tryAll": "See all time"
   },
   "account": {
     "guest": "Guest Player",

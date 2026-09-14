@@ -220,7 +220,8 @@
     "tabTables": "टेबल",
     "tabAnalysis": "विश्लेषण",
     "noRoundsYet": "अभी कोई राउंड नहीं खेला",
-    "vsTotal": "कुल में से"
+    "vsTotal": "कुल में से",
+    "tryAll": "सभी समय देखें"
   },
   "account": {
     "guest": "अतिथि",

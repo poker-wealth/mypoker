@@ -220,7 +220,8 @@
     "tabTables": "テーブル",
     "tabAnalysis": "分析",
     "noRoundsYet": "まだプレイ記録がありません",
-    "vsTotal": "全体比"
+    "vsTotal": "全体比",
+    "tryAll": "全期間を見る"
   },
   "account": {
     "guest": "ゲスト",

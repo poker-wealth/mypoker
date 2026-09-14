@@ -223,7 +223,27 @@ export function Data() {
             ) : rounds.length > 1 ? (
               <TrendChart rounds={rounds} />
             ) : (
-              <p className="py-6 text-center text-[0.7rem] text-dim">{t('data.noRounds')}</p>
+              /* An empty window says WHICH window it is empty for.
+                 "No rounds in this period" under a Today filter reads as "you
+                 have never played" — it cost a real "are u sure its functional"
+                 from someone with 61 hands sitting one tap away under All.
+                 Only shown while a narrower filter is on; under All there is
+                 nothing wider to suggest. */
+              <p className="py-6 text-center text-[0.7rem] text-dim">
+                {t('data.noRounds')}
+                {period !== 'all' && day === '' && (
+                  <>
+                    {' '}
+                    <button
+                      type="button"
+                      onClick={() => setPeriod('all')}
+                      className="font-semibold text-brand underline underline-offset-2"
+                    >
+                      {t('data.tryAll')}
+                    </button>
+                  </>
+                )}
+              </p>
             )}
           </div>
         </section>
