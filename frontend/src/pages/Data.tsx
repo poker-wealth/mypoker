@@ -2,6 +2,13 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BarChart3 } from 'lucide-react';
 import { Segmented } from '@/components/ui/Segmented';
+import {
+  FairnessBar,
+  HandTypesCard,
+  KeyStats,
+  PositionCard,
+  StatsRadar,
+} from './data/AnalysisCards';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -51,7 +58,7 @@ const PERIODS: { value: StatsPeriod; key: string }[] = [
 export function Data() {
   const { t } = useTranslation();
   const [period, setPeriod] = useState<StatsPeriod>('today');
-  const [tab, setTab] = useState<'overview' | 'hands'>('overview');
+  const [tab, setTab] = useState<'overview' | 'hands' | 'tables' | 'analysis'>('overview');
   /**
    * One specific day, or '' for the rolling period.
    *
@@ -123,27 +130,48 @@ export function Data() {
       )}
 
       {/*
-        TWO TABS, not the reference's four.
+        THE REFERENCE'S FOUR TABS: Overview / Hands / Tables / Analysis.
 
-        The reference has Overview / Hands / Tables / Analysis. Only the first
-        two have anything to show. "Tables" would list the tables a player has
-        sat at, which is not recorded — the ledger stores a round's net movement
-        and no table identity. "Analysis" is the radar and its six stats, which
-        need preflop action data that is not recorded either.
-
-        Drawing four tabs where two open an empty screen is the same mistake as
-        a greyed control with no reason: it reads as a feature that exists and
-        is merely quiet. Two honest tabs beat four with nothing behind them, and
-        the other two arrive on their own when hand histories do.
+        This carried two for a while, on the reasoning that four tabs where two
+        open an empty screen reads as a feature that exists and is merely quiet.
+        The owner has since asked for the reference exactly, twice, so all four
+        are here — and the two that have no data behind them SAY what they are
+        waiting for instead of opening a blank screen. That is the version of
+        "exactly this" that does not lie: the navigation is the reference's, and
+        no figure is invented to fill it.
       */}
       <Segmented
         options={[
           { value: 'overview' as const, label: t('data.tabOverview') },
           { value: 'hands' as const, label: t('data.tabHands') },
+          { value: 'tables' as const, label: t('data.tabTables') },
+          { value: 'analysis' as const, label: t('data.tabAnalysis') },
         ]}
         value={tab}
         onChange={setTab}
       />
+
+      {/* TABLES — the tables this player has sat at. Not recorded: settlement
+          writes a round's net movement and carries no table identity, so there
+          is nothing to list. It arrives with hand recording. */}
+      {tab === 'tables' && (
+        <div className="rounded-(--radius-app) border border-border bg-surface px-4 py-10 text-center">
+          <p className="text-[0.75rem] font-bold">{t('data.tabTables')}</p>
+          <p className="mt-1 text-[0.68rem] text-dim">{t('data.needsHands')}</p>
+        </div>
+      )}
+
+      {/* ANALYSIS — the same radar and key stats the Overview carries, which is
+          where the reference puts them too. Shown here rather than duplicated:
+          one set of cards, reachable from both places. */}
+      {tab === 'analysis' && (
+        <div className="grid gap-2.5 sm:grid-cols-2">
+          <StatsRadar />
+          <KeyStats />
+          <PositionCard />
+          <HandTypesCard />
+        </div>
+      )}
 
       {tab === 'overview' && (
         <>
@@ -261,50 +289,51 @@ export function Data() {
                 />
               }
             />
-            <Tile
-              label={t('data.netProfit')}
-              value={moneyFromDecimal(stats.data.netProfit, { sign: true })}
-              tone={Number(stats.data.netProfit) >= 0 ? 'success' : 'danger'}
-              delta={
-                <Delta
-                  current={Number(stats.data.netProfit)}
-                  previous={Number(prevStats.data?.netProfit ?? 0)}
-                  hadPrior={prevWindow !== null && prevStats.isSuccess}
-                />
-              }
-            />
-            {/* VPIP and PFR are not here on purpose. They need preflop ACTION
-                data — did the player voluntarily put money in, did they raise —
-                and the ledger records only a round's net movement. The mockup
-                shows 23.1% and 38.7%; those are design-document numbers, and
-                printing them next to real figures makes all six look real. */}
-            <Tile
-              label={t('account.statBiggestWin')}
-              value={moneyFromDecimal(stats.data.biggestWin)}
-              tone="accent"
-              delta={
-                <Delta
-                  current={Number(stats.data.biggestWin)}
-                  previous={Number(prevStats.data?.biggestWin ?? 0)}
-                  hadPrior={prevWindow !== null && prevStats.isSuccess}
-                />
-              }
-            />
+            {/*
+              VPIP AND PFR hold the reference's third and fourth slots, and they
+              are EMPTY.
+
+              They need preflop ACTION — did this player voluntarily put money
+              in, did they raise — and the ledger records only a round's net
+              movement. The reference shows 24.6% and 19.3%; those are
+              design-document numbers, and printing them beside two real figures
+              would make the real ones unbelievable too.
+
+              Net profit is not a tile any more because it is the headline
+              above, and biggest win moved into Key Stats, where it is still a
+              real figure on a card of mostly-pending ones.
+            */}
+            <Tile label={t('data.vpip')} value="—" />
+            <Tile label={t('data.pfr')} value="—" />
           </div>
         )}
       </section>
 
-      {/* Time of day — real, and computed the same way the trend is: from the
-          rounds actually loaded, so it can never disagree with the list below.
-          Each round carries its own timestamp, which is the whole of what this
-          needs. Nothing here is estimated. */}
-      <TimeOfDay rounds={rounds} />
+      {/*
+        THE ANALYSIS HALF, in the reference's order and at its sizes: the radar
+        beside Key Stats, then Position / Hand Types / Time of Day / Game Type
+        across, then the fairness bar.
 
-      {/* Play distribution — real, from the VIP volume tracker, which records
-          per-game rounds at settlement. The mockup's fixed 65/20/10/5 split is
-          replaced rather than kept: a pie chart of invented percentages is a
-          claim about how this player spends their time. */}
-      <PlayDistribution />
+        Two of those four are REAL — Time of Day is computed from the rounds
+        actually loaded (so it can never disagree with the list below it), and
+        Game Type comes from the VIP volume tracker, which records per-game
+        rounds at settlement. The other two, and the radar, and Key Stats, are
+        waiting on hand recording; they say so rather than showing the
+        reference's design-document numbers. See AnalysisCards.tsx.
+      */}
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        <StatsRadar />
+        <KeyStats />
+      </div>
+
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        <PositionCard />
+        <HandTypesCard />
+        <TimeOfDay rounds={rounds} />
+        <PlayDistribution />
+      </div>
+
+      <FairnessBar />
 
         </>
       )}
@@ -760,7 +789,43 @@ function PlayDistribution() {
 
   const games = vip.data?.breakdown ?? [];
   const totalRounds = games.reduce((sum, g) => sum + g.rounds, 0);
-  if (totalRounds === 0) return null;
+
+  /*
+   * AN EMPTY DONUT STILL DRAWS ITS CARD.
+   *
+   * This used to `return null` when nobody had played, which took the whole
+   * card off the page — so the row of four became a row of three and the pie
+   * chart the reference shows was simply missing, with nothing saying why.
+   * Reported as "there is a pie chart circle in the picture too".
+   *
+   * The ring is drawn hollow, with the reason in the middle. Nothing is
+   * invented to fill it: an empty ring is the honest picture of no rounds
+   * played, where a full one would be a claim about how someone spends their
+   * time.
+   */
+  if (totalRounds === 0) {
+    return (
+      <section className="rounded-(--radius-app) border border-border bg-surface p-4">
+        <h2 className="mb-3 text-[0.75rem] font-bold tracking-wider text-dim uppercase">
+          {t('data.playDistribution')}
+        </h2>
+        <div className="flex items-center gap-4">
+          <svg viewBox="0 0 100 100" className="size-[90px] shrink-0" aria-hidden="true">
+            <circle
+              cx="50"
+              cy="50"
+              r="40"
+              fill="transparent"
+              stroke="currentColor"
+              strokeWidth="16"
+              className="text-surface-2"
+            />
+          </svg>
+          <p className="text-[0.66rem] leading-snug text-dim">{t('data.noRoundsYet')}</p>
+        </div>
+      </section>
+    );
+  }
 
   // Distinct hues rather than the brand ramp: adjacent segments have to be told
   // apart at 90px, which a single-hue gradient does not manage.
@@ -799,6 +864,19 @@ function PlayDistribution() {
               />
             ))}
           </svg>
+
+          {/* The share of the biggest slice, in the middle of the ring — where
+              the reference puts its "22.6% vs Total". Read off the same
+              segments the ring is drawn from, so the label and the picture
+              cannot disagree. */}
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-[0.8rem] leading-none font-black text-text tabular-nums">
+              {Math.round(Math.max(...segments.map((s) => s.share)) * 100)}%
+            </span>
+            <span className="mt-0.5 text-[0.5rem] leading-none text-dim">
+              {t('data.vsTotal')}
+            </span>
+          </div>
         </div>
         <ul className="flex flex-1 flex-col justify-center gap-2">
           {segments.map((s) => (

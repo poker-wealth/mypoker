@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { ImageBackground, Pressable, ScrollView, StyleSheet, Text, View, Dimensions } from 'react-native';
+import { ImageBackground, Pressable, ScrollView, StyleSheet, Text, TextInput, View, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -14,6 +14,7 @@ import { Screen, Skeleton } from '../ui';
 import { GAMES } from '../games';
 import { useContextStore } from '../store/context';
 import { ContextBanner } from '../components/ContextBanner';
+import { parseInviteInput } from '../lib/parseInvite';
 
 /**
  * The promo banners, in order. `require` is deliberate — Metro resolves these
@@ -298,6 +299,15 @@ export function LobbyScreen() {
             </Pressable>
           </View>
 
+        {/* PASTE AN INVITE — the same box as the Mini App's lobby.
+            A deep link only opens the app if the bot has a Mini App registered
+            in BotFather, and this one had none: every shared invite answered
+            'Bot application not found', then BOT_INVALID. That switch is the
+            bot owner's, not code's, so a player holding a dead link still has
+            a way in. It stays useful afterwards — it is also how a link pasted
+            from outside Telegram gets used. */}
+        <InviteBox />
+
         {/* My Games Section */}
         <View style={styles.myGamesHeader}>
           <Text style={styles.myGamesTitle}>My Games</Text>
@@ -367,6 +377,67 @@ export function LobbyScreen() {
   );
 }
 
+
+/**
+ * Join a table from a pasted invite — the twin of `InviteBox` in
+ * `frontend/src/pages/Lobby.tsx`.
+ *
+ * Exists because a Telegram deep link is not self-sufficient: it only opens the
+ * app if the bot has a Mini App registered in BotFather, and this bot had none,
+ * so every invite anyone shared was a dead link. Takes the whole link, either
+ * Telegram form or a web URL, or the bare table id.
+ *
+ * Reports rather than guesses: navigating to an id the server could never have
+ * minted would swap a clear message for an error screen at the table.
+ */
+function InviteBox() {
+  const { t } = useTranslation();
+  const nav = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const [text, setText] = useState('');
+  const [bad, setBad] = useState(false);
+
+  const go = (): void => {
+    const invite = parseInviteInput(text);
+    if (!invite) {
+      setBad(true);
+      return;
+    }
+    nav.navigate('Table', { tableId: invite.tableId });
+  };
+
+  return (
+    <View style={styles.inviteWrap}>
+      <Text style={styles.inviteTitle}>{t('lobby.haveInvite')}</Text>
+      <View style={styles.inviteRow}>
+        <TextInput
+          value={text}
+          onChangeText={(v) => {
+            setText(v);
+            setBad(false);
+          }}
+          placeholder={t('lobby.invitePlaceholder')}
+          placeholderTextColor={theme.dim}
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={styles.inviteInput}
+        />
+        <Pressable
+          disabled={text.trim().length === 0}
+          onPress={go}
+          style={({ pressed }) => [
+            styles.inviteBtn,
+            text.trim().length === 0 && styles.inviteBtnOff,
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          <Text style={styles.inviteBtnText}>{t('lobby.join')}</Text>
+        </Pressable>
+      </View>
+      {bad ? <Text style={styles.inviteError}>{t('lobby.inviteNotRecognised')}</Text> : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.bg },
   header: {
@@ -424,6 +495,29 @@ const styles = StyleSheet.create({
   },
   promoActionText: { color: '#000', fontSize: 15, fontFamily: weight('800'), letterSpacing: 0.5 },
 
+  inviteWrap: { marginTop: 16, gap: 8 },
+  inviteTitle: { color: theme.text, fontSize: 15, fontFamily: weight('800') },
+  inviteRow: { flexDirection: 'row', gap: 8 },
+  inviteInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: theme.surface,
+    borderRadius: radius.card,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: theme.text,
+    fontSize: 13,
+  },
+  inviteBtn: {
+    justifyContent: 'center',
+    paddingHorizontal: 18,
+    borderRadius: radius.card,
+    backgroundColor: '#D9B87C',
+  },
+  inviteBtnOff: { opacity: 0.4 },
+  inviteBtnText: { color: '#000', fontSize: 13, fontFamily: weight('800') },
+  inviteError: { color: theme.danger, fontSize: 11 },
   myGamesHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 },
   myGamesTitle: { color: '#EED9A0', fontSize: 18, fontFamily: weight('800') },
   myGamesRight: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EED9A0', borderRadius: 20, padding: 2 },

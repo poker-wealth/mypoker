@@ -1,4 +1,5 @@
 import { type HandRank } from './hand-evaluator';
+import type { RecordedAction } from '../../history/hand-record';
 import { TEXAS, type PokerVariant } from './variants';
 import {
   TexasBetting,
@@ -52,6 +53,7 @@ export class TexasHand {
   private readonly variant: PokerVariant;
   private revealedCount = 0;
   private result: HandResult | null = null;
+  private readonly actionLog: RecordedAction[] = [];
 
   constructor(players: { id: string; stack: number }[], config: TexasHandConfig) {
     const n = players.length;
@@ -117,9 +119,54 @@ export class TexasHand {
   // ── Play ─────────────────────────────────────────────────────────────────────
   act(playerId: string, action: Action): void {
     if (this.result) throw new Error('hand is already complete');
+
+    /*
+     * THE ACTION LOG — recorded here, and only here.
+     *
+     * Everything the Data page cannot currently show (VPIP, PFR, 3-Bet, WTSD,
+     * W$SD, Aggression) is derived from who did what before the flop and after
+     * it. Nothing in this engine kept that: the betting layer applies an action
+     * and moves on, so the moment a hand ended, how it was played was gone.
+     *
+     * CAPTURED BEFORE `betting.act`, not after, for two reasons that are both
+     * bugs if ignored:
+     *
+     *   THE STREET ADVANCES INSIDE the call. A river call that closes the
+     *   betting leaves `street` reading SHOWDOWN, so reading it afterwards
+     *   files the last action of every street under the next one — and a
+     *   preflop call that closes preflop would be recorded as a flop call,
+     *   which is precisely the action VPIP is counted from.
+     *
+     *   THE AMOUNT IS A STACK DELTA, measured across the call. Using the
+     *   action's own `amount` would be wrong for a raise (it is a raise-TO
+     *   total, not the chips added) and absent for a call, which carries no
+     *   amount at all. What left the player's stack is what they committed,
+     *   whatever the action was called.
+     *
+     * BLIND POSTS ARE NOT ACTIONS and never reach here — they are posted by
+     * the betting layer at setup. That is exactly right for VPIP, which counts
+     * money put in BY CHOICE: a big blind who checks has not entered the pot.
+     */
+    const street = this.betting.street;
+    const stackBefore = this.betting.seatsPublic().find((s) => s.id === playerId)?.stack ?? 0;
+
     this.betting.act(playerId, action);
+
+    const stackAfter = this.betting.seatsPublic().find((s) => s.id === playerId)?.stack ?? 0;
+    this.actionLog.push({
+      playerId,
+      street,
+      type: action.type,
+      amount: Math.max(0, stackBefore - stackAfter),
+    });
+
     this.syncCommunity();
     if (this.betting.handComplete) this.settle();
+  }
+
+  /** Every action taken in this hand, in order. Empty before the first one. */
+  actions(): readonly RecordedAction[] {
+    return this.actionLog;
   }
 
   /** Reveal community cards appropriate to the current street. */

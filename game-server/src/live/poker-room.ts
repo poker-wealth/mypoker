@@ -1,4 +1,6 @@
 import { EventBus } from '../core/event-bus';
+import { positionOf } from '../history/hand-record';
+import { recordHand } from '../history/hand-store';
 import type { FinancialCoreClient } from '../core/financial-core-client';
 import { FakeChainClient } from '../fairness';
 import type { ChainClient } from '../fairness';
@@ -413,6 +415,10 @@ export class PokerRoom implements LiveRoom {
 
   private startTimer: NodeJS.Timeout | undefined;
   private actionTimer: NodeJS.Timeout | undefined;
+  /** Stacks as each hand began — the baseline for a hand record's net. */
+  private stacksAtHandStart = new Map<string, number>();
+  /** When the current hand was dealt. */
+  private handStartedAt: Date | undefined;
   private showdownTimer: NodeJS.Timeout | undefined;
   private queue: Promise<void> = Promise.resolve();
   private disposed = false;
@@ -1248,6 +1254,22 @@ export class PokerRoom implements LiveRoom {
     }
     await game.startHand(buttonIndex);
 
+    /*
+     * STACKS AS THE HAND BEGINS — the only way to know what a hand was worth.
+     *
+     * `net` in a hand record is what the player finished with minus what they
+     * started with, and nothing else records the second half of that: the
+     * engine's stacks are updated in place, so by the time the hand settles,
+     * what someone sat down with is gone. Captured here, read in `finishHand`.
+     *
+     * Taken AFTER `startHand`, so the blinds a player was forced to post are
+     * already out of their stack — those are part of what the hand cost them,
+     * and counting from before them would credit every big blind with a small
+     * profit they never made.
+     */
+    this.stacksAtHandStart = new Map(game.seatedStacks());
+    this.handStartedAt = new Date();
+
     this.game = game;
     this.winners = [];
     this.lastJackpot = null; // the previous hand's celebration ends here
@@ -1480,12 +1502,81 @@ export class PokerRoom implements LiveRoom {
     // off the hand's path (a chain/DB hiccup must never delay the showdown).
     this.notarizeRound(game);
 
+    // Record how the hand was PLAYED, the same way and for the same reason:
+    // off the critical path, never able to delay or fail a showdown.
+    this.recordHandHistory(game, result);
+
     this.phase = 'SHOWDOWN';
     this.push();
     this.showdownTimer = setTimeout(() => {
       this.showdownTimer = undefined;
       void this.enqueue(() => this.endShowdown());
     }, this.config.showdownDelayMs);
+  }
+
+  /**
+   * Turn the hand just finished into a history record.
+   *
+   * FIRE AND FORGET, like notarization above it and for the same reason: the
+   * money has already moved through `transfer()` and the showdown is already on
+   * screen. A history write is a record of something that has happened, and a
+   * table must never stop dealing because an analytics collection was
+   * unreachable. `recordHand` swallows its own failures; this adds the guard
+   * for anything thrown while ASSEMBLING the record, which would otherwise be
+   * an unhandled rejection — and in Node that takes the process down, which
+   * means one table's bad hand killing every table.
+   */
+  private recordHandHistory(game: TexasGame, result: ReturnType<TexasGame['settledResult']>): void {
+    try {
+      const round = game.roundInfo();
+      const hand = game.playedHand();
+      if (!round || !hand || !result) return;
+
+      const players = this.occupied().filter((s) => s.inHand);
+      if (players.length === 0) return;
+
+      const buttonPos = players.findIndex((s) => s.index === this.buttonSeat);
+      const stacksNow = game.seatedStacks();
+      const showdownIds = new Set(result.showdown.map((e) => e.id));
+
+      const seats = players.map((seat, i) => {
+        const started = this.stacksAtHandStart.get(seat.playerId) ?? seat.stack;
+        const ended = stacksNow.get(seat.playerId) ?? seat.stack;
+        const won = result.payouts.get(seat.playerId) ?? 0;
+        return {
+          playerId: seat.playerId,
+          seatIndex: seat.index,
+          position: positionOf(
+            // Distance after the button, wrapping. Falls back to raw order when
+            // no button was found rather than guessing a position.
+            buttonPos < 0 ? i : (i - buttonPos + players.length) % players.length,
+            players.length,
+          ),
+          holeCards: [...(hand.holeCardsFor(seat.playerId) ?? [])],
+          // What they put in IS what left their stack, plus anything they won
+          // back — the two together are the only figures that are certainly
+          // true from out here.
+          invested: Math.max(0, started - ended + won),
+          net: ended - started,
+          sawShowdown: showdownIds.has(seat.playerId),
+          wonAtShowdown: showdownIds.has(seat.playerId) && won > 0,
+        };
+      });
+
+      void recordHand({
+        roundId: round.roundId,
+        tableId: this.config.id,
+        gameId: this.config.game,
+        handNumber: this.handNumber,
+        playedAt: this.handStartedAt ?? new Date(),
+        bigBlind: this.config.bigBlind,
+        community: [...result.community],
+        seats,
+        actions: [...hand.actions()],
+      });
+    } catch (err) {
+      console.error(`[room ${this.config.id}] could not assemble hand history:`, err);
+    }
   }
 
   private async endShowdown(): Promise<void> {
