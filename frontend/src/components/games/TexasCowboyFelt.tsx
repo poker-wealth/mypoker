@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { PlayingCard } from '@/components/poker/PlayingCard';
 import type { TableCommand, TableSnapshot } from '@/lib/liveTable';
-import { BoardPanel, BetCell } from './texascowboy/BetPanel';
+import { BoardPanel, BetRow, BetCell } from './texascowboy/BetPanel';
 import { cn } from '@/lib/cn';
 
 /**
@@ -24,15 +24,16 @@ import { cn } from '@/lib/cn';
  * THREE PLACES THIS DELIBERATELY DIVERGES, all for the same reason — the
  * reference draws things our server does not send:
  *
- *   THE SURFACE IS GREEN AGAIN, and that reversal is worth recording. It was
- *   green, was rejected on sight ("what is this"), and became translucent black
- *   so the player's chosen ground showed through. Victor has since asked twice
- *   for this exact reference — "they have to look like this exactly" — and the
- *   reference is green felt with cream market cards. Latest word wins.
+ *   THE SURFACE IS THE PLAYER'S, NOT THIS GAME'S. The reference is green
+ *   felt with cream market cards, and both were built and both were rejected:
+ *   green first ("what is this"), then the cream band ("remove that cream"),
+ *   then the green again the moment it was seen over a blue ground — "on blue
+ *   background its still showing green".
  *
- *   This is the ONE game that paints its own surface. It is not a poker table
- *   with seats; it is a betting board with its own artwork, the way baccarat
- *   boards are. Every other felt still takes the player's chosen ground.
+ *   That is the settled rule for every felt in this app and this board is not
+ *   an exception: the LAYOUT is copied from the reference, the COLOUR comes
+ *   from whatever ground the player picked, and the panels are translucent so
+ *   it shows through and tints them.
  *
  *   NO CAPACITY DOTS. Each reference cell carries a row of dots and a line like
  *   "276 hands vacant" — how much of that market is still open to back. Our
@@ -95,12 +96,24 @@ export interface TexasCowboyRound {
  * The other two are grouped under a gold label. Every id here is a market the
  * server actually settles — see the note at the top about not merging them.
  */
-const BANDS: Array<{ labelKey?: string; cream?: boolean; markets: string[] }> = [
-  { cream: true, markets: ['cowboy_win', 'tie', 'cowgirl_win'] },
-  { labelKey: 'cowboy.eitherHand', markets: ['high_card', 'one_pair', 'two_pair'] },
+const BANDS: Array<{ labelKey?: string; rows: string[][] }> = [
+  // The duel: three across, like the reference's top band.
+  { rows: [['cowboy_win', 'tie', 'cowgirl_win']] },
+  // The reference puts one market across the full width here, then a pair
+  // underneath it. Ours has three markets, so they take the same shape.
+  {
+    labelKey: 'cowboy.eitherHand',
+    rows: [['high_card'], ['one_pair', 'two_pair']],
+  },
+  // The reference is a row of two over a row of three. Ours has seven markets,
+  // so it runs 2-3-2 — the same rhythm, and no row left short.
   {
     labelKey: 'cowboy.winningRank',
-    markets: ['three_of_a_kind', 'straight', 'flush', 'full_house', 'four_of_a_kind', 'straight_flush', 'royal_flush'],
+    rows: [
+      ['three_of_a_kind', 'straight'],
+      ['flush', 'full_house', 'four_of_a_kind'],
+      ['straight_flush', 'royal_flush'],
+    ],
   },
 ];
 
@@ -161,10 +174,9 @@ export function TexasCowboyFelt({
           : 'tie';
 
   return (
-    /* THE GREEN FELT, painted by this game — see the note at the top for why
-       this one board owns its surface while every other felt takes the
-       player's chosen ground. */
-    <div className="relative flex min-h-[40rem] w-full flex-col self-stretch overflow-hidden bg-[linear-gradient(180deg,#2f7a5a_0%,#25654a_45%,#1b4d39_100%)] text-white select-none">
+    /* NO COLOUR OF ITS OWN. The player's chosen ground shows through every
+       panel here — see the note at the top. */
+    <div className="relative flex min-h-[40rem] w-full flex-col self-stretch overflow-hidden text-white select-none">
       {/* ── THE SCENE ─────────────────────────────────────────────────────────
           The two of them facing in, the board dealt between them, the clock
           above. The reference puts the characters large and edge-to-edge; they
@@ -263,25 +275,28 @@ export function TexasCowboyFelt({
           cell — the reference's shape, carrying our real markets. */}
       <div className="relative z-10 flex flex-1 flex-col gap-1.5 px-1.5 py-2">
         {BANDS.map((band, i) => (
-          <BoardPanel key={i} {...(band.labelKey ? { label: t(band.labelKey) } : {})} {...(band.cream ? { cream: true } : {})}>
-            {band.markets.map((id) => {
-              const market = marketOf(id);
-              return (
-                <BetCell
-                  key={id}
-                  name={market?.name ?? titleOf(id)}
-                  multiplier={market?.multiplier ?? null}
-                  pool={poolOf(id)}
-                  yours={yoursOn(id)}
-                  onBet={() => bet(id)}
-                  disabled={!isBettingOpen || !you || market?.enabled === false}
-                  won={wonMarket === id}
-                  {...(band.cream ? { cream: true } : {})}
-                  poolLabel={t('cowboy.poolShort')}
-                  yoursLabel={t('cowboy.yoursShort')}
-                />
-              );
-            })}
+          <BoardPanel key={i} {...(band.labelKey ? { label: t(band.labelKey) } : {})}>
+            {band.rows.map((row, r) => (
+              <BetRow key={r}>
+                {row.map((id) => {
+                  const market = marketOf(id);
+                  return (
+                    <BetCell
+                      key={id}
+                      name={market?.name ?? titleOf(id)}
+                      multiplier={market?.multiplier ?? null}
+                      pool={poolOf(id)}
+                      yours={yoursOn(id)}
+                      onBet={() => bet(id)}
+                      disabled={!isBettingOpen || !you || market?.enabled === false}
+                      won={wonMarket === id}
+                      poolLabel={t('cowboy.poolShort')}
+                      yoursLabel={t('cowboy.yoursShort')}
+                    />
+                  );
+                })}
+              </BetRow>
+            ))}
           </BoardPanel>
         ))}
       </div>
