@@ -99,21 +99,25 @@ function stadiumRings(edge: { x: number; yTop: number; yBottom: number; yMid: nu
    * a rail — while the gaps above and below them ran to 25% and 28% of empty
    * felt. So the middle of each rail was crowded and both ends were bare.
    *
-   * ±20 opens the pair to 40% apart and uses the space that was already there:
-   * the top chair drops nearer the top curve, the bottom one nearer the hero,
-   * and the felt reads evenly occupied instead of pinched in the middle.
+   * ±28 opens the pair to 56% apart and uses the space that was already there:
+   * the top chair sits near the top curve, the bottom one near the hero, and
+   * the felt reads evenly occupied instead of pinched in the middle. It went to
+   * ±20 first and that was still too tight — "made it more wider".
    *
-   * NOT a change to the seat SIZE. That went up separately (17 → 20 cqmin);
-   * making the circles bigger here would have made the crowding worse, which
-   * is the opposite of what was asked.
+   * NOT THE SEAT SIZE, and not the rails either. Both were tried and both were
+   * wrong: "space it out … and dont make the circle bigger". A bigger circle in
+   * the same space is MORE crowded, not less, and moving the rails outward
+   * widens the table without putting any more room between the two chairs that
+   * were touching. The only thing that answers the complaint is the distance
+   * between them, which is this number.
    */
   const six: SeatPos[] = [
     { left: '50%', top: `${yBottom}%`, align: 'bottom' },
-    { left: `${x}%`, top: `${yMid + 20}%`, align: 'left' },
-    { left: `${x}%`, top: `${yMid - 20}%`, align: 'left' },
+    { left: `${x}%`, top: `${yMid + 28}%`, align: 'left' },
+    { left: `${x}%`, top: `${yMid - 28}%`, align: 'left' },
     { left: '50%', top: `${yTop}%`, align: 'top' },
-    { left: `${right}%`, top: `${yMid - 20}%`, align: 'right' },
-    { left: `${right}%`, top: `${yMid + 20}%`, align: 'right' },
+    { left: `${right}%`, top: `${yMid - 28}%`, align: 'right' },
+    { left: `${right}%`, top: `${yMid + 28}%`, align: 'right' },
   ];
 
   /**
@@ -158,14 +162,14 @@ function stadiumRings(edge: { x: number; yTop: number; yBottom: number; yMid: nu
    */
   const nine: SeatPos[] = [
     { left: '50%', top: `${yBottom}%`, align: 'bottom' }, // 0 bottom centre — hero
-    { left: `${x + 2}%`, top: `${yMid + 20}%`, align: 'left' }, // 1 left lower
+    { left: `${x + 2}%`, top: `${yMid + 28}%`, align: 'left' }, // 1 left lower
     { left: `${x}%`, top: `${yMid}%`, align: 'left' }, // 2 left middle
-    { left: `${x + 2}%`, top: `${yMid - 20}%`, align: 'left' }, // 3 left upper
+    { left: `${x + 2}%`, top: `${yMid - 28}%`, align: 'left' }, // 3 left upper
     { left: '34%', top: `${yTop}%`, align: 'top' }, // 4 top, left of centre
     { left: '66%', top: `${yTop}%`, align: 'top' }, // 5 top, right of centre
-    { left: `${right - 2}%`, top: `${yMid - 20}%`, align: 'right' }, // 6 right upper
+    { left: `${right - 2}%`, top: `${yMid - 28}%`, align: 'right' }, // 6 right upper
     { left: `${right}%`, top: `${yMid}%`, align: 'right' }, // 7 right middle
-    { left: `${right - 2}%`, top: `${yMid + 20}%`, align: 'right' }, // 8 right lower
+    { left: `${right - 2}%`, top: `${yMid + 28}%`, align: 'right' }, // 8 right lower
   ];
 
   const pick = (...i: number[]): SeatPos[] => i.map((n) => eight[n]!);

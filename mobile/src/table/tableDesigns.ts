@@ -56,16 +56,21 @@ function stadiumRings(edge: {
    *
    * They were `yMid ± 12`: 24% of the table height between the two chairs on a
    * rail, with a quarter of the felt empty above them and more below. Crowded
-   * in the middle, bare at both ends. ±20 opens the pair to 40% apart and uses
-   * the room that was already there.
+   * in the middle, bare at both ends. ±28 opens the pair to 56% apart and uses
+   * the room that was already there. (±20 first; still too tight.)
+   *
+   * NOT the seat size and not the rails — both were tried and both were wrong.
+   * A bigger circle in the same space is more crowded, not less, and moving the
+   * rails outward widens the table without putting any room between the two
+   * chairs that were touching.
    */
   const six: SeatPos[] = [
     { left: 50, top: yBottom, align: 'bottom' },
-    { left: x, top: yMid + 20, align: 'left' },
-    { left: x, top: yMid - 20, align: 'left' },
+    { left: x, top: yMid + 28, align: 'left' },
+    { left: x, top: yMid - 28, align: 'left' },
     { left: 50, top: yTop, align: 'top' },
-    { left: right, top: yMid - 20, align: 'right' },
-    { left: right, top: yMid + 20, align: 'right' },
+    { left: right, top: yMid - 28, align: 'right' },
+    { left: right, top: yMid + 28, align: 'right' },
   ];
   /**
    * SEVEN AND EIGHT: three chairs down each straight rail, one on each curve.
@@ -97,14 +102,14 @@ function stadiumRings(edge: {
    */
   const nine: SeatPos[] = [
     { left: 50, top: yBottom, align: 'bottom' }, // 0 bottom centre — hero
-    { left: x + 2, top: yMid + 20, align: 'left' }, // 1 left lower
+    { left: x + 2, top: yMid + 28, align: 'left' }, // 1 left lower
     { left: x, top: yMid, align: 'left' }, // 2 left middle
-    { left: x + 2, top: yMid - 20, align: 'left' }, // 3 left upper
+    { left: x + 2, top: yMid - 28, align: 'left' }, // 3 left upper
     { left: 34, top: yTop, align: 'top' }, // 4 top, left of centre
     { left: 66, top: yTop, align: 'top' }, // 5 top, right of centre
-    { left: right - 2, top: yMid - 20, align: 'right' }, // 6 right upper
+    { left: right - 2, top: yMid - 28, align: 'right' }, // 6 right upper
     { left: right, top: yMid, align: 'right' }, // 7 right middle
-    { left: right - 2, top: yMid + 20, align: 'right' }, // 8 right lower
+    { left: right - 2, top: yMid + 28, align: 'right' }, // 8 right lower
   ];
 
   const pick = (...i: number[]): SeatPos[] => i.map((n) => eight[n]!);
