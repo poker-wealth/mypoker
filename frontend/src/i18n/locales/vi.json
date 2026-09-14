@@ -1000,5 +1000,18 @@
     "you": "TÔI",
     "grabbed": "Bạn đã cướp được bao!",
     "hitMine": "Bạn đã trúng mìn!"
+  },
+  "cowboy": {
+    "cowboy": "Cao bồi",
+    "cowgirl": "Nữ cao bồi",
+    "push": "Hòa",
+    "wins": "{{who}} thắng",
+    "eitherHand": "Kiểu bài bất kỳ",
+    "winningRank": "Hạng bài thắng",
+    "joinGame": "Vào chơi",
+    "betsClosed": "Đã đóng cược",
+    "settled": "Đã thanh toán",
+    "poolShort": "Cả bàn",
+    "yoursShort": "Của bạn"
   }
 }

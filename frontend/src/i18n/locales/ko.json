@@ -1000,5 +1000,18 @@
     "you": "나",
     "grabbed": "봉투를 잡았습니다!",
     "hitMine": "지뢰를 밟았습니다!"
+  },
+  "cowboy": {
+    "cowboy": "카우보이",
+    "cowgirl": "카우걸",
+    "push": "무승부",
+    "wins": "{{who}} 승리",
+    "eitherHand": "어느 쪽 족보든",
+    "winningRank": "승리 족보",
+    "joinGame": "게임 참가",
+    "betsClosed": "베팅 마감",
+    "settled": "정산됨",
+    "poolShort": "전체",
+    "yoursShort": "내 베팅"
   }
 }

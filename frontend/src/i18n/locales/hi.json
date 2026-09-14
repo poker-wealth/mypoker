@@ -1000,5 +1000,18 @@
     "you": "मैं",
     "grabbed": "आपने पैकेट पा लिया!",
     "hitMine": "आप माइन पर पड़ गए!"
+  },
+  "cowboy": {
+    "cowboy": "काउबॉय",
+    "cowgirl": "काउगर्ल",
+    "push": "बराबरी",
+    "wins": "{{who}} जीता",
+    "eitherHand": "कोई भी हैंड प्रकार",
+    "winningRank": "जीतने वाली रैंक",
+    "joinGame": "गेम जॉइन करें",
+    "betsClosed": "दांव बंद",
+    "settled": "निपटान हुआ",
+    "poolShort": "टेबल",
+    "yoursShort": "आपका"
   }
 }

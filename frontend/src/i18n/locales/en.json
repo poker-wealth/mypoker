@@ -1000,5 +1000,18 @@
     "you": "ME",
     "grabbed": "You grabbed a packet!",
     "hitMine": "You hit the mine!"
+  },
+  "cowboy": {
+    "cowboy": "Cowboy",
+    "cowgirl": "Cowgirl",
+    "push": "Push",
+    "wins": "{{who}} wins",
+    "eitherHand": "Either hand type",
+    "winningRank": "Winning hand rank",
+    "joinGame": "Join Game",
+    "betsClosed": "Bets closed",
+    "settled": "Settled",
+    "poolShort": "Table",
+    "yoursShort": "You"
   }
 }

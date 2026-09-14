@@ -1000,5 +1000,18 @@
     "you": "ฉัน",
     "grabbed": "คุณคว้าซองได้แล้ว!",
     "hitMine": "คุณโดนระเบิด!"
+  },
+  "cowboy": {
+    "cowboy": "คาวบอย",
+    "cowgirl": "คาวเกิร์ล",
+    "push": "เสมอ",
+    "wins": "{{who}} ชนะ",
+    "eitherHand": "ไพ่แบบใดก็ได้",
+    "winningRank": "อันดับไพ่ที่ชนะ",
+    "joinGame": "เข้าร่วมเกม",
+    "betsClosed": "ปิดรับเดิมพัน",
+    "settled": "ชำระแล้ว",
+    "poolShort": "ทั้งโต๊ะ",
+    "yoursShort": "ของฉัน"
   }
 }

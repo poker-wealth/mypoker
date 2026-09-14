@@ -1000,5 +1000,18 @@
     "you": "SAYA",
     "grabbed": "Kamu dapat paketnya!",
     "hitMine": "Kamu kena ranjau!"
+  },
+  "cowboy": {
+    "cowboy": "Koboi",
+    "cowgirl": "Koboi wanita",
+    "push": "Seri",
+    "wins": "{{who}} menang",
+    "eitherHand": "Tipe kartu apa pun",
+    "winningRank": "Peringkat kartu menang",
+    "joinGame": "Gabung",
+    "betsClosed": "Taruhan ditutup",
+    "settled": "Selesai",
+    "poolShort": "Meja",
+    "yoursShort": "Anda"
   }
 }

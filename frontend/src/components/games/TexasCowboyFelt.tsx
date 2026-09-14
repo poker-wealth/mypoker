@@ -1,18 +1,52 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { PlayingCard } from '@/components/poker/PlayingCard';
 import type { TableCommand, TableSnapshot } from '@/lib/liveTable';
+import { BoardPanel, BetCell } from './texascowboy/BetPanel';
+import { cn } from '@/lib/cn';
 
 /**
  * TEXAS COWBOY — a betting board, not a poker seat.
  *
- * Two hands are dealt, Cowboy and Cowgirl, and nobody plays them: the table bets on the outcome.
- * So the screen is read top to bottom — the scene, then the board. Tap a chip, tap a market, the
- * bet is placed; there is no separate confirm step, because a window that closes in twelve seconds
- * cannot afford one.
+ * Two hands are dealt, Cowboy and Cowgirl, and nobody plays them: the table
+ * bets on the outcome. So the screen reads top to bottom — the two of them
+ * facing each other with the board between, then the markets. Tap a chip, tap a
+ * market, the bet is placed; there is no confirm step, because a window that
+ * closes in twelve seconds cannot afford one.
  *
- * The server owns every number here. Odds, stakes and the road all come from the round; the felt
- * never multiplies anything out except to preview a return.
+ * BUILT TO THE REFERENCE Victor supplied (14 Sep 2026): the characters at the
+ * top facing in, the community cards between them, then bordered panels of
+ * markets with a gold side-label per group and a big multiplier in each cell,
+ * and a single gold "Join Game" across the foot.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * THREE PLACES THIS DELIBERATELY DIVERGES, all for the same reason — the
+ * reference draws things our server does not send:
+ *
+ *   THE SURFACE IS GREEN AGAIN, and that reversal is worth recording. It was
+ *   green, was rejected on sight ("what is this"), and became translucent black
+ *   so the player's chosen ground showed through. Victor has since asked twice
+ *   for this exact reference — "they have to look like this exactly" — and the
+ *   reference is green felt with cream market cards. Latest word wins.
+ *
+ *   This is the ONE game that paints its own surface. It is not a poker table
+ *   with seats; it is a betting board with its own artwork, the way baccarat
+ *   boards are. Every other felt still takes the player's chosen ground.
+ *
+ *   NO CAPACITY DOTS. Each reference cell carries a row of dots and a line like
+ *   "276 hands vacant" — how much of that market is still open to back. Our
+ *   markets are uncapped and the server publishes no such limit, so the cells
+ *   carry what is real instead: the chips the table has on them and the chips
+ *   you have.
+ *
+ *   MARKETS ARE NOT COMBINED. The reference sells "Three of a kind / Straight /
+ *   Flush" as ONE bet at 4.5x. Our server settles those as three separate
+ *   markets, so they are three cells. Drawing them as one would take a single
+ *   tap and place it on whichever of the three this file guessed.
+ *
+ * The server owns every number. The felt never multiplies anything out except
+ * to preview a return.
  */
 
 export type PokerHandType =
@@ -54,12 +88,20 @@ export interface TexasCowboyRound {
   history?: Array<'COWBOY' | 'COWGIRL' | 'TIE'>;
 }
 
-/** The board, in the rows it is read in. */
-const ROWS: Array<{ label: string; markets: string[] }> = [
-  { label: 'Who wins', markets: ['cowboy_win', 'tie', 'cowgirl_win'] },
-  { label: 'Either hand makes', markets: ['high_card', 'one_pair', 'two_pair'] },
-  { label: 'Winning hand', markets: ['three_of_a_kind', 'straight', 'flush'] },
-  { label: 'Long shots', markets: ['full_house', 'four_of_a_kind', 'straight_flush', 'royal_flush'] },
+/**
+ * The board, in the reference's three bands.
+ *
+ * Band one is the duel itself and carries no side-label, like the reference.
+ * The other two are grouped under a gold label. Every id here is a market the
+ * server actually settles — see the note at the top about not merging them.
+ */
+const BANDS: Array<{ labelKey?: string; cream?: boolean; markets: string[] }> = [
+  { cream: true, markets: ['cowboy_win', 'tie', 'cowgirl_win'] },
+  { labelKey: 'cowboy.eitherHand', markets: ['high_card', 'one_pair', 'two_pair'] },
+  {
+    labelKey: 'cowboy.winningRank',
+    markets: ['three_of_a_kind', 'straight', 'flush', 'full_house', 'four_of_a_kind', 'straight_flush', 'royal_flush'],
+  },
 ];
 
 const CHIPS = [100, 500, 1_000, 5_000];
@@ -77,6 +119,7 @@ export function TexasCowboyFelt({
   /** Opens the buy-in sheet. See FeltComponent.onSit in registry.ts. */
   onSit: (seatIndex: number) => void;
 }) {
+  const { t } = useTranslation();
   const [chip, setChip] = useState<number>(100);
   const [now, setNow] = useState(Date.now());
 
@@ -85,8 +128,6 @@ export function TexasCowboyFelt({
     return () => clearInterval(timer);
   }, []);
 
-  // The round arrives in its own field. It used to be JSON stuffed into `message` — the line the
-  // result banner prints — which put the whole round state on screen as text.
   const round = (snapshot?.gameState as TexasCowboyRound | undefined) ?? null;
   const seats = snapshot?.seats ?? [];
   const you = seats.find((s) => s.isYou);
@@ -100,7 +141,7 @@ export function TexasCowboyFelt({
   const remaining = Math.max(0, closesAt - now);
   const isBettingOpen = round?.phase === 'BETTING_OPEN';
 
-  const oddsOf = (id: string): number => round?.markets.find((m) => m.id === id)?.multiplier ?? 0;
+  const marketOf = (id: string) => round?.markets.find((m) => m.id === id);
   const poolOf = (id: string): number => round?.pools?.[id] ?? 0;
   const yoursOn = (id: string): number => round?.yourStakes?.[id] ?? 0;
 
@@ -109,38 +150,40 @@ export function TexasCowboyFelt({
     onCommand?.({ kind: 'act', action: { type: 'bet', amount: chip, selection: marketId } });
   };
 
+  /** The market that just won, so its cell can be marked. */
+  const wonMarket =
+    round?.result === null || round?.result === undefined
+      ? null
+      : round.result.winner === 'COWBOY'
+        ? 'cowboy_win'
+        : round.result.winner === 'COWGIRL'
+          ? 'cowgirl_win'
+          : 'tie';
+
   return (
-    /* NO GREEN GROUND ANYWHERE, including inside.
-       An earlier pass took only the outer colour off and kept the greens
-       within, on the reasoning that the betting strip and its lanes were this
-       game's artwork rather than a background. That was wrong in practice: the
-       strip and the scene panel are most of the screen, so the top bar showed
-       the player's ground and everything beneath it was green. Victor saw it
-       and asked what it was.
-       They are translucent black now — the grid, its borders and its type are
-       untouched, and the player's colour shows through and tints them, so this
-       board reads as the same table on any ground. */
-    <div className="relative flex min-h-[40rem] w-full flex-col self-stretch overflow-hidden text-white select-none">
-      {/*
-        The scene: the two of them facing each other, the community cards dealt between them, the
-        clock above. It is the top of the screen and the board is everything below, because that is
-        the order the game is read in — watch the hands, then back a market.
-      */}
-      <div className="relative h-52 shrink-0 overflow-hidden bg-[radial-gradient(ellipse_at_center,rgba(0,0,0,0.18)_0%,rgba(0,0,0,0.42)_75%)]">
+    /* THE GREEN FELT, painted by this game — see the note at the top for why
+       this one board owns its surface while every other felt takes the
+       player's chosen ground. */
+    <div className="relative flex min-h-[40rem] w-full flex-col self-stretch overflow-hidden bg-[linear-gradient(180deg,#2f7a5a_0%,#25654a_45%,#1b4d39_100%)] text-white select-none">
+      {/* ── THE SCENE ─────────────────────────────────────────────────────────
+          The two of them facing in, the board dealt between them, the clock
+          above. The reference puts the characters large and edge-to-edge; they
+          are cropped by the panel rather than scaled down, which is what keeps
+          them looking painted on rather than pasted in. */}
+      <div className="relative h-56 shrink-0 overflow-hidden bg-[radial-gradient(ellipse_at_center,rgba(0,0,0,0.18)_0%,rgba(0,0,0,0.45)_75%)]">
         <Duelist
           side="left"
-          title="COWBOY"
-          emoji="🤠"
-          accent="text-amber-200"
+          art="/brand/cowboy.webp"
+          name={t('cowboy.cowboy')}
           cards={round?.cowboy.holeCards ?? []}
           hand={round?.cowboy.evaluation?.displayName}
           won={round?.result?.winner === 'COWBOY'}
         />
         <Duelist
           side="right"
-          title="COWGIRL"
-          emoji="💃"
-          accent="text-rose-200"
+          art="/brand/cowgirl.webp"
+          name={t('cowboy.cowgirl')}
+          mirror
           cards={round?.cowgirl.holeCards ?? []}
           hand={round?.cowgirl.evaluation?.displayName}
           won={round?.result?.winner === 'COWGIRL'}
@@ -150,41 +193,43 @@ export function TexasCowboyFelt({
         <div className="absolute top-2 left-1/2 z-20 -translate-x-1/2">
           {remaining > 0 && isBettingOpen ? (
             <div
-              className={`grid h-14 w-14 place-items-center rounded-full border-4 text-lg font-black tabular-nums ${
+              className={cn(
+                'grid h-12 w-12 place-items-center rounded-full border-[3px] text-base font-black tabular-nums',
                 remaining > 3_000
-                  ? 'border-emerald-300 bg-black/50 text-emerald-200'
-                  : 'animate-pulse border-rose-500 bg-black/50 text-rose-300'
-              }`}
+                  ? 'border-[#e8c06a] bg-black/55 text-[#ffd97a]'
+                  : 'animate-pulse border-rose-500 bg-black/55 text-rose-300',
+              )}
             >
-              {Math.ceil(remaining / 1_000)}s
+              {Math.ceil(remaining / 1_000)}
             </div>
           ) : (
-            <div className="rounded-full bg-black/60 px-3 py-1 text-[0.7rem] font-black tracking-wider text-emerald-200">
-              {round?.phase === 'SETTLED' ? 'SETTLED' : 'BETS CLOSED'}
+            <div className="rounded-full bg-black/60 px-3 py-1 text-[0.66rem] font-black tracking-wider text-[#e8c06a]">
+              {round?.phase === 'SETTLED' ? t('cowboy.settled') : t('cowboy.betsClosed')}
             </div>
           )}
         </div>
 
-        {/* The community cards, dealt between them */}
+        {/* The community cards, dealt between them. */}
         <div className="absolute top-1/2 left-1/2 z-10 flex -translate-x-1/2 -translate-y-1/2 gap-1">
           {Array.from({ length: 5 }, (_, i) => {
             const card = round?.communityCards[i];
-            return <PlayingCard key={i} {...(card ? { card } : {})} size="md" index={i} />;
+            return <PlayingCard key={i} {...(card ? { card } : {})} size="sm" index={i} />;
           })}
         </div>
 
-        {/* The road: how the last rounds went */}
+        {/* The road: how the last rounds went. */}
         <div className="absolute bottom-2 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full bg-black/55 px-3 py-1">
-          <span className="mr-1 text-[0.6rem] font-bold tracking-wider text-emerald-200/70">
-            ROUND #{round?.roundNumber ?? '—'}
+          <span className="mr-1 text-[0.58rem] font-bold tracking-wider text-[#e8c06a]/75">
+            #{round?.roundNumber ?? '—'}
           </span>
           {(round?.history ?? []).slice(-14).map((w, i) => (
             <span
               key={i}
               title={w}
-              className={`h-2 w-2 rounded-full ${
-                w === 'COWBOY' ? 'bg-amber-400' : w === 'COWGIRL' ? 'bg-rose-400' : 'bg-emerald-300'
-              }`}
+              className={cn(
+                'h-2 w-2 rounded-full',
+                w === 'COWBOY' ? 'bg-amber-400' : w === 'COWGIRL' ? 'bg-rose-400' : 'bg-emerald-300',
+              )}
             />
           ))}
         </div>
@@ -197,13 +242,15 @@ export function TexasCowboyFelt({
             initial={{ scale: 0.6, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.6, opacity: 0 }}
-            className="absolute top-24 left-1/2 z-50 -translate-x-1/2 rounded-2xl border-2 border-amber-500 bg-black/80 px-8 py-4 text-center backdrop-blur-md"
+            className="absolute top-24 left-1/2 z-50 -translate-x-1/2 rounded-2xl border-2 border-[#e8c06a] bg-black/80 px-8 py-4 text-center backdrop-blur-md"
           >
-            <div className="text-3xl font-black tracking-tight uppercase">
-              {round.result.winner === 'TIE' ? 'TIE' : `${round.result.winner} WINS`}
+            <div className="text-2xl font-black tracking-tight uppercase">
+              {round.result.winner === 'TIE'
+                ? t('cowboy.push')
+                : t('cowboy.wins', { who: t(`cowboy.${round.result.winner === 'COWBOY' ? 'cowboy' : 'cowgirl'}`) })}
             </div>
             {round.result.winningHandType && (
-              <div className="mt-1 text-base font-bold text-amber-400">
+              <div className="mt-1 text-sm font-bold text-[#ffd97a]">
                 {titleOf(round.result.winningHandType)}
               </div>
             )}
@@ -211,160 +258,147 @@ export function TexasCowboyFelt({
         )}
       </AnimatePresence>
 
-      {/*
-        The board. One bordered grid, not floating cards: each row is a group with its name in the
-        left block, and every cell carries the chips already riding on it, so a glance tells you
-        where the table's money is.
-      */}
-      <div className="relative z-10 flex-1 border-y-2 border-amber-900/60 bg-black/30">
-        {ROWS.map((row) => (
-          <div
-            key={row.label}
-            className="flex items-stretch border-b border-emerald-900/70 last:border-b-0"
-          >
-            <div className="grid w-20 shrink-0 place-items-center border-r border-white/10 bg-black/35 px-1 text-center text-[0.68rem] leading-tight font-black tracking-wide text-amber-300">
-              {row.label}
-            </div>
-            <div className="flex flex-1">
-              {row.markets.map((id) => (
-                <MarketCell
+      {/* ── THE BOARD ─────────────────────────────────────────────────────────
+          Bordered panels, a gold side-label per group, a big multiplier per
+          cell — the reference's shape, carrying our real markets. */}
+      <div className="relative z-10 flex flex-1 flex-col gap-1.5 px-1.5 py-2">
+        {BANDS.map((band, i) => (
+          <BoardPanel key={i} {...(band.labelKey ? { label: t(band.labelKey) } : {})} {...(band.cream ? { cream: true } : {})}>
+            {band.markets.map((id) => {
+              const market = marketOf(id);
+              return (
+                <BetCell
                   key={id}
-                  id={id}
-                  odds={oddsOf(id)}
+                  name={market?.name ?? titleOf(id)}
+                  multiplier={market?.multiplier ?? null}
                   pool={poolOf(id)}
                   yours={yoursOn(id)}
-                  open={isBettingOpen && Boolean(you)}
                   onBet={() => bet(id)}
+                  disabled={!isBettingOpen || !you || market?.enabled === false}
+                  won={wonMarket === id}
+                  {...(band.cream ? { cream: true } : {})}
+                  poolLabel={t('cowboy.poolShort')}
+                  yoursLabel={t('cowboy.yoursShort')}
                 />
-              ))}
-            </div>
-          </div>
+              );
+            })}
+          </BoardPanel>
         ))}
       </div>
 
-      {/* Chips, or the way in */}
-      <div className="relative z-10 flex items-center justify-center gap-3 px-4 py-3">
-        {!you ? (
-          <button
-            onClick={sitDown}
-            className="w-full max-w-md rounded-full bg-gradient-to-b from-amber-300 to-amber-500 py-3 text-sm font-black tracking-widest text-black uppercase shadow-lg active:scale-95"
-          >
-            Join Game
-          </button>
+      {/* ── THE FOOT ──────────────────────────────────────────────────────────
+          Seated, it is the chip tray. Not seated, it is the reference's single
+          gold Join Game — because until you are in, nothing above can be
+          tapped, and a tray of chips over a board you cannot bet on is a
+          control that does nothing. */}
+      <div className="relative z-10 shrink-0 px-3 pt-1 pb-3">
+        {you ? (
+          <div className="flex items-center justify-center gap-2">
+            {CHIPS.map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setChip(value)}
+                className={cn(
+                  'h-11 w-11 rounded-full border-2 text-[0.62rem] font-black tabular-nums transition active:scale-95',
+                  chip === value
+                    ? 'border-[#ffd97a] bg-[#e8c06a] text-black'
+                    : 'border-[#d9b87c]/40 bg-black/40 text-[#e8c06a]',
+                )}
+              >
+                {value >= 1_000 ? `${value / 1_000}K` : value}
+              </button>
+            ))}
+          </div>
         ) : (
-          <>
-            <div className="flex gap-2">
-              {CHIPS.map((amt) => (
-                <button
-                  key={amt}
-                  onClick={() => setChip(amt)}
-                  className={`h-12 w-12 rounded-full border-[3px] text-[0.7rem] font-black shadow-lg transition ${
-                    chip === amt
-                      ? 'border-amber-300 bg-amber-500 text-black'
-                      : 'border-white/15 bg-black/30 text-white/70'
-                  }`}
-                >
-                  {amt >= 1_000 ? `${amt / 1_000}k` : amt}
-                </button>
-              ))}
-            </div>
-            <div className="text-[0.7rem] text-emerald-200/80">
-              {isBettingOpen ? `Tap a market to stake $${chip}` : 'Betting is closed'}
-              <div className="font-bold text-white">Balance ${you.stack}</div>
-            </div>
-          </>
+          <button
+            type="button"
+            onClick={sitDown}
+            className="w-full rounded-full bg-[linear-gradient(180deg,#f0d493,#d9b87c)] py-3 text-sm font-black tracking-wide text-[#4a3312] transition active:scale-[0.99]"
+          >
+            {t('cowboy.joinGame')}
+          </button>
         )}
       </div>
     </div>
   );
 }
 
-/** One of the two hands, standing at their end of the scene. */
+/**
+ * One of the two characters, with their hole cards.
+ *
+ * The art is a PORTRAIT with a transparent background, so it is anchored to the
+ * bottom of the panel and allowed to crop — scaling it to fit would leave a
+ * small figure floating in the middle of the felt.
+ *
+ * `mirror` FLIPS THE PICTURE so the two face each other. The source portraits
+ * were not drawn as a pair: the cowboy looks to his right, which is inward from
+ * the left side, but the cowgirl looks the same way — which from the right side
+ * is out of the frame, away from him. Victor: "she suppose to be looking at him
+ * not the other way round." Flipping her costs nothing (the art is symmetric in
+ * everything but direction) and is the only way to make them a duel rather than
+ * two people ignoring each other.
+ */
 function Duelist({
   side,
-  title,
-  accent,
-  emoji,
+  art,
+  name,
   cards,
   hand,
   won,
+  mirror,
 }: {
   side: 'left' | 'right';
-  title: string;
-  accent: string;
-  emoji: string;
+  art: string;
+  name: string;
   cards: string[];
   hand?: string | undefined;
-  won: boolean;
+  won?: boolean;
+  /** Flip horizontally, so a portrait drawn facing one way faces the other. */
+  mirror?: boolean;
 }) {
   return (
     <div
-      className={`absolute bottom-0 z-10 flex w-32 flex-col items-center pb-6 ${
-        side === 'left' ? 'left-2' : 'right-2'
-      }`}
+      className={cn(
+        'absolute bottom-0 z-0 flex h-full w-[30%] flex-col justify-end',
+        side === 'left' ? 'left-0 items-start' : 'right-0 items-end',
+      )}
     >
-      <div className={`text-5xl drop-shadow-lg ${side === 'right' ? 'scale-x-[-1]' : ''}`}>
-        {emoji}
-      </div>
+      <img
+        src={art}
+        alt=""
+        aria-hidden
+        draggable={false}
+        loading="lazy"
+        decoding="async"
+        className={cn(
+          'pointer-events-none absolute bottom-0 h-[92%] w-full object-contain transition-opacity',
+          side === 'left' ? 'left-0 object-left-bottom' : 'right-0 object-right-bottom',
+          mirror && '-scale-x-100',
+          won ? 'opacity-100' : 'opacity-85',
+        )}
+      />
+
+      {/* Name and hand sit ON the art, so they are on a scrim rather than
+          competing with it. */}
       <div
-        className={`rounded-full px-3 text-xs font-black tracking-widest ${accent} ${
-          won ? 'bg-amber-400/25 ring-1 ring-amber-300' : ''
-        }`}
+        className={cn(
+          'relative z-10 m-1.5 max-w-[92%] rounded-md bg-black/55 px-2 py-1 backdrop-blur-[2px]',
+          won && 'ring-1 ring-[#e8c06a]',
+        )}
       >
-        {title}
-      </div>
-      <div className="mt-1 flex gap-1">
-        {cards.length > 0
-          ? cards.map((c, i) => <PlayingCard key={i} card={c} size="sm" index={i} />)
-          : [0, 1].map((i) => <PlayingCard key={i} size="sm" faceDown />)}
-      </div>
-      {hand && (
-        <div className="mt-1 rounded bg-black/60 px-1.5 text-[0.6rem] font-bold text-emerald-300">
-          {hand}
+        <div className="text-[0.62rem] leading-tight font-black tracking-wider text-[#e8c06a]">
+          {name}
         </div>
-      )}
+        {hand && <div className="text-[0.58rem] leading-tight text-white/75">{hand}</div>}
+      </div>
+
+      <div className={cn('relative z-10 mb-1 flex gap-0.5', side === 'left' ? 'ml-1.5' : 'mr-1.5')}>
+        {Array.from({ length: 2 }, (_, i) => {
+          const card = cards[i];
+          return <PlayingCard key={i} {...(card ? { card } : {})} size="sm" index={i} />;
+        })}
+      </div>
     </div>
-  );
-}
-
-/** One market on the board: what the table has on it, the odds, and what you have on it. */
-function MarketCell({
-  id,
-  odds,
-  pool,
-  yours,
-  open,
-  onBet,
-}: {
-  id: string;
-  odds: number;
-  pool: number;
-  yours: number;
-  open: boolean;
-  onBet: () => void;
-}) {
-  return (
-    <button
-      disabled={!open}
-      onClick={onBet}
-      className={`relative flex flex-1 flex-col items-center justify-center border-r border-emerald-900/70 px-1 py-3 transition last:border-r-0 ${
-        yours > 0 ? 'bg-amber-400/15' : 'hover:bg-emerald-800/50'
-      } disabled:cursor-default`}
-    >
-      {/* What the table is backing, above the name — the chips on the cell. */}
-      <span className="h-4 text-[0.65rem] font-bold text-white/90">
-        {pool > 0 ? `🪙 ${pool}` : ''}
-      </span>
-      <span className="text-[0.68rem] leading-tight font-bold tracking-wide text-emerald-50">
-        {titleOf(id)}
-      </span>
-      <span className="font-mono text-base font-black text-amber-300">{odds}×</span>
-
-      {yours > 0 && (
-        <span className="absolute top-1 right-1 rounded-full bg-amber-400 px-1.5 text-[0.6rem] font-black text-black shadow">
-          ${yours}
-        </span>
-      )}
-    </button>
   );
 }

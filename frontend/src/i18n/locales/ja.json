@@ -1000,5 +1000,18 @@
     "you": "私",
     "grabbed": "お年玉をゲット！",
     "hitMine": "地雷を踏みました！"
+  },
+  "cowboy": {
+    "cowboy": "カウボーイ",
+    "cowgirl": "カウガール",
+    "push": "引き分け",
+    "wins": "{{who}} の勝ち",
+    "eitherHand": "いずれかの役",
+    "winningRank": "勝利した役",
+    "joinGame": "参加する",
+    "betsClosed": "ベット締切",
+    "settled": "精算済み",
+    "poolShort": "全体",
+    "yoursShort": "自分"
   }
 }

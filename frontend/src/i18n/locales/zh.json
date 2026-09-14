@@ -1000,5 +1000,18 @@
     "you": "我",
     "grabbed": "恭喜抢到红包！",
     "hitMine": "很遗憾，踩雷了！"
+  },
+  "cowboy": {
+    "cowboy": "牛仔",
+    "cowgirl": "女牛仔",
+    "push": "和局",
+    "wins": "{{who}} 获胜",
+    "eitherHand": "任一牌型",
+    "winningRank": "获胜牌型",
+    "joinGame": "加入游戏",
+    "betsClosed": "停止下注",
+    "settled": "已结算",
+    "poolShort": "全场",
+    "yoursShort": "我的"
   }
 }
