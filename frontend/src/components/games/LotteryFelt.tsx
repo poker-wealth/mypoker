@@ -6,9 +6,11 @@ import { SeatStrip } from './SeatStrip';
 export interface LotteryFeltProps {
   snapshot?: any;
   onCommand?: (cmd: any) => void;
+  /** Opens the buy-in sheet. See FeltComponent.onSit in registry.ts. */
+  onSit: (seatIndex: number) => void;
 }
 
-export function LotteryFelt({ snapshot, onCommand }: LotteryFeltProps) {
+export function LotteryFelt({ snapshot, onCommand, onSit }: LotteryFeltProps) {
   const [selectedNum, setSelectedNum] = useState<number>(0);
   const [betAmount, setBetAmount] = useState(100);
 
@@ -17,10 +19,13 @@ export function LotteryFelt({ snapshot, onCommand }: LotteryFeltProps) {
   const youSeat = seats.find((s: any) => s.isYou);
   const isSeated = Boolean(youSeat);
 
-  /** Take the first free chair, at the table's own minimum — seat 0 is usually already taken. */
+  /**
+   * Take the first free chair — seat 0 is usually already taken. The AMOUNT is the player's
+   * to choose: this opens the buy-in sheet rather than sitting at the table minimum.
+   */
   const sitDown = (): void => {
     const free = (snapshot?.seats ?? []).find((s: any) => !s.playerId);
-    onCommand?.({ kind: 'sit', seat: free?.index ?? 0, buyIn: snapshot?.minBuyIn ?? 1000 });
+    onSit(free?.index ?? 0);
   };
 
   return (

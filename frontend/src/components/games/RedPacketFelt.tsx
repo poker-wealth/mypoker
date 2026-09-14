@@ -61,9 +61,11 @@ interface RedEnvelopeRound {
 export interface RedPacketFeltProps {
   snapshot?: TableSnapshot | null;
   onCommand?: (cmd: TableCommand) => void;
+  /** Opens the buy-in sheet. See FeltComponent.onSit in registry.ts. */
+  onSit: (seatIndex: number) => void;
 }
 
-export function RedPacketFelt({ snapshot, onCommand }: RedPacketFeltProps) {
+export function RedPacketFelt({ snapshot, onCommand, onSit }: RedPacketFeltProps) {
   const { t } = useTranslation();
   const [now, setNow] = useState(() => Date.now());
 
@@ -128,7 +130,7 @@ export function RedPacketFelt({ snapshot, onCommand }: RedPacketFeltProps) {
 
   const sit = (): void => {
     const free = seats.find((s) => !s.playerId);
-    onCommand?.({ kind: 'sit', seat: free?.index ?? 0, buyIn: snapshot?.minBuyIn ?? 1_000 });
+    onSit(free?.index ?? 0);
   };
 
   const claim = (): void => {

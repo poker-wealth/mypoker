@@ -1004,3 +1004,38 @@ unregister must come **first**, while the credential it needs still exists.
 The general form: teardown that calls the network runs before the credentials
 are destroyed, and setup that depends on a state attaches to the state rather
 than to each of its causes.
+
+---
+
+## 35. A money fix on one platform is a money bug still live on the other
+
+On 25 Aug the mobile audit (`26d6f41`) found that every non-poker felt took a
+seat with `{ kind: 'sit', buyIn: snapshot.minBuyIn }` straight from its button.
+One tap moved money at an amount the player was never shown and never chose. It
+was fixed properly: `onSit` became a **required** prop on mobile's
+`FeltComponent`, so a felt that forgot the buy-in sheet stopped compiling.
+
+The web felts were never touched. All nine of them — the Telegram Mini App, the
+client the owner actually tests — kept spending the table minimum on tap for
+three more weeks, until a Cowboy redesign happened to read the sit handler.
+
+Nothing was going to catch it:
+
+- `check:parity` enumerates **routes and tabs**, not behaviour. Both platforms
+  had a table screen; that was all it asked.
+- The fix lived in a mobile commit message and a mobile code comment ("An audit
+  found all eight"). Neither is anywhere a web change would look.
+- There was no entry here. Section 9 says parity is enumerated, never assumed —
+  and a *fix* is exactly the kind of parity nobody enumerates.
+
+**Rule:** when a bug is about money or security and the logic exists on both
+clients, the fix is not done until the other client is checked by name — and
+the commit that fixes one side says what it found on the other, even when the
+answer is "same bug, not fixed here."
+
+**How it was closed on the web** mirrors mobile deliberately: `onSit` is required
+on `FeltComponent` in `frontend/src/components/games/registry.ts`, and
+`Table.tsx` wires it to the same `BuyInSheet` the poker table has always used.
+Making it required found a renderer the grep had missed — `src/demo/DemoPage.tsx`
+stores the felts in a map rather than rendering them as JSX, so a search for
+`<XFelt` never saw it. The compiler did.

@@ -8,6 +8,8 @@ import type { TableCommand, TableSnapshot } from '@/lib/liveTable';
 export interface DouDiZhuFeltProps {
   snapshot?: TableSnapshot | null;
   onCommand?: (cmd: TableCommand) => void;
+  /** Opens the buy-in sheet. See FeltComponent.onSit in registry.ts. */
+  onSit: (seatIndex: number) => void;
 }
 
 const RANK_SUIT_SYMBOLS: Record<string, string> = {
@@ -30,7 +32,7 @@ function formatCard(card: string): { rank: string; suit: string; color: string }
   };
 }
 
-export function DouDiZhuFelt({ snapshot, onCommand }: DouDiZhuFeltProps) {
+export function DouDiZhuFelt({ snapshot, onCommand, onSit }: DouDiZhuFeltProps) {
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
 
   const phase = snapshot?.phase ?? 'WAITING';
@@ -64,7 +66,7 @@ export function DouDiZhuFelt({ snapshot, onCommand }: DouDiZhuFeltProps) {
   /** Take the first free chair. Dou Di Zhu deals at three, so the table waits until it has them. */
   const sitDown = () => {
     const free = seats.find((s) => !s.playerId);
-    onCommand?.({ kind: 'sit', seat: free?.index ?? 0, buyIn: snapshot?.minBuyIn ?? 1_000 });
+    onSit(free?.index ?? 0);
   };
 
   return (

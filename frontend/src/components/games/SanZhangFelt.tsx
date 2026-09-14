@@ -5,9 +5,11 @@ import { TableNotice } from './TableNotice';
 export interface SanZhangFeltProps {
   snapshot?: any;
   onCommand?: (cmd: any) => void;
+  /** Opens the buy-in sheet. See FeltComponent.onSit in registry.ts. */
+  onSit: (seatIndex: number) => void;
 }
 
-export function SanZhangFelt({ snapshot, onCommand }: SanZhangFeltProps) {
+export function SanZhangFelt({ snapshot, onCommand, onSit }: SanZhangFeltProps) {
   const [betAmount, setBetAmount] = useState(100);
 
   const phase = snapshot?.phase ?? 'WAITING';
@@ -15,10 +17,13 @@ export function SanZhangFelt({ snapshot, onCommand }: SanZhangFeltProps) {
   const youSeat = seats.find((s: any) => s.isYou);
   const isSeated = Boolean(youSeat);
 
-  /** Take the first free chair, at the table's own minimum — seat 0 is usually already taken. */
+  /**
+   * Take the first free chair — seat 0 is usually already taken. The AMOUNT is the player's
+   * to choose: this opens the buy-in sheet rather than sitting at the table minimum.
+   */
   const sitDown = (): void => {
     const free = (snapshot?.seats ?? []).find((s: any) => !s.playerId);
-    onCommand?.({ kind: 'sit', seat: free?.index ?? 0, buyIn: snapshot?.minBuyIn ?? 1000 });
+    onSit(free?.index ?? 0);
   };
 
   return (

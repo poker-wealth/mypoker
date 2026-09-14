@@ -24,6 +24,19 @@ import type { TableCommand, TableSnapshot } from '@/lib/liveTable';
 export type FeltComponent = (props: {
   snapshot?: TableSnapshot | null;
   onCommand?: (cmd: TableCommand) => void;
+  /**
+   * Taking a seat opens the buy-in sheet — it does NOT commit one.
+   *
+   * Every felt here used to send `{ kind: 'sit', buyIn: snapshot.minBuyIn }` straight from its
+   * button, so one tap moved money at an amount the player was never shown and never chose. The
+   * poker table has always gone through BuyInSheet; these nine did not. Mobile's audit found and
+   * fixed the same thing in all eight of its felts, and the web — the Mini App — was left out.
+   *
+   * REQUIRED, not optional, and that is the fix as much as the call sites are: optional is what
+   * made the old path reachable, and a required prop turns a felt that forgets it into a compile
+   * error rather than a player spending money they did not agree to.
+   */
+  onSit: (seatIndex: number) => void;
 }) => React.ReactElement;
 
 export const GAME_FELTS: Record<string, FeltComponent> = {

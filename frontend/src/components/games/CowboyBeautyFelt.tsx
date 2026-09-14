@@ -32,6 +32,8 @@ interface CowboyBeautyRound {
 export interface CowboyBeautyFeltProps {
   snapshot?: TableSnapshot | null;
   onCommand?: (cmd: TableCommand) => void;
+  /** Opens the buy-in sheet. See FeltComponent.onSit in registry.ts. */
+  onSit: (seatIndex: number) => void;
 }
 
 const CHIPS = [50, 100, 500, 1_000];
@@ -40,7 +42,7 @@ const CHIPS = [50, 100, 500, 1_000];
 const asMultiple = (bps: number | null | undefined): string =>
   bps === null || bps === undefined ? '—' : `${(bps / 10_000).toFixed(2)}×`;
 
-export function CowboyBeautyFelt({ snapshot, onCommand }: CowboyBeautyFeltProps) {
+export function CowboyBeautyFelt({ snapshot, onCommand, onSit }: CowboyBeautyFeltProps) {
   const [side, setSide] = useState<Side>('COWBOY');
   const [betAmount, setBetAmount] = useState(100);
   const [now, setNow] = useState(() => Date.now());
@@ -63,7 +65,7 @@ export function CowboyBeautyFelt({ snapshot, onCommand }: CowboyBeautyFeltProps)
 
   const sitDown = (): void => {
     const free = seats.find((s) => !s.playerId);
-    onCommand?.({ kind: 'sit', seat: free?.index ?? 0, buyIn: snapshot?.minBuyIn ?? 1_000 });
+    onSit(free?.index ?? 0);
   };
 
   const back = (which: Side): void => {

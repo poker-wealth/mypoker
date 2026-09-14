@@ -25,6 +25,7 @@ import { DEMO_SCRIPTS } from './scripts';
 type FeltComponent = (props: {
   snapshot?: TableSnapshot | null;
   onCommand?: (cmd: TableCommand) => void;
+  onSit: (seatIndex: number) => void;
 }) => React.ReactElement;
 
 const FELTS: Record<string, FeltComponent> = {
@@ -101,7 +102,10 @@ export function DemoPage() {
       {/* The real screen for this game, driven by the script. */}
       <div className="flex min-h-[26rem] flex-1 items-center justify-center px-3 py-4">
         {Felt ? (
-          <Felt snapshot={current.snapshot} />
+          // Inert on purpose, like every control here: the walkthrough has no server, no
+          // account and no chips, so a seat tap has nothing to open. The live table wires
+          // this to the buy-in sheet — see FeltComponent.onSit in components/games/registry.ts.
+          <Felt snapshot={current.snapshot} onSit={() => undefined} />
         ) : (
           <PokerTable state={view} />
         )}

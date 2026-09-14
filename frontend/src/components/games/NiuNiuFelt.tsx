@@ -30,6 +30,8 @@ interface NiuNiuRoundState {
 export interface NiuNiuFeltProps {
   snapshot?: TableSnapshot | null;
   onCommand?: (cmd: TableCommand) => void;
+  /** Opens the buy-in sheet. See FeltComponent.onSit in registry.ts. */
+  onSit: (seatIndex: number) => void;
 }
 
 const CHIPS = [50, 100, 500, 1_000];
@@ -53,7 +55,7 @@ function useCountdown(
   return left > 0 ? left : 0;
 }
 
-export function NiuNiuFelt({ snapshot, onCommand }: NiuNiuFeltProps) {
+export function NiuNiuFelt({ snapshot, onCommand, onSit }: NiuNiuFeltProps) {
   const design = useTableDesign((d) => d.design);
   const [betAmount, setBetAmount] = useState(100);
   const [multiplier, setMultiplier] = useState(1);
@@ -79,10 +81,13 @@ export function NiuNiuFelt({ snapshot, onCommand }: NiuNiuFeltProps) {
   const ordered =
     yourPlace > 0 ? [...occupied.slice(yourPlace), ...occupied.slice(0, yourPlace)] : occupied;
 
-  /** Take the first free chair, at the table's own minimum — seat 0 is usually already taken. */
+  /**
+   * Take the first free chair — seat 0 is usually already taken. The AMOUNT is the player's
+   * to choose: this opens the buy-in sheet rather than sitting at the table minimum.
+   */
   const sitDown = (): void => {
     const free = seats.find((s) => !s.playerId);
-    onCommand?.({ kind: 'sit', seat: free?.index ?? 0, buyIn: snapshot?.minBuyIn ?? 1_000 });
+    onSit(free?.index ?? 0);
   };
 
   const bid = (n: number): void => onCommand?.({ kind: 'act', action: { type: `bid-${n}` } });

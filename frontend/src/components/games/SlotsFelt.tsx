@@ -6,6 +6,8 @@ import { SeatStrip } from './SeatStrip';
 export interface SlotsFeltProps {
   snapshot?: any;
   onCommand?: (cmd: any) => void;
+  /** Opens the buy-in sheet. See FeltComponent.onSit in registry.ts. */
+  onSit: (seatIndex: number) => void;
 }
 
 const SYMBOL_ICONS: Record<string, string> = {
@@ -15,7 +17,7 @@ const SYMBOL_ICONS: Record<string, string> = {
   SEVEN: '7️⃣',
 };
 
-export function SlotsFelt({ snapshot, onCommand }: SlotsFeltProps) {
+export function SlotsFelt({ snapshot, onCommand, onSit }: SlotsFeltProps) {
   const [wager, setWager] = useState(100);
 
   const phase = snapshot?.phase ?? 'WAITING';
@@ -24,10 +26,13 @@ export function SlotsFelt({ snapshot, onCommand }: SlotsFeltProps) {
   const isSeated = Boolean(youSeat);
   const board = snapshot?.board ?? ['CHERRY', 'BELL', 'STAR'];
 
-  /** Take the first free chair, at the table's own minimum — seat 0 is usually already taken. */
+  /**
+   * Take the first free chair — seat 0 is usually already taken. The AMOUNT is the player's
+   * to choose: this opens the buy-in sheet rather than sitting at the table minimum.
+   */
   const sitDown = (): void => {
     const free = (snapshot?.seats ?? []).find((s: any) => !s.playerId);
-    onCommand?.({ kind: 'sit', seat: free?.index ?? 0, buyIn: snapshot?.minBuyIn ?? 1000 });
+    onSit(free?.index ?? 0);
   };
 
   return (

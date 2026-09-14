@@ -436,7 +436,13 @@ function LiveTable({ tableId }: { tableId: string }) {
         )}
       >
         {Felt ? (
-          <Felt snapshot={snapshot} onCommand={(cmd) => live.command(cmd)} />
+          <Felt
+            snapshot={snapshot}
+            onCommand={(cmd) => live.command(cmd)}
+            // The same sheet the poker table opens: the player sees the table's range
+            // and their balance and picks the amount. See FeltComponent.onSit.
+            onSit={(seatIndex) => setBuyInFor(seatIndex)}
+          />
         ) : (
           <PokerTable
             state={view}
