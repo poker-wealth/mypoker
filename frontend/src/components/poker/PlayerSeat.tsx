@@ -45,7 +45,14 @@ interface PlayerSeatProps {
  * same fraction of the table on every design. Clamped so it stays tappable on a
  * small phone and does not balloon on a desktop-width felt.
  */
-const AVATAR = 'size-[clamp(52px,20cqmin,82px)]';
+/*
+ * BACK TO THE ORIGINAL SIZE. This was briefly grown to
+ * `clamp(52px,20cqmin,82px)` on a reading of "make the circle a bit wider" as
+ * "bigger". It meant spacing — "space it out ooo… not make the circle bigger"
+ * — and a bigger circle made the crowding it was about WORSE. The chairs are
+ * spread apart in tableDesigns.ts instead; the circle is the size it was.
+ */
+const AVATAR = 'size-[clamp(44px,17cqmin,70px)]';
 
 export function PlayerSeat({
   seat,

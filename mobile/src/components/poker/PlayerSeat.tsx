@@ -26,13 +26,13 @@ export interface PlayerSeatProps {
   accent?: string;
 }
 
-/**
- * The seat circle. Widened from 54 on 14 Sep 2026 — "make the circle a bit
- * wider" — and kept in step with the Mini App, whose seat grew by the same
- * proportion (17 → 20 cqmin, clamped 52–82px). A chair that is one size on the
- * phone and another in Telegram is the drift these two files exist to prevent.
+/*
+ * BACK TO 54, with the Mini App. It was briefly 64 on a reading of "make the
+ * circle a bit wider" as "bigger". It meant SPACING — "space it out ooo… not
+ * make the circle bigger" — and a bigger circle made the crowding it was about
+ * worse. The chairs are spread apart in `table/tableDesigns.ts` instead.
  */
-const AVATAR = 64;
+const AVATAR = 54;
 
 export function PlayerSeat({ seat, onSit, toAct = false, accent = '#f5c451' }: PlayerSeatProps) {
   const { t } = useTranslation();
