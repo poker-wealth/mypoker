@@ -45,7 +45,7 @@ interface PlayerSeatProps {
  * same fraction of the table on every design. Clamped so it stays tappable on a
  * small phone and does not balloon on a desktop-width felt.
  */
-const AVATAR = 'size-[clamp(44px,17cqmin,70px)]';
+const AVATAR = 'size-[clamp(52px,20cqmin,82px)]';
 
 export function PlayerSeat({
   seat,
