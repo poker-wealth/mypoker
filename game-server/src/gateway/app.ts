@@ -258,7 +258,12 @@ function cors(allowed: string[]) {
       // while a browser refused to send the request at all.
       //
       // Adding a verb to any route means adding it here.
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
+      //
+      // DELETE is the third time. `DELETE /me/push-tokens` (sign-out forgets the
+      // device) was mounted without it, and cors-methods.test.ts - written after
+      // the PATCH incidents above for exactly this - went red and stayed red on
+      // main, because nobody ran the gateway suite before merging.
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
       res.setHeader('Access-Control-Max-Age', '600');
     }
     if (req.method === 'OPTIONS') {
