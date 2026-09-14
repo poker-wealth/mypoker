@@ -81,8 +81,22 @@ export function PlayerSeat({
     // read as a filled — and so occupied — seat.
     if (!onSit) {
       return (
+        /*
+         * "Sit here", not "Empty" — the same words as the chair next to it.
+         *
+         * This branch is the chair you cannot take: you are already seated, or
+         * watching without a session. It used to read "Empty", which made a
+         * table look like two different kinds of chair depending on who was
+         * looking at it. Owner's call, 14 Sep 2026: "change from empty back to
+         * sit here."
+         *
+         * It is STILL NOT A BUTTON, and that is what keeps this honest: no
+         * press animation, no tap target, and dimmer than the live one. The
+         * seat says what it is — a free chair — while staying visibly not an
+         * offer to THIS viewer.
+         */
         <div className={cn(emptySeat, 'border border-white/[0.16] text-white/30')}>
-          {t('table.seatEmpty')}
+          {t('table.seatOpen')}
         </div>
       );
     }

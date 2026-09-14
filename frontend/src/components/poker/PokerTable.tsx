@@ -94,28 +94,6 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
   const [aw = '1', ah = '1'] = design.aspect.split('/').map((n) => n.trim());
   const isWide = Number(aw) > Number(ah);
 
-  /**
-   * The felt's width when HEIGHT is the binding constraint.
-   *
-   * The table was sized by width alone: it took the full width of the screen
-   * and derived its height from the aspect ratio, which on a 3/4 portrait felt
-   * is a third taller than it is wide. On a phone that is taller than the space
-   * between the top bar and the dock, so the page scrolled — you could not see
-   * the seats at the top and the controls at the bottom at the same time.
-   * Reported 12 Sep 2026: "the board should fit into the screen so we don't
-   * need to scroll down to see the tabs at the bottom nor scroll up to see the
-   * tabs at the top."
-   *
-   * `100cqh` is the height this container actually has (the flex row between
-   * the bar and the dock, which is a size container). Multiplied by the aspect
-   * ratio it gives the width at which the table exactly fills that height;
-   * `min()` with 100% keeps the old width-driven behaviour whenever width is
-   * the tighter of the two. So the felt now fits the smaller dimension, which
-   * is what "fits the screen" means, and nothing changes on a wide screen
-   * where height was never the problem.
-   */
-  const fitWidth = `min(100%, calc(100cqh * ${Number(aw) / Number(ah)}))`;
-
   // Mobile keeps the 440px felt; desktop scales it up so the table fills the
   // screen instead of sitting as a small oval in a sea of empty space. The felt
   // is aspect-ratio + %-positioned, so the whole table (seats) scales together.
@@ -125,18 +103,23 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
         // `h-full` + a size container: the box the felt must fit INSIDE. Its
         // height is what `100cqh` reads in `fitWidth` above.
         'relative mx-auto flex h-full w-full items-center justify-center',
-        // A LANDSCAPE felt is short, so it can afford to be much wider — capping
-        // it at the portrait width leaves a cramped strip with the seats
-        // crowding each other. A portrait felt keeps the original ceiling,
-        // because widening that one only makes it taller than the screen.
-        //
-        // The PADDING matters more than the cap on a phone: at 360px wide the
-        // ceiling is never reached, and 20px of gutter each side is 11% of the
-        // felt. A wide table gets almost none — it has vertical room to spare
-        // and needs every pixel of width.
+        /*
+         * NO WIDTH CAP AND NO GUTTER ON A PHONE.
+         *
+         * The portrait felt used to stop at 440px with 20px of padding each
+         * side. Both made sense when the felt was a PICTURE of a table that
+         * would look wrong stretched. There is no picture now, and on a phone
+         * those two took ~11% of the width off a table that is already fitted
+         * to the screen's height — the seats ended up clustered in the middle
+         * with empty margins beside them.
+         *
+         * The caps stay on LARGE screens, where an unbounded felt would run to
+         * the full width of a desktop monitor and put the two rails a metre
+         * apart. A phone has no such problem; it has the opposite one.
+         */
         isWide
           ? 'px-0 max-w-none md:max-w-[1100px] lg:max-w-[1400px]'
-          : 'px-5 max-w-[440px] md:max-w-[620px] lg:max-w-[780px]',
+          : 'px-1 max-w-none md:max-w-[620px] lg:max-w-[780px]',
       )}
       style={{ containerType: 'size' }}
     >
@@ -152,7 +135,31 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
       */}
       <div
         className="relative"
-        style={{ aspectRatio: design.aspect, containerType: 'size', width: fitWidth }}
+        style={
+          /*
+           * THE FELT FILLS THE SPACE IT IS GIVEN — it is no longer locked to an
+           * aspect ratio.
+           *
+           * That ratio existed to match ARTWORK: a design used to be a picture
+           * of a table, and the seat ring was measured off that picture, so the
+           * box had to keep the picture's proportions or players floated off
+           * the rail. The artwork is gone — a design is a ground colour now,
+           * and the seats themselves make the oval.
+           *
+           * What the ratio was still doing was squeezing the table. Since the
+           * felt is fitted to the screen HEIGHT, a 3/4 ratio forced the box
+           * narrow on a tall phone, and seats positioned at 16% of that narrow
+           * box landed around 29% of the screen: everything bunched into the
+           * middle with wide empty margins either side. Reported as "you made
+           * the circle stuff inside instead of wider like i asked, spacious".
+           *
+           * Filling the box spreads the same percentages across the real width,
+           * which is what makes the table look spacious rather than pinched.
+           * `containerType: size` stays — the seats size themselves in `cqmin`
+           * against this box.
+           */
+          { containerType: 'size', width: '100%', height: '100%' }
+        }
       >
 
         {/* Embedded HTML5 Canvas Element for inspection */}
