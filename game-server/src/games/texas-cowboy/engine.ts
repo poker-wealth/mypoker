@@ -389,12 +389,32 @@ export class TexasCowboyEngine {
     this.state.phase = 'ROUND_COMPLETE';
   }
 
-  private betWins(bet: UserBet, result: NonNullable<TexasCowboyRound['result']>): boolean {
-    const market = this.state.markets.find((m) => m.id === bet.marketId);
-    if (!market) return false;
+  /**
+   * Which markets this round's result pays, by id. `null` until the hands are evaluated.
+   *
+   * Public so the room can keep the per-market trails the board shows (the dot rows and "N hands
+   * vacant"). It goes through `marketWins` — the same judgement `betWins` uses to pay money — so
+   * the board and the settlement cannot disagree about what hit. A second copy of these three
+   * lines in the room is the version that drifts.
+   */
+  marketOutcomes(): Record<string, boolean> | null {
+    const result = this.state.result;
+    if (!result) return null;
+    const out: Record<string, boolean> = {};
+    for (const market of this.state.markets) out[market.id] = this.marketWins(market, result);
+    return out;
+  }
+
+  private marketWins(market: BettingMarket, result: NonNullable<TexasCowboyRound['result']>): boolean {
     if (market.category === 'WINNER') return market.selection === result.winner;
     if (market.category === 'TIE') return result.winner === 'TIE';
     return result.winner !== 'TIE' && market.selection === result.winningHandType;
+  }
+
+  private betWins(bet: UserBet, result: NonNullable<TexasCowboyRound['result']>): boolean {
+    const market = this.state.markets.find((m) => m.id === bet.marketId);
+    if (!market) return false;
+    return this.marketWins(market, result);
   }
 
   private betVoids(bet: UserBet, result: NonNullable<TexasCowboyRound['result']>): boolean {

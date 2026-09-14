@@ -1,19 +1,31 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { PlayingCard } from '../poker/PlayingCard';
-import { radius, space, theme } from '../../theme';
 import type { TableCommand, TableSnapshot } from '../../lib/liveTable';
 
 /**
- * TEXAS COWBOY — a betting board, not a poker seat.
+ * TEXAS COWBOY — laid out after the reference's Cowboy screen, as closely as the owner asked.
  *
- * Ported from `frontend/src/components/games/TexasCowboyFelt.tsx`. Two hands are dealt, Cowboy and
- * Cowgirl, and nobody plays them: the table bets on the outcome. So the screen is read top to
- * bottom — the scene, then the board. Tap a chip, tap a market, the bet is placed; there is no
- * separate confirm step, because a window that closes in twelve seconds cannot afford one.
+ * Ported from `frontend/src/components/games/TexasCowboyFelt.tsx`, which carries the full reasoning;
+ * the short version, so this file stands on its own:
  *
- * The server owns every number here. Odds, stakes and the road all come from the round; the felt
- * never multiplies anything out.
+ *   OUR BETS, THEIR LAYOUT. Each server market keeps its own cell. The reference's merged cells
+ *   ("High card / One pair", "Three of a kind / Straight / Flush") are split in place, because a
+ *   merged tap could not say which bet it placed. Its "Either hand type" block has no market here
+ *   and is not drawn.
+ *
+ *   THE ODDS ARE OURS — every multiplier comes from the round.
+ *
+ *   THE CHARACTERS ARE PLACEHOLDERS until ours are drawn.
+ *
+ *   NO FIGURE IS INVENTED. Trails come only from what the server recorded; a vacancy that is a
+ *   lower bound prints with "+".
+ *
+ *   NO GROUND OF ITS OWN. Every surface is translucent over the table's ground.
+ *
+ * TYPE: the web board uses Oswald, a condensed face. The app loads only Nunito, and adding a font
+ * family is a package and a native rebuild, so this uses Nunito's heavy weights with tightened
+ * tracking — closest to the reference without a new dependency.
  */
 
 export type PokerHandType =
@@ -44,20 +56,37 @@ export interface TexasCowboyRound {
   yourStakes?: Record<string, number>;
   /** Who won the last rounds, oldest first. The road. */
   history?: Array<'COWBOY' | 'COWGIRL' | 'TIE'>;
+  /** Per market, whether each of the last rounds paid it, oldest first. */
+  marketHistory?: Record<string, boolean[]>;
+  /** Per market, rounds since it last paid. `exact: false` means "at least". */
+  vacant?: Record<string, { rounds: number; exact: boolean }>;
 }
 
-/** The board, in the rows it is read in. */
-const ROWS: Array<{ label: string; markets: string[] }> = [
-  { label: 'Who wins', markets: ['cowboy_win', 'tie', 'cowgirl_win'] },
-  { label: 'Either hand makes', markets: ['high_card', 'one_pair', 'two_pair'] },
-  { label: 'Winning hand', markets: ['three_of_a_kind', 'straight', 'flush'] },
-  { label: 'Long shots', markets: ['full_house', 'four_of_a_kind', 'straight_flush', 'royal_flush'] },
-];
+/** The reference's wording for each of our markets. Kept in step with the web felt by hand. */
+const LABEL: Record<string, string> = {
+  cowboy_win: 'Cowboy Win',
+  tie: 'Push',
+  cowgirl_win: 'Cowgirl Win',
+  high_card: 'High card',
+  one_pair: 'One pair',
+  two_pair: 'Two pairs',
+  three_of_a_kind: 'Three of a kind',
+  straight: 'Straight',
+  flush: 'Flush',
+  full_house: 'Full House',
+  four_of_a_kind: 'Four of a kind',
+  straight_flush: 'Straight Flush',
+  royal_flush: 'Royal Flush',
+};
 
+/** From this multiplier up a cell shows "N hands vacant" instead of dots — as the reference does. */
+const LONG_SHOT = 20;
 const CHIPS = [100, 500, 1_000, 5_000];
 
-const titleOf = (id: string): string =>
-  id.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+const GOLD = '#d4b26a';
+const GOLD_LINE = 'rgba(212,178,106,0.45)';
+const CREAM = '#f4ecd6';
+const OUTCOMES = new Set(['cowboy_win', 'cowgirl_win', 'tie']);
 
 export function TexasCowboyFelt({
   snapshot,
@@ -67,14 +96,8 @@ export function TexasCowboyFelt({
   snapshot: TableSnapshot;
   onCommand: (cmd: TableCommand) => void;
   /**
-   * Taking a seat opens the buy-in sheet — it does NOT commit one.
-   *
-   * Every one of these felts used to send { kind: 'sit', buyIn: snapshot.minBuyIn } straight
-   * from the button, so a tap moved money at an amount the player was never shown and never
-   * chose. The poker felt has always gone through BuyInSheet; the other eight did not. An audit
-   * found all eight.
-   *
-   * Required, not optional: a felt that cannot open the sheet must not fall back to spending.
+   * Taking a seat opens the buy-in sheet — it does NOT commit one. Required, not optional: a felt
+   * that cannot open the sheet must not fall back to spending.
    */
   onSit: (seatIndex: number) => void;
 }) {
@@ -82,12 +105,10 @@ export function TexasCowboyFelt({
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 100);
+    const t = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(t);
   }, []);
 
-  // The round arrives in its own field. It used to be JSON stuffed into `message` — the line the
-  // result banner prints — which put the whole round state on screen as text.
   const round = (snapshot.gameState as TexasCowboyRound | undefined) ?? null;
   const seats = snapshot.seats;
   const you = seats.find((s) => s.isYou);
@@ -100,124 +121,135 @@ export function TexasCowboyFelt({
   const closesAt = snapshot.actionDeadline ?? round?.bettingWindow?.closesAt ?? 0;
   const remaining = Math.max(0, closesAt - now);
   const isBettingOpen = round?.phase === 'BETTING_OPEN';
-
-  const oddsOf = (id: string): number => round?.markets.find((m) => m.id === id)?.multiplier ?? 0;
-  const poolOf = (id: string): number => round?.pools?.[id] ?? 0;
-  const yoursOn = (id: string): number => round?.yourStakes?.[id] ?? 0;
+  const canBet = isBettingOpen && Boolean(you);
 
   const bet = (marketId: string): void => {
-    if (!isBettingOpen || !you) return;
+    if (!canBet) return;
     onCommand({ kind: 'act', action: { type: 'bet', amount: chip, selection: marketId } });
   };
 
+  const cell = (id: string, opts: { flex?: number; small?: boolean; last?: boolean } = {}) => (
+    <MarketCell
+      key={id}
+      label={LABEL[id] ?? id}
+      odds={round?.markets.find((m) => m.id === id)?.multiplier ?? 0}
+      pool={round?.pools?.[id] ?? 0}
+      yours={round?.yourStakes?.[id] ?? 0}
+      trail={round?.marketHistory?.[id]}
+      vacant={round?.vacant?.[id]}
+      showTrail={!OUTCOMES.has(id)}
+      open={canBet}
+      flex={opts.flex ?? 1}
+      small={Boolean(opts.small)}
+      last={Boolean(opts.last)}
+      onBet={() => bet(id)}
+    />
+  );
+
   return (
     <View style={styles.wrap}>
-      {/*
-        The scene: the two of them facing each other, the community cards dealt between them, the
-        clock above. It is the top of the screen and the board is everything below, because that is
-        the order the game is read in — watch the hands, then back a market.
-      */}
+      {/* ── The scene ─────────────────────────────────────────────────────── */}
       <View style={styles.scene}>
-        <View style={styles.clock}>
-          {remaining > 0 && isBettingOpen ? (
-            <View style={[styles.clockDial, remaining > 3_000 ? styles.clockOk : styles.clockLate]}>
-              <Text style={[styles.clockText, remaining > 3_000 ? styles.clockTextOk : styles.clockTextLate]}>
-                {Math.ceil(remaining / 1_000)}s
-              </Text>
-            </View>
-          ) : (
-            <Text style={styles.clockClosed}>
-              {round?.phase === 'SETTLED' ? 'SETTLED' : 'BETS CLOSED'}
+        <Duelist
+          side="left"
+          figure="🤠"
+          cards={round?.cowboy.holeCards ?? []}
+          won={round?.result?.winner === 'COWBOY'}
+          hand={round?.cowboy.evaluation?.displayName}
+        />
+        <Duelist
+          side="right"
+          figure="💃"
+          cards={round?.cowgirl.holeCards ?? []}
+          won={round?.result?.winner === 'COWGIRL'}
+          hand={round?.cowgirl.evaluation?.displayName}
+        />
+
+        {isBettingOpen && remaining > 0 ? (
+          <View style={[styles.clock, remaining <= 3_000 && styles.clockLate]}>
+            <Text style={[styles.clockText, remaining <= 3_000 && styles.clockTextLate]}>
+              {Math.ceil(remaining / 1_000)}
             </Text>
-          )}
-        </View>
-
-        <View style={styles.duelists}>
-          <Duelist
-            title="COWBOY"
-            emoji="🤠"
-            accent="#fde68a"
-            cards={round?.cowboy.holeCards ?? []}
-            hand={round?.cowboy.evaluation?.displayName}
-            won={round?.result?.winner === 'COWBOY'}
-          />
-
-          {/* The community cards, dealt between them */}
-          <View style={styles.community}>
-            {Array.from({ length: 5 }, (_, i) => {
-              const card = round?.communityCards[i];
-              return <PlayingCard key={i} {...(card ? { card } : {})} size="sm" />;
-            })}
           </View>
+        ) : null}
 
-          <Duelist
-            title="COWGIRL"
-            emoji="💃"
-            accent="#fecdd3"
-            cards={round?.cowgirl.holeCards ?? []}
-            hand={round?.cowgirl.evaluation?.displayName}
-            won={round?.result?.winner === 'COWGIRL'}
-          />
+        {/* The board, dealt between them: face-up once revealed, red backs until. */}
+        <View style={styles.community}>
+          {Array.from({ length: 5 }, (_, i) => {
+            const card = round?.communityCards[i];
+            return card ? (
+              <PlayingCard key={i} card={card} size="md" />
+            ) : (
+              <CardBack key={i} width={44} height={64} />
+            );
+          })}
         </View>
 
-        {/* The road: how the last rounds went */}
-        <View style={styles.road}>
-          <Text style={styles.roadLabel}>ROUND #{round?.roundNumber ?? '—'}</Text>
-          {(round?.history ?? []).slice(-14).map((w, i) => (
-            <View
-              key={i}
-              style={[
-                styles.roadDot,
-                {
-                  backgroundColor:
-                    w === 'COWBOY' ? '#fbbf24' : w === 'COWGIRL' ? '#fb7185' : '#6ee7b7',
-                },
-              ]}
-            />
-          ))}
-        </View>
-      </View>
-
-      {/* Result */}
-      {round?.result ? <ResultBanner result={round.result} /> : null}
-
-      {/*
-        The board. One bordered grid, not floating cards: each row is a group with its name in the
-        left block, and every cell carries the chips already riding on it, so a glance tells you
-        where the table's money is.
-      */}
-      <View style={styles.board}>
-        {ROWS.map((row, rowIdx) => (
-          <View key={row.label} style={[styles.boardRow, rowIdx === ROWS.length - 1 && styles.boardRowLast]}>
-            <View style={styles.rowLabel}>
-              <Text style={styles.rowLabelText}>{row.label}</Text>
-            </View>
-            <View style={styles.rowCells}>
-              {row.markets.map((id, cellIdx) => (
-                <MarketCell
-                  key={id}
-                  id={id}
-                  odds={oddsOf(id)}
-                  pool={poolOf(id)}
-                  yours={yoursOn(id)}
-                  open={isBettingOpen && Boolean(you)}
-                  last={cellIdx === row.markets.length - 1}
-                  onBet={() => bet(id)}
+        {/* The table's name where the reference prints its stake tier, then the road. */}
+        <View style={styles.roadWrap}>
+          <Text style={styles.tableName} numberOfLines={1}>
+            {snapshot.name ?? ''}
+          </Text>
+          <View style={styles.road}>
+            <Text style={styles.roadIcon}>🂠</Text>
+            <View style={styles.roadDots}>
+              {(round?.history ?? []).slice(-10).map((w, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.roadDot,
+                    { backgroundColor: w === 'COWBOY' ? '#2cc4c9' : w === 'COWGIRL' ? '#d42a3c' : GOLD },
+                  ]}
                 />
               ))}
             </View>
           </View>
-        ))}
+        </View>
+
+        {round?.result ? <ResultBanner result={round.result} /> : null}
       </View>
 
-      {/* Chips, or the way in */}
+      {/* ── The paytable ──────────────────────────────────────────────────── */}
+      <View style={styles.tables}>
+        <View style={styles.block}>
+          <View style={styles.row}>
+            {cell('cowboy_win', { flex: 1.2 })}
+            {cell('tie', { flex: 0.9 })}
+            {cell('cowgirl_win', { flex: 1.2, last: true })}
+          </View>
+        </View>
+
+        <View style={styles.block}>
+          <View style={styles.row}>
+            <View style={styles.rankLabel}>
+              <Text style={styles.rankLabelText}>{'Winning\nhand rank'}</Text>
+            </View>
+            {cell('high_card')}
+            {cell('one_pair')}
+            {cell('two_pair', { last: true })}
+          </View>
+          <View style={[styles.row, styles.rowRule]}>
+            {cell('three_of_a_kind', { small: true })}
+            {cell('straight')}
+            {cell('flush', { last: true })}
+          </View>
+          <View style={[styles.row, styles.rowRule]}>
+            {cell('full_house', { small: true })}
+            {cell('four_of_a_kind', { small: true })}
+            {cell('straight_flush', { small: true })}
+            {cell('royal_flush', { small: true, last: true })}
+          </View>
+        </View>
+      </View>
+
+      {/* ── Join, or your chips ───────────────────────────────────────────── */}
       <View style={styles.footer}>
         {!you ? (
-          <Pressable onPress={sitDown} style={styles.join}>
-            <Text style={styles.joinText}>JOIN GAME</Text>
+          <Pressable onPress={sitDown} style={styles.join} accessibilityRole="button">
+            <Text style={styles.joinText}>Join Game</Text>
           </Pressable>
         ) : (
-          <>
+          <View style={styles.seated}>
             <View style={styles.chips}>
               {CHIPS.map((amt) => (
                 <Pressable
@@ -231,50 +263,73 @@ export function TexasCowboyFelt({
                 </Pressable>
               ))}
             </View>
-            <View>
-              <Text style={styles.hint}>
-                {isBettingOpen ? `Tap a market to stake ₮${chip}` : 'Betting is closed'}
-              </Text>
-              <Text style={styles.balance}>Balance ₮{you.stack}</Text>
+            <View style={styles.balanceBox}>
+              <Text style={styles.hint}>{isBettingOpen ? `Tap a bet to stake ${chip}` : 'Betting is closed'}</Text>
+              <Text style={styles.balance}>{you.stack}</Text>
             </View>
-          </>
+          </View>
         )}
       </View>
     </View>
   );
 }
 
-/** One of the two hands, standing at their end of the scene. */
-function Duelist({
-  title,
-  accent,
-  emoji,
-  cards,
-  hand,
-  won,
-}: {
-  title: string;
-  accent: string;
-  emoji: string;
-  cards: string[];
-  hand?: string | undefined;
-  won: boolean;
-}) {
+/** The reference's card back: red, inside a white border. */
+function CardBack({ width, height, style }: { width: number; height: number; style?: object }) {
   return (
-    <View style={styles.duelist}>
-      <Text style={styles.duelistEmoji}>{emoji}</Text>
-      <Text style={[styles.duelistTitle, { color: accent }, won && styles.duelistWon]}>{title}</Text>
-      <View style={styles.duelistCards}>
-        {cards.length > 0
-          ? cards.map((c, i) => <PlayingCard key={i} card={c} size="sm" />)
-          : [0, 1].map((i) => <PlayingCard key={i} size="sm" faceDown />)}
-      </View>
-      {hand ? <Text style={styles.duelistHand}>{hand}</Text> : null}
+    <View style={[styles.back, { width, height }, style]}>
+      <View style={styles.backInner} />
     </View>
   );
 }
 
-/** The result, popping in over the scene the way the web felt's does. */
+/** One of the two figures, at their end of the scene, holding their two cards. */
+function Duelist({
+  side,
+  figure,
+  cards,
+  won,
+  hand,
+}: {
+  side: 'left' | 'right';
+  figure: string;
+  cards: string[];
+  won: boolean;
+  hand?: string | undefined;
+}) {
+  return (
+    <View style={[styles.duelist, side === 'left' ? styles.duelistLeft : styles.duelistRight]}>
+      {/* PLACEHOLDER FIGURE — the illustration goes here, bottom-anchored. */}
+      <Text
+        style={[
+          styles.figure,
+          side === 'right' && styles.figureFlip,
+          won && styles.figureWon,
+        ]}
+      >
+        {figure}
+      </Text>
+      <View style={[styles.hole, side === 'left' ? styles.holeLeft : styles.holeRight]}>
+        {cards.length > 0
+          ? cards.map((c, i) => (
+              <View key={i} style={i > 0 ? styles.holeSecond : styles.holeFirst}>
+                <PlayingCard card={c} size="md" />
+              </View>
+            ))
+          : [0, 1].map((i) => (
+              <CardBack
+                key={i}
+                width={46}
+                height={64}
+                style={i > 0 ? styles.holeSecond : styles.holeFirst}
+              />
+            ))}
+      </View>
+      {hand ? <Text style={styles.hand}>{hand}</Text> : null}
+    </View>
+  );
+}
+
 function ResultBanner({
   result,
 }: {
@@ -288,220 +343,276 @@ function ResultBanner({
     return () => anim.stop();
   }, [result.winner, result.winningHandType, enter]);
 
-  const scale = enter.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
+  const scale = enter.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
+  const title =
+    result.winner === 'TIE' ? 'Push' : `${result.winner === 'COWBOY' ? 'Cowboy' : 'Cowgirl'} Win`;
 
   return (
     <Animated.View style={[styles.result, { opacity: enter, transform: [{ scale }] }]}>
-      <Text style={styles.resultText}>
-        {result.winner === 'TIE' ? 'TIE' : `${result.winner} WINS`}
-      </Text>
+      <Text style={styles.resultText}>{title}</Text>
       {result.winningHandType ? (
-        <Text style={styles.resultHand}>{titleOf(result.winningHandType)}</Text>
+        <Text style={styles.resultHand}>
+          {LABEL[result.winningHandType.toLowerCase()] ?? result.winningHandType}
+        </Text>
       ) : null}
     </Animated.View>
   );
 }
 
-/** One market on the board: what the table has on it, the odds, and what you have on it. */
+/** One market: header strip with the chips on it, name and odds, then its trail or vacancy. */
 function MarketCell({
-  id,
+  label,
   odds,
   pool,
   yours,
+  trail,
+  vacant,
+  showTrail,
   open,
+  flex,
+  small,
   last,
   onBet,
 }: {
-  id: string;
+  label: string;
   odds: number;
   pool: number;
   yours: number;
+  trail: boolean[] | undefined;
+  vacant: { rounds: number; exact: boolean } | undefined;
+  showTrail: boolean;
   open: boolean;
+  flex: number;
+  small: boolean;
   last: boolean;
   onBet: () => void;
 }) {
+  const longShot = odds >= LONG_SHOT;
+
   return (
     <Pressable
       disabled={!open}
       onPress={onBet}
-      style={[styles.cell, !last && styles.cellDivider, yours > 0 && styles.cellBacked]}
+      style={[styles.cell, { flex }, !last && styles.cellRule, yours > 0 && styles.cellBacked]}
     >
-      {/* What the table is backing, above the name — the chips on the cell. */}
-      <Text style={styles.cellPool}>{pool > 0 ? `🪙 ${pool}` : ' '}</Text>
-      <Text style={styles.cellName} numberOfLines={2}>
-        {titleOf(id)}
-      </Text>
-      <Text style={styles.cellOdds}>{odds}×</Text>
-      {yours > 0 ? (
-        <View style={styles.cellYours}>
-          <Text style={styles.cellYoursText}>₮{yours}</Text>
+      <View style={styles.cellHead}>
+        {pool > 0 ? <Text style={styles.cellPool}>{pool}</Text> : null}
+        {yours > 0 ? (
+          <View style={styles.cellYours}>
+            <Text style={styles.cellYoursText}>{yours}</Text>
+          </View>
+        ) : null}
+      </View>
+
+      <View style={styles.cellBody}>
+        <Text style={[styles.cellName, small && styles.cellNameSmall]} numberOfLines={2}>
+          {label}
+        </Text>
+        <Text style={styles.cellOdds}>{odds}x</Text>
+      </View>
+
+      {showTrail ? (
+        <View style={styles.cellFoot}>
+          {longShot ? (
+            vacant && vacant.rounds > 0 ? (
+              <Text style={styles.vacant} numberOfLines={1}>
+                {vacant.rounds}
+                {vacant.exact ? '' : '+'} hands vacant
+              </Text>
+            ) : null
+          ) : (
+            <View style={styles.trail}>
+              {(trail ?? []).slice(-10).map((hit, i) => (
+                <View key={i} style={[styles.trailDot, hit ? styles.trailHit : styles.trailMiss]} />
+              ))}
+            </View>
+          )}
         </View>
       ) : null}
     </Pressable>
   );
 }
 
-/** Web paints radial green gradients; these are their mid tones, flat. */
-const SCENE_FELT = '#12523a';
-const BOARD_FELT = '#0d5236';
-const BOARD_EDGE = 'rgba(6,78,59,0.7)';
-
 const styles = StyleSheet.create({
-  wrap: { borderRadius: radius.card, overflow: 'hidden', backgroundColor: '#07301f' },
-  scene: { backgroundColor: SCENE_FELT, paddingVertical: space.sm, gap: space.sm },
-  clock: { alignItems: 'center' },
-  clockDial: {
-    width: 52,
-    height: 52,
-    borderRadius: radius.pill,
-    borderWidth: 4,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  wrap: { flex: 1, width: '100%' },
+
+  scene: { width: '100%', aspectRatio: 10 / 7, position: 'relative', overflow: 'hidden' },
+  duelist: {
+    position: 'absolute',
+    bottom: 0,
+    width: '32%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  duelistLeft: { left: 0 },
+  duelistRight: { right: 0 },
+  figure: { fontSize: 78, lineHeight: 88, marginBottom: -6 },
+  figureFlip: { transform: [{ scaleX: -1 }] },
+  figureWon: { textShadowColor: 'rgba(241,214,101,0.9)', textShadowRadius: 18 },
+  hole: { flexDirection: 'row', marginBottom: '8%', zIndex: 2 },
+  holeLeft: { marginLeft: '18%' },
+  holeRight: { marginRight: '18%' },
+  holeFirst: { transform: [{ rotate: '-6deg' }] },
+  holeSecond: { marginLeft: -18, transform: [{ rotate: '6deg' }] },
+  hand: {
+    position: 'absolute',
+    bottom: 4,
+    zIndex: 3,
+    borderRadius: 4,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 5,
+    color: CREAM,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+
+  clock: {
+    position: 'absolute',
+    top: 10,
+    alignSelf: 'center',
+    zIndex: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 2,
+    borderColor: GOLD,
+    backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  clockOk: { borderColor: '#6ee7b7' },
   clockLate: { borderColor: '#f43f5e' },
-  clockText: { fontSize: 17, fontWeight: '900' },
-  clockTextOk: { color: '#a7f3d0' },
-  clockTextLate: { color: '#fda4af' },
-  clockClosed: {
-    borderRadius: radius.pill,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: space.md,
-    paddingVertical: 4,
-    color: '#a7f3d0',
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1,
-    overflow: 'hidden',
-  },
-  duelists: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: space.sm,
-  },
-  duelist: { alignItems: 'center', width: 92 },
-  duelistEmoji: { fontSize: 34 },
-  duelistTitle: {
-    borderRadius: radius.pill,
-    paddingHorizontal: space.sm,
-    fontSize: 11,
-    fontWeight: '900',
-    letterSpacing: 1,
-    overflow: 'hidden',
-  },
-  duelistWon: { backgroundColor: 'rgba(251,191,36,0.25)' },
-  duelistCards: { flexDirection: 'row', gap: 2, marginTop: 4 },
-  duelistHand: {
-    marginTop: 4,
-    borderRadius: 4,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 4,
-    color: '#6ee7b7',
-    fontSize: 9,
-    fontWeight: '700',
-    overflow: 'hidden',
-  },
-  community: { flexDirection: 'row', gap: 2, flexShrink: 1, justifyContent: 'center' },
-  road: {
-    flexDirection: 'row',
+  clockText: { color: CREAM, fontSize: 16, fontWeight: '800' },
+  clockTextLate: { color: '#fecdd3' },
+
+  community: {
+    position: 'absolute',
+    top: '26%',
     alignSelf: 'center',
-    alignItems: 'center',
+    zIndex: 10,
+    flexDirection: 'row',
     gap: 4,
-    borderRadius: radius.pill,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    paddingHorizontal: space.md,
-    paddingVertical: 4,
   },
-  roadLabel: { color: 'rgba(167,243,208,0.7)', fontSize: 9, fontWeight: '700', letterSpacing: 1 },
-  roadDot: { width: 8, height: 8, borderRadius: 4 },
+
+  roadWrap: {
+    position: 'absolute',
+    bottom: '6%',
+    alignSelf: 'center',
+    width: '62%',
+    zIndex: 20,
+    alignItems: 'center',
+    gap: 5,
+  },
+  tableName: { color: CREAM, fontSize: 12, fontWeight: '600' },
+  road: {
+    width: '100%',
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(42,18,12,0.85)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 9,
+    gap: 6,
+  },
+  roadIcon: { color: CREAM, fontSize: 14 },
+  roadDots: { flex: 1, flexDirection: 'row', justifyContent: 'center', gap: 5, overflow: 'hidden' },
+  roadDot: { width: 10, height: 10, borderRadius: 5 },
+
   result: {
     position: 'absolute',
-    top: 70,
+    top: '16%',
     alignSelf: 'center',
     zIndex: 50,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: '#f59e0b',
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    paddingHorizontal: 28,
-    paddingVertical: space.md,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: GOLD,
+    backgroundColor: 'rgba(20,12,6,0.85)',
+    paddingHorizontal: 26,
+    paddingVertical: 10,
     alignItems: 'center',
   },
-  resultText: { color: theme.text, fontSize: 26, fontWeight: '900', letterSpacing: -0.5 },
-  resultHand: { marginTop: 4, color: theme.jackpot, fontSize: 15, fontWeight: '700' },
-  board: { borderTopWidth: 2, borderBottomWidth: 2, borderColor: 'rgba(120,53,15,0.6)', backgroundColor: BOARD_FELT },
-  boardRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BOARD_EDGE },
-  boardRowLast: { borderBottomWidth: 0 },
-  rowLabel: {
-    width: 78,
+  resultText: { color: CREAM, fontSize: 22, fontWeight: '900', letterSpacing: 0.5, textTransform: 'uppercase' },
+  resultHand: { marginTop: 2, color: GOLD, fontSize: 13, fontWeight: '700' },
+
+  tables: { paddingHorizontal: 10, paddingTop: 4, paddingBottom: 12, gap: 12 },
+  block: {
+    borderWidth: 1,
+    borderColor: 'rgba(212,178,106,0.6)',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  row: { flexDirection: 'row', alignItems: 'stretch' },
+  rowRule: { borderTopWidth: 1, borderTopColor: GOLD_LINE },
+  rankLabel: {
+    flex: 0.95,
+    backgroundColor: 'rgba(0,0,0,0.32)',
     borderRightWidth: 1,
-    borderRightColor: BOARD_EDGE,
-    backgroundColor: '#0a4229',
-    paddingHorizontal: 4,
+    borderRightColor: GOLD_LINE,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 4,
   },
-  rowLabelText: {
-    color: '#fcd34d',
-    fontSize: 10,
-    fontWeight: '900',
-    textAlign: 'center',
-    letterSpacing: 0.3,
-  },
-  rowCells: { flex: 1, flexDirection: 'row' },
-  cell: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2, paddingVertical: space.md },
-  cellDivider: { borderRightWidth: 1, borderRightColor: BOARD_EDGE },
-  cellBacked: { backgroundColor: 'rgba(251,191,36,0.15)' },
-  cellPool: { height: 14, color: 'rgba(255,255,255,0.9)', fontSize: 10, fontWeight: '700' },
-  cellName: {
-    color: '#ecfdf5',
-    fontSize: 10,
-    fontWeight: '700',
-    textAlign: 'center',
-    letterSpacing: 0.2,
-  },
-  cellOdds: { color: '#fcd34d', fontSize: 15, fontWeight: '900' },
-  cellYours: {
-    position: 'absolute',
-    top: 3,
-    right: 3,
-    borderRadius: radius.pill,
-    backgroundColor: theme.jackpot,
-    paddingHorizontal: 5,
-  },
-  cellYoursText: { color: '#000', fontSize: 9, fontWeight: '900' },
-  footer: {
+  rankLabelText: { color: GOLD, fontSize: 15, fontWeight: '800', textAlign: 'center', letterSpacing: -0.3 },
+
+  cell: { backgroundColor: 'rgba(255,255,255,0.025)' },
+  cellRule: { borderRightWidth: 1, borderRightColor: GOLD_LINE },
+  cellBacked: { backgroundColor: 'rgba(241,214,101,0.12)' },
+  cellHead: {
+    height: 22,
+    backgroundColor: 'rgba(0,0,0,0.28)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: space.md,
-    paddingHorizontal: space.md,
-    paddingVertical: space.md,
+    gap: 5,
   },
-  join: {
+  cellPool: { color: CREAM, opacity: 0.8, fontSize: 10, fontWeight: '700' },
+  cellYours: { borderRadius: 999, backgroundColor: '#f1d665', paddingHorizontal: 5 },
+  cellYoursText: { color: '#5c3a12', fontSize: 10, fontWeight: '800' },
+  cellBody: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2, paddingVertical: 9 },
+  cellName: { color: CREAM, fontSize: 16, fontWeight: '800', textAlign: 'center', letterSpacing: -0.4 },
+  cellNameSmall: { fontSize: 12, letterSpacing: -0.2 },
+  cellOdds: { marginTop: 4, color: CREAM, fontSize: 17, fontWeight: '800', letterSpacing: -0.3 },
+  cellFoot: { height: 14, alignItems: 'center', justifyContent: 'center', paddingBottom: 3 },
+  vacant: { color: GOLD, fontSize: 10 },
+  trail: { flexDirection: 'row', gap: 3 },
+  trailDot: { width: 7, height: 7, borderRadius: 3.5 },
+  trailHit: { backgroundColor: '#e8956b' },
+  trailMiss: { backgroundColor: 'rgba(170,176,172,0.75)' },
+
+  back: {
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    backgroundColor: '#e07682',
+    padding: 3,
+  },
+  backInner: {
     flex: 1,
-    borderRadius: radius.pill,
-    backgroundColor: theme.jackpot,
-    paddingVertical: 12,
-    alignItems: 'center',
+    borderRadius: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
   },
-  joinText: { color: '#000', fontSize: 14, fontWeight: '900', letterSpacing: 2 },
-  chips: { flexDirection: 'row', gap: space.sm },
+
+  footer: { paddingHorizontal: 24, paddingTop: 4, paddingBottom: 16 },
+  join: { borderRadius: 999, backgroundColor: '#f1d665', paddingVertical: 13, alignItems: 'center' },
+  joinText: { color: '#8a5620', fontSize: 20, fontWeight: '600' },
+  seated: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  chips: { flexDirection: 'row', gap: 8 },
   chip: {
     width: 44,
     height: 44,
-    borderRadius: radius.pill,
-    borderWidth: 3,
-    borderColor: '#047857',
-    backgroundColor: '#064e3b',
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: 'rgba(212,178,106,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  chipOn: { borderColor: '#fcd34d', backgroundColor: '#f59e0b' },
-  chipText: { color: '#a7f3d0', fontSize: 11, fontWeight: '900' },
-  chipTextOn: { color: '#000' },
-  hint: { color: 'rgba(167,243,208,0.8)', fontSize: 11 },
-  balance: { color: theme.text, fontSize: 12, fontWeight: '700' },
+  chipOn: { borderColor: GOLD, backgroundColor: '#f1d665' },
+  chipText: { color: CREAM, fontSize: 11, fontWeight: '800' },
+  chipTextOn: { color: '#5c3a12' },
+  balanceBox: { alignItems: 'flex-end' },
+  hint: { color: CREAM, fontSize: 11 },
+  balance: { color: GOLD, fontSize: 14, fontWeight: '700' },
 });
