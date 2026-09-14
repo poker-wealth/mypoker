@@ -60,9 +60,9 @@ describe('CORS preflight', () => {
 
     // A sanity floor, so that a walk which silently returns nothing cannot make
     // the real assertion below pass vacuously. Named verbs rather than a count:
-    // the app happens to mount exactly three today, and a `> 3` floor would be
-    // asserting a number nobody chose.
-    expect([...mounted].sort()).toEqual(['GET', 'PATCH', 'POST']);
+    // the app happens to mount exactly four today, and a `> 4` floor would be
+    // asserting a number nobody chose. DELETE joined with `/me/push-tokens`.
+    expect([...mounted].sort()).toEqual(['DELETE', 'GET', 'PATCH', 'POST']);
 
     return request(instance)
       .options('/admin/players/x')

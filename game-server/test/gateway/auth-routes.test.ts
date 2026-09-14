@@ -21,6 +21,10 @@ jest.mock('../../src/auth/user-store', () => ({
     changePassword: jest.fn(),
     findForPasswordReset: jest.fn(),
     resetPassword: jest.fn(),
+    // /auth/telegram caches the player's name after issuing the token and chains
+    // `.catch` on the result, so the mock must return a promise. A bare jest.fn()
+    // returns undefined, the route throws, and every Telegram test here got a 500.
+    rememberTelegramProfile: jest.fn().mockResolvedValue(undefined),
   },
 }));
 
