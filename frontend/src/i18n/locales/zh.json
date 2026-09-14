@@ -73,9 +73,6 @@
     "onlyOpen": "仅显示有空位的牌桌",
     "createPrivateHint": "私人牌桌属于联盟，请在你的联盟中开设。",
     "yourSeat": "您的座位",
-    "haveInvite": "收到邀请？",
-    "invitePlaceholder": "粘贴邀请链接或牌桌 ID",
-    "inviteNotRecognised": "这不像是牌桌邀请",
     "moreGamesBlurb": "棋牌、快速游戏与老虎机"
   },
   "games": {

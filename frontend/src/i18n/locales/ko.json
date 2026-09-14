@@ -73,9 +73,6 @@
     "onlyOpen": "빈자리가 있는 테이블만",
     "createPrivateHint": "프라이빗 테이블은 얼라이언스 기능입니다. 내 얼라이언스에서 개설하세요.",
     "yourSeat": "내 자리",
-    "haveInvite": "초대를 받으셨나요?",
-    "invitePlaceholder": "초대 링크 또는 테이블 ID 붙여넣기",
-    "inviteNotRecognised": "테이블 초대가 아닌 것 같습니다",
     "moreGamesBlurb": "카드 게임, 퀵 게임, 슬롯"
   },
   "games": {
