@@ -176,23 +176,24 @@ body,
 }
 
 /*
- * The Lobby's ground — the Texas Hold'em entry screen, after HHPoker's.
+ * The Lobby's ground — the Texas Hold'em entry screen. HHPoker's shape, our
+ * palette (owner, 15 Sep 2026: "match with our project UI").
  *
- * A deep indigo lit from the middle, with a faint quatrefoil pattern pressed
- * into it: the reference's damask, drawn as one 56px SVG tile rather than
- * shipped as an image, so the screen costs no bytes to paint. One deliberate
- * look in both themes — it is a felt, and felts do not go light.
+ * The app's near-black, lit warm from the middle, with a faint gold quatrefoil
+ * pressed into it: the reference's damask, drawn as one 56px SVG tile rather
+ * than shipped as an image, so the screen costs no bytes to paint. One
+ * deliberate look in both themes — it is a felt, and felts do not go light.
  */
 .lobby-ground {
-  background: radial-gradient(120% 85% at 50% 40%, #1f4474 0%, #142c50 48%, #0a1528 100%);
+  background: radial-gradient(120% 85% at 50% 42%, #2b2219 0%, #17130e 50%, #0b0a08 100%);
 }
 .lobby-ground::before {
   content: '';
   position: absolute;
   inset: 0;
-  opacity: 0.035;
+  opacity: 0.06;
   background-size: 56px 56px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 56 56'%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='1.2'%3E%3Cpath d='M28 7c6 7 6 14 0 21-6-7-6-14 0-21zM28 28c6 7 6 14 0 21-6-7-6-14 0-21zM7 28c7-6 14-6 21 0-7 6-14 6-21 0zM28 28c7-6 14-6 21 0-7 6-14 6-21 0z'/%3E%3Ccircle cx='0' cy='0' r='5'/%3E%3Ccircle cx='56' cy='0' r='5'/%3E%3Ccircle cx='0' cy='56' r='5'/%3E%3Ccircle cx='56' cy='56' r='5'/%3E%3C/g%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 56 56'%3E%3Cg fill='none' stroke='%23d9b87c' stroke-width='1.2'%3E%3Cpath d='M28 7c6 7 6 14 0 21-6-7-6-14 0-21zM28 28c6 7 6 14 0 21-6-7-6-14 0-21zM7 28c7-6 14-6 21 0-7 6-14 6-21 0zM28 28c7-6 14-6 21 0-7 6-14 6-21 0z'/%3E%3Ccircle cx='0' cy='0' r='5'/%3E%3Ccircle cx='56' cy='0' r='5'/%3E%3Ccircle cx='0' cy='56' r='5'/%3E%3Ccircle cx='56' cy='56' r='5'/%3E%3C/g%3E%3C/svg%3E");
 }
 
 /* The PIN field: warm parchment, pressed in. */

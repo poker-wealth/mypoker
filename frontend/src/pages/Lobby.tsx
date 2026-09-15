@@ -68,8 +68,10 @@ export function Lobby() {
         document.body,
       )}
 
-      <div className="flex min-h-[calc(100dvh-11rem)] flex-col items-center justify-center pb-6 text-center">
-        <label htmlFor={inputId} className="text-[0.95rem] text-[#c7d2e4]">
+      {/* No header above this screen, so only the shell's own padding and the
+          tab bar come off the height. */}
+      <div className="flex min-h-[calc(100dvh-7.5rem)] flex-col items-center justify-center pb-6 text-center">
+        <label htmlFor={inputId} className="text-[0.95rem] text-text/75">
           {t('lobby.pinPrompt')}
         </label>
         <input
@@ -106,7 +108,7 @@ export function Lobby() {
           {joining ? t('lobby.joining') : t('lobby.joinGame')}
         </button>
 
-        <p className="mt-20 text-[0.95rem] text-[#c7d2e4]">{t('lobby.startAndInvite')}</p>
+        <p className="mt-20 text-[0.95rem] text-text/75">{t('lobby.startAndInvite')}</p>
         <TableButton
           label={t('lobby.createGame')}
           onClick={() => {
@@ -131,7 +133,8 @@ const TABLE_SHAPE =
   'M62 8C92 8 102 20 120 20S148 8 178 8C214 8 236 30 236 57S214 106 178 106H62C26 106 4 84 4 57S26 8 62 8Z';
 
 /**
- * Create Game, drawn as a poker table — a copper rail around an indigo felt.
+ * Create Game, drawn as a poker table — a gold rail around the maroon felt our
+ * own tables use (`--felt-poker`), rather than the reference's blue.
  *
  * Inline SVG rather than artwork: it scales to any width without a second
  * asset, stays sharp, and costs nothing on the one screen every player opens.
@@ -155,28 +158,30 @@ function TableButton({ label, onClick }: { label: string; onClick: () => void })
         className="absolute inset-0 size-full drop-shadow-[0_6px_10px_rgb(0_0_0/0.45)]"
       >
         <defs>
+          {/* The brand gold, light to deep: --brand-gradient's stops, run top to bottom. */}
           <linearGradient id={`${id}-rail`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#ec9f5a" />
-            <stop offset="0.5" stopColor="#a9571f" />
-            <stop offset="1" stopColor="#6a3210" />
+            <stop offset="0" stopColor="#ebd3a0" />
+            <stop offset="0.5" stopColor="#b8934f" />
+            <stop offset="1" stopColor="#6e4f22" />
           </linearGradient>
+          {/* --felt-poker (#4a2028), lit from the middle. */}
           <radialGradient id={`${id}-felt`} cx="0.5" cy="0.42" r="0.7">
-            <stop offset="0" stopColor="#12598d" />
-            <stop offset="1" stopColor="#062a4d" />
+            <stop offset="0" stopColor="#6a2e39" />
+            <stop offset="1" stopColor="#2c1016" />
           </radialGradient>
         </defs>
-        <path d={TABLE_SHAPE} fill={`url(#${id}-rail)`} stroke="#2b1405" strokeWidth="2" />
+        <path d={TABLE_SHAPE} fill={`url(#${id}-rail)`} stroke="#241808" strokeWidth="2" />
         <path d={TABLE_SHAPE} fill={`url(#${id}-felt)`} transform={inset(0.9, 0.82)} />
         <path
           d={TABLE_SHAPE}
           fill="none"
-          stroke="#ffffff"
-          strokeOpacity="0.14"
+          stroke="#d9b87c"
+          strokeOpacity="0.22"
           strokeWidth="1.5"
           transform={inset(0.82, 0.7)}
         />
       </svg>
-      <span className="relative text-xl font-medium text-white">{label}</span>
+      <span className="relative text-xl font-semibold text-text">{label}</span>
     </button>
   );
 }
