@@ -1039,3 +1039,35 @@ on `FeltComponent` in `frontend/src/components/games/registry.ts`, and
 Making it required found a renderer the grep had missed — `src/demo/DemoPage.tsx`
 stores the felts in a map rather than rendering them as JSX, so a search for
 `<XFelt` never saw it. The compiler did.
+
+---
+
+## 36. A red suite on main stays red until someone runs the whole suite
+
+On 14 Sep `npm test` in game-server was failing on main — 2 suites, 6 tests —
+and nothing about any merged PR said so. Both failures were tests that had
+already done their job and been ignored:
+
+- **`cors-methods.test.ts`** exists because PATCH was once mounted without being
+  added to `Access-Control-Allow-Methods`. Its own comment reads "mounting a
+  DELETE without allowing it fails here instead of in someone's browser." Then
+  `DELETE /me/push-tokens` was mounted without it (772718a), and the test failed
+  exactly as designed.
+- **`auth-routes.test.ts`** mocks `userStore` with a fixed list of functions.
+  `/auth/telegram` started calling `rememberTelegramProfile` (6072f01), the list
+  was not updated, the mock returned `undefined`, and five sign-in tests got a
+  500. Production was fine; the suite was not.
+
+Neither was noticed for days, because each PR verified the files it touched —
+the relevant package's tsc, and the one or two suites next to the change. A
+gateway route added in a push-notification PR is not "next to" a CORS test.
+
+**Rule:** before merging anything that touches game-server, run `npm test` for
+the WHOLE package, not the suites near the change — and compare the result with
+main, so a failure that was already there is named as pre-existing rather than
+quietly inherited. A mock with a fixed method list is a list that must grow with
+the thing it mocks; when a route gains a call, grep the tests for that module's
+`jest.mock` in the same change.
+
+Found while running the full suite for the Texas Cowboy branch; confirmed on a
+clean checkout of main that both failures predated it.
