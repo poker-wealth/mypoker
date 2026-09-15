@@ -82,6 +82,21 @@ export interface TableDesign {
 function stadiumRings(edge: { x: number; yTop: number; yBottom: number; yMid: number }): Record<number, SeatPos[]> {
   const { x, yTop, yBottom, yMid } = edge;
   const right = 100 - x;
+  /*
+   * THE MIDDLE PAIR SITS FURTHER OUT, 15 Sep 2026: "When the cards appear, we
+   * can't see other players by the side because it's too close to the cards."
+   *
+   * The left- and right-middle chairs share a row with the board. At the rail
+   * inset (13–17%) the gap between them on a phone is ~190px, and five cards
+   * need ~240px — so the cards landed on those two players. Pushing just that
+   * pair out to 6% (the inset the wide felts already use for their end seats)
+   * gives the ring the bulge an oval has at its widest point, and the board
+   * the room it needs. The upper and lower chairs, and the vertical spacing the
+   * owner set on 14 Sep, are untouched. PokerTable's board cards are sized to
+   * this gap (`board` in PlayingCard) — change one and check the other.
+   */
+  const midX = 6;
+  const midRight = 100 - midX;
 
   /**
    * The SIX-seat ring, measured against the artwork. Left exactly as it was.
@@ -138,11 +153,11 @@ function stadiumRings(edge: { x: number; yTop: number; yBottom: number; yMid: nu
   const eight: SeatPos[] = [
     { left: '50%', top: `${yBottom}%`, align: 'bottom' }, // 0 bottom centre — hero
     { left: `${x}%`, top: `${yMid + 22}%`, align: 'left' }, // 1 left lower
-    { left: `${x}%`, top: `${yMid}%`, align: 'left' }, // 2 left middle
+    { left: `${midX}%`, top: `${yMid}%`, align: 'left' }, // 2 left middle — out past the board
     { left: `${x}%`, top: `${yMid - 22}%`, align: 'left' }, // 3 left upper
     { left: '50%', top: `${yTop}%`, align: 'top' }, // 4 top centre
     { left: `${right}%`, top: `${yMid - 22}%`, align: 'right' }, // 5 right upper
-    { left: `${right}%`, top: `${yMid}%`, align: 'right' }, // 6 right middle
+    { left: `${midRight}%`, top: `${yMid}%`, align: 'right' }, // 6 right middle — out past the board
     { left: `${right}%`, top: `${yMid + 22}%`, align: 'right' }, // 7 right lower
   ];
 
@@ -163,12 +178,12 @@ function stadiumRings(edge: { x: number; yTop: number; yBottom: number; yMid: nu
   const nine: SeatPos[] = [
     { left: '50%', top: `${yBottom}%`, align: 'bottom' }, // 0 bottom centre — hero
     { left: `${x + 2}%`, top: `${yMid + 28}%`, align: 'left' }, // 1 left lower
-    { left: `${x}%`, top: `${yMid}%`, align: 'left' }, // 2 left middle
+    { left: `${midX}%`, top: `${yMid}%`, align: 'left' }, // 2 left middle — out past the board
     { left: `${x + 2}%`, top: `${yMid - 28}%`, align: 'left' }, // 3 left upper
     { left: '34%', top: `${yTop}%`, align: 'top' }, // 4 top, left of centre
     { left: '66%', top: `${yTop}%`, align: 'top' }, // 5 top, right of centre
     { left: `${right - 2}%`, top: `${yMid - 28}%`, align: 'right' }, // 6 right upper
-    { left: `${right}%`, top: `${yMid}%`, align: 'right' }, // 7 right middle
+    { left: `${midRight}%`, top: `${yMid}%`, align: 'right' }, // 7 right middle — out past the board
     { left: `${right - 2}%`, top: `${yMid + 28}%`, align: 'right' }, // 8 right lower
   ];
 

@@ -273,14 +273,15 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
 
           <div className="flex gap-1 sm:gap-1.5">
             {state.board.map((c, i) => (
-              <PlayingCard key={c} card={c} size="md" index={i} />
+              <PlayingCard key={c} card={c} size="board" index={i} />
             ))}
             {/* Streets still to come — only during a hand. On an idle table five
                 empty dashed boxes were just outlines of nothing. */}
             {inHand && Array.from({ length: 5 - state.board.length }).map((_, i) => (
               <div
                 key={`slot-${i}`}
-                className="h-16 w-11 rounded-lg border border-dashed border-white/15 bg-white/[0.03]"
+                // Same box as a `board` card, so a dealt card lands exactly on its slot.
+                className="aspect-[11/16] w-[min(2.75rem,calc((71cqw_-_40px)/5))] shrink-0 rounded-lg border border-dashed border-white/15 bg-white/[0.03]"
               />
             ))}
           </div>
