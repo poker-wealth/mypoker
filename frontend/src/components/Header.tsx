@@ -1,5 +1,4 @@
 import { Settings, ShieldCheck, Bell } from 'lucide-react';
-import { cn } from '@/lib/cn';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useUnreadCount } from '@/api/hooks';
@@ -22,6 +21,11 @@ export function Header() {
   const { t } = useTranslation();
   const unread = useUnreadCount();
 
+  // The Lobby is the Hold'em entry screen and carries no header at all — no
+  // title, no bell (owner, 15 Sep 2026). Its ground runs to the top edge, as
+  // the reference's does. The bell stays on every other tab.
+  if (location.pathname === '/') return null;
+
   let title = '';
   let rightElement = null;
 
@@ -39,11 +43,6 @@ export function Header() {
       break;
     case '/games':
       title = t('nav.games');
-      break;
-    case '/':
-      // The Hold'em entry screen: a title and the bell, nothing more. It is
-      // modelled on HHPoker's, which is clean because it carries so little.
-      title = t('nav.lobby');
       break;
     case '/data':
       title = t('nav.data');
@@ -67,14 +66,7 @@ export function Header() {
   }
 
   return (
-    <header
-      className={cn(
-        'sticky top-0 z-20 -mx-4 mb-1 px-4 pb-3 pt-4',
-        // The lobby paints its own ground edge to edge; a dark band across the
-        // top of it would cut the screen in two.
-        location.pathname === '/' ? 'bg-transparent' : 'bg-bg/95 backdrop-blur-md',
-      )}
-    >
+    <header className="sticky top-0 z-20 -mx-4 mb-1 bg-bg/95 px-4 pb-3 pt-4 backdrop-blur-md">
       <div className="flex items-center justify-between">
         <h1 className="text-base font-black tracking-tight">{title}</h1>
         <div className="flex items-center gap-2">
