@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, Menu, Wifi, WifiOff, MessageSquare, List as ListIcon, Spade, Mic } from 'lucide-react';
+import { ChevronLeft, Menu, WifiOff, MessageSquare, List as ListIcon, Spade, Mic } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { PokerTable } from '@/components/poker/PokerTable';
 import { ActionBar } from '@/components/poker/ActionBar';
@@ -312,12 +312,11 @@ function LiveTable({ tableId }: { tableId: string }) {
       className={cn('flex flex-col', Felt ? 'min-h-full' : 'h-dvh overflow-hidden')}
       style={{ background: groundFor(chosenDesign) }}
     >
+      {/* No title strip. The table's name, number and blinds are printed on the
+          felt, as the reference does; repeating them up here — beside a
+          "Hand —" and a second, differently formatted blinds figure — was noise
+          (owner, 15 Sep 2026). */}
       <TopBar
-        subtitle={
-          snapshot
-            ? `${snapshot.name} · Hand ${view.handId} · Blinds ${chips(snapshot.smallBlind)}/${chips(snapshot.bigBlind)}`
-            : t('table.connecting')
-        }
         onBack={() => navigate(-1)}
         status={status}
         onOpenMenu={() => setMenuOpen(true)}
@@ -617,13 +616,12 @@ function LiveTable({ tableId }: { tableId: string }) {
               Retry
             </Button>
           </div>
-        ) : (
+        ) : status === 'ready' ? null : (
+          // Nothing to say on a healthy table the player is only watching: the
+          // "Sit here" chairs are the invitation. This used to print "Tap an
+          // open seat to join the table" under them, saying it twice.
           <div className="py-3 text-center text-sm text-dim">
-            {status === 'ready'
-              ? t('table.tapOpenSeat')
-              : status === 'reconnecting'
-                ? t('table.reconnecting')
-                : t('table.connectingTable')}
+            {status === 'reconnecting' ? t('table.reconnecting') : t('table.connectingTable')}
           </div>
         )}
 
@@ -818,7 +816,7 @@ function TopBar({
   status,
   onOpenMenu,
 }: {
-  subtitle: string;
+  subtitle?: string;
   onBack: () => void;
   status?: string;
   /** Opens the table menu drawer. */
@@ -845,20 +843,20 @@ function TopBar({
           </button>
         )}
       </div>
-      <div className="text-center">
-        <div className="text-[0.66rem] text-dim">{subtitle}</div>
-      </div>
+      {subtitle && (
+        <div className="text-center">
+          <div className="text-[0.66rem] text-dim">{subtitle}</div>
+        </div>
+      )}
       <div className="flex gap-2">
-        {status && (
+        {/* Only when something is wrong. A green "connected" badge on every
+            healthy table is a control-shaped thing that says nothing. */}
+        {status && status !== 'ready' && (
           <div
             className="grid size-9 place-items-center rounded-full border border-border bg-surface"
             title={status}
           >
-            {status === 'ready' ? (
-              <Wifi size={15} className="text-success" />
-            ) : (
-              <WifiOff size={15} className="text-danger" />
-            )}
+            <WifiOff size={15} className="text-danger" />
           </div>
         )}
 
