@@ -39,6 +39,13 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
   const design = override ?? chosen;
   const positions = ringFor(design, Math.max(2, state.seats.length));
 
+  /**
+   * Is a hand running? The live feed sends '—' as the hand id between hands
+   * (useLiveTable); cards on the board or chips in the pot settle it either way,
+   * and cover the demo engine, which always has a hand id.
+   */
+  const inHand = state.handId !== '—' || state.board.length > 0 || state.pot > 0;
+
 
   // Whose turn it is, read off the seat the feed already marks — no new prop,
   // and no second opinion about who is to act. Rendered on the felt below.
@@ -190,50 +197,43 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
             own. Victor: "it should be one whole back ground complete". One
             surface, painted once, at the top. */}
 
-        {/* The brand across the felt, as on the reference table. Always there,
-            faint, under the board — a watermark, not a message. */}
-        <div className="pointer-events-none absolute inset-0 z-[5] flex flex-col items-center justify-center">
-          {/* WHITE, not black, here and on the wordmark below. Both were
-              `text-black/…`, which was right while a bright felt sat behind
-              them and is invisible now the felt is gone — the table renders on
-              the app's near-black background. The reference shows this block as
-              faint LIGHT type on a dark ground. */}
-          {info && state.board.length === 0 && (
-            <div className="mb-[2cqmin] text-center text-[3.2cqmin] leading-relaxed text-white/30">
-              {/* The reference's centre block, ours: the name between asterisks,
-                  the table number (which IS the invitation code here — the
-                  share link is /table/<id>), the blinds, and OUR host — read
-                  from the page, never hardcoded, so it is always the domain
-                  the app is actually served on. */}
-              <div className="font-semibold">* {info.name} *</div>
-              <div>#{info.tableId}</div>
-              <div>
-                {t('tableEntry.stakesBlurb', {
-                  stakes: `${info.smallBlind}/${info.bigBlind}`,
-                })}
-              </div>
-              <div>www.{PERMANENT_DOMAIN}</div>
-            </div>
-          )}
-          {/* Faded DARK, not light — the reference's wordmark is a dark grey
-              pressed into the red ground, not a pale watermark over it. It sits
-              at z-[5] under the board (z-10) and is pointer-events-none, so it
-              can neither cover a card nor swallow a tap: the cards deal over
-              the top of it. */}
-          <div className="select-none text-[10cqmin] font-black tracking-[0.06em] text-[#1a1012]/45">
-            MYPOKER
-          </div>
-        </div>
+        {/*
+          THE CARD ROW IS KEPT CLEAR. The table's identity and the wordmark used
+          to be centred on the felt — exactly where the board deals — so the
+          text sat over the card slots (owner, 15 Sep 2026: "covering where the
+          cards will display"). Now the identity sits ABOVE the row and the
+          wordmark BELOW it, and nothing is printed on the row itself.
+        */}
 
-        {/* MYPY in the corner, as the reference table keeps its mascot.
-            Decoration only — it takes no taps and promises nothing. */}
-        <img
-          src="/brand/logo-icon.png"
-          alt=""
-          aria-hidden
-          draggable={false}
-          className="pointer-events-none absolute bottom-[2cqmin] left-[2.5cqmin] z-[6] w-[11cqmin] select-none opacity-90 drop-shadow-lg"
-        />
+        {/* The table's identity: name between asterisks, table number, blinds,
+            and our host — read from the page, never hardcoded. WHITE and faint:
+            the reference shows this as light type on a dark ground. Only while
+            no hand is running; during a hand the pot takes this spot. */}
+        {info && !inHand && (
+          <div
+            className="pointer-events-none absolute left-1/2 z-[5] -translate-x-1/2 -translate-y-full text-center text-[3.2cqmin] leading-relaxed whitespace-nowrap text-white/30"
+            style={{ top: `calc(${design.boardTop} - 2.75rem)` }}
+          >
+            <div className="font-semibold">* {info.name} *</div>
+            <div>#{info.tableId}</div>
+            <div>
+              {t('tableEntry.stakesBlurb', {
+                stakes: `${info.smallBlind}/${info.bigBlind}`,
+              })}
+            </div>
+            <div>www.{PERMANENT_DOMAIN}</div>
+          </div>
+        )}
+
+        {/* The wordmark, faded DARK — pressed into the ground as on the
+            reference, not a pale watermark. Below the card row, and under
+            everything else (z-[5], no pointer events). */}
+        <div
+          className="pointer-events-none absolute left-1/2 z-[5] -translate-x-1/2 select-none text-[10cqmin] font-black tracking-[0.06em] text-[#1a1012]/45"
+          style={{ top: `calc(${design.boardTop} + 3rem)` }}
+        >
+          MYPOKER
+        </div>
 
         {/* Board + pot, across the middle of the felt */}
         <div
@@ -256,8 +256,9 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
             {state.board.map((c, i) => (
               <PlayingCard key={c} card={c} size="md" index={i} />
             ))}
-            {/* Streets still to come */}
-            {Array.from({ length: 5 - state.board.length }).map((_, i) => (
+            {/* Streets still to come — only during a hand. On an idle table five
+                empty dashed boxes were just outlines of nothing. */}
+            {inHand && Array.from({ length: 5 - state.board.length }).map((_, i) => (
               <div
                 key={`slot-${i}`}
                 className="h-16 w-11 rounded-lg border border-dashed border-white/15 bg-white/[0.03]"
