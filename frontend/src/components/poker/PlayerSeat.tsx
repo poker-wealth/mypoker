@@ -377,7 +377,9 @@ export function PlayerSeat({
         <div
           className={cn(
             'absolute z-20 scale-[0.7] drop-shadow-xl',
-            align === 'bottom' && 'top-[-34px]',
+            // Your own bet goes BESIDE your avatar. Above it is where your hole
+            // cards are, and the stack sat on top of them.
+            align === 'bottom' && (seat.isHero ? 'left-[calc(100%+4px)] top-1/2 -translate-y-1/2' : 'top-[-34px]'),
             align === 'top' && 'bottom-[-34px]',
             align === 'left' && 'right-[-42px] top-1/2 -translate-y-1/2',
             align === 'right' && 'left-[-42px] top-1/2 -translate-y-1/2',

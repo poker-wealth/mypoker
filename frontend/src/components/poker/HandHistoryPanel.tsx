@@ -1,29 +1,28 @@
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'motion/react';
 import { ChevronLeft, ChevronRight, Star, Share2, User } from 'lucide-react';
+import { useTableHands } from '@/api/hooks';
+import { errorKey } from '@/api/errors';
+import type { HandView } from '@/api/hands';
+import type { Card } from '@/lib/cards';
+import { chips } from '@/lib/money';
 import { cn } from '@/lib/cn';
+import { PlayingCard } from './PlayingCard';
 
 /**
- * The hand-history panel, opened from the table's list icon.
+ * The hand-history panel, opened from the table menu.
  *
- * WHAT IS REAL: the table's name, its blinds, how many are seated, its id, and
- * Share — all off the snapshot, all live.
+ * WHAT IS REAL: the table's name, blinds, how many are seated, its id, Share —
+ * all off the snapshot — and now THE HANDS THEMSELVES. Every hand you were
+ * dealt into at this table is recorded server-side (history/hand-store.ts) and
+ * read back through `GET /me/hands`, newest first. The scrubber steps through
+ * them: the board, each player's result, and the cards the table actually saw.
+ * An opponent's folded cards never reach this screen — the gateway strips them
+ * (history/hand-view.ts), so there is nothing here to hide.
  *
- * WHAT IS DRAWN BUT DISABLED, each for its own reason:
- *
- *  - THE HAND SCRUBBER browses past hands. No hand histories are recorded
- *    anywhere in this platform, so there is nothing to scrub through; `0/0` is
- *    the literal truth rather than a placeholder. This is the same wall the
- *    Data page radar and the profile stat row are behind — one backend feature
- *    unlocks all three.
- *  - ANONYMOUS SEATING has no backend at all. Nothing in the room, the gateway
- *    or the seat record supports hiding who is sitting.
- *  - FAVOURITE TABLES likewise: no favourites exist, so `0/15` counts nothing.
- *
- * Drawn rather than omitted because the layout is the owner's, who asked for
- * "the ui, no need for connection". Disabled WITH its reason rather than greyed
- * in silence, because a control that looks live and does nothing is the failure
- * this project keeps correcting.
+ * STILL DISABLED, each with its reason: anonymous seating and favourite tables,
+ * neither of which has a backend.
  */
 export function HandHistoryPanel({
   open,
@@ -34,6 +33,7 @@ export function HandHistoryPanel({
   bigBlind,
   seated,
   onShare,
+  nameOf,
 }: {
   open: boolean;
   onClose: () => void;
@@ -44,8 +44,26 @@ export function HandHistoryPanel({
   /** How many are sitting. Real, from the snapshot. */
   seated: number;
   onShare: () => void;
+  /** A player's display name, from the table. Absent for someone who has left. */
+  nameOf?: (playerId: string) => string | undefined;
 }) {
   const { t } = useTranslation();
+  const handsQuery = useTableHands(tableId, open);
+  const hands = handsQuery.data?.hands ?? [];
+  /** Index into `hands`, which is newest first — 0 is the latest hand. */
+  const [index, setIndex] = useState(0);
+
+  // Every time the panel opens, start at the latest hand.
+  useEffect(() => {
+    if (open) setIndex(0);
+  }, [open]);
+
+  const total = hands.length;
+  const current: HandView | undefined = hands[Math.min(index, Math.max(0, total - 1))];
+  const olderAvailable = index < total - 1;
+  const newerAvailable = index > 0;
+  // The scrubber runs oldest → newest, left → right, so the latest hand is at the right end.
+  const thumbPct = total > 1 ? ((total - 1 - index) / (total - 1)) * 100 : 100;
 
   return (
     <AnimatePresence>
@@ -99,36 +117,51 @@ export function HandHistoryPanel({
             </div>
             <p className="px-4 pt-1 text-[0.55rem] text-dim/70">{t('table.anonymousSoon')}</p>
 
-            {/* The hands themselves. Empty, and saying so plainly. */}
-            <div className="flex flex-1 items-center justify-center px-6 text-center">
-              <p className="text-[0.72rem] leading-relaxed text-dim">
-                {t('table.noHandHistory')}
-              </p>
+            {/* The hand. */}
+            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+              {handsQuery.isPending ? (
+                <p className="pt-10 text-center text-[0.72rem] text-dim">{t('common.loading')}</p>
+              ) : handsQuery.isError ? (
+                <p className="pt-10 text-center text-[0.72rem] text-danger">{t(errorKey(handsQuery.error))}</p>
+              ) : !current ? (
+                <p className="pt-10 text-center text-[0.72rem] leading-relaxed text-dim">
+                  {t('table.noHandHistory')}
+                </p>
+              ) : (
+                <HandDetail hand={current} nameOf={nameOf} />
+              )}
             </div>
 
-            {/* The scrubber. Inert — there is nothing to scrub. */}
+            {/* The scrubber: older to the left, newer to the right. */}
             <div className="flex items-center gap-3 border-t border-border/60 px-4 py-3">
               <button
                 type="button"
-                disabled
+                disabled={!olderAvailable}
+                onClick={() => setIndex((i) => Math.min(total - 1, i + 1))}
                 aria-label={t('table.previousHand')}
-                className="shrink-0 cursor-not-allowed text-dim opacity-50"
+                className="shrink-0 text-dim transition-colors active:text-text disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronLeft size={17} />
               </button>
 
               <div className="min-w-0 flex-1">
                 <div className="relative h-1 rounded-full bg-surface-2">
-                  <span className="absolute right-0 top-1/2 size-3.5 -translate-y-1/2 rounded-full bg-coin-gold/70" />
+                  <span
+                    className="absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-coin-gold/80"
+                    style={{ left: `${thumbPct}%` }}
+                  />
                 </div>
-                <p className="mt-1 text-center text-[0.62rem] tabular-nums text-dim">0/0</p>
+                <p className="mt-1 text-center text-[0.62rem] tabular-nums text-dim">
+                  {total === 0 ? '0/0' : `${total - index}/${total}`}
+                </p>
               </div>
 
               <button
                 type="button"
-                disabled
+                disabled={!newerAvailable}
+                onClick={() => setIndex((i) => Math.max(0, i - 1))}
                 aria-label={t('table.nextHand')}
-                className="shrink-0 cursor-not-allowed text-dim opacity-50"
+                className="shrink-0 text-dim transition-colors active:text-text disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronRight size={17} />
               </button>
@@ -159,5 +192,69 @@ export function HandHistoryPanel({
         </>
       )}
     </AnimatePresence>
+  );
+}
+
+/** One recorded hand: its number and time, the board, and every player's result. */
+function HandDetail({
+  hand,
+  nameOf,
+}: {
+  hand: HandView;
+  nameOf?: (playerId: string) => string | undefined;
+}) {
+  const time = new Date(hand.playedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-baseline justify-between">
+        <span className="text-[0.9rem] font-black tabular-nums text-text">#{hand.handNumber}</span>
+        <span className="text-[0.68rem] tabular-nums text-dim">{time}</span>
+      </div>
+
+      {/* The board as it was revealed. Nothing when everyone folded preflop. */}
+      <div className="flex min-h-11 gap-1">
+        {hand.community.map((c, i) => (
+          <PlayingCard key={`${c}-${i}`} card={c as Card} size="sm" index={0} />
+        ))}
+      </div>
+
+      <ul className="space-y-2">
+        {hand.seats.map((s) => {
+          const who = nameOf?.(s.playerId) ?? s.playerId.slice(0, 8);
+          return (
+            <li
+              key={s.playerId}
+              className={cn(
+                'flex items-center gap-2 rounded-lg border px-2 py-1.5',
+                s.isYou ? 'border-coin-gold/40 bg-coin-gold/[0.06]' : 'border-border/50',
+              )}
+            >
+              <div className="flex shrink-0 -space-x-2">
+                {s.holeCards
+                  ? s.holeCards.map((c, i) => (
+                      <PlayingCard key={`${c}-${i}`} card={c as Card} size="sm" index={0} />
+                    ))
+                  : [0, 1].map((i) => <PlayingCard key={i} card={null} faceDown size="sm" index={0} />)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[0.72rem] font-semibold text-text">{who}</p>
+                <p className="text-[0.58rem] uppercase tracking-wide text-dim">{s.position}</p>
+              </div>
+              {/* Signed result, with its own sign rather than a formatter's. */}
+              <span
+                className={cn(
+                  'shrink-0 text-[0.78rem] font-black tabular-nums',
+                  s.net > 0 ? 'text-success' : s.net < 0 ? 'text-danger' : 'text-dim',
+                )}
+              >
+                {s.net > 0 ? '+' : s.net < 0 ? '−' : ''}
+                {chips(Math.abs(s.net))}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

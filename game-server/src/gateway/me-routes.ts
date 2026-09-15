@@ -1,4 +1,7 @@
 import express, { Router, type Request, type Response } from 'express';
+import { z } from 'zod';
+import { handsAtTable } from '../history/hand-store';
+import { handViewFor } from '../history/hand-view';
 import type { GatewayConfig } from './config';
 import { requireAuth } from './auth';
 import {
@@ -98,6 +101,36 @@ export function buildMeRouter(config: GatewayConfig, deps: MeRouterDeps = {}): R
 
   r.get('/stats', (req, res) => void forwardTo(config, req, res, '/me/stats'));
   r.get('/history', (req, res) => void forwardTo(config, req, res, '/me/history'));
+
+  /*
+   * The hands you played at one table — the table's hand-history panel.
+   *
+   * Read HERE, not forwarded: hand records are play, not money, and live in
+   * game-server (history/hand-record.ts explains the split). Every record goes
+   * through `handViewFor` before it leaves, so an opponent's hole cards are
+   * only ever sent when the table already saw them at a showdown.
+   */
+  const handsQuery = z.object({
+    tableId: z.string().min(1).max(64),
+    limit: z.coerce.number().int().min(1).max(100).default(50),
+  });
+  r.get('/hands', (req: Request, res: Response): void => {
+    void (async (): Promise<void> => {
+      const parsed = handsQuery.safeParse(req.query);
+      if (!parsed.success) {
+        res.status(400).json({ error: 'tableId is required' });
+        return;
+      }
+      const playerId = req.player!.playerId;
+      try {
+        const records = await handsAtTable(playerId, parsed.data.tableId, parsed.data.limit);
+        res.json({ hands: records.map((record) => handViewFor(record, playerId)) });
+      } catch (err) {
+        console.error('[gateway] hand history read failed:', err);
+        res.status(503).json({ error: 'hand history unavailable' });
+      }
+    })();
+  });
 
   // Wallet. financial-core owns every balance and the withdrawal state machine;
   // the gateway forwards the player's own token so FC scopes each read/write to

@@ -40,6 +40,25 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
   const positions = ringFor(design, Math.max(2, state.seats.length));
 
   /**
+   * YOU SIT AT THE BOTTOM, whichever chair the server gave you (owner, 15 Sep
+   * 2026: "any body that joins should be at the bottom").
+   *
+   * Every ring's position 0 is the bottom centre, but seats were placed by
+   * their SERVER index — so a player in chair 6 sat at the side, their hole
+   * cards under the board. The ring is now rotated so the hero's chair lands on
+   * position 0 and everyone else keeps their order around the table. The seat
+   * indices themselves are untouched: `onSit` still sends the real chair.
+   *
+   * Found by `isHero`, not `heroSeat`, which reads 0 for a spectator too. A
+   * spectator has no edge to rotate to, so the table shows as numbered.
+   * Mobile does the same (mobile/src/components/poker/PokerTable.tsx).
+   */
+  const heroIndex = state.seats.findIndex((s) => s.isHero);
+  const ringSize = Math.max(2, state.seats.length);
+  const posFor = (i: number) =>
+    positions[heroIndex < 0 ? i : (i - heroIndex + ringSize) % ringSize] ?? positions[0]!;
+
+  /**
    * Is a hand running? The live feed sends '—' as the hand id between hands
    * (useLiveTable); cards on the board or chips in the pot settle it either way,
    * and cover the demo engine, which always has a hand id.
@@ -337,7 +356,7 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
           bets={state.seats.map((seat, i) => ({
             seatIndex: i,
             amount: seat.bet,
-            from: positions[i] ?? positions[0]!,
+            from: posFor(i),
           }))}
         />
 
@@ -346,18 +365,25 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
           handId={state.handId}
           amount={state.pot}
           winners={state.seats
-            .map((seat, i) => (seat.isWinner ? (positions[i] ?? positions[0]!) : null))
+            .map((seat, i) => (seat.isWinner ? posFor(i) : null))
             .filter((p): p is NonNullable<typeof p> => p !== null)}
           youWon={state.seats.some((seat) => seat.isWinner && seat.isHero)}
         />
 
         {/* Seats */}
         {state.seats.map((seat, i) => {
-          const pos = positions[i] ?? positions[0]!;
+          const pos = posFor(i);
           return (
             <div
               key={`${seat.id}-${i}`}
-              className="absolute z-20 -translate-x-1/2 -translate-y-1/2"
+              // YOUR seat draws over every other seat. Seats render in chair
+              // order at one z-index, so a later chair painted over your hole
+              // cards wherever the two met ("I can't even make out the hole
+              // cards").
+              className={cn(
+                'absolute -translate-x-1/2 -translate-y-1/2',
+                seat.isHero ? 'z-30' : 'z-20',
+              )}
               style={{ left: pos.left, top: pos.top }}
             >
               <PlayerSeat
