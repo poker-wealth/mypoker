@@ -73,7 +73,14 @@
     "onlyOpen": "Chỉ bàn còn chỗ trống",
     "createPrivateHint": "Bàn riêng thuộc về liên minh — hãy mở từ liên minh của bạn.",
     "yourSeat": "Ghế của bạn",
-    "moreGamesBlurb": "Game bài, game nhanh và slot"
+    "moreGamesBlurb": "Game bài, game nhanh và slot",
+    "pinPrompt": "Nhập mã PIN để vào bàn.",
+    "joinGame": "Vào bàn",
+    "joining": "Đang vào…",
+    "startAndInvite": "Tạo bàn và mời bạn bè cùng chơi!",
+    "createGame": "Tạo bàn",
+    "pinNotFound": "Không tìm thấy bàn nào với mã PIN này.",
+    "pinTooMany": "Thử quá nhiều lần. Vui lòng đợi vài phút rồi thử lại."
   },
   "games": {
     "searchPlaceholder": "Tìm trò chơi",
@@ -898,7 +905,7 @@
     "buyInBlurb": "Người chơi mua vào từ {{min}} đến {{max}}.",
     "seats": "Chỗ ngồi",
     "seatsBlurb": "{{count}} chỗ. Hai người là đủ để bắt đầu.",
-    "codeLabel": "Mã mời",
+    "codeLabel": "Mã PIN",
     "shareBlurbPrivate": "Gửi liên kết này để mời bạn bè — liên kết đã kèm mã."
   },
   "createGame": {

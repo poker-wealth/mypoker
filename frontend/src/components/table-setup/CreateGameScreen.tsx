@@ -60,10 +60,18 @@ export function CreateGameScreen({
   open,
   onClose,
   onCreated,
+  games,
 }: {
   open: boolean;
   onClose: () => void;
   onCreated: (table: CreatedTable) => void;
+  /**
+   * Limit which games can be picked. Absent offers the whole catalog, as from
+   * Games. The Lobby passes `['texas']`: it IS the Hold'em door, so offering Niu
+   * Niu there would undo the reason it was split from Games. With one game the
+   * chip row is not drawn at all — a single chip is not a choice.
+   */
+  games?: readonly PlayerTableGame[];
 }) {
   const { t } = useTranslation();
   const create = useCreatePlayerTable();
@@ -164,8 +172,11 @@ export function CreateGameScreen({
         <div className="flex-1 space-y-5 overflow-y-auto px-4 py-4">
           {/* Every game on the platform, and who may find the table. Ours, not
               the reference's — one create screen serves the whole catalog. */}
+          {(games === undefined || games.length > 1) && (
           <div className="flex flex-wrap gap-1.5">
-            {visibleGames().map((g) => (
+            {visibleGames()
+              .filter((g) => games === undefined || games.includes(g.id as PlayerTableGame))
+              .map((g) => (
               <button
                 key={g.id}
                 type="button"
@@ -187,6 +198,7 @@ export function CreateGameScreen({
               </button>
             ))}
           </div>
+          )}
           <Segmented
             options={(['public', 'private'] as TableVisibility[]).map((v) => ({
               value: v,

@@ -73,7 +73,14 @@
     "onlyOpen": "Only tables with a free seat",
     "createPrivateHint": "Private tables belong to an alliance — open one from your alliance.",
     "yourSeat": "Your seat",
-    "moreGamesBlurb": "Card games, quick games and slots"
+    "moreGamesBlurb": "Card games, quick games and slots",
+    "pinPrompt": "Enter game PIN to join.",
+    "joinGame": "Join Game",
+    "joining": "Joining…",
+    "startAndInvite": "Start a game and invite friends!",
+    "createGame": "Create Game",
+    "pinNotFound": "No game found with that PIN.",
+    "pinTooMany": "Too many tries. Wait a few minutes and try again."
   },
   "games": {
     "searchPlaceholder": "Search games",
@@ -898,7 +905,7 @@
     "buyInBlurb": "Players buy in for {{min}} to {{max}}.",
     "seats": "Seats",
     "seatsBlurb": "{{count}} chairs. Two players is enough to start.",
-    "codeLabel": "Invite code",
+    "codeLabel": "Game PIN",
     "shareBlurbPrivate": "Send this link to invite a friend — the code travels with it."
   },
   "createGame": {

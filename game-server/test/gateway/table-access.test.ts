@@ -148,4 +148,102 @@ describe('TableAccess — who may reach a private table', () => {
       expect(access.unlock('t-priv', 'creator', first)).toBe('unknown-table');
     });
   });
+
+  describe('game PIN — the lobby join', () => {
+    const other = (pin: string): string => (pin === '000000' ? '111111' : '000000');
+
+    it("gives every table a six-digit PIN, and a private table's PIN is its code", () => {
+      const code = access.register('t-priv', 'private', 'creator') as string;
+      access.register('t-pub', 'public', 'creator');
+
+      expect(access.pinFor('t-priv', 'creator')).toBe(code);
+      expect(access.pinFor('t-pub', 'anyone')).toMatch(/^\d{6}$/);
+    });
+
+    it('never hands a private PIN to someone outside the table', () => {
+      access.register('t-priv', 'private', 'creator');
+
+      expect(access.pinFor('t-priv', 'a-stranger')).toBeNull();
+      expect(access.pinFor('t-does-not-exist', 'anyone')).toBeNull();
+    });
+
+    it('finds a public table', () => {
+      access.register('t-pub', 'public', 'creator');
+      const pin = access.pinFor('t-pub', 'guest') as string;
+
+      expect(access.redeemPin('guest', pin)).toEqual({ result: 'ok', tableId: 't-pub' });
+    });
+
+    it('finds a private table AND lets the player in — the PIN is the code', () => {
+      const code = access.register('t-priv', 'private', 'creator') as string;
+      expect(access.mayJoin('t-priv', 'guest')).toBe(false);
+
+      expect(access.redeemPin('guest', code)).toEqual({ result: 'ok', tableId: 't-priv' });
+      expect(access.mayJoin('t-priv', 'guest')).toBe(true);
+    });
+
+    it('keeps PINs unique across tables, even where random draws collide', () => {
+      // 2,000 draws from a million collide more often than not; every PIN must still be distinct.
+      const pins = new Set<string>();
+      for (let i = 0; i < 2_000; i += 1) {
+        access.register(`t-${i}`, i % 2 === 0 ? 'public' : 'private', 'creator');
+        pins.add(access.pinFor(`t-${i}`, 'creator') as string);
+      }
+      expect(pins.size).toBe(2_000);
+    });
+
+    it('answers not-found for a PIN that matches nothing', () => {
+      expect(access.redeemPin('guest', '123456')).toEqual({ result: 'not-found' });
+    });
+
+    it('caps wrong PINs per player across every table — and the cap holds for the right PIN', () => {
+      const code = access.register('t-priv', 'private', 'creator') as string;
+
+      for (let i = 0; i < 10; i += 1) {
+        expect(access.redeemPin('attacker', other(code))).toEqual({ result: 'not-found' });
+      }
+      expect(access.redeemPin('attacker', code)).toEqual({ result: 'too-many-attempts' });
+      expect(access.mayJoin('t-priv', 'attacker')).toBe(false);
+
+      // Counted per player: the invited guest is unaffected.
+      expect(access.redeemPin('guest', code)).toEqual({ result: 'ok', tableId: 't-priv' });
+    });
+
+    it('lets a shut-out player try again once the window has passed', () => {
+      let now = 1_000_000;
+      const timed = new TableAccess(() => now);
+      const code = timed.register('t-priv', 'private', 'creator') as string;
+
+      for (let i = 0; i < 10; i += 1) timed.redeemPin('guest', other(code));
+      expect(timed.redeemPin('guest', code)).toEqual({ result: 'too-many-attempts' });
+
+      now += 10 * 60_000;
+      expect(timed.redeemPin('guest', code)).toEqual({ result: 'ok', tableId: 't-priv' });
+    });
+
+    it('does not refill the budget on a success, so owning a table buys no extra guesses', () => {
+      access.register('t-mine', 'public', 'attacker');
+      const mine = access.pinFor('t-mine', 'attacker') as string;
+
+      for (let i = 0; i < 9; i += 1) access.redeemPin('attacker', other(mine));
+      expect(access.redeemPin('attacker', mine)).toEqual({ result: 'ok', tableId: 't-mine' });
+      expect(access.redeemPin('attacker', other(mine))).toEqual({ result: 'not-found' });
+      expect(access.redeemPin('attacker', mine)).toEqual({ result: 'too-many-attempts' });
+    });
+
+    it("refuses a player who already spent that table's own unlock budget", () => {
+      const code = access.register('t-priv', 'private', 'creator') as string;
+      for (let i = 0; i < 10; i += 1) access.unlock('t-priv', 'guest', other(code));
+
+      expect(access.redeemPin('guest', code)).toEqual({ result: 'too-many-attempts' });
+      expect(access.mayJoin('t-priv', 'guest')).toBe(false);
+    });
+
+    it('forgets the PIN with the table', () => {
+      const code = access.register('t-priv', 'private', 'creator') as string;
+      access.forget('t-priv');
+
+      expect(access.redeemPin('guest', code)).toEqual({ result: 'not-found' });
+    });
+  });
 });
