@@ -28,6 +28,12 @@ export interface CreatedTable {
    * the felt beside the table id — docs/REFERENCE-STUDY-HH.md §14.2.
    */
   joinCode: string | null;
+  /**
+   * The six-digit game PIN — what a friend types into the lobby's "Enter game
+   * PIN to join". Every table has one; for a private table it is the same
+   * number as `joinCode`. Absent only from a gateway that predates the PIN.
+   */
+  pin?: string | null;
 }
 
 /** The poker variants — the games with the full create-options screen. */
@@ -106,19 +112,24 @@ export const createPlayerTableApi = (body: {
  * distinguishing them would turn this into an oracle for which table ids exist.
  */
 /*
- * KNOWN GAP — there is no way to TYPE a code anywhere in the app.
+ * TYPING A CODE is now the lobby's PIN box (`joinByPinApi` below): a private
+ * table's PIN is its code, so redeeming the PIN unlocks the table for that
+ * player. This call stays for links that carry `?code=` — its one caller is
+ * `PrivateTableGate` in pages/Table.tsx.
  *
- * This has exactly one caller: `PrivateTableGate` in pages/Table.tsx, which
- * redeems `?code=` out of the URL. So the only route into a private table is a
- * link that carries the code. Someone who is told the code out loud, or whose
- * link loses the query string, reaches the felt, is refused by the socket, and
- * has nothing to type it into.
- *
- * `tableEntry.shareBlurbPrivate` used to promise that path in all eight
- * locales. The promise has been withdrawn rather than left standing over
- * nothing (TRAPS §7), but the gap is real and is §12: a rule the player cannot
- * satisfy. The fix is a six-digit prompt on that socket error which calls this
- * and reconnects — its own change, with its own tests and eight more strings.
+ * STILL OPEN: a player who reaches a private felt with no code in the URL is
+ * refused by the socket and offered no prompt there. They have to go back to
+ * the lobby and type the PIN.
  */
 export const unlockTableApi = (tableId: string, code: string): Promise<{ unlocked: boolean }> =>
   api.post<{ unlocked: boolean }>(`/tables/${encodeURIComponent(tableId)}/unlock`, { code });
+
+/**
+ * "Enter game PIN to join" — find a table from its six digits alone.
+ *
+ * 404 when no live table has that PIN; 429 once this player has spent their
+ * guesses (ten per ten minutes, across every table). On success a private
+ * table is already unlocked for this player, so the felt opens without asking.
+ */
+export const joinByPinApi = (pin: string): Promise<{ tableId: string }> =>
+  api.post<{ tableId: string }>('/tables/join', { pin });

@@ -73,7 +73,14 @@
     "onlyOpen": "เฉพาะโต๊ะที่มีที่นั่งว่าง",
     "createPrivateHint": "โต๊ะส่วนตัวเป็นของพันธมิตร เปิดได้จากพันธมิตรของคุณ",
     "yourSeat": "ที่นั่งของคุณ",
-    "moreGamesBlurb": "เกมไพ่ เกมเร็ว และสล็อต"
+    "moreGamesBlurb": "เกมไพ่ เกมเร็ว และสล็อต",
+    "pinPrompt": "ใส่ PIN เกมเพื่อเข้าร่วม",
+    "joinGame": "เข้าร่วมเกม",
+    "joining": "กำลังเข้าร่วม…",
+    "startAndInvite": "สร้างเกมแล้วชวนเพื่อนมาเล่น!",
+    "createGame": "สร้างเกม",
+    "pinNotFound": "ไม่พบเกมที่ใช้ PIN นี้",
+    "pinTooMany": "ลองหลายครั้งเกินไป โปรดรอสักครู่แล้วลองใหม่"
   },
   "games": {
     "searchPlaceholder": "ค้นหาเกม",
@@ -898,7 +905,7 @@
     "buyInBlurb": "ผู้เล่นซื้อเข้า {{min}} ถึง {{max}}",
     "seats": "ที่นั่ง",
     "seatsBlurb": "{{count}} ที่นั่ง เริ่มเล่นได้ตั้งแต่ 2 คน",
-    "codeLabel": "รหัสเชิญ",
+    "codeLabel": "PIN เกม",
     "shareBlurbPrivate": "ส่งลิงก์นี้ให้เพื่อน — ลิงก์มีรหัสอยู่แล้ว"
   },
   "createGame": {

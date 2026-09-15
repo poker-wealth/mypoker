@@ -175,6 +175,38 @@ body,
   height: 100%;
 }
 
+/*
+ * The Lobby's ground — the Texas Hold'em entry screen, after HHPoker's.
+ *
+ * A deep indigo lit from the middle, with a faint quatrefoil pattern pressed
+ * into it: the reference's damask, drawn as one 56px SVG tile rather than
+ * shipped as an image, so the screen costs no bytes to paint. One deliberate
+ * look in both themes — it is a felt, and felts do not go light.
+ */
+.lobby-ground {
+  background: radial-gradient(120% 85% at 50% 40%, #1f4474 0%, #142c50 48%, #0a1528 100%);
+}
+.lobby-ground::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.035;
+  background-size: 56px 56px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56' viewBox='0 0 56 56'%3E%3Cg fill='none' stroke='%23ffffff' stroke-width='1.2'%3E%3Cpath d='M28 7c6 7 6 14 0 21-6-7-6-14 0-21zM28 28c6 7 6 14 0 21-6-7-6-14 0-21zM7 28c7-6 14-6 21 0-7 6-14 6-21 0zM28 28c7-6 14-6 21 0-7 6-14 6-21 0z'/%3E%3Ccircle cx='0' cy='0' r='5'/%3E%3Ccircle cx='56' cy='0' r='5'/%3E%3Ccircle cx='0' cy='56' r='5'/%3E%3Ccircle cx='56' cy='56' r='5'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* The PIN field: warm parchment, pressed in. */
+.lobby-pin {
+  background: linear-gradient(180deg, #dcc59d 0%, #ecdbbb 55%, #e3cfa9 100%);
+  box-shadow:
+    inset 0 2px 4px rgb(0 0 0 / 0.28),
+    0 1px 0 rgb(255 255 255 / 0.12);
+  color: #3a2a14;
+}
+.lobby-pin::placeholder {
+  color: rgb(58 42 20 / 0.35);
+}
+
 body {
   margin: 0;
   /* Nothing should ever scroll the page sideways (Phase E #4). A wide table or

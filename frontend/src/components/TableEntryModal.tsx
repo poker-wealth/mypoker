@@ -9,6 +9,7 @@ import { cn } from '@/lib/cn';
 import { toast } from '@/lib/toast';
 import { DEFAULT_TABLE_ID, TELEGRAM_APP_NAME, TELEGRAM_BOT_NAME } from '@/config';
 import { inviteUrl } from '@/lib/tableInvite';
+import type { PlayerTableGame } from '@/api/tables';
 
 /**
  * Tapping Hold'em opens this (owner-approved; not in the FairPlay doc): join the
@@ -26,8 +27,23 @@ import { inviteUrl } from '@/lib/tableInvite';
  *
  * "Join" goes to DEFAULT_TABLE_ID, exactly what the tile did before this
  * existed, so nothing is lost for a player who just wants a seat.
+ *
+ * `startWith="create"` skips the join/create choice and opens the create
+ * screen directly — the lobby's Create Game button, where the choice has
+ * already been made. Closing the create screen then closes the whole flow.
  */
-export function TableEntryModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function TableEntryModal({
+  open,
+  onClose,
+  startWith = 'choose',
+  games,
+}: {
+  open: boolean;
+  onClose: () => void;
+  startWith?: 'choose' | 'create';
+  /** Passed to the create screen — see CreateGameScreen's `games`. */
+  games?: readonly PlayerTableGame[];
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
@@ -35,12 +51,18 @@ export function TableEntryModal({ open, onClose }: { open: boolean; onClose: () 
   const [createdId, setCreatedId] = useState<string | null>(null);
   /** Private tables only; null for public. See CreatedTable.joinCode. */
   const [createdCode, setCreatedCode] = useState<string | null>(null);
+  /** Every table's game PIN — for a private one, the same digits as the code. */
+  const [createdPin, setCreatedPin] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const direct = startWith === 'create';
+  const inCreate = creating || (direct && !createdId);
 
   const close = (): void => {
     setCreating(false);
     setCreatedId(null);
     setCreatedCode(null);
+    setCreatedPin(null);
     setCopied(false);
     onClose();
   };
@@ -92,7 +114,9 @@ export function TableEntryModal({ open, onClose }: { open: boolean; onClose: () 
 
   return (
     <>
-      <Modal open={open} onClose={close} title={t('tableEntry.title')}>
+      {/* Opened directly into create, the choice step never shows — only the
+          share step, once a table exists. */}
+      <Modal open={open && (!direct || createdId !== null)} onClose={close} title={t('tableEntry.title')}>
         {createdId ? (
           <div className="space-y-3">
             <div className="space-y-2.5 rounded-(--radius-app) border border-border bg-surface p-4">
@@ -127,9 +151,10 @@ export function TableEntryModal({ open, onClose }: { open: boolean; onClose: () 
                   {copied ? t('tableEntry.copied') : t('tableEntry.copy')}
                 </span>
               </button>
-              {/* The code, shown on its own so it can be read out. Spaced and
-                  tabular so six digits are unambiguous when spoken. */}
-              {createdCode ? (
+              {/* The game PIN, shown on its own so it can be read out and typed
+                  into a friend's lobby. Spaced and tabular so six digits are
+                  unambiguous when spoken. For a private table it is the code. */}
+              {createdPin ? (
                 <div className="flex items-center gap-2 rounded-(--radius-app) border border-border bg-surface-2 px-3 py-2">
                   <KeyRound size={14} className="shrink-0 text-brand" />
                   <div className="min-w-0 flex-1">
@@ -137,7 +162,7 @@ export function TableEntryModal({ open, onClose }: { open: boolean; onClose: () 
                       {t('tableEntry.codeLabel')}
                     </span>
                     <span className="block font-mono text-[0.95rem] tracking-[0.3em] tabular-nums text-text">
-                      {createdCode}
+                      {createdPin}
                     </span>
                   </div>
                 </div>
@@ -166,13 +191,16 @@ export function TableEntryModal({ open, onClose }: { open: boolean; onClose: () 
       </Modal>
 
       <CreateGameScreen
-        open={open && creating && !createdId}
-        onClose={() => setCreating(false)}
+        open={open && inCreate && !createdId}
+        onClose={direct ? close : () => setCreating(false)}
+        {...(games ? { games } : {})}
         onCreated={(table) => {
           setCreating(false);
           setCreatedId(table.tableId);
           // Private tables carry a join code; public ones return null.
           setCreatedCode(table.joinCode ?? null);
+          // A gateway that predates the PIN sends none; a private table's code is its PIN.
+          setCreatedPin(table.pin ?? table.joinCode ?? null);
         }}
       />
     </>

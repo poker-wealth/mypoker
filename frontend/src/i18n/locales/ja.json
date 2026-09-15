@@ -73,7 +73,14 @@
     "onlyOpen": "空席のあるテーブルのみ",
     "createPrivateHint": "プライベートテーブルは同盟のものです。ご自分の同盟から開設してください。",
     "yourSeat": "あなたの席",
-    "moreGamesBlurb": "カードゲーム、クイックゲーム、スロット"
+    "moreGamesBlurb": "カードゲーム、クイックゲーム、スロット",
+    "pinPrompt": "ゲームPINを入力して参加",
+    "joinGame": "ゲームに参加",
+    "joining": "参加中…",
+    "startAndInvite": "ゲームを作って友達を招待しよう！",
+    "createGame": "ゲームを作成",
+    "pinNotFound": "そのPINのゲームは見つかりません。",
+    "pinTooMany": "試行回数が多すぎます。数分後にもう一度お試しください。"
   },
   "games": {
     "searchPlaceholder": "ゲームを検索",
@@ -898,7 +905,7 @@
     "buyInBlurb": "バイインは {{min}} から {{max}} です。",
     "seats": "座席",
     "seatsBlurb": "{{count}} 席。2 人からゲームを開始できます。",
-    "codeLabel": "招待コード",
+    "codeLabel": "ゲームPIN",
     "shareBlurbPrivate": "このリンクを友達に送ってください。コードが含まれています。"
   },
   "createGame": {

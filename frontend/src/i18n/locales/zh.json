@@ -73,7 +73,14 @@
     "onlyOpen": "仅显示有空位的牌桌",
     "createPrivateHint": "私人牌桌属于联盟，请在你的联盟中开设。",
     "yourSeat": "您的座位",
-    "moreGamesBlurb": "棋牌、快速游戏与老虎机"
+    "moreGamesBlurb": "棋牌、快速游戏与老虎机",
+    "pinPrompt": "输入房间号加入牌局。",
+    "joinGame": "加入牌局",
+    "joining": "正在加入…",
+    "startAndInvite": "开一局，邀请好友一起玩！",
+    "createGame": "创建牌局",
+    "pinNotFound": "没有找到这个房间号的牌局。",
+    "pinTooMany": "尝试次数过多，请几分钟后再试。"
   },
   "games": {
     "searchPlaceholder": "搜索游戏",
@@ -898,7 +905,7 @@
     "buyInBlurb": "玩家买入 {{min}} 至 {{max}}。",
     "seats": "座位",
     "seatsBlurb": "{{count}} 个座位。两人即可开局。",
-    "codeLabel": "邀请码",
+    "codeLabel": "房间号",
     "shareBlurbPrivate": "把链接发给朋友，链接里已带邀请码。"
   },
   "createGame": {

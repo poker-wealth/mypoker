@@ -1,509 +1,182 @@
-import { useEffect, useRef, useState } from 'react';
+import { useId, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-
 import { useNavigate } from 'react-router-dom';
-import { SlidersHorizontal, ChevronRight, ChevronLeft, LayoutGrid, Dice5 } from 'lucide-react';
-import { useTables } from '@/api/hooks';
-import { formatMicros } from '@/api/lobby';
-
-import { ContextBanner } from '@/components/ContextBanner';
-import { Skeleton } from '@/components/ui/Skeleton';
-import { cn } from '@/lib/cn';
+import { ApiError } from '@/api/client';
+import { errorKey } from '@/api/errors';
+import { joinByPinApi, type PlayerTableGame } from '@/api/tables';
+import { TableEntryModal } from '@/components/TableEntryModal';
 import { haptic } from '@/lib/telegram';
 
-/**
- * The promo banners, mirroring `PROMO_SLIDES` in
- * `mobile/src/screens/LobbyScreen.tsx` — one lobby, two clients.
- *
- * WebP, not the PNGs the app ships: these are 626 KB here against 5.7 MB of
- * source art, and the web side has a weight budget the native app does not
- * (root CLAUDE.md). Each banner is FINISHED artwork — the wordmark, the
- * headline and the "View details by clicking" pill are painted in — so
- * nothing is drawn on top of them.
- */
-const PROMO_SLIDES = ['/brand/promo-1.webp', '/brand/promo-2.webp', '/brand/promo-3.webp', '/brand/promo-4.webp'];
+/** Must match CODE_LENGTH in game-server/src/gateway/table-access.ts. */
+const PIN_LENGTH = 6;
 
-/** How long a banner holds before the next slides in. Matches the app. */
-const PROMO_INTERVAL_MS = 5_000;
+/** The Lobby opens Texas Hold'em tables only; every other game is created from Games. */
+const LOBBY_GAMES: readonly PlayerTableGame[] = ['texas'];
 
 /**
- * A lobby row, built only from what the server actually sent.
+ * Tab 3 — Lobby: straight into Texas Hold'em.
  *
- * There is deliberately no sample/fallback list any more. Six invented tables
- * (T-001…T-006, with "$1,200" and "$980" in the status column) used to render
- * whenever the API returned nothing — which, with the gateway undeployed, is
- * every time. A player opening the app saw a full lobby of tables that do not
- * exist, priced with figures nobody computed. An empty lobby is a fact; a
- * fabricated one is a lie that also happens to be unjoinable.
+ * Owner's instruction, 15 Sep 2026: the Lobby tab goes straight to Hold'em,
+ * shaped like HHPoker's centre tab — one field for a game PIN, a button to join
+ * with it, and a button to start a game. Every other game stays in Games. The
+ * feed that used to be this page (banners, CREATE / JOIN, All games,
+ * Tournament) moved whole to the top of Alliance — components/lobby/HomeFeed.tsx.
+ *
+ * NOTHING HERE IS DECORATION. The PIN box calls `/tables/join`, which exists
+ * for it: a PIN alone names a table, and a private table's PIN is its code, so
+ * typing it also lets the player in. Create Game opens the same create screen
+ * Games uses, already past the join-or-create question.
  */
-interface DisplayTable {
-  id: string;
-  blinds: string;
-  players: string;
-  buyIn: string;
-  /** Pooled jackpot on this table, micro-USD. Null when the table has none. */
-  jackpot: number | null;
-  isFull: boolean;
-  /** The table this player is seated at — the one that is refusing all the others. */
-  youAreSeated: boolean;
-  /** Table chips. Null when the game has no stake level — see formatBlinds. */
-  stakes: number | null;
-}
-
-/**
- * The blind filters, in TABLE CHIPS — the unit the server filters in.
- *
- * These were micro-USD (2_000_000 for "1/2") against a server comparing table
- * chips, whose largest big blind is 100. Every threshold was therefore
- * unreachable and tapping ANY filter but ALL emptied the lobby completely.
- * Same root cause as the blinds column: the numbers were correct for
- * `dev-seed.ts` and nobody re-read them when the live rooms took over.
- *
- * `minStakes` is the big blind, so the label's second number is the value.
- */
-const STAKES_OPTIONS = [
-  { id: 'all', label: 'ALL', minStakes: undefined },
-  { id: '1/2', label: '1/2', minStakes: 2 },
-  { id: '5/10', label: '5/10', minStakes: 10 },
-  { id: '25/50', label: '25/50', minStakes: 50 },
-  { id: '100/200', label: '100/200', minStakes: 200 },
-];
-
-/**
- * The blinds cell.
- *
- * Chips are not money: no currency mark, no micro conversion, just a grouped
- * integer. An em dash when the table has no blind structure at all — nine of
- * the thirteen live tables let each player pick their own bet, and printing
- * "0/0" for them stated a stake level that does not exist (docs/TRAPS.md #3).
- *
- * NO `stakes / 2` FALLBACK. An earlier draft of this used one for tables whose
- * server had not sent a small blind, and it promptly invented one: Dou Di Zhu
- * has a flat base stake of 100 and no blinds at all, and the fallback printed
- * it as "50/100". A missing small blind means there is no pair to show, not
- * that it can be guessed — so a flat stake renders as the single figure it is.
- */
-function formatBlinds(stakes: number | null, smallBlind?: number | null): string {
-  if (stakes === null || stakes === undefined) return '—';
-  if (smallBlind === null || smallBlind === undefined) return stakes.toLocaleString();
-  return `${smallBlind.toLocaleString()}/${stakes.toLocaleString()}`;
-}
-
 export function Lobby() {
-  const navigate = useNavigate();
-  const [blinds, setBlinds] = useState('all');
-  const [onlyOpen, setOnlyOpen] = useState(false);
-  /** 'home' is the lobby; 'tables' is the Live Tables screen JOIN opens. */
-  const [view, setView] = useState<'home' | 'tables'>('home');
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const inputId = useId();
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [joining, setJoining] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
 
-  const targetStakes = STAKES_OPTIONS.find((s) => s.id === blinds)?.minStakes;
+  const ready = pin.length === PIN_LENGTH && !joining;
 
-  /*
-   * THE LOBBY IS TEXAS HOLD'EM. Owner's instruction, 12 Sep 2026: "The lobby
-   * only needs to play Texas Hold'em. Put all other games into the Games
-   * category."
-   *
-   * Filtered SERVER-SIDE, so the rows and the counts on them agree: asking for
-   * everything and hiding the rest here would show "12 tables" over a list of
-   * three.
-   *
-   * The tab row that used to sit above this (DEZHOU / AUSHA / OTHERS) is gone
-   * with it — two of those tabs selected games that no longer belong here, and
-   * the third was every game at once. Every other game is reachable from Games,
-   * where they are grouped by kind.
-   */
-  const tables = useTables({
-    gameId: 'texas',
-    minStakes: targetStakes,
-    maxStakes: targetStakes,
-    // Stakes and seat filters stay server-side, so the count the lobby shows
-    // is the count the server filtered.
-    ...(onlyOpen ? { hasSeats: true } : {}),
-  });
-
-  const rawTables = tables.data?.tables ?? [];
-
-  // Null while the lobby has not answered. '$ 0.00' is a claim about the pools
-  // and it is the wrong one — the hero shows a skeleton instead.
-
-  const displayTables: DisplayTable[] = rawTables.map((t) => ({
-    id: t.id,
-    blinds: formatBlinds(t.stakes, t.smallBlind),
-    players: `${t.players} / ${t.maxPlayers}`,
-    // The server's own figure. It used to fall back to 40 when absent, which
-    // put a buy-in on the row that the table had never quoted.
-    buyIn: t.buyInBB === null ? '—' : `${t.buyInBB} BB`,
-    // Null rather than a substitute. The old line read
-    //   t.jackpot || t.stakes * 10
-    // so a table with an empty pool advertised ten times its blind as a dollar
-    // amount — invented from unrelated data, on REAL tables, not just the
-    // sample ones. Nothing here may stand in for a number the server did not
-    // send.
-    jackpot: t.jackpot > 0 ? t.jackpot : null,
-    isFull: t.status === 'FULL' || t.players >= t.maxPlayers,
-    youAreSeated: t.youAreSeated === true,
-    stakes: t.stakes,
-  }));
-
-  // ── Promo carousel ────────────────────────────────────────────────────────
-  const [slide, setSlide] = useState(0);
-  const [paused, setPaused] = useState(false);
-  /**
-   * Which banners have actually decoded.
-   *
-   * Per index rather than a single flag: the slides load independently (only
-   * the first is eager), so one shared boolean would either hide the shimmer
-   * on a slide still loading or keep it over one already painted.
-   */
-  const [loaded, setLoaded] = useState<ReadonlySet<number>>(() => new Set());
-  const trackRef = useRef<HTMLDivElement>(null);
-
-  /**
-   * Advance on its own, pausing while a pointer rests on the banner.
-   *
-   * Scheduled from the slide actually showing, so a manual tap on a dot
-   * restarts the clock rather than firing on the old one's leftover timer.
-   */
-  useEffect(() => {
-    if (paused || PROMO_SLIDES.length < 2) return;
-    const id = setTimeout(() => setSlide((s) => (s + 1) % PROMO_SLIDES.length), PROMO_INTERVAL_MS);
-    return () => clearTimeout(id);
-  }, [slide, paused]);
-
-  /**
-   * The tables list, as its own screen — the shape the native app uses.
-   *
-   * Everything below (the DEZHOU/AUSHA/OTHERS tabs, the blind filters, the
-   * table itself) used to sit stacked under the banner on one long page,
-   * which is not what the app does and not what the owner approved: there,
-   * JOIN opens "Live Tables" and the lobby home stays a lobby.
-   */
-  /**
-   * Tabs, blind filters and the table itself — the whole Live Tables
-   * screen, held in one place so the `tables` view above renders exactly
-   * what the lobby used to render inline.
-   */
-  const tablesSection = (
-    <>
-        {/* The DEZHOU / AUSHA / OTHERS tab row stood here. It is gone with the
-            lobby's narrowing to Texas Hold'em: two of its tabs selected games
-            that now live in Games, and the third was every game at once. The
-            stakes pills below still filter, because a Texas lobby still has
-            stake levels to choose between. */}
-
-        {/* Stakes Filter Pills */}
-        <div className="flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar">
-          <div className="flex items-center gap-1.5">
-            {STAKES_OPTIONS.map((s) => {
-              const active = blinds === s.id;
-              return (
-                <button
-                  key={s.id}
-                  onClick={() => setBlinds(s.id)}
-                  className={cn(
-                    'px-3 py-1.5 text-xs font-bold transition-all rounded-md shrink-0',
-                    active
-                      ? 'bg-gold text-bg shadow-xs'
-                      : 'bg-surface-2/80 text-dim hover:text-text',
-                  )}
-                >
-                  {s.label}
-                </button>
-              );
-            })}
-          </div>
-          {/* Was inert. Toggles the one filter a player in a lobby actually
-              wants — hide tables they cannot sit at — which the API already
-              supports via hasSeats. */}
-          <button
-            aria-label={t('lobby.onlyOpen')}
-            aria-pressed={onlyOpen}
-            onClick={() => {
-              haptic('light');
-              setOnlyOpen((v) => !v);
-            }}
-            className={cn(
-              'grid size-7 shrink-0 place-items-center rounded-md border transition-colors active:scale-95',
-              onlyOpen
-                ? 'border-gold bg-[color-mix(in_srgb,var(--gold)_16%,transparent)] text-gold'
-                : 'border-border bg-surface-2 text-dim hover:text-text',
-            )}
-          >
-            <SlidersHorizontal size={14} />
-          </button>
-        </div>
-
-        {/* Table List Grid */}
-        {/* `overflow-x-auto`, NOT `overflow-hidden`.
-            Five columns do not always fit the 520px shell — a long table id
-            (`t-9281a78425c9`) plus the "your seat" badge is enough to push past
-            it. Clipping meant the Status column, which holds the ONLY control
-            in the row, was cut off the right edge and unreachable. Scrolling
-            keeps it reachable; `whitespace-nowrap` below stops the cells
-            collapsing into two-line stacks ("100 / BB") on the way there. */}
-        <div className="overflow-x-auto no-scrollbar rounded-xl border border-border/80 bg-surface/90 shadow-sm">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-border/60 text-[0.65rem] text-dim uppercase tracking-wider">
-                <th className="px-2.5 py-2.5 font-bold">Table</th>
-                <th className="px-2.5 py-2.5 font-bold whitespace-nowrap">Blinds</th>
-                <th className="px-2.5 py-2.5 font-bold whitespace-nowrap">Players</th>
-                <th className="px-2.5 py-2.5 font-bold whitespace-nowrap">Buy-in</th>
-                <th className="px-2.5 py-2.5 text-right font-bold">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/40">
-              {tables.isPending ? (
-                [0, 1, 2].map((i) => (
-                  <tr key={i}>
-                    <td colSpan={5} className="px-3 py-3">
-                      <Skeleton className="h-4 w-full" />
-                    </td>
-                  </tr>
-                ))
-              ) : tables.isError ? (
-                // An unreachable lobby is not an empty one. Saying "no tables
-                // found" when the request failed tells the player the platform
-                // is dead rather than that we could not ask.
-                <tr>
-                  <td colSpan={5} className="py-8 text-center text-dim">
-                    {t('states.serviceUnavailable')}
-                  </td>
-                </tr>
-              ) : displayTables.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="py-8 text-center text-dim">
-                    {t('lobby.noTables')}
-                  </td>
-                </tr>
-              ) : (
-                displayTables.map((tbl) => (
-                  <tr
-                    key={tbl.id}
-                    onClick={() => navigate(`/table/${tbl.id}`)}
-                    className="cursor-pointer transition-colors active:bg-surface-2/80 hover:bg-surface-2/40"
-                  >
-                    {/* The table's real id. It used to render `T-00${index}`, a
-                        label invented per render that matched nothing a player
-                        could be told over support. */}
-                    <td className="px-2.5 py-3 font-bold whitespace-nowrap text-[#eab308]">
-                      {tbl.id}
-                      {/* The row holding this player's seat. It is the reason every
-                          other table is refusing them, and the only row that can
-                          release it — so it is marked next to the name rather than
-                          buried in the status column. */}
-                      {tbl.youAreSeated && (
-                        <span className="ml-2 rounded-full bg-brand/20 px-2 py-0.5 text-[0.6rem] font-bold text-brand align-middle">
-                          {t('lobby.yourSeat')}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-2.5 py-3 tabular-nums whitespace-nowrap text-dim font-medium">
-                      {tbl.blinds}
-                    </td>
-                    <td className="px-2.5 py-3 tabular-nums whitespace-nowrap font-semibold text-text">
-                      {tbl.players}
-                    </td>
-                    <td className="px-2.5 py-3 tabular-nums whitespace-nowrap text-dim font-medium">
-                      {tbl.buyIn}
-                    </td>
-                    <td className="px-2.5 py-3 text-right">
-                      {tbl.isFull ? (
-                        <span className="inline-block min-w-16 rounded-md border border-border bg-surface-2 px-2.5 py-1 text-center text-[0.7rem] font-bold text-dim">
-                          {t('lobby.wait')}
-                        </span>
-                      ) : tbl.jackpot !== null ? (
-                        <span className="inline-block min-w-16 rounded-md border border-jackpot/40 bg-[color-mix(in_srgb,var(--jackpot)_14%,transparent)] px-2.5 py-1 text-center text-[0.7rem] font-bold text-jackpot shadow-xs">
-                          ${formatMicros(tbl.jackpot, 0)}
-                        </span>
-                      ) : (
-                        // Open, but with no pool to advertise. Say the table is
-                        // open rather than print a dollar sign next to nothing.
-                        <span className="inline-block min-w-16 rounded-md border border-jackpot/40 bg-[color-mix(in_srgb,var(--jackpot)_14%,transparent)] px-2.5 py-1 text-center text-[0.7rem] font-bold text-jackpot shadow-xs">
-                          {t('lobby.open')}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-
-    </>
-  );
-
-  if (view === 'tables') {
-    return (
-      <div className="flex flex-col space-y-3.5 pb-4">
-        <div className="flex items-center">
-          <button
-            type="button"
-            onClick={() => setView('home')}
-            aria-label={t('common.back')}
-            className="grid size-9 place-items-center rounded-lg text-dim transition-colors hover:bg-surface-2 hover:text-text"
-          >
-            <ChevronLeft size={20} />
-          </button>
-          {/* Padded by the button's width so the title centres on the screen. */}
-          <h2 className="min-w-0 flex-1 truncate pr-9 text-center text-base font-black">
-            {t('lobby.liveTables')}
-          </h2>
-        </div>
-        {tablesSection}
-      </div>
-    );
-  }
+  const join = async (): Promise<void> => {
+    if (!ready) return;
+    haptic('light');
+    setJoining(true);
+    setError(null);
+    try {
+      const { tableId } = await joinByPinApi(pin);
+      navigate(`/table/${tableId}`);
+    } catch (e) {
+      // A PIN that matches nothing and a player out of guesses are the two
+      // answers someone can act on, so they get words of their own.
+      if (e instanceof ApiError && e.status === 404) setError(t('lobby.pinNotFound'));
+      else if (e instanceof ApiError && e.status === 429) setError(t('lobby.pinTooMany'));
+      else setError(t(errorKey(e)));
+    } finally {
+      setJoining(false);
+    }
+  };
 
   return (
-    <div className="flex flex-col space-y-3.5 pb-4">
-      <ContextBanner />
+    <>
+      {/* The ground is portalled to <body>. The page renders inside a motion
+          wrapper whose transform turns `fixed` into "fixed to the wrapper",
+          which would leave the edges of the screen bare. */}
+      {createPortal(
+        <div aria-hidden className="lobby-ground pointer-events-none fixed inset-0 -z-10" />,
+        document.body,
+      )}
 
-      {/* Promo banners — the app's lobby, on the web. The slide is the image
-          and nothing else: the art already carries its own headline and CTA,
-          so any text here would print the words twice. */}
-      <div
-        // The banner's own shape, held from first paint so the page never
-        // reflows when the art lands. 1536x658 is promo-1; the others are
-        // within a few percent and are covered into this box.
-        className="relative aspect-[1536/658] overflow-hidden rounded-2xl"
-        onMouseEnter={() => setPaused(true)}
-        onMouseLeave={() => setPaused(false)}
-        onTouchStart={() => setPaused(true)}
-        onTouchEnd={() => setPaused(false)}
-      >
-        {/* The skeleton, UNDER the track.
-            The banners carried no reserved height, so this whole block was 0px
-            tall until the first file arrived and then snapped open — Victor's
-            words: "the image appearing all of a sudden from no way after
-            looking like nothing is there". The container now holds the
-            banner's shape from first paint, a shimmer fills it while the file
-            is in flight, and the art fades in over the top. Nothing moves. */}
-        {!loaded.has(slide) && (
-          <div className="absolute inset-0 animate-pulse rounded-2xl bg-surface-2" />
-        )}
-        <div
-          ref={trackRef}
-          className="flex h-full transition-transform duration-500 ease-out"
-          style={{ transform: `translateX(-${slide * 100}%)` }}
-        >
-          {PROMO_SLIDES.map((src, i) => (
-            <img
-              key={src}
-              src={src}
-              alt=""
-              aria-hidden
-              draggable={false}
-              // The first banner is the one on screen at first paint; the rest
-              // can wait until the carousel reaches them.
-              loading={i === 0 ? 'eager' : 'lazy'}
-              decoding="async"
-              onLoad={() => setLoaded((prev) => (prev.has(i) ? prev : new Set(prev).add(i)))}
-              // `object-cover` because the four banners are not all the same
-              // shape (2.23 to 2.33); the box is one ratio, so the odd ones are
-              // cropped a hair rather than letterboxed or resizing the block.
-              className={cn(
-                'h-full w-full shrink-0 select-none rounded-2xl object-cover transition-opacity duration-300',
-                loaded.has(i) ? 'opacity-100' : 'opacity-0',
-              )}
-            />
-          ))}
-        </div>
-        {PROMO_SLIDES.length > 1 && (
-          <div className="absolute inset-x-0 bottom-2 flex justify-center gap-1.5">
-            {PROMO_SLIDES.map((src, i) => (
-              <button
-                key={src}
-                type="button"
-                aria-label={`${i + 1} / ${PROMO_SLIDES.length}`}
-                onClick={() => setSlide(i)}
-                className={cn(
-                  'h-1.5 rounded-full transition-all',
-                  i === slide ? 'w-3.5 bg-white' : 'w-1.5 bg-white/40',
-                )}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+      <div className="flex min-h-[calc(100dvh-11rem)] flex-col items-center justify-center pb-6 text-center">
+        <label htmlFor={inputId} className="text-[0.95rem] text-[#c7d2e4]">
+          {t('lobby.pinPrompt')}
+        </label>
+        <input
+          id={inputId}
+          value={pin}
+          onChange={(e) => {
+            // Digits only, and never more than a PIN holds — a pasted
+            // "694 023" or "PIN: 694023" still lands as the six digits.
+            setPin(e.target.value.replace(/\D/g, '').slice(0, PIN_LENGTH));
+            setError(null);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') void join();
+          }}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          enterKeyHint="go"
+          maxLength={PIN_LENGTH + 8}
+          aria-invalid={error !== null}
+          // The letter-spacing trails the last digit too; the matching left
+          // padding keeps the six digits centred in the field.
+          className="lobby-pin mt-3 h-12 w-full max-w-[15.5rem] rounded-md pl-[0.45em] text-center font-mono text-2xl tracking-[0.45em] tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-gold/70"
+        />
+        <p role="alert" className="mt-2 min-h-5 text-[0.8rem] text-danger">
+          {error}
+        </p>
 
-      {/* CREATE / JOIN — beneath the banner, never over it: the artwork
-          carries its own call to action and a bar across it hides that. */}
-      <div className="flex overflow-hidden rounded-2xl bg-gold text-bg shadow-lg">
         <button
           type="button"
+          disabled={!ready}
+          onClick={() => void join()}
+          className="mt-2 h-13 w-full max-w-[16.5rem] rounded-full bg-gold text-lg font-semibold text-[#3a2a14] shadow-[0_2px_0_rgb(0_0_0/0.3)] transition active:scale-[0.98] disabled:opacity-60"
+        >
+          {joining ? t('lobby.joining') : t('lobby.joinGame')}
+        </button>
+
+        <p className="mt-20 text-[0.95rem] text-[#c7d2e4]">{t('lobby.startAndInvite')}</p>
+        <TableButton
+          label={t('lobby.createGame')}
           onClick={() => {
             haptic('light');
-            navigate('/games');
+            setCreateOpen(true);
           }}
-          className="flex flex-1 items-center justify-center gap-2 border-r border-black/20 py-3 text-sm font-black tracking-wide transition active:scale-[0.99]"
-        >
-          <LayoutGrid size={18} />
-          {t('lobby.create')}
-          <ChevronRight size={14} />
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            haptic('light');
-            setView('tables');
-          }}
-          className="flex flex-1 items-center justify-center gap-2 py-3 text-sm font-black tracking-wide transition active:scale-[0.99]"
-        >
-          <Dice5 size={18} />
-          {t('lobby.join')}
-          <ChevronRight size={14} />
-        </button>
+        />
       </div>
 
-
-      {/* MY GAMES USED TO LIST EVERY GAME HERE, as a row of text links straight
-          into a table. Owner's instruction, 12 Sep 2026: the lobby plays Texas
-          Hold'em, and every other game belongs in Games — where they are
-          grouped by kind and carry their artwork, rather than being a row of
-          names competing with the lobby's own tables.
-
-          What stays is the way THERE. One link, not a second catalogue: two
-          places listing the same games is how they drift apart. */}
-      <button
-        type="button"
-        onClick={() => {
-          haptic('light');
-          navigate('/games');
-        }}
-        className="flex w-full items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3 text-left transition active:scale-[0.99]"
-      >
-        <span>
-          <span className="block text-base font-black">{t('lobby.moreGames')}</span>
-          <span className="block text-[0.72rem] text-dim">{t('lobby.moreGamesBlurb')}</span>
-        </span>
-        <ChevronRight size={18} className="shrink-0 text-dim" />
-      </button>
-
-      {/* Tournament — the section the app carries, with the truth in it.
-          There is NO tournament backend: no route, no engine, nothing on the
-          server answers for an MTT. The app's version of this lists invented
-          events ("Golden Freeroll-8 Max", a 500 prize, a date in September)
-          that no player can enter and no code produced. Copying those here
-          would have doubled a fabrication rather than shipped a feature, so
-          the section says what is true and will fill itself the day a
-          schedule exists. */}
-      <div>
-        <div className="mb-2 text-base font-black">{t('lobby.tournaments')}</div>
-        <div className="rounded-2xl border border-dashed border-border bg-surface px-4 py-6 text-center text-[0.8rem] text-dim">
-          {t('lobby.noTournaments')}
-        </div>
-      </div>
-
-      {/* No QUICK JOIN / CREATE PRIVATE TABLE pair here. CREATE and JOIN live
-          on the lobby's home view; repeating them at the foot of the table
-          list gave the same two doors different names on one screen. Removed
-          from the app for that reason — the clients match. */}
-    </div>
+      <TableEntryModal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        startWith="create"
+        games={LOBBY_GAMES}
+      />
+    </>
   );
 }
 
+/** The table's outline: HHPoker's rounded table with the dip at its top edge. */
+const TABLE_SHAPE =
+  'M62 8C92 8 102 20 120 20S148 8 178 8C214 8 236 30 236 57S214 106 178 106H62C26 106 4 84 4 57S26 8 62 8Z';
 
+/**
+ * Create Game, drawn as a poker table — a copper rail around an indigo felt.
+ *
+ * Inline SVG rather than artwork: it scales to any width without a second
+ * asset, stays sharp, and costs nothing on the one screen every player opens.
+ */
+function TableButton({ label, onClick }: { label: string; onClick: () => void }) {
+  // useId can contain characters that are not valid inside url(#…).
+  const id = useId().replace(/[^a-zA-Z0-9_-]/g, '');
+  const inset = (sx: number, sy: number): string =>
+    `translate(120 57) scale(${sx} ${sy}) translate(-120 -57)`;
 
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="relative mt-4 grid w-full max-w-[16.5rem] place-items-center transition active:scale-[0.97]"
+      style={{ aspectRatio: '240 / 114' }}
+    >
+      <svg
+        viewBox="0 0 240 114"
+        aria-hidden
+        className="absolute inset-0 size-full drop-shadow-[0_6px_10px_rgb(0_0_0/0.45)]"
+      >
+        <defs>
+          <linearGradient id={`${id}-rail`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#ec9f5a" />
+            <stop offset="0.5" stopColor="#a9571f" />
+            <stop offset="1" stopColor="#6a3210" />
+          </linearGradient>
+          <radialGradient id={`${id}-felt`} cx="0.5" cy="0.42" r="0.7">
+            <stop offset="0" stopColor="#12598d" />
+            <stop offset="1" stopColor="#062a4d" />
+          </radialGradient>
+        </defs>
+        <path d={TABLE_SHAPE} fill={`url(#${id}-rail)`} stroke="#2b1405" strokeWidth="2" />
+        <path d={TABLE_SHAPE} fill={`url(#${id}-felt)`} transform={inset(0.9, 0.82)} />
+        <path
+          d={TABLE_SHAPE}
+          fill="none"
+          stroke="#ffffff"
+          strokeOpacity="0.14"
+          strokeWidth="1.5"
+          transform={inset(0.82, 0.7)}
+        />
+      </svg>
+      <span className="relative text-xl font-medium text-white">{label}</span>
+    </button>
+  );
+}

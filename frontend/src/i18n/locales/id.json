@@ -73,7 +73,14 @@
     "onlyOpen": "Hanya meja dengan kursi kosong",
     "createPrivateHint": "Meja pribadi milik aliansi — buka dari aliansi Anda.",
     "yourSeat": "Kursi Anda",
-    "moreGamesBlurb": "Game kartu, game cepat, dan slot"
+    "moreGamesBlurb": "Game kartu, game cepat, dan slot",
+    "pinPrompt": "Masukkan PIN permainan untuk bergabung.",
+    "joinGame": "Gabung Permainan",
+    "joining": "Bergabung…",
+    "startAndInvite": "Mulai permainan dan undang teman!",
+    "createGame": "Buat Permainan",
+    "pinNotFound": "Tidak ada permainan dengan PIN itu.",
+    "pinTooMany": "Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi."
   },
   "games": {
     "searchPlaceholder": "Cari game",
@@ -898,7 +905,7 @@
     "buyInBlurb": "Pemain buy-in {{min}} sampai {{max}}.",
     "seats": "Kursi",
     "seatsBlurb": "{{count}} kursi. Dua pemain sudah cukup untuk mulai.",
-    "codeLabel": "Kode undangan",
+    "codeLabel": "PIN Permainan",
     "shareBlurbPrivate": "Kirim tautan ini untuk mengundang teman — kodenya sudah termasuk."
   },
   "createGame": {

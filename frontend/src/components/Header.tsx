@@ -1,4 +1,5 @@
-import { HelpCircle, Settings, ShieldCheck, Bell } from 'lucide-react';
+import { Settings, ShieldCheck, Bell } from 'lucide-react';
+import { cn } from '@/lib/cn';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useUnreadCount } from '@/api/hooks';
@@ -27,18 +28,22 @@ export function Header() {
   switch (location.pathname) {
     case '/alliance':
       title = t('nav.alliance');
-      rightElement = <HelpCircle size={18} className="text-dim" />;
-      break;
-    case '/games':
-      title = t('nav.games');
-      break;
-    case '/':
-      title = t('nav.lobby');
+      // The badge moved here with the promo feed it headed (owner, 15 Sep 2026).
+      // It replaces a help icon that was never a button — decoration shaped like
+      // a control.
       rightElement = (
         <div className="flex items-center gap-1.5 rounded-md border border-success/30 bg-success/10 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-wide text-success">
           <ShieldCheck size={13} /> {t('lobby.fairSecure')}
         </div>
       );
+      break;
+    case '/games':
+      title = t('nav.games');
+      break;
+    case '/':
+      // The Hold'em entry screen: a title and the bell, nothing more. It is
+      // modelled on HHPoker's, which is clean because it carries so little.
+      title = t('nav.lobby');
       break;
     case '/data':
       title = t('nav.data');
@@ -62,7 +67,14 @@ export function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-20 -mx-4 mb-1 bg-bg/95 px-4 pb-3 pt-4 backdrop-blur-md">
+    <header
+      className={cn(
+        'sticky top-0 z-20 -mx-4 mb-1 px-4 pb-3 pt-4',
+        // The lobby paints its own ground edge to edge; a dark band across the
+        // top of it would cut the screen in two.
+        location.pathname === '/' ? 'bg-transparent' : 'bg-bg/95 backdrop-blur-md',
+      )}
+    >
       <div className="flex items-center justify-between">
         <h1 className="text-base font-black tracking-tight">{title}</h1>
         <div className="flex items-center gap-2">

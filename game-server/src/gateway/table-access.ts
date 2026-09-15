@@ -53,10 +53,34 @@ const CODE_LENGTH = 6;
  */
 const MAX_ATTEMPTS = 10;
 
+/**
+ * Wrong game PINs tolerated per player, across EVERY table, inside one window.
+ *
+ * `redeemPin` is the lobby's "Enter game PIN to join": the player names no
+ * table, so the per-(table, player) budget above cannot apply — a script would
+ * simply spread its guesses across a million PINs. This budget is per player
+ * and global.
+ *
+ * Time-windowed rather than permanent, so a fat-fingered player is shut out for
+ * minutes, not until the process restarts. And a SUCCESS does not refill it —
+ * otherwise an attacker tops the budget back up by redeeming the PIN of a table
+ * they opened themselves.
+ */
+const MAX_PIN_ATTEMPTS = 10;
+const PIN_WINDOW_MS = 10 * 60_000;
+
 interface Entry {
   /** Absent for a public table. Public tables are registered too, so that an unknown id is
    *  distinguishable from a known-public one. */
   code?: string;
+  /**
+   * The six digits the lobby's PIN box takes. Every player-created table has one.
+   *
+   * For a PRIVATE table it IS the code — one number to read out, not two. For a
+   * PUBLIC table it is only an address: that table admits anyone anyway, so the
+   * PIN finds it and grants nothing more.
+   */
+  pin: string;
   /** Players who have proved they hold the code, plus the creator. */
   unlocked: Set<string>;
   /** Wrong guesses so far, per player. */
@@ -65,28 +89,57 @@ interface Entry {
 
 export type UnlockResult = 'ok' | 'wrong-code' | 'too-many-attempts' | 'unknown-table';
 
+export type PinResult =
+  | { result: 'ok'; tableId: string }
+  | { result: 'not-found' }
+  | { result: 'too-many-attempts' };
+
 export class TableAccess {
   private readonly tables = new Map<string, Entry>();
+  /** PIN → table id. Unique among registered tables, so a PIN names exactly one. */
+  private readonly byPin = new Map<string, string>();
+  /** When each player's recent wrong PINs were entered. See MAX_PIN_ATTEMPTS. */
+  private readonly pinFailures = new Map<string, number[]>();
+
+  /** The clock is injected so the PIN window can be tested without fake timers. */
+  constructor(private readonly now: () => number = Date.now) {}
 
   /**
    * Record a newly created table.
    *
    * Returns the minted code for a private table and `null` for a public one, so
    * the caller cannot forget to handle the private case: there is no code to
-   * hand back for a public table and the type says as much.
+   * hand back for a public table and the type says as much. Both get a PIN —
+   * read it with `pinFor`.
    */
   register(tableId: string, visibility: 'public' | 'private', creatorPlayerId: string): string | null {
+    // A reused id must not leave its old PIN pointing here.
+    this.forget(tableId);
+    const pin = this.mintPin();
+    this.byPin.set(pin, tableId);
     if (visibility === 'public') {
-      this.tables.set(tableId, { unlocked: new Set(), attempts: new Map() });
+      this.tables.set(tableId, { pin, unlocked: new Set(), attempts: new Map() });
       return null;
     }
-    // randomInt, not Math.random: this is a credential, and Math.random is
-    // neither uniform nor unpredictable enough to be one.
-    let code = '';
-    for (let i = 0; i < CODE_LENGTH; i += 1) code += String(randomInt(0, 10));
     // The creator is unlocked by construction — they were just shown the code.
-    this.tables.set(tableId, { code, unlocked: new Set([creatorPlayerId]), attempts: new Map() });
-    return code;
+    this.tables.set(tableId, { code: pin, pin, unlocked: new Set([creatorPlayerId]), attempts: new Map() });
+    return pin;
+  }
+
+  /**
+   * Six random digits no registered table is using.
+   *
+   * Unique rather than merely random: a PIN is looked up on its own, so two
+   * tables sharing one would send a player to whichever was indexed last.
+   * randomInt, not Math.random: a private table's PIN is a credential, and
+   * Math.random is neither uniform nor unpredictable enough to be one.
+   */
+  private mintPin(): string {
+    for (;;) {
+      let pin = '';
+      for (let i = 0; i < CODE_LENGTH; i += 1) pin += String(randomInt(0, 10));
+      if (!this.byPin.has(pin)) return pin;
+    }
   }
 
   /**
@@ -137,8 +190,56 @@ export class TableAccess {
     return entry.unlocked.has(playerId) ? entry.code : null;
   }
 
-  /** Drop a table's record when its room goes away. */
+  /**
+   * A table's PIN, for someone who may already reach it — the creator's share
+   * dialog. A public table admits anyone, so anyone may read its PIN; a private
+   * table's PIN is its code and is withheld exactly as `codeFor` withholds it.
+   */
+  pinFor(tableId: string, playerId: string): string | null {
+    const entry = this.tables.get(tableId);
+    if (!entry) return null;
+    if (entry.code && !entry.unlocked.has(playerId)) return null;
+    return entry.pin;
+  }
+
+  /**
+   * The lobby's "Enter game PIN to join": find a table from its PIN alone.
+   *
+   * A private table's PIN is its code, so finding one also unlocks it for this
+   * player — they have just proved they hold the code, as `unlock` would have
+   * them prove it.
+   *
+   * Every miss counts against the player's global budget. A hit does not refund
+   * it. A player who has already spent a table's own `unlock` budget is refused
+   * here too: a second door must not walk past the first door's lock.
+   */
+  redeemPin(playerId: string, pin: string): PinResult {
+    const now = this.now();
+    const recent = (this.pinFailures.get(playerId) ?? []).filter((at) => now - at < PIN_WINDOW_MS);
+    if (recent.length > 0) this.pinFailures.set(playerId, recent);
+    else this.pinFailures.delete(playerId);
+
+    if (recent.length >= MAX_PIN_ATTEMPTS) return { result: 'too-many-attempts' };
+
+    const tableId = this.byPin.get(pin);
+    const entry = tableId === undefined ? undefined : this.tables.get(tableId);
+    if (tableId === undefined || !entry) {
+      this.pinFailures.set(playerId, [...recent, now]);
+      return { result: 'not-found' };
+    }
+
+    if (entry.code && !entry.unlocked.has(playerId)) {
+      if ((entry.attempts.get(playerId) ?? 0) >= MAX_ATTEMPTS) return { result: 'too-many-attempts' };
+      entry.unlocked.add(playerId);
+      entry.attempts.delete(playerId);
+    }
+    return { result: 'ok', tableId };
+  }
+
+  /** Drop a table's record when its room goes away. Its PIN goes with it. */
   forget(tableId: string): void {
+    const entry = this.tables.get(tableId);
+    if (entry && this.byPin.get(entry.pin) === tableId) this.byPin.delete(entry.pin);
     this.tables.delete(tableId);
   }
 }

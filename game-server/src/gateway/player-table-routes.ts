@@ -136,6 +136,8 @@ export function buildPlayerTableRouter(
 
   /** Digits only, and exactly as long as `table-access.ts` mints. */
   const unlockBody = z.object({ code: z.string().regex(/^\d{6}$/) });
+  /** The same six digits, typed into the lobby with no table named. */
+  const pinBody = z.object({ pin: z.string().regex(/^\d{6}$/) });
 
   r.post('/', requireAuth(config), (req: Request, res: Response): void => {
     const playerId = req.player?.playerId;
@@ -310,7 +312,45 @@ export function buildPlayerTableRouter(
     // exists so a failure to open leaves nothing registered behind it.
     const joinCode = tableAccess.register(tableId, input.visibility, playerId);
 
-    res.status(201).json({ tableId, visibility: input.visibility, joinCode });
+    // The PIN friends type into the lobby. For a private table it equals the code.
+    const pin = tableAccess.pinFor(tableId, playerId);
+
+    res.status(201).json({ tableId, visibility: input.visibility, joinCode, pin });
+  });
+
+  /**
+   * "Enter game PIN to join" — the lobby's way in, naming no table.
+   *
+   * 404 for a PIN that matches nothing. That does reveal whether a PIN is live,
+   * and it cannot help it: finding the table IS the answer. What stops this
+   * being a scan is the per-player budget in `TableAccess.redeemPin`, not a
+   * vaguer status code.
+   *
+   * A PIN whose room has gone reads as not found rather than sending the player
+   * to a felt that no longer exists.
+   */
+  r.post('/join', requireAuth(config), (req: Request, res: Response): void => {
+    const playerId = req.player?.playerId;
+    if (!playerId) {
+      res.status(401).json({ error: 'unauthorized' });
+      return;
+    }
+    const parsed = pinBody.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({ error: 'a game PIN is six digits' });
+      return;
+    }
+
+    const found = tableAccess.redeemPin(playerId, parsed.data.pin);
+    if (found.result === 'too-many-attempts') {
+      res.status(429).json({ error: 'too many attempts — try again in a few minutes' });
+      return;
+    }
+    if (found.result === 'not-found' || !deps.hub.tables().some((t) => t.tableId === found.tableId)) {
+      res.status(404).json({ error: 'no game with that PIN' });
+      return;
+    }
+    res.status(200).json({ tableId: found.tableId });
   });
 
   /**

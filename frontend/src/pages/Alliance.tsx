@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
 import { Shield, Users, Plus, Crown, Lock, TableProperties } from 'lucide-react';
+import { HomeFeed } from '@/components/lobby/HomeFeed';
 import { Button } from '@/components/ui/Button';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -20,7 +20,11 @@ import type { League } from '@/api/leagues';
 /**
  * Tab 1 — Alliance.
  *
- * Two lists, deliberately separate: the ones you belong to, and the ones you
+ * The home feed leads it — promo banners, CREATE / JOIN, All games, Tournament.
+ * That feed used to BE the Lobby tab; the owner moved it here on 15 Sep 2026 so
+ * the Lobby could go straight to Texas Hold'em (see pages/Lobby.tsx).
+ *
+ * Then two lists, deliberately separate: the ones you belong to, and the ones you
  * could join. Merging them and marking membership with a badge makes "am I in
  * this?" a thing to scan for, when it is the first question the screen should
  * answer.
@@ -41,7 +45,6 @@ export function Alliance() {
   const mine = useMyLeagues();
   const discover = useDiscoverLeagues();
   const join = useJoinLeague();
-  const navigate = useNavigate();
 
   const activeLeagueId = useContextStore((s) => s.leagueId);
   const enterLeague = useContextStore((s) => s.enterLeague);
@@ -58,7 +61,10 @@ export function Alliance() {
     if (mine.isSuccess) leaveContextIfGone(mine.data.leagues.map((l) => l.leagueId));
   }, [mine.isSuccess, mine.data, leaveContextIfGone]);
 
+  // The alliance lists sit inside the feed so they show under its home view and
+  // step aside when JOIN swaps in the Live Tables screen.
   return (
+    <HomeFeed>
     <div className="space-y-4">
       {/* Mine */}
       <section>
@@ -109,12 +115,12 @@ export function Alliance() {
                         onClick={() => {
                           haptic('light');
                           enterLeague(l.leagueId, l.name);
-                          // Straight to the room: entering an alliance and
-                          // staying on a list of alliances makes the switch feel
-                          // like it did not happen. The lobby is the index
-                          // route — '/lobby' matches nothing and navigated the
-                          // player to a blank screen.
-                          navigate('/');
+                          // Up to the feed at the top of THIS page. It used to
+                          // navigate to the lobby, because that is where the
+                          // alliance's tables were listed; they now sit behind
+                          // JOIN in the feed above, under the context banner
+                          // that says which alliance you are in.
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
                         }}
                       >
                         {t('context.enter')}
@@ -210,6 +216,7 @@ export function Alliance() {
       <CreateTableSheet league={tableFor} onClose={() => setTableFor(null)} />
       <GrantSheet league={grantFor} onClose={() => setGrantFor(null)} />
     </div>
+    </HomeFeed>
   );
 }
 

@@ -73,7 +73,14 @@
     "onlyOpen": "केवल खाली सीट वाली टेबल",
     "createPrivateHint": "निजी टेबल गठबंधन की होती हैं — इन्हें अपने गठबंधन से खोलें।",
     "yourSeat": "आपकी सीट",
-    "moreGamesBlurb": "कार्ड गेम, क्विक गेम और स्लॉट"
+    "moreGamesBlurb": "कार्ड गेम, क्विक गेम और स्लॉट",
+    "pinPrompt": "जुड़ने के लिए गेम PIN डालें।",
+    "joinGame": "गेम में जुड़ें",
+    "joining": "जुड़ रहे हैं…",
+    "startAndInvite": "गेम शुरू करें और दोस्तों को बुलाएँ!",
+    "createGame": "गेम बनाएँ",
+    "pinNotFound": "इस PIN वाला कोई गेम नहीं मिला।",
+    "pinTooMany": "बहुत ज़्यादा प्रयास। कुछ मिनट बाद फिर कोशिश करें।"
   },
   "games": {
     "searchPlaceholder": "गेम खोजें",
@@ -898,7 +905,7 @@
     "buyInBlurb": "खिलाड़ी {{min}} से {{max}} तक बाय-इन करते हैं।",
     "seats": "सीटें",
     "seatsBlurb": "{{count}} सीटें। दो खिलाड़ी से शुरू हो सकता है।",
-    "codeLabel": "आमंत्रण कोड",
+    "codeLabel": "गेम PIN",
     "shareBlurbPrivate": "यह लिंक दोस्त को भेजें — इसमें कोड शामिल है।"
   },
   "createGame": {
