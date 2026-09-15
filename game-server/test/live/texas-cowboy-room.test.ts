@@ -27,8 +27,21 @@ async function until(condition: () => boolean, timeoutMs = 20_000): Promise<void
   throw new Error('timed out waiting for state');
 }
 
+/**
+ * Every room a test opens, closed in afterEach — NOT at the bottom of the test body.
+ *
+ * The room runs its own round clock. With `room.dispose()` as a test's last line, any assertion
+ * that fails above it skips the dispose, the clock keeps scheduling rounds, and Jest never exits:
+ * a broken build shows up as a run that hangs silently rather than one that fails. Found by
+ * breaking the trail recording on purpose — the test caught it, and then the run sat for two hours.
+ */
+const openRooms: TexasCowboyRoom[] = [];
+afterEach(() => {
+  for (const room of openRooms.splice(0)) room.dispose();
+});
+
 function newRoom(id: string, deps: { directory: DevPlayers; fc: ChipBank }): TexasCowboyRoom {
-  return new TexasCowboyRoom(
+  const room = new TexasCowboyRoom(
     {
       id,
       name: 'Test Texas Cowboy',
@@ -40,6 +53,8 @@ function newRoom(id: string, deps: { directory: DevPlayers; fc: ChipBank }): Tex
     },
     deps,
   );
+  openRooms.push(room);
+  return room;
 }
 
 describe('TexasCowboyRoom — Live Room Integration', () => {
@@ -83,6 +98,26 @@ describe('TexasCowboyRoom — Live Room Integration', () => {
     await until(() => players.totalChips() + bank.sinkTotal() !== startingTotal || false, 1_000)
       .catch(() => undefined);
     await until(() => room.snapshotFor(alice).phase === 'SHOWDOWN', 40_000);
+
+    // The board's trails come from the same judgement that pays money. After one evaluated round
+    // every market has exactly one entry, exactly one of the three outcome markets hit, and each
+    // market that hit shows a zero, exact vacancy while the others show one round, not exact.
+    const gs = room.snapshotFor(alice).gameState as {
+      result: { winner: 'COWBOY' | 'COWGIRL' | 'TIE' } | null;
+      markets: { id: string }[];
+      marketHistory?: Record<string, boolean[]>;
+      vacant?: Record<string, { rounds: number; exact: boolean }>;
+    };
+    for (const m of gs.markets) expect(gs.marketHistory?.[m.id]).toHaveLength(1);
+    const outcomeHits = ['cowboy_win', 'cowgirl_win', 'tie'].filter((id) => gs.marketHistory?.[id]?.[0]);
+    expect(outcomeHits).toHaveLength(1);
+    const expectedWinner = { cowboy_win: 'COWBOY', cowgirl_win: 'COWGIRL', tie: 'TIE' }[outcomeHits[0] as 'cowboy_win'];
+    expect(gs.result?.winner).toBe(expectedWinner);
+    for (const m of gs.markets) {
+      const hit = gs.marketHistory![m.id]![0];
+      expect(gs.vacant?.[m.id]).toEqual(hit ? { rounds: 0, exact: true } : { rounds: 1, exact: false });
+    }
+
     await wait(6_000); // settlement runs a beat after showdown
 
     expect(players.totalChips() + bank.sinkTotal()).toBe(startingTotal);

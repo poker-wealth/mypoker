@@ -43,6 +43,19 @@ export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSea
   private timer: NodeJS.Timeout | null = null;
   /** Winners of the last rounds, oldest first. Public — it is the road every player reads. */
   private readonly history: Array<'COWBOY' | 'COWGIRL' | 'TIE'> = [];
+  /**
+   * Per market, whether each of the last rounds paid it, oldest first — the dot trail under every
+   * cell on the board. Results only, like `history`: never a stake, never a player.
+   */
+  private readonly marketHistory = new Map<string, boolean[]>();
+  /**
+   * Per market, rounds since it last paid — the "N hands vacant" line on the long shots.
+   *
+   * `exact` is false until the market has paid at least once since this room started. Until then
+   * the count is only the rounds this room has run, a LOWER bound, and the felt prints it as
+   * "N+". Showing it as an exact streak would be a figure nobody measured.
+   */
+  private readonly vacant = new Map<string, { rounds: number; exact: boolean }>();
   private disposed = false;
 
   constructor(config: TexasCowboyRoomConfig, deps: RoomDeps) {
@@ -187,6 +200,20 @@ export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSea
       if (this.history.length > HISTORY_LENGTH) this.history.shift();
     }
 
+    // The same record, per market, from the engine's own judgement of what paid.
+    const hits = this.engine.marketOutcomes();
+    if (hits) {
+      for (const [marketId, hit] of Object.entries(hits)) {
+        const trail = this.marketHistory.get(marketId) ?? [];
+        trail.push(hit);
+        if (trail.length > HISTORY_LENGTH) trail.shift();
+        this.marketHistory.set(marketId, trail);
+
+        const prev = this.vacant.get(marketId) ?? { rounds: 0, exact: false };
+        this.vacant.set(marketId, hit ? { rounds: 0, exact: true } : { rounds: prev.rounds + 1, exact: prev.exact });
+      }
+    }
+
     this.push();
     this.schedulePhase(() => this.settleRound(), 4000); // Let players see results
   }
@@ -320,6 +347,8 @@ export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSea
       gameState: {
         ...roundState,
         history: [...this.history],
+        marketHistory: Object.fromEntries([...this.marketHistory].map(([id, t]) => [id, [...t]])),
+        vacant: Object.fromEntries([...this.vacant].map(([id, v]) => [id, { ...v }])),
         pools: this.engine.poolByMarket(),
         yourStakes: this.engine.poolByMarket(playerId),
       },
