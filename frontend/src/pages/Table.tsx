@@ -373,6 +373,7 @@ function LiveTable({ tableId }: { tableId: string }) {
           open={historyOpen}
           onClose={() => setHistoryOpen(false)}
           name={snapshot.name}
+          nameOf={(id) => snapshot.seats.find((s) => s.playerId === id)?.name}
           tableId={snapshot.tableId}
           smallBlind={snapshot.smallBlind}
           bigBlind={snapshot.bigBlind}
@@ -652,15 +653,17 @@ function LiveTable({ tableId }: { tableId: string }) {
           <ToolbarIcon
             label={unread > 0 ? t('table.chatUnread', { count: unread }) : t('table.chat')}
             onClick={() => setChatOpen((o) => !o)}
+            badge={
+              /* Unread count — the drawer is closed by default, so without the
+                 badge a player could be spoken to all session and never know. */
+              unread > 0 ? (
+                <span className="absolute -right-2.5 -top-2 grid min-w-[1.05rem] place-items-center rounded-full bg-danger px-1 text-[0.58rem] font-black leading-[1.05rem] text-white ring-2 ring-bg">
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              ) : undefined
+            }
           >
             <MessageSquare size={19} />
-            {/* Unread count — the drawer is closed by default, so without the
-                badge a player could be spoken to all session and never know. */}
-            {unread > 0 && (
-              <span className="absolute -right-1 -top-1 grid min-w-[1.05rem] place-items-center rounded-full bg-danger px-1 text-[0.58rem] font-black leading-[1.05rem] text-white ring-2 ring-bg">
-                {unread > 9 ? '9+' : unread}
-              </span>
-            )}
           </ToolbarIcon>
         </div>
       </div>
@@ -749,24 +752,35 @@ function statusLine(
  * A game with no table behind it yet. Only Texas Hold'em is playable; the rest of the catalogue is
  * still tiles. Better to say so than to open a poker felt under a Baccarat heading.
  */
-/** One icon of the bottom toolbar — a plain tap target with room for a badge. */
+/**
+ * One icon of the bottom toolbar — a plain tap target with room for a badge.
+ *
+ * The badge is anchored to the ICON, not the button. The button is a quarter
+ * of the toolbar wide (`flex-1`), so a badge pinned to its corner floated a
+ * thumb's width away from the bubble it belonged to (owner, 15 Sep 2026).
+ */
 function ToolbarIcon({
   label,
   onClick,
   children,
+  badge,
 }: {
   label: string;
   onClick: () => void;
   children: React.ReactNode;
+  badge?: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="relative grid h-10 flex-1 place-items-center text-dim transition-colors active:text-text"
+      className="grid h-10 flex-1 place-items-center text-dim transition-colors active:text-text"
     >
-      {children}
+      <span className="relative inline-grid place-items-center">
+        {children}
+        {badge}
+      </span>
     </button>
   );
 }

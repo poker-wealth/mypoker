@@ -327,7 +327,7 @@
     "handHistory": "牌局记录",
     "anonymous": "匿名",
     "anonymousSoon": "暂不支持匿名入座",
-    "noHandHistory": "暂无牌局记录。本平台不保存牌局历史。",
+    "noHandHistory": "这张牌桌还没有打过牌局。",
     "previousHand": "上一局",
     "favourite": "收藏",
     "favouritesSoon": "暂不支持收藏牌桌",

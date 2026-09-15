@@ -376,7 +376,14 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
           return (
             <div
               key={`${seat.id}-${i}`}
-              className="absolute z-20 -translate-x-1/2 -translate-y-1/2"
+              // YOUR seat draws over every other seat. Seats render in chair
+              // order at one z-index, so a later chair painted over your hole
+              // cards wherever the two met ("I can't even make out the hole
+              // cards").
+              className={cn(
+                'absolute -translate-x-1/2 -translate-y-1/2',
+                seat.isHero ? 'z-30' : 'z-20',
+              )}
               style={{ left: pos.left, top: pos.top }}
             >
               <PlayerSeat

@@ -43,6 +43,7 @@ import {
   grantToMemberApi,
 } from './leagues';
 import { createPlayerTableApi } from './tables';
+import { fetchTableHands } from './hands';
 import {
   fetchNotifications,
   markNotificationsRead,
@@ -453,6 +454,19 @@ export function useCreatePlayerTable() {
       void queryClient.invalidateQueries({ queryKey: ['lobby', 'tables'] });
       void queryClient.invalidateQueries({ queryKey: ['lobby', 'games'] });
     },
+  });
+}
+
+/**
+ * Your hands at one table, for the hand-history panel. Fetched only while the
+ * panel is open, and fresh each time it opens — a hand may have finished since.
+ */
+export function useTableHands(tableId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['hands', tableId],
+    queryFn: () => fetchTableHands(tableId),
+    enabled: enabled && Boolean(tableId),
+    staleTime: 0,
   });
 }
 

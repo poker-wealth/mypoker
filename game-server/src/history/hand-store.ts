@@ -55,6 +55,18 @@ export async function handsFor(
   return HandRecordModel.find(query).sort({ playedAt: -1 }).limit(limit).lean<HandRecord[]>();
 }
 
+/**
+ * The hands a player took part in at ONE table, newest first — the table's
+ * hand-history panel. Only hands they were dealt into: a spectator's history of
+ * a table is not theirs to read.
+ */
+export async function handsAtTable(playerId: string, tableId: string, limit = 50): Promise<HandRecord[]> {
+  return HandRecordModel.find({ tableId, 'seats.playerId': playerId })
+    .sort({ playedAt: -1 })
+    .limit(limit)
+    .lean<HandRecord[]>();
+}
+
 export interface HandStatsResult {
   stats: PlayerHandStats;
   byPosition: Record<Position, number | null>;
