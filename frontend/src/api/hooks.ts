@@ -43,7 +43,7 @@ import {
   grantToMemberApi,
 } from './leagues';
 import { createPlayerTableApi } from './tables';
-import { fetchTableHands } from './hands';
+import { fetchSavedHands, fetchTableHands, saveHandApi, unsaveHandApi } from './hands';
 import {
   fetchNotifications,
   markNotificationsRead,
@@ -467,6 +467,38 @@ export function useTableHands(tableId: string, enabled: boolean) {
     queryFn: () => fetchTableHands(tableId),
     enabled: enabled && Boolean(tableId),
     staleTime: 0,
+  });
+}
+
+/**
+ * The hands this player has starred, and the server's own limit.
+ *
+ * Account-wide, not per table: the same shortlist follows them to every felt,
+ * which is why it is not keyed by table.
+ */
+export function useSavedHands(enabled: boolean) {
+  return useQuery({
+    queryKey: ['hands', 'saved'],
+    queryFn: fetchSavedHands,
+    enabled,
+    staleTime: 0,
+  });
+}
+
+/** Star a hand, then re-read the shortlist so the count is the server's. */
+export function useSaveHand() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: saveHandApi,
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ['hands', 'saved'] }),
+  });
+}
+
+export function useUnsaveHand() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: unsaveHandApi,
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ['hands', 'saved'] }),
   });
 }
 

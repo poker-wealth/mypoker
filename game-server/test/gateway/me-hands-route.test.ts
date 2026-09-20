@@ -35,3 +35,26 @@ describe('GET /me/hands', () => {
     expect(res.status).toBe(400);
   });
 });
+
+/**
+ * The star. Its rule is pinned in test/history/saved-hands.test.ts; these pin
+ * the doors — a session is required, and a save must name a hand. Neither
+ * reaches the database.
+ */
+describe('saved hands', () => {
+  const token = (): string => signToken({ playerId: 'p-1', role: 'player' }, JWT_SECRET, 300);
+
+  it('401s without a session', async () => {
+    expect((await request(app()).get('/me/hands/saved')).status).toBe(401);
+    expect((await request(app()).post('/me/hands/saved').send({ roundId: 'r1' })).status).toBe(401);
+    expect((await request(app()).delete('/me/hands/saved/r1')).status).toBe(401);
+  });
+
+  it('400s a save that names no hand', async () => {
+    const res = await request(app())
+      .post('/me/hands/saved')
+      .set('authorization', `Bearer ${token()}`)
+      .send({});
+    expect(res.status).toBe(400);
+  });
+});

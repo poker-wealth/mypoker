@@ -33,3 +33,24 @@ export interface HandView {
 
 export const fetchTableHands = (tableId: string): Promise<{ hands: HandView[] }> =>
   api.get<{ hands: HandView[] }>(`/me/hands?tableId=${encodeURIComponent(tableId)}`);
+
+/**
+ * Saved hands — the star in the history panel.
+ *
+ * The LIMIT comes from the server with the list, rather than being written
+ * twice: the panel prints what the server actually enforces, so the two cannot
+ * drift into a screen that says 15 over a rule of 10.
+ */
+export interface SavedHands {
+  roundIds: string[];
+  limit: number;
+}
+
+export const fetchSavedHands = (): Promise<SavedHands> => api.get<SavedHands>('/me/hands/saved');
+
+/** 404 if it is not a hand you played; 409 once the shortlist is full. */
+export const saveHandApi = (roundId: string): Promise<{ saved: boolean }> =>
+  api.post<{ saved: boolean }>('/me/hands/saved', { roundId });
+
+export const unsaveHandApi = (roundId: string): Promise<{ removed: boolean }> =>
+  api.delete<{ removed: boolean }>(`/me/hands/saved/${encodeURIComponent(roundId)}`);

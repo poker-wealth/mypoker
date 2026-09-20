@@ -2,13 +2,19 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'motion/react';
 import { ChevronLeft, ChevronRight, Star, Share2, User } from 'lucide-react';
-import { useTableHands } from '@/api/hooks';
+import { useSavedHands, useSaveHand, useTableHands, useUnsaveHand } from '@/api/hooks';
 import { errorKey } from '@/api/errors';
+import { ApiError } from '@/api/client';
+import { toast } from '@/lib/toast';
+import { haptic } from '@/lib/telegram';
 import type { HandView } from '@/api/hands';
 import type { Card } from '@/lib/cards';
 import { chips } from '@/lib/money';
 import { cn } from '@/lib/cn';
 import { PlayingCard } from './PlayingCard';
+
+/** Fallback only — the real ceiling arrives with the list (SAVED_HAND_LIMIT on the server). */
+const SAVED_HAND_LIMIT = 15;
 
 /**
  * The hand-history panel, opened from the table menu.
@@ -58,12 +64,46 @@ export function HandHistoryPanel({
     if (open) setIndex(0);
   }, [open]);
 
+  /*
+   * The starred shortlist. Account-wide and server-owned: the panel prints the
+   * count and the ceiling it is told, and every tap is followed by a re-read,
+   * so two devices starring at once cannot leave a stale number on screen.
+   */
+  const savedQuery = useSavedHands(open);
+  const savedIds = savedQuery.data?.roundIds ?? [];
+  const limit = savedQuery.data?.limit ?? SAVED_HAND_LIMIT;
+  const save = useSaveHand();
+  const unsave = useUnsaveHand();
+  const busy = save.isPending || unsave.isPending;
+
   const total = hands.length;
   const current: HandView | undefined = hands[Math.min(index, Math.max(0, total - 1))];
   const olderAvailable = index < total - 1;
   const newerAvailable = index > 0;
   // The scrubber runs oldest → newest, left → right, so the latest hand is at the right end.
   const thumbPct = total > 1 ? ((total - 1 - index) / (total - 1)) * 100 : 100;
+
+  const isSaved = current ? savedIds.includes(current.roundId) : false;
+  const full = savedIds.length >= limit;
+
+  const toggleSaved = (): void => {
+    if (!current || busy) return;
+    haptic('light');
+    if (isSaved) {
+      unsave.mutate(current.roundId, {
+        onError: (e) => toast.error(t(errorKey(e))),
+      });
+      return;
+    }
+    save.mutate(current.roundId, {
+      onError: (e) =>
+        // A 409 means someone else's tab filled the shortlist since this panel
+        // last read it — say which it is rather than "something went wrong".
+        toast.error(
+          e instanceof ApiError && e.status === 409 ? t('table.savedFull', { limit }) : t(errorKey(e)),
+        ),
+    });
+  };
 
   return (
     <AnimatePresence>
@@ -166,16 +206,23 @@ export function HandHistoryPanel({
                 <ChevronRight size={17} />
               </button>
 
-              {/* Favourites — no backend, so the count is literally zero. */}
+              {/* Save this hand. The count and its ceiling are the server's —
+                  see useSavedHands — so the label cannot promise a different
+                  number from the rule. Owner, 20 Sep 2026: "Clicking this
+                  should save the game record." */}
               <button
                 type="button"
-                disabled
-                title={t('table.favouritesSoon')}
-                aria-label={t('table.favourite')}
-                className="flex shrink-0 cursor-not-allowed flex-col items-center text-coin-gold opacity-60"
+                disabled={!current || busy || (full && !isSaved)}
+                onClick={toggleSaved}
+                title={full && !isSaved ? t('table.savedFull', { limit }) : t('table.saveHand')}
+                aria-label={isSaved ? t('table.savedHand') : t('table.saveHand')}
+                aria-pressed={isSaved}
+                className="flex shrink-0 flex-col items-center text-coin-gold transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <Star size={16} />
-                <span className="text-[0.55rem] tabular-nums">0/15</span>
+                <Star size={16} fill={isSaved ? 'currentColor' : 'none'} />
+                <span className="text-[0.55rem] tabular-nums">
+                  {savedIds.length}/{limit}
+                </span>
               </button>
 
               {/* Share IS wired — the same invite link the menu copies. */}

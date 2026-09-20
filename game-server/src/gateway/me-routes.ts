@@ -2,6 +2,14 @@ import express, { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { handsAtTable } from '../history/hand-store';
 import { handViewFor } from '../history/hand-view';
+import {
+  listSavedHands,
+  playedInHand,
+  saveDecision,
+  saveHand,
+  unsaveHand,
+  SAVED_HAND_LIMIT,
+} from '../history/saved-hands';
 import type { GatewayConfig } from './config';
 import { requireAuth } from './auth';
 import {
@@ -128,6 +136,76 @@ export function buildMeRouter(config: GatewayConfig, deps: MeRouterDeps = {}): R
       } catch (err) {
         console.error('[gateway] hand history read failed:', err);
         res.status(503).json({ error: 'hand history unavailable' });
+      }
+    })();
+  });
+
+  /*
+   * SAVED HANDS — the star in the history panel, and the 15 it counts to.
+   *
+   * The limit travels with the list so the screen prints the server's number
+   * rather than its own copy of it.
+   */
+  const savedBody = z.object({ roundId: z.string().min(1).max(128) });
+
+  r.get('/hands/saved', (req: Request, res: Response): void => {
+    void (async (): Promise<void> => {
+      try {
+        const roundIds = await listSavedHands(req.player!.playerId);
+        res.json({ roundIds, limit: SAVED_HAND_LIMIT });
+      } catch (err) {
+        console.error('[gateway] saved hands read failed:', err);
+        res.status(503).json({ error: 'saved hands unavailable' });
+      }
+    })();
+  });
+
+  r.post('/hands/saved', (req: Request, res: Response): void => {
+    void (async (): Promise<void> => {
+      const parsed = savedBody.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        res.status(400).json({ error: 'a hand id is required' });
+        return;
+      }
+      const playerId = req.player!.playerId;
+      const { roundId } = parsed.data;
+      try {
+        // A star is not a way to pin arbitrary round ids to an account: you can
+        // only save a hand you were dealt into.
+        if (!(await playedInHand(playerId, roundId))) {
+          res.status(404).json({ error: 'no such hand' });
+          return;
+        }
+        const decision = saveDecision(await listSavedHands(playerId), roundId);
+        if (decision === 'full') {
+          res.status(409).json({ error: 'saved hands are full', code: 'saved_full', limit: SAVED_HAND_LIMIT });
+          return;
+        }
+        // 'already-saved' still writes: the upsert is a no-op, and answering ok
+        // keeps a double tap from reading as a failure.
+        await saveHand(playerId, roundId);
+        res.status(201).json({ saved: true });
+      } catch (err) {
+        console.error('[gateway] saving a hand failed:', err);
+        res.status(503).json({ error: 'saved hands unavailable' });
+      }
+    })();
+  });
+
+  r.delete('/hands/saved/:roundId', (req: Request, res: Response): void => {
+    void (async (): Promise<void> => {
+      const raw = req.params.roundId;
+      const roundId = typeof raw === 'string' ? raw : '';
+      if (!roundId) {
+        res.status(400).json({ error: 'a hand id is required' });
+        return;
+      }
+      try {
+        await unsaveHand(req.player!.playerId, roundId);
+        res.json({ removed: true });
+      } catch (err) {
+        console.error('[gateway] un-saving a hand failed:', err);
+        res.status(503).json({ error: 'saved hands unavailable' });
       }
     })();
   });

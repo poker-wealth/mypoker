@@ -159,6 +159,9 @@ export const api = {
     request<T>(path, { ...options, method: 'POST', body }),
   patch: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method' | 'body'>) =>
     request<T>(path, { ...options, method: 'PATCH', body }),
+  /** The gateway allows DELETE in its CORS preflight — see app.ts, TRAPS §36. */
+  delete: <T>(path: string, options?: Omit<RequestOptions, 'method' | 'body'>) =>
+    request<T>(path, { ...options, method: 'DELETE' }),
   /** Raw-bytes POST — see `requestUpload`. */
   upload: <T>(path: string, body: Blob, options: UploadOptions) => requestUpload<T>(path, body, options),
 };
