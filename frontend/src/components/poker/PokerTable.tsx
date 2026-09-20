@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AnimatePresence, motion } from 'motion/react';
 import { PlayerSeat } from './PlayerSeat';
@@ -17,6 +17,31 @@ import { PERMANENT_DOMAIN } from '@/config';
  * The table: the chosen design's artwork with the seats placed on its rail and the board across the
  * felt.
  */
+
+/**
+ * ONE DESIGN SIZE, SCALED TO FIT — the fix for "In a smaller screen, it's
+ * squeezing and not well done" (owner, 16 Sep 2026).
+ *
+ * The felt used to be sized to the space it had while its CONTENTS kept pixel
+ * floors: a 44px minimum avatar, a 74px name pill, 44px cards. On a narrow
+ * window the table shrank and those did not, so seats, pills and the board all
+ * landed on each other.
+ *
+ * Now the table is laid out ONCE at this nominal width and scaled as a whole.
+ * Every proportion is fixed at the size it was tuned at, and a small screen
+ * gets the same table, smaller — which is what a native poker client does.
+ */
+const NOMINAL_W = 440;
+
+/**
+ * Room for what deliberately hangs past the felt's edge: the middle seats sit
+ * at a 6% inset, so half an avatar, its name pill and an action bubble sit
+ * outside the box. Counted into the fit so nothing is cut off.
+ */
+const BLEED = 26;
+
+/** Beyond this the table stops growing — a felt the width of a desktop monitor is not a table. */
+const MAX_SCALE = 1.8;
 
 interface PokerTableProps {
   state: TableState;
@@ -120,65 +145,54 @@ export function PokerTable({ state, onSit, onChallenge, design: override, info }
   const [aw = '1', ah = '1'] = design.aspect.split('/').map((n) => n.trim());
   const isWide = Number(aw) > Number(ah);
 
-  /**
-   * The felt's width when HEIGHT is the binding constraint.
-   *
-   * The table was sized by width alone: it took the full width of the screen
-   * and derived its height from the aspect ratio, which on a 3/4 portrait felt
-   * is a third taller than it is wide. On a phone that is taller than the space
-   * between the top bar and the dock, so the page scrolled — you could not see
-   * the seats at the top and the controls at the bottom at the same time.
-   * Reported 12 Sep 2026: "the board should fit into the screen so we don't
-   * need to scroll down to see the tabs at the bottom nor scroll up to see the
-   * tabs at the top."
-   *
-   * `100cqh` is the height this container actually has (the flex row between
-   * the bar and the dock, which is a size container). Multiplied by the aspect
-   * ratio it gives the width at which the table exactly fills that height;
-   * `min()` with 100% keeps the old width-driven behaviour whenever width is
-   * the tighter of the two. So the felt now fits the smaller dimension, which
-   * is what "fits the screen" means, and nothing changes on a wide screen
-   * where height was never the problem.
-   */
-  const fitWidth = `min(100%, calc(100cqh * ${Number(aw) / Number(ah)}))`;
+  /** The table's own height at NOMINAL_W, from the design's aspect ratio. */
+  const nominalH = Math.round((NOMINAL_W * Number(ah)) / Number(aw));
 
-  // Mobile keeps the 440px felt; desktop scales it up so the table fills the
-  // screen instead of sitting as a small oval in a sea of empty space. The felt
-  // is aspect-ratio + %-positioned, so the whole table (seats) scales together.
+  /**
+   * How much of that nominal table fits the space this component was given.
+   *
+   * Measured rather than computed in CSS: a scale factor is a ratio of two
+   * lengths, and CSS cannot divide one length by another. A ResizeObserver
+   * keeps it right through a rotation, a keyboard opening, or a desktop window
+   * being dragged narrower — which is exactly when the old layout collapsed.
+   */
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const fit = (w: number, h: number): void => {
+      if (w <= 0 || h <= 0) return;
+      setScale(Math.min(w / (NOMINAL_W + BLEED * 2), h / (nominalH + BLEED * 2), MAX_SCALE));
+    };
+    fit(el.clientWidth, el.clientHeight);
+    const ro = new ResizeObserver((entries) => {
+      const rect = entries[0]?.contentRect;
+      if (rect) fit(rect.width, rect.height);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [nominalH]);
+
   return (
     <div
-      className={cn(
-        // `h-full` + a size container: the box the felt must fit INSIDE. Its
-        // height is what `100cqh` reads in `fitWidth` above.
-        'relative mx-auto flex h-full w-full items-center justify-center',
-        // A LANDSCAPE felt is short, so it can afford to be much wider — capping
-        // it at the portrait width leaves a cramped strip with the seats
-        // crowding each other. A portrait felt keeps the original ceiling,
-        // because widening that one only makes it taller than the screen.
-        //
-        // The PADDING matters more than the cap on a phone: at 360px wide the
-        // ceiling is never reached, and 20px of gutter each side is 11% of the
-        // felt. A wide table gets almost none — it has vertical room to spare
-        // and needs every pixel of width.
-        isWide
-          ? 'px-0 max-w-none md:max-w-[1100px] lg:max-w-[1400px]'
-          : 'px-5 max-w-[440px] md:max-w-[620px] lg:max-w-[780px]',
-      )}
-      style={{ containerType: 'size' }}
+      ref={boxRef}
+      className={cn('relative mx-auto flex h-full w-full items-center justify-center', isWide && 'px-0')}
     >
       {/*
-        `container-type: size` makes this box the reference for the seats.
-
-        Seat avatars were a fixed 56–62px while the felt scaled with the screen,
-        which is fine on a tall portrait table and wrong on a short landscape
-        one: the same circle that reads as a chair on a 780px-high felt covers a
-        quarter of a 250px-high one. Sizing them in `cqmin` — a share of the
-        table's SHORTER side — keeps a seat the same fraction of the table on
-        any felt, in either orientation.
+        The table itself, at its design size. `container-type: size` makes this
+        box the reference for everything positioned inside it — seats in `cqmin`,
+        board cards in `cqw` — so those all resolve against a box that never
+        changes, and the transform below does the fitting.
       */}
       <div
-        className="relative"
-        style={{ aspectRatio: design.aspect, containerType: 'size', width: fitWidth }}
+        className="relative shrink-0"
+        style={{
+          width: NOMINAL_W,
+          height: nominalH,
+          transform: `scale(${scale})`,
+          containerType: 'size',
+        }}
       >
 
         {/* Embedded HTML5 Canvas Element for inspection */}
