@@ -96,6 +96,46 @@ describe('PokerRoom — a table real people sit at', () => {
     h.room.dispose();
   });
 
+  it('reports the stack a player actually has left, mid-hand', async () => {
+    // The client's all-in is `bet + stack`. While the room reported the buy-in
+    // for the whole hand, that asked for more than the player had and the
+    // engine refused it — the player was told they had insufficient funds
+    // while shoving their own chips (owner, 20 Sep 2026).
+    const h = harness();
+    await seatBoth(h, 0, 1);
+
+    const seatOf: Record<number, string> = { 0: h.alice, 1: h.bob };
+    const chipsOf = (view: TableSnapshot, isYou: boolean) => {
+      const s = view.seats.find((seat) => seat.isYou === isYou)!;
+      return { stack: s.stack, bet: s.bet };
+    };
+
+    // Blinds are already posted: what is behind plus what is in front is what
+    // they brought, and neither seat still shows the full 2,000 behind.
+    for (const id of [h.alice, h.bob]) {
+      const mine = chipsOf(h.room.snapshotFor(id), true);
+      expect(mine.stack + mine.bet).toBe(2_000);
+      expect(mine.bet).toBeGreaterThan(0);
+      expect(mine.stack).toBeLessThan(2_000);
+    }
+
+    // And it tracks a raise, rather than waiting for the hand to end.
+    const toAct = h.room.snapshotFor(h.alice).toActSeat!;
+    const actor = seatOf[toAct]!;
+    const before = chipsOf(h.room.snapshotFor(actor), true);
+    await h.room.command(actor, { kind: 'act', action: { type: 'raise', amount: 200 } });
+
+    const after = chipsOf(h.room.snapshotFor(actor), true);
+    expect(after.bet).toBe(200);
+    expect(after.stack).toBe(2_000 - 200);
+    expect(after.stack).toBeLessThan(before.stack);
+
+    // The all-in the client would offer is exactly the all-in the engine allows.
+    const legal = h.room.snapshotFor(actor).legal;
+    if (legal?.allInRaiseTo != null) expect(after.stack + after.bet).toBe(legal.allInRaiseTo);
+    h.room.dispose();
+  });
+
   it('never puts an opponent’s hole cards in your snapshot', async () => {
     const h = harness();
     await seatBoth(h, 0, 1);

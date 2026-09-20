@@ -1891,7 +1891,26 @@ export class PokerRoom implements LiveRoom {
         playerId: seat.playerId,
         name: seat.name,
         ...(seat.avatarUrl ? { avatarUrl: seat.avatarUrl } : {}),
-        stack: seat.stack,
+        /*
+         * THE LIVE STACK, not the one they sat down with.
+         *
+         * `seat.stack` is only refreshed from the engine when a hand ENDS
+         * (`finishHand`), so mid-hand this reported the buy-in however much had
+         * gone into the pot. The client's all-in is `bet + stack`, so it asked
+         * for more chips than the player had left, the engine refused it
+         * ("raise exceeds stack"), and the player was told they had
+         * insufficient funds while shoving their own chips — owner, 20 Sep
+         * 2026: "An 'All-in' action triggers an 'insufficient funds' alert; the
+         * calculation is based on the initial buy-in amount rather than the
+         * real-time remaining balance."
+         *
+         * While a hand runs, the ENGINE's seat is the authority — it is what
+         * `legalActions` is computed from, so the number the player sees and
+         * the number the server enforces are now the same one. At showdown the
+         * engine has already been copied back onto the seat, payouts included,
+         * and `seat.stack` is the settled figure.
+         */
+        stack: detail && !showdown ? detail.stack : seat.stack,
         boughtIn: seat.boughtIn,
         handsPlayed: seat.handsPlayed,
         bet: showdown || !detail ? 0 : detail.streetContributed,
