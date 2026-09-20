@@ -381,8 +381,10 @@ export function PlayerSeat({
             // cards are, and the stack sat on top of them.
             align === 'bottom' && (seat.isHero ? 'left-[calc(100%+4px)] top-1/2 -translate-y-1/2' : 'top-[-34px]'),
             align === 'top' && 'bottom-[-34px]',
-            align === 'left' && 'right-[-42px] top-1/2 -translate-y-1/2',
-            align === 'right' && 'left-[-42px] top-1/2 -translate-y-1/2',
+            // Side seats push chips inward AND up. Straight inward, a middle
+            // seat's bet landed on the board, which shares its row.
+            align === 'left' && 'right-[-38px] -top-6',
+            align === 'right' && 'left-[-38px] -top-6',
           )}
         >
           <ChipStack amount={seat.bet} />

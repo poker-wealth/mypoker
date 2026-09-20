@@ -3,12 +3,20 @@ import { rankOf, suitOf, isRedSuit, type Card } from '@/lib/cards';
 import { useTablePrefs } from '@/store/tablePrefs';
 import { cn } from '@/lib/cn';
 
-type Size = 'sm' | 'md' | 'lg';
+type Size = 'sm' | 'md' | 'lg' | 'board';
 
 const sizes: Record<Size, string> = {
   sm: 'h-11 w-8 text-[0.7rem] rounded-md',
   md: 'h-16 w-11 text-sm rounded-lg',
   lg: 'h-20 w-14 text-base rounded-lg',
+  /*
+   * The community cards: `md` at most, smaller on a narrow felt, so five of
+   * them always fit between the two middle side seats. 71cqw is the gap those
+   * seats leave (6% inset each side, 17cqmin avatars — see `midX` in
+   * lib/tableDesigns.ts); 40px covers the four gaps and a margin. Must sit
+   * inside the felt's size container (PokerTable), where cqw is its width.
+   */
+  board: 'aspect-[11/16] w-[min(2.75rem,calc((71cqw_-_40px)/5))] text-sm rounded-lg',
 };
 
 interface PlayingCardProps {
