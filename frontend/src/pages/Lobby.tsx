@@ -1,11 +1,13 @@
 import { useId, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { ApiError } from '@/api/client';
 import { errorKey } from '@/api/errors';
 import { joinByPinApi, type PlayerTableGame } from '@/api/tables';
 import { TableEntryModal } from '@/components/TableEntryModal';
+import { LiveTables } from '@/components/lobby/LiveTables';
 import { haptic } from '@/lib/telegram';
 
 /** Must match CODE_LENGTH in game-server/src/gateway/table-access.ts. */
@@ -19,9 +21,15 @@ const LOBBY_GAMES: readonly PlayerTableGame[] = ['texas'];
  *
  * Owner's instruction, 15 Sep 2026: the Lobby tab goes straight to Hold'em,
  * shaped like HHPoker's centre tab — one field for a game PIN, a button to join
- * with it, and a button to start a game. Every other game stays in Games. The
- * feed that used to be this page (banners, CREATE / JOIN, All games,
- * Tournament) moved whole to the top of Alliance — components/lobby/HomeFeed.tsx.
+ * with it, and a button to start a game. Every other game stays in Games, and
+ * Alliance is leagues and clubs only (owner's tab plan, 16 Sep 2026).
+ *
+ * The platform's own open Hold'em tables are one tap away behind "Live Tables"
+ * (components/lobby/LiveTables.tsx) rather than listed here — the reference
+ * keeps this screen to a PIN and a table, and a list nobody can reach would be
+ * worse than either. The promo banners and the empty Tournament box that used
+ * to sit on this page are gone with the feed; bringing either back is the
+ * owner's call, not a default.
  *
  * NOTHING HERE IS DECORATION. The PIN box calls `/tables/join`, which exists
  * for it: a PIN alone names a table, and a private table's PIN is its code, so
@@ -36,6 +44,8 @@ export function Lobby() {
   const [error, setError] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  /** 'home' is the entry screen; 'tables' is the list of open Texas tables. */
+  const [view, setView] = useState<'home' | 'tables'>('home');
 
   const ready = pin.length === PIN_LENGTH && !joining;
 
@@ -57,6 +67,9 @@ export function Lobby() {
       setJoining(false);
     }
   };
+
+  // The open tables, as their own screen — the entry screen stays uncrowded.
+  if (view === 'tables') return <LiveTables onBack={() => setView('home')} />;
 
   return (
     <>
@@ -108,7 +121,22 @@ export function Lobby() {
           {joining ? t('lobby.joining') : t('lobby.joinGame')}
         </button>
 
-        <p className="mt-20 text-[0.95rem] text-text/75">{t('lobby.startAndInvite')}</p>
+        {/* The platform's own open tables. A quiet link rather than a list on
+            this screen: the Lobby is the door, and the reference keeps it to a
+            PIN and a table. Without it those tables have no way in at all. */}
+        <button
+          type="button"
+          onClick={() => {
+            haptic('light');
+            setView('tables');
+          }}
+          className="mt-6 inline-flex items-center gap-1 text-[0.85rem] font-semibold text-gold/90 underline-offset-4 transition active:scale-95 hover:underline"
+        >
+          {t('lobby.liveTables')}
+          <ChevronRight size={15} />
+        </button>
+
+        <p className="mt-14 text-[0.95rem] text-text/75">{t('lobby.startAndInvite')}</p>
         <TableButton
           label={t('lobby.createGame')}
           onClick={() => {

@@ -4,7 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Segmented } from '@/components/ui/Segmented';
 import { GameTile } from '@/components/GameTile';
-import { TableEntryModal } from '@/components/TableEntryModal';
 import { visibleGames, type GameCategory, type GameDef } from '@/lib/games';
 import { useLobbyGames } from '@/api/hooks';
 
@@ -19,7 +18,6 @@ export function Games() {
   const [q, setQ] = useState('');
   // Hold'em taps open the join-or-create modal instead of going straight to
   // felt (owner-approved). Other games still navigate directly.
-  const [entryOpen, setEntryOpen] = useState(false);
 
   const lobby = useLobbyGames();
 
@@ -36,7 +34,10 @@ export function Games() {
   // tables. An audit caught this page as the one map site bypassing the gate.
   const games = visibleGames();
   const grouped = {
-    poker: games.filter(g => g.category === 'poker'),
+    // NO TEXAS HOLD'EM HERE. Owner's tab plan, 16 Sep 2026: "Tab 2 displays
+    // games other than Texas Hold'em"; Hold'em is the Lobby, which is nothing
+    // else. Short Deck and Omaha stay — they are their own games.
+    poker: games.filter((g) => g.category === 'poker' && g.id !== 'texas'),
     card: games.filter(g => g.category === 'card'),
     quick: games.filter(g => g.category === 'quick' || g.category === 'arcade'),
   };
@@ -87,9 +88,7 @@ export function Games() {
                   game={g}
                   tables={live.get(g.id)?.tables}
                   jackpot={live.get(g.id)?.jackpot}
-                  onClick={() =>
-                    g.id === 'texas' ? setEntryOpen(true) : navigate(`/table/${g.id}`)
-                  }
+                  onClick={() => navigate(`/table/${g.id}`)}
                 />
               ))}
             </div>
@@ -154,8 +153,6 @@ export function Games() {
           ))}
         </div>
       </section>
-
-      <TableEntryModal open={entryOpen} onClose={() => setEntryOpen(false)} />
     </div>
   );
 }
