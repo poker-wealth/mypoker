@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { acquireMic, parkMic, stopMic } from '@/lib/microphone';
 
 /**
  * Press-and-hold voice recording for the table (SAMUEL_V2 task 2).
@@ -114,9 +115,10 @@ export function useVoiceRecorder(): UseVoiceRecorder {
   const teardown = useCallback((): void => {
     if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null; }
     if (autoStopRef.current) { clearTimeout(autoStopRef.current); autoStopRef.current = null; }
-    // Stopping the tracks is what turns the browser's recording indicator off.
-    // Leaving them live would keep a microphone open on someone's phone.
-    streamRef.current?.getTracks().forEach((t) => t.stop());
+    // PARKED, not stopped: muted now, and the device handed back a minute later
+    // if nobody records again. Stopping it here is what made Telegram's webview
+    // ask for permission on every single press — see the note on `acquireMic`.
+    parkMic();
     streamRef.current = null;
     recorderRef.current = null;
     setRecording(false);
@@ -124,6 +126,18 @@ export function useVoiceRecorder(): UseVoiceRecorder {
   }, []);
 
   useEffect(() => teardown, [teardown]);
+
+  /*
+   * The page going away is the one moment the microphone must be released
+   * outright rather than parked — a backgrounded Mini App holding a live device
+   * is exactly what a player would (rightly) complain about. `pagehide` covers
+   * the back-forward cache, which `unload` does not.
+   */
+  useEffect(() => {
+    const drop = (): void => stopMic();
+    window.addEventListener('pagehide', drop);
+    return () => window.removeEventListener('pagehide', drop);
+  }, []);
 
   const start = useCallback((): void => {
     if (recorderRef.current) return; // already holding
@@ -134,11 +148,10 @@ export function useVoiceRecorder(): UseVoiceRecorder {
     finishedRef.current = null;
     setError(null);
 
-    void navigator.mediaDevices
-      .getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
+    void acquireMic()
       .then((stream) => {
         // The press may have ended while the permission prompt was up.
-        if (cancelledRef.current) { stream.getTracks().forEach((t) => t.stop()); return; }
+        if (cancelledRef.current) { parkMic(); return; }
 
         streamRef.current = stream;
         const rec = new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: BITS_PER_SECOND });
