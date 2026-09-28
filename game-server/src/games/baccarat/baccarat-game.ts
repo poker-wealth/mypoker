@@ -202,4 +202,11 @@ export class BaccaratGame extends BaseGame<BaccaratPhase, BaccaratAction, Baccar
   roundSeed(): string | undefined {
     return this.lastFinalSeed;
   }
+  /**
+   * The FC settlement round id this round was minted with — so a caller (the jackpot payout)
+   * can share the exact id `settleTableHand` used instead of minting a second, divergent one.
+   */
+  getRoundId(): string {
+    return this.roundId;
+  }
 }

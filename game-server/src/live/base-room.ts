@@ -409,7 +409,7 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
         const acctKey = accounts[tierLower];
         if (this.fc.jackpotPayout) {
           try {
-            await this.fc.jackpotPayout({
+            const result = await this.fc.jackpotPayout({
               tableId: this.config.id,
               roundId,
               tier: tierLower,
@@ -417,15 +417,24 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
               amount: String(hitChips),
               jackpotAccountId: acctKey,
             });
-            const winnerSeat = this.seatOf(hit.playerId);
-            this.lastJackpotWin = {
-              tier: hit.tier,
-              playerId: hit.playerId,
-              playerName: winnerSeat?.name ?? hit.playerId,
-              amount: hitChips,
-              animationMs: hit.animationMs,
-              roundId: hit.roundId,
-            };
+            if (result.applied) {
+              const winnerSeat = this.seatOf(hit.playerId);
+              this.lastJackpotWin = {
+                tier: hit.tier,
+                playerId: hit.playerId,
+                playerName: winnerSeat?.name ?? hit.playerId,
+                amount: hitChips,
+                animationMs: hit.animationMs,
+                roundId: hit.roundId,
+              };
+            } else {
+              // FC's idempotency key is `${roundId}:jackpot:${tierLower}` — applied:false means this
+              // exact payout already happened (a reused round id, most likely). No chips moved, so
+              // announcing it again would tell a player they won money that never arrived.
+              console.error(
+                `[room ${this.config.id}] jackpot payout for ${roundId}:${tierLower} was a replay — not announced`,
+              );
+            }
           } catch (err) {
             console.error(`[room ${this.config.id}] Jackpot payout error:`, err);
           }
