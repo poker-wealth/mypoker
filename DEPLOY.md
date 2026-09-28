@@ -126,14 +126,26 @@ Also update, or they will still point at the old host:
   ```
 
   Field names are `routes.ts`'s `depositBody` schema (`playerId`, `amount`, `txHash`,
-  `contractAddress`, `confirmations`) — this is a real on-chain deposit, not a synthetic credit, so
-  it only clears `processConfirmedDeposit`'s checks (`deposit-credit.ts`) when `contractAddress` is
-  the official USDT-TRC20 contract (`usdtContract()` in `config/chain.ts`, default
-  `TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t`, overridable via `USDT_TRC20_CONTRACT`) and
+  `contractAddress`, `confirmations`). FC does not verify `/internal/deposits` against the chain —
+  it trusts the caller. The `txHash` MUST be a real USDT-TRC20 transfer into a platform-controlled
+  wallet (treasury / sweep address) so the ledger stays backed; a made-up `txHash` creates an
+  unbacked liability. It only clears `processConfirmedDeposit`'s checks (`deposit-credit.ts`) when
+  `contractAddress` is the official USDT-TRC20 contract (`usdtContract()` in `config/chain.ts`,
+  default `TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t`, overridable via `USDT_TRC20_CONTRACT`) and
   `confirmations` is at least the required threshold (`requiredConfirmations()`, default 20,
   overridable via `DEPOSIT_CONFIRMATIONS`). It credits the account's PLATFORM-scope AVAILABLE
   balance (`getOrCreatePlayerAccount(playerId)` with no scope defaults to `PLATFORM_SCOPE`) — the
   room then locks it from there into the float itself.
+
+  Never cite a transaction that landed at a player's derived deposit address — deposit-watcher
+  credits those by the same `deposit:<txHash>` idempotency key (`deposit-credit.ts`), so whichever
+  runs first wins (the vendor gets nothing, or a player loses a real deposit).
+
+  The route answers HTTP 200 even when it refuses — check the body for `credited: true`; refusals
+  come back as `{credited: false, reason: 'wrong_contract' | 'unconfirmed' | 'already_credited'}`
+  (`DepositOutcome` in `deposit-credit.ts`). Also: `amount` is a plain decimal string with at most 6
+  decimal places (e.g. `"100.00"`, no currency symbol) and `confirmations` is a JSON number, not a
+  string.
 
   $100.00 only OPENS the table, it does not size it: one spin's max win (wager ×
   `maxPayoutMultiple`, 100×) can drain the whole float in a single payout, and the very next

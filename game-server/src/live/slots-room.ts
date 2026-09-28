@@ -186,7 +186,23 @@ export class SlotsRoom extends BaseLiveRoom<SlotsRoomConfig, RoomSeat> {
     // instances sharing a config.id, so a random component is load-bearing here.
     const roundId = `${this.config.id}-spin-${this.handNumber}-${randomUUID().slice(0, 8)}`;
 
-    const receipt = await this.adapter.play(playerId, roundId, wager);
+    let receipt;
+    try {
+      receipt = await this.adapter.play(playerId, roundId, wager);
+    } catch (err) {
+      // The settlement may have committed inside FC even though this rejection is what reached us
+      // (e.g. the response was lost) — `vendorFloat` then overstates what is actually locked, and
+      // with `vendorFunded` still true `ensureVendorFunded` stays a no-op and never notices. Mark
+      // the float stale so the NEXT spin's `ensureVendorFunded` re-reads the real locked balance
+      // before trusting it again, rather than spinning on a number that may no longer be true.
+      // Only when there is real ground truth to re-read (`lockedBalance` present) — otherwise
+      // forcing a re-fund would hit `fundVendor`'s UNKNOWN-balance branch and buy the whole float
+      // again on top of whatever is already locked, which is worse than doing nothing.
+      if (this.fc.lockedBalance) {
+        this.vendorFunded = false;
+      }
+      throw err;
+    }
     // `receipt.providerDelta`, NOT `-receipt.net` (BUG-10 follow-up A): on a player LOSS the vendor
     // is the WINNER in the adapter's settlement, so rake + the jackpot injection come off the
     // vendor's own credit first — crediting the full `|net|` here drifted the tracked float upward

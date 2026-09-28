@@ -468,3 +468,94 @@ describe('SlotsRoom — fundVendor when the locked balance is unknown (BUG-10 fo
     room.dispose();
   });
 });
+
+/**
+ * BUG-10 follow-up C. `adapter.play` calls `fc.settleTableHand` and only THEN builds and returns
+ * the receipt, so a rejection that arrives AFTER settlement has already committed at FC (the
+ * response lost in transit, say) skips the `vendorFloat += receipt.providerDelta` line entirely —
+ * the tracked float is left exactly where it was before the spin, even though the real locked
+ * balance has already moved. Left alone, `vendorFunded` also stays true, so the stale float (still
+ * >= VENDOR_FLOAT) makes the very next spin's `ensureVendorFunded` short-circuit without ever
+ * re-reading FC: the room keeps trusting a number that stopped being true.
+ */
+describe('SlotsRoom — vendor float re-reads FC after a failed spin (BUG-10 follow-up C)', () => {
+  const baseConfig = {
+    name: 'Test Slots',
+    game: 'slots' as const,
+    minBuyIn: 1_000,
+    maxBuyIn: 50_000,
+    maxSeats: 6,
+    commissionBps: 500,
+  };
+
+  it('marks the float stale on an adapter.play rejection so the next spin re-reads the real locked balance', async () => {
+    const players = new DevPlayers({ startingChips: 100_000 });
+    const bank = new ChipBank(players);
+    const alice = players.create('Alice').id;
+    const tableId = 'slots-stale-float';
+
+    const realLockedBalance = bank.lockedBalance.bind(bank);
+    let lockedBalanceCalls = 0;
+    bank.lockedBalance = (accountId: string, scope?: WalletScope): Promise<string> => {
+      lockedBalanceCalls += 1;
+      return realLockedBalance(accountId, scope);
+    };
+
+    const SECRET = 'slots-stale-float-test-secret';
+    const room = new SlotsRoom(
+      { id: tableId, ...baseConfig, secret: SECRET },
+      { directory: players, fc: bank },
+    );
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: 20_000 });
+
+    // Every spin loses outright (payout 0) — deterministic, so the vendor's real locked balance
+    // (and a correctly-tracked float) moves by the exact same known amount each spin: the
+    // rake-trimmed 95 out of a 100-chip wager at commissionBps 500 (same arithmetic as the
+    // follow-up A test above).
+    (room as unknown as { provider: { playRound(req: RoundRequest): Promise<SignedRoundResult> } })
+      .provider.playRound = async (req: RoundRequest): Promise<SignedRoundResult> => {
+        const payout = 0;
+        return {
+          result: { roundId: req.roundId, payout, outcome: { reels: ['BAR', 'BAR', 'LEMON'] } },
+          signature: signResult(SECRET, { ...req, payout }),
+        };
+      };
+
+    // Make the very next `adapter.play` commit for real (so FC's ledger genuinely moves) and then
+    // reject anyway — simulating a settlement that landed at FC but whose response never made it
+    // back to the room.
+    const adapter = (room as unknown as { adapter: { play: (...args: unknown[]) => Promise<unknown> } }).adapter;
+    const realPlay = adapter.play.bind(adapter);
+    adapter.play = async (...args: unknown[]) => {
+      await realPlay(...args);
+      throw new Error('response lost after settlement committed');
+    };
+
+    // Spin 1: funds the vendor float (the first lockedBalance read), then the forced rejection
+    // fires after FC has already moved 95 chips into the vendor's real locked balance.
+    await expect(
+      room.command(alice, { kind: 'act', action: { type: 'spin', amount: 100 } }),
+    ).rejects.toThrow(/response lost after settlement committed/);
+
+    const vendorId = `acc-slots-vendor:${tableId}`;
+    const realLockedAfterFailedSpin = Number(await bank.lockedBalance(vendorId));
+    expect(realLockedAfterFailedSpin).toBe(10_095); // the settlement really did commit
+
+    // Isolate spin 2's own re-read from everything counted so far.
+    lockedBalanceCalls = 0;
+    adapter.play = realPlay;
+
+    await room.command(alice, { kind: 'act', action: { type: 'spin', amount: 100 } });
+
+    // Without the fix this stays 0: a stale vendorFunded=true + stale vendorFloat >= VENDOR_FLOAT
+    // makes ensureVendorFunded return early, never touching FC.
+    expect(lockedBalanceCalls).toBeGreaterThan(0);
+
+    const realLockedFinal = Number(await bank.lockedBalance(vendorId));
+    const trackedFloat = (room as unknown as { vendorFloat: number }).vendorFloat;
+    expect(realLockedFinal).toBe(10_190); // 10,095 (after spin 1) + another 95 (spin 2)
+    expect(trackedFloat).toBe(realLockedFinal);
+
+    room.dispose();
+  });
+});
