@@ -1853,14 +1853,19 @@ export class PokerRoom implements LiveRoom {
     const pools = this.jackpotAccountIds();
     for (const hit of hits) {
       const tierKey = hit.tier.toLowerCase() as 'mini' | 'minor' | 'major' | 'grand';
-      const amountChips = hit.amount / CHIPS_TO_MICROS; // micros → table currency
+      // The chip rail (fc-chip-adapter → chip-currency.parseChips) only accepts whole-chip decimal
+      // strings (/^\d+$/) — a fractional amount like "12.500000" throws there and refuses the whole
+      // payout. Floor to the whole chip the ledger can actually move; a sub-chip remainder is not
+      // worth minting a fifth currency unit over, and a hit that floors to zero pays nothing.
+      const amountChips = Math.floor(hit.amount / CHIPS_TO_MICROS); // micros → table currency
+      if (amountChips <= 0) continue;
       try {
         await this.fc.jackpotPayout({
           tableId: this.config.id,
           tier: tierKey,
           jackpotAccountId: pools[tierKey],
           playerId: hit.playerId,
-          amount: amountChips.toFixed(6),
+          amount: String(amountChips),
           roundId: req.roundId,
         });
       } catch (err) {
