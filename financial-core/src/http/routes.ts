@@ -1152,6 +1152,14 @@ export function buildRouter(): Router {
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
       const b = settleBody.parse(req.body);
+      // The pools must exist before settleRound injects the jackpot — transfer() throws
+      // AccountNotFoundError otherwise, failing the whole settlement. table-settlements (below)
+      // already does this; /internal/settlements skipped it, so the first single-leg settlement
+      // for a fresh table's jackpot pools crashed instead of provisioning them.
+      if (b.jackpotAccounts) {
+        const tableOwner = jackpotPoolOwner(b.jackpotAccounts.mini, b.roundId);
+        await ensureJackpotAccounts(tableOwner, b.jackpotAccounts);
+      }
       const winnerAccountId = await resolvePlayerAccountId(
         b.winnerAccountId,
         playerScope(b.tableType, b.leagueId),

@@ -1,5 +1,5 @@
 import { Money } from '../../src/domain/money';
-import { AccountType, LedgerType } from '../../src/domain/account-types';
+import { AccountType, LedgerType, PLATFORM_SCOPE } from '../../src/domain/account-types';
 import { AccountModel } from '../../src/wallet/account.model';
 import { LedgerModel } from '../../src/wallet/ledger.model';
 import { transfer } from '../../src/wallet/transfer';
@@ -104,7 +104,15 @@ describe('ensureJackpotAccounts', () => {
     // the match, both attempt an insert, and the unique (accountType, ownerId, scope) index accepts
     // one and rejects the other with a duplicate-key error — a real race is timing-dependent and not
     // reliable to force through the public API against a real (if in-memory) Mongo, so this drives
-    // the exact failure `updateOne` can throw directly.
+    // the exact failure `updateOne` can throw directly. Success here hinges on the OTHER racer's
+    // insert actually being there by the time the catch looks for it — planted up front, the same as
+    // the winning racer's insert would have left behind for real.
+    await AccountModel.create({
+      _id: ids.mini,
+      accountType: AccountType.JACKPOT_MINI,
+      ownerId: FRESH_TABLE,
+      scope: PLATFORM_SCOPE,
+    });
     const duplicateKey = Object.assign(new Error('E11000 duplicate key error'), { code: 11000 });
     const spy = jest.spyOn(AccountModel, 'updateOne').mockImplementationOnce(() => {
       throw duplicateKey;
@@ -114,7 +122,36 @@ describe('ensureJackpotAccounts', () => {
     } finally {
       spy.mockRestore();
     }
-    // The other three tiers (not intercepted) were created normally by the same call.
+    // The other three tiers (not intercepted) were created normally by the same call, plus the one
+    // the mock planted for mini — four real accounts, no duplicates.
+    expect(await AccountModel.countDocuments({ ownerId: FRESH_TABLE })).toBe(4);
+  });
+
+  // BUG-05 follow-up: the catch above used to treat ANY E11000 as success, without checking that a
+  // matching (accountType, ownerId, scope) account actually exists. That is right for the benign
+  // upsert race (above), but wrong for a genuine id collision — `ids[tier]` colliding with some
+  // OTHER account's `_id` (wrong type/owner/scope) is a real bug and must not be swallowed as if it
+  // were the same race.
+  it('rethrows when the _id collision is a genuine conflict, not the benign upsert race', async () => {
+    const FRESH_TABLE = 'tx-test-conflict';
+    const ids = {
+      mini: `jp:mini:${FRESH_TABLE}`,
+      minor: `jp:minor:${FRESH_TABLE}`,
+      major: `jp:major:${FRESH_TABLE}`,
+      grand: `jp:grand:${FRESH_TABLE}`,
+    };
+    // Some unrelated account already holds the exact id this table's mini pool would use — a
+    // different table's pool that happened to collide on id shape, say. Not this table's mini
+    // account by any (accountType, ownerId, scope) reading.
+    await AccountModel.create({
+      _id: ids.mini,
+      accountType: AccountType.JACKPOT_MINI,
+      ownerId: 'some-other-table',
+      scope: PLATFORM_SCOPE,
+    });
+
+    await expect(ensureJackpotAccounts(FRESH_TABLE, ids)).rejects.toThrow();
+    // The three uncontested tiers still got created — only the conflicting one is loud.
     expect(await AccountModel.countDocuments({ ownerId: FRESH_TABLE })).toBe(3);
   });
 });

@@ -107,7 +107,30 @@ export async function ensureJackpotAccounts(
         // error. The account exists either way, which is all this function promises — so a
         // duplicate key here is success, not failure (same treatment as getOrCreatePlayerAccount /
         // getOrCreateExternalAccount above).
+        //
+        // But E11000 does not by itself prove it was THIS race: `ids[tier]` collides with the
+        // default `_id` unique index too, and a genuine conflict there — the id already belongs to
+        // some other account entirely, e.g. a different type/owner sharing the string by accident —
+        // must not be swallowed. Confirm the benign case actually holds: a jackpot account for this
+        // exact (type, owner, scope) exists. Only then is this a race we lost harmlessly; otherwise
+        // rethrow so a real conflict stays loud instead of masquerading as success.
         if (!isDuplicateKeyError(err)) throw err;
+        const matching = await AccountModel.findOne({
+          accountType: JACKPOT_TYPE[tier],
+          ownerId: tableId,
+          scope: PLATFORM_SCOPE,
+        });
+        if (matching) return; // the benign race: someone else's insert won, the account is there
+        const conflicting = await AccountModel.findOne({ _id: ids[tier] });
+        if (conflicting) {
+          throw new Error(
+            `ensureJackpotAccounts: _id ${ids[tier]} for ${tier} tier of table ${tableId} already ` +
+              `belongs to a different account (type=${conflicting.accountType}, ` +
+              `owner=${conflicting.ownerId}, scope=${conflicting.scope}) — refusing to treat a ` +
+              'genuine id conflict as the benign upsert race',
+          );
+        }
+        throw err;
       }
     }),
   );
