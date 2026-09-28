@@ -114,6 +114,37 @@ describe('POST /internal/withdrawals/:id/broadcast and /sign-broadcast (BUG-09 f
       expect(res.status).toBe(200);
       expect((await WithdrawalModel.findById(id))!.state).toBe(WithdrawalState.BROADCASTING);
     });
+
+    // D10: the admin "mark as sent" action always sets requirePending — this closes off the arm above
+    // ("no pendingTxId at all → accept any txHash") for that specific action, since a stale/mistaken
+    // admin screen resolving a send that isn't actually pending would otherwise silently record a
+    // fabricated txHash.
+    it('D10: requirePending refuses a row with no pendingTxId set at all', async () => {
+      const id = await approvedWithdrawal();
+      const res = await post(`/internal/withdrawals/${id}/broadcast`, {
+        txHash: 'c'.repeat(64),
+        requirePending: true,
+      });
+      expect(res.status).toBe(409);
+      expect((await WithdrawalModel.findById(id))!.state).toBe(WithdrawalState.APPROVED); // untouched
+    });
+
+    it('D10: requirePending accepts a txHash that matches the real pendingTxId', async () => {
+      const id = await approvedWithdrawal();
+      await WithdrawalModel.updateOne({ _id: id }, { $set: { pendingTxId: 'a'.repeat(64) } });
+
+      const res = await post(`/internal/withdrawals/${id}/broadcast`, {
+        txHash: 'a'.repeat(64),
+        requirePending: true,
+        resolvedBy: 'ops-2',
+      });
+      expect(res.status).toBe(200);
+
+      const w = await WithdrawalModel.findById(id);
+      expect(w!.state).toBe(WithdrawalState.BROADCASTING);
+      // D9: attribution recorded.
+      expect(w!.resolvedBy).toBe('ops-2');
+    });
   });
 
   describe('/sign-broadcast', () => {

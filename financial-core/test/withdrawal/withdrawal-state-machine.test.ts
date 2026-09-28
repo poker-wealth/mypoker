@@ -205,6 +205,121 @@ describe('withdrawal state machine', () => {
     expect(await balances(player)).toEqual({ available: 1000, clearing: 0 });
   });
 
+  it('BUG-09 D7: fromStates refuses a rollback from a state not in the list', async () => {
+    const player = await makePlayer('1000');
+    const id = await requestWithdrawal({
+      playerAccountId: player,
+      amount: Money.fromDecimalString('300'),
+      address: 'TXaddr',
+    });
+    await approveWithdrawal(id, 'ops-1');
+    await broadcastWithdrawal(id, 'tx-hash-live'); // now BROADCASTING
+
+    await expect(
+      rollbackWithdrawal(id, 'refused', {
+        allowPendingTx: true, // even an explicit chain-check confirmation does not bypass this
+        fromStates: [WithdrawalState.REQUESTED, WithdrawalState.APPROVED],
+      }),
+    ).rejects.toThrow(InvalidWithdrawalTransitionError);
+
+    const w = await WithdrawalModel.findById(id);
+    expect(w!.state).toBe(WithdrawalState.BROADCASTING); // untouched — no refund
+    expect(await balances(player)).toEqual({ available: 700, clearing: 300 });
+  });
+
+  it('BUG-09 D7: fromStates lets a matching state through as normal', async () => {
+    const player = await makePlayer('1000');
+    const id = await requestWithdrawal({
+      playerAccountId: player,
+      amount: Money.fromDecimalString('300'),
+      address: 'TXaddr',
+    });
+    await approveWithdrawal(id, 'ops-1');
+
+    await rollbackWithdrawal(id, 'risk flagged', {
+      fromStates: [WithdrawalState.REQUESTED, WithdrawalState.APPROVED],
+    });
+
+    const w = await WithdrawalModel.findById(id);
+    expect(w!.state).toBe(WithdrawalState.ROLLED_BACK);
+    expect(await balances(player)).toEqual({ available: 1000, clearing: 0 });
+  });
+
+  it('BUG-09 D9: rejectedBy and chainCheckedBy are recorded, and pendingTxId survives the rollback', async () => {
+    const player = await makePlayer('1000');
+    const id = await requestWithdrawal({
+      playerAccountId: player,
+      amount: Money.fromDecimalString('300'),
+      address: 'TXaddr',
+    });
+    await approveWithdrawal(id, 'ops-1');
+    await WithdrawalModel.updateOne({ _id: id }, { $set: { pendingTxId: 'a'.repeat(64) } });
+
+    await rollbackWithdrawal(id, 'confirmed never landed on-chain', {
+      allowPendingTx: true,
+      rejectedBy: 'ops-2',
+    });
+
+    const w = await WithdrawalModel.findById(id);
+    expect(w!.state).toBe(WithdrawalState.ROLLED_BACK);
+    expect(w!.rejectedBy).toBe('ops-2');
+    // chainCheckedBy defaults to rejectedBy when the rollback went through allowPendingTx.
+    expect(w!.chainCheckedBy).toBe('ops-2');
+    // pendingTxId is deliberately preserved — it is the record of exactly what was chain-checked.
+    expect(w!.pendingTxId).toBe('a'.repeat(64));
+  });
+
+  it('BUG-09 D9: an ordinary reject (no pendingTxId) records rejectedBy but never sets chainCheckedBy', async () => {
+    const player = await makePlayer('1000');
+    const id = await requestWithdrawal({
+      playerAccountId: player,
+      amount: Money.fromDecimalString('300'),
+      address: 'TXaddr',
+    });
+    await approveWithdrawal(id, 'ops-1');
+
+    await rollbackWithdrawal(id, 'risk flagged', { rejectedBy: 'ops-2' });
+
+    const w = await WithdrawalModel.findById(id);
+    expect(w!.rejectedBy).toBe('ops-2');
+    expect(w!.chainCheckedBy).toBeUndefined();
+  });
+
+  it('BUG-09 D10: broadcastWithdrawal with requirePending refuses a row with no matching pendingTxId', async () => {
+    const player = await makePlayer('1000');
+    const id = await requestWithdrawal({
+      playerAccountId: player,
+      amount: Money.fromDecimalString('300'),
+      address: 'TXaddr',
+    });
+    await approveWithdrawal(id, 'ops-1'); // no pendingTxId set at all
+
+    await expect(
+      broadcastWithdrawal(id, 'c'.repeat(64), { requirePending: true }),
+    ).rejects.toThrow(/requirePending/);
+
+    const w = await WithdrawalModel.findById(id);
+    expect(w!.state).toBe(WithdrawalState.APPROVED); // untouched
+  });
+
+  it('BUG-09 D9/D10: broadcastWithdrawal records resolvedBy when requirePending resolves a real pendingTxId', async () => {
+    const player = await makePlayer('1000');
+    const id = await requestWithdrawal({
+      playerAccountId: player,
+      amount: Money.fromDecimalString('300'),
+      address: 'TXaddr',
+    });
+    await approveWithdrawal(id, 'ops-1');
+    await WithdrawalModel.updateOne({ _id: id }, { $set: { pendingTxId: 'd'.repeat(64) } });
+
+    await broadcastWithdrawal(id, 'd'.repeat(64), { requirePending: true, resolvedBy: 'ops-3' });
+
+    const w = await WithdrawalModel.findById(id);
+    expect(w!.state).toBe(WithdrawalState.BROADCASTING);
+    expect(w!.resolvedBy).toBe('ops-3');
+    expect(w!.pendingTxId).toBeUndefined();
+  });
+
   it('rejects an illegal transition (cannot confirm a REQUESTED withdrawal)', async () => {
     const player = await makePlayer('1000');
     const id = await requestWithdrawal({

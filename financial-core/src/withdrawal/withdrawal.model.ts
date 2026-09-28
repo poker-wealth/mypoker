@@ -39,6 +39,19 @@ export interface WithdrawalDoc {
   pendingTxExpiration?: Date;
   txHash?: string;
   failureReason?: string;
+  /** BUG-09 follow-up (D9): who initiated the sign-broadcast that set `pendingTxId`, for the audit trail. */
+  sentBy?: string;
+  /** BUG-09 follow-up (D9): who resolved an unresolved send via `/broadcast` (or the ordinary sign-broadcast path). */
+  resolvedBy?: string;
+  /** BUG-09 follow-up (D9): the admin who refused this withdrawal via `/reject`. */
+  rejectedBy?: string;
+  /**
+   * BUG-09 follow-up (D9): who confirmed, by checking the chain, that it was safe to refund a
+   * withdrawal with an unresolved broadcast (the `chainChecked:true` reject). Distinct from
+   * `rejectedBy` because an ordinary reject (no pendingTxId in play) never involves a chain check at
+   * all — this is set only on that specific, higher-stakes path.
+   */
+  chainCheckedBy?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -73,6 +86,10 @@ const withdrawalSchema = new Schema<WithdrawalDoc>(
     pendingTxExpiration: { type: Date, required: false },
     txHash: { type: String, required: false },
     failureReason: { type: String, required: false },
+    sentBy: { type: String, required: false },
+    resolvedBy: { type: String, required: false },
+    rejectedBy: { type: String, required: false },
+    chainCheckedBy: { type: String, required: false },
   },
   { timestamps: true, versionKey: false, minimize: false },
 );

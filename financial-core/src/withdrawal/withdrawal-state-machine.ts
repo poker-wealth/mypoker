@@ -160,10 +160,37 @@ export async function approveWithdrawal(
  * this guard they could type (or the client could send) any txHash while a real broadcast is still
  * unresolved, silently discarding the actual pending send and recording a fabricated one instead.
  */
-export async function broadcastWithdrawal(withdrawalId: string, txHash: string): Promise<void> {
+export interface BroadcastWithdrawalOptions {
+  /**
+   * BUG-09 follow-up (D10): when true, this refuses to record a send unless `txHash` is EXACTLY the
+   * withdrawal's own unresolved `pendingTxId` — the "no pendingTxId at all → accept any txHash" arm
+   * below is not available. That arm exists for the ordinary auto sign-broadcast follow-through
+   * (there is nothing to compare against yet); an admin's manual "mark as sent" action is resolving a
+   * SPECIFIC unresolved send they read off the chain, and if the withdrawal turns out not to have one
+   * — already resolved, state moved on, stale screen — that is a bug to surface, not a hash to accept.
+   */
+  requirePending?: boolean;
+  /** BUG-09 follow-up (D9): the admin who resolved this send via the manual `/broadcast` route, for the audit trail. */
+  resolvedBy?: string;
+}
+
+export async function broadcastWithdrawal(
+  withdrawalId: string,
+  txHash: string,
+  opts?: BroadcastWithdrawalOptions,
+): Promise<void> {
   const w = await loadOrThrow(withdrawalId);
   assertTransition(w.state, WithdrawalState.BROADCASTING);
-  if (w.pendingTxId && w.pendingTxId !== txHash) {
+  if (opts?.requirePending) {
+    if (w.pendingTxId !== txHash) {
+      throw new WithdrawalBroadcastPendingError(
+        withdrawalId,
+        `withdrawal ${withdrawalId} has no unresolved broadcast matching txHash ${txHash} ` +
+          `(pendingTxId: ${w.pendingTxId ?? 'none'}) — requirePending refuses to record a send that ` +
+          'is not the one actually pending',
+      );
+    }
+  } else if (w.pendingTxId && w.pendingTxId !== txHash) {
     throw new WithdrawalBroadcastPendingError(
       withdrawalId,
       `withdrawal ${withdrawalId} has a pending broadcast ${w.pendingTxId} — txHash ${txHash} does not ` +
@@ -172,14 +199,24 @@ export async function broadcastWithdrawal(withdrawalId: string, txHash: string):
   }
   // Filter accepts either no pendingTxId at all, or one that matches txHash exactly — atomically, so a
   // concurrent CAS onto pendingTxId between the read above and this write cannot slip a mismatched
-  // txHash through.
+  // txHash through. requirePending (D10) drops the "no pendingTxId at all" arm: the filter then only
+  // matches a row whose pendingTxId is still exactly this txHash.
   const moved = await WithdrawalModel.updateOne(
     {
       _id: withdrawalId,
       state: WithdrawalState.APPROVED,
-      $or: [{ pendingTxId: { $exists: false } }, { pendingTxId: txHash }],
+      ...(opts?.requirePending
+        ? { pendingTxId: txHash }
+        : { $or: [{ pendingTxId: { $exists: false } }, { pendingTxId: txHash }] }),
     },
-    { $set: { state: WithdrawalState.BROADCASTING, txHash }, $unset: { pendingTxId: '', pendingTxExpiration: '' } },
+    {
+      $set: {
+        state: WithdrawalState.BROADCASTING,
+        txHash,
+        ...(opts?.resolvedBy ? { resolvedBy: opts.resolvedBy } : {}),
+      },
+      $unset: { pendingTxId: '', pendingTxExpiration: '' },
+    },
   );
   if (moved.matchedCount === 0) {
     throw new InvalidWithdrawalTransitionError(w.state, WithdrawalState.BROADCASTING);
@@ -304,6 +341,28 @@ export interface RollbackWithdrawalOptions {
    * `chainChecked` flag on the reject route, the only caller that ever sets this.
    */
   allowPendingTx?: boolean;
+  /**
+   * BUG-09 follow-up (D7): restrict which states this may roll back FROM. `w.state` (read just above,
+   * before the atomic write) is checked against this list and throws immediately if it doesn't match —
+   * and the write below stays CAS-safe even so, because its filter pins `state: w.state`, the very
+   * state this check just approved. If the row has since moved to a state that check never saw (e.g.
+   * the watcher advancing it to BROADCASTING mid-review), the filter simply fails to match and the
+   * generic `matchedCount === 0` branch throws the same error — the fast check here is a clearer
+   * message, not the only guard.
+   *
+   * The reject route (the only caller a human drives) passes `[REQUESTED, APPROVED]` — a live
+   * BROADCASTING withdrawal is refundable only by the watcher, which actually checks the chain before
+   * doing it. Every other caller (the watcher itself, build/sign's own rollback) passes nothing.
+   */
+  fromStates?: WithdrawalState[];
+  /** BUG-09 follow-up (D9): the admin who refused this withdrawal, for the audit trail. */
+  rejectedBy?: string;
+  /**
+   * BUG-09 follow-up (D9): who confirmed the chain check that authorized `allowPendingTx`. Defaults to
+   * `rejectedBy` — refusing a withdrawal with an unresolved broadcast is, in practice, one admin doing
+   * both in the same action — but is its own field because that need not always be true.
+   */
+  chainCheckedBy?: string;
 }
 
 /**
@@ -322,6 +381,9 @@ export async function rollbackWithdrawal(
 ): Promise<void> {
   const w = await loadOrThrow(withdrawalId);
   assertTransition(w.state, WithdrawalState.ROLLED_BACK);
+  if (opts?.fromStates && !opts.fromStates.includes(w.state)) {
+    throw new InvalidWithdrawalTransitionError(w.state, WithdrawalState.ROLLED_BACK);
+  }
   const amountD = w.amount;
   const negAmountD = Money.fromDecimal128(w.amount).negate().toDecimal128();
   const releaseHold = isHeldInClearing(w.state);
@@ -336,13 +398,27 @@ export async function rollbackWithdrawal(
       if (released.matchedCount === 0) throw new InsufficientBalanceError(w.playerAccountId);
     }
 
+    // D9: `pendingTxId`/`pendingTxExpiration` are deliberately NOT `$unset` here even when
+    // allowPendingTx let this through — they are the record of exactly which broadcast an admin
+    // chain-checked and refunded. Clearing them would make a ROLLED_BACK-with-a-pendingTxId doc
+    // indistinguishable from an ordinary one, which is the one thing an investigator into a suspected
+    // double-pay most needs to find.
     const moved = await WithdrawalModel.updateOne(
       {
         _id: withdrawalId,
         state: w.state,
         ...(opts?.allowPendingTx ? {} : { pendingTxId: { $exists: false } }),
       },
-      { $set: { state: WithdrawalState.ROLLED_BACK, failureReason: reason } },
+      {
+        $set: {
+          state: WithdrawalState.ROLLED_BACK,
+          failureReason: reason,
+          ...(opts?.rejectedBy ? { rejectedBy: opts.rejectedBy } : {}),
+          ...(opts?.allowPendingTx && (opts?.chainCheckedBy ?? opts?.rejectedBy)
+            ? { chainCheckedBy: opts.chainCheckedBy ?? opts.rejectedBy }
+            : {}),
+        },
+      },
       { session },
     );
     if (moved.matchedCount === 0) {

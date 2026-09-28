@@ -2,6 +2,7 @@ import express, { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { Money } from '../domain/money';
 import { LedgerType, LedgerDirection, PLATFORM_SCOPE } from '../domain/account-types';
+import { WithdrawalState } from '../domain/withdrawal-types';
 import { LedgerModel } from '../wallet/ledger.model';
 import { transfer } from '../wallet/transfer';
 import { TableType, getRakeDestination } from '../settlement/settlement-domain';
@@ -17,6 +18,8 @@ import {
   rollbackWithdrawal,
 } from '../withdrawal/withdrawal-state-machine';
 import { signAndBroadcastWithdrawal } from '../withdrawal/withdrawal-broadcast';
+import { PENDING_TX_GRACE_MS } from '../withdrawal/withdrawal-watcher';
+import { alertOps } from '../lib/alert';
 import { evaluateCB3, evaluateCB4, evaluateCB5 } from '../circuit-breakers/breakers';
 import {
   setWithdrawalAddress,
@@ -1806,6 +1809,18 @@ export function buildRouter(): Router {
    * already be live on-chain. Refunding here without checking the chain risks a double-pay (refund +
    * the on-chain transfer landing anyway), so this refuses unless the caller explicitly confirms they
    * checked, the same way other admin routes require an explicit flag rather than assuming intent.
+   *
+   * BUG-09 follow-up (D7): BROADCASTING is refused outright, chainChecked or not. A row can reach
+   * BROADCASTING while an admin has the review sheet open — the watcher's own reconcile pass resolving
+   * the same `pendingTxId` this admin is looking at — and a chainChecked reject issued a moment later
+   * would then refund a transfer that is, right now, live on-chain. Only the watcher (which actually
+   * checks the chain before it acts) ever rolls a BROADCASTING withdrawal back, on genuine on-chain
+   * failure.
+   *
+   * BUG-09 follow-up (D8): a chainChecked reject of a `pendingTxId` is only trustworthy once the signed
+   * tx could actually be dead — before its own expiration (+ the watcher's grace period) TronGrid could
+   * still mine it at any moment, and an admin ticking the box seconds after the send (before there was
+   * anything real to check) would refund funds that then land anyway.
    */
   const rejectWithdrawalBody = z.object({
     rejectedBy: z.string().min(1),
@@ -1820,6 +1835,16 @@ export function buildRouter(): Router {
       const id = String(req.params.id);
       const w = await WithdrawalModel.findById(id);
       if (!w) throw new ApiError(404, `withdrawal not found: ${id}`);
+
+      // D7: a live broadcast — only the watcher, having actually checked the chain, ever refunds one.
+      if (w.state === WithdrawalState.BROADCASTING) {
+        throw new ApiError(
+          409,
+          `withdrawal ${id} already broadcast (${w.txHash ?? w.pendingTxId ?? ''}) — only the watcher ` +
+            'rolls back a broadcast withdrawal, on on-chain failure',
+        );
+      }
+
       if (w.pendingTxId && b.chainChecked !== true) {
         throw new ApiError(
           409,
@@ -1827,15 +1852,52 @@ export function buildRouter(): Router {
             're-send with chainChecked:true, or resolve via /broadcast + /confirm if it landed',
         );
       }
-      // The refusing administrator is recorded in the reason, since the
-      // withdrawal document has no rejectedBy field of its own.
+
+      if (w.pendingTxId && b.chainChecked === true) {
+        // D8: refuse to treat the pending send as dead before its own signed expiration, plus the same
+        // grace period the watcher's reconcile pass honors — this is deliberately the SAME window, not
+        // a separate one an admin could beat by acting faster than the watcher does.
+        if (w.pendingTxExpiration) {
+          const deadAtMs = w.pendingTxExpiration.getTime() + PENDING_TX_GRACE_MS;
+          if (Date.now() <= deadAtMs) {
+            throw new ApiError(
+              409,
+              `withdrawal ${id} has a pending broadcast (${w.pendingTxId}) that cannot be declared ` +
+                `dead before ${new Date(deadAtMs).toISOString()} — wait, or /broadcast if it landed`,
+            );
+          }
+        } else {
+          // Legacy row, broadcast before pendingTxExpiration existed — no expiry to reason from. Let
+          // the explicit chainChecked confirmation through (an admin has looked at the chain), same as
+          // the watcher's own reconcile alerting rather than guessing for a legacy row, but tell ops.
+          await alertOps(
+            'chainChecked reject allowed with no recorded pendingTxExpiration — cannot verify grace period elapsed',
+            { withdrawalId: id, txId: w.pendingTxId },
+          );
+        }
+        // D9: every chainChecked refusal of an unresolved broadcast is worth ops' attention on its
+        // own — it is, by construction, the one reject outcome that could turn out to be a double-pay.
+        await alertOps('withdrawal with unresolved broadcast refused by admin (chainChecked)', {
+          withdrawalId: id,
+          txId: w.pendingTxId,
+          rejectedBy: b.rejectedBy,
+        });
+      }
+
+      // The refusing administrator is recorded in the reason (readable audit text) and in the
+      // withdrawal's own `rejectedBy` field (D9, structured — the document previously had none).
       //
       // allowPendingTx mirrors chainChecked straight through: the early check above is a fast,
       // friendly 409 for the common case, but the real guard is the atomic filter inside
       // rollbackWithdrawal itself (D1) — a pendingTxId that appears between that read and this call
       // (a concurrent send) is still caught, because allowPendingTx is false unless the caller said so.
+      // fromStates (D7) is the same kind of belt-and-braces: the BROADCASTING check above reads `w`
+      // once, up front; rollbackWithdrawal's own fromStates check re-reads and re-checks state right
+      // before it writes, so a row that reaches BROADCASTING in the gap between the two is still caught.
       await rollbackWithdrawal(id, `${b.reason} (refused by ${b.rejectedBy})`, {
         allowPendingTx: b.chainChecked === true,
+        fromStates: [WithdrawalState.REQUESTED, WithdrawalState.APPROVED],
+        rejectedBy: b.rejectedBy,
       });
       res.json({ state: await currentState(id) });
     }),
@@ -1881,21 +1943,39 @@ export function buildRouter(): Router {
   // ambiguous (may be live on-chain) and does NOT roll back — the withdrawal stays APPROVED with
   // pendingTxId set, blocking a re-send until a human resolves it via /broadcast or /reject. See
   // signAndBroadcastWithdrawal's doc comment in withdrawal-broadcast.ts.
+  // D9: `sentBy` is optional (older callers, or a re-send triggered without one, still work) and is
+  // recorded purely for the audit trail — it never gates anything.
+  const signBroadcastBody = z.object({ sentBy: z.string().min(1).optional() });
   r.post(
     '/internal/withdrawals/:id/sign-broadcast',
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
-      const txHash = await signAndBroadcastWithdrawal(req.params.id as string);
+      const { sentBy } = signBroadcastBody.parse(req.body);
+      const txHash = await signAndBroadcastWithdrawal(req.params.id as string, undefined, {
+        ...(sentBy ? { sentBy } : {}),
+      });
       res.json({ state: await currentState(req.params.id as string), txHash });
     }),
   );
-  const broadcastBody = z.object({ txHash: z.string().min(1) });
+  const broadcastBody = z.object({
+    txHash: z.string().min(1),
+    resolvedBy: z.string().min(1).optional(),
+    /**
+     * BUG-09 follow-up (D10): when true, refuses unless `txHash` is exactly this withdrawal's own
+     * unresolved `pendingTxId` — see broadcastWithdrawal's `requirePending` doc comment. The gateway's
+     * admin "mark as sent" action always sets this; the ordinary auto sign-broadcast path never does.
+     */
+    requirePending: z.boolean().optional(),
+  });
   r.post(
     '/internal/withdrawals/:id/broadcast',
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
-      const { txHash } = broadcastBody.parse(req.body);
-      await broadcastWithdrawal(req.params.id as string, txHash);
+      const { txHash, resolvedBy, requirePending } = broadcastBody.parse(req.body);
+      await broadcastWithdrawal(req.params.id as string, txHash, {
+        ...(resolvedBy ? { resolvedBy } : {}),
+        ...(requirePending !== undefined ? { requirePending } : {}),
+      });
       res.json({ state: await currentState(req.params.id as string) });
     }),
   );

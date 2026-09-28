@@ -227,6 +227,22 @@ describe('signAndBroadcastWithdrawal (BUG-09)', () => {
     expect(w!.pendingTxId).toBeUndefined();
   });
 
+  // D9: sentBy is recorded on the pendingTxId CAS — the admin who initiated the send, for the audit
+  // trail. It survives on the withdrawal doc even through an ambiguous broadcast (hold and pendingTxId
+  // both stay), because that is exactly the case an investigator most needs it for.
+  it('BUG-09 D9: sentBy is recorded on the pendingTxId CAS and survives an ambiguous broadcast', async () => {
+    const { id } = await approvedWithdrawal('120');
+
+    await expect(
+      signAndBroadcastWithdrawal(id, cfg(fakeFetch({ broadcast: 'throws' })), { sentBy: 'ops-4' }),
+    ).rejects.toThrow();
+
+    const w = await WithdrawalModel.findById(id);
+    expect(w!.state).toBe(WithdrawalState.APPROVED);
+    expect(w!.pendingTxId).toBe('a'.repeat(64));
+    expect(w!.sentBy).toBe('ops-4');
+  });
+
   it('two concurrent sends: only one build-and-signs its way to a broadcast', async () => {
     const { id, player } = await approvedWithdrawal('300');
     let broadcastCalls = 0;

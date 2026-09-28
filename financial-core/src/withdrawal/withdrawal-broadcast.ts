@@ -55,9 +55,15 @@ export function signerConfigFromEnv(): SignerConfig {
  *
  * Returns the on-chain txHash.
  */
+export interface SignAndBroadcastOptions {
+  /** BUG-09 follow-up (D9): the admin who initiated this send, recorded on the pendingTxId CAS. */
+  sentBy?: string;
+}
+
 export async function signAndBroadcastWithdrawal(
   withdrawalId: string,
   cfg: SignerConfig = signerConfigFromEnv(),
+  opts?: SignAndBroadcastOptions,
 ): Promise<string> {
   const w = await WithdrawalModel.findById(withdrawalId);
   if (!w) throw new WithdrawalNotFoundError(withdrawalId);
@@ -99,6 +105,7 @@ export async function signAndBroadcastWithdrawal(
       $set: {
         pendingTxId: signed.tx.txID,
         ...(expirationMs !== undefined ? { pendingTxExpiration: new Date(expirationMs) } : {}),
+        ...(opts?.sentBy ? { sentBy: opts.sentBy } : {}),
       },
     },
   );
