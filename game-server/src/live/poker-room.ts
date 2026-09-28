@@ -1319,7 +1319,19 @@ export class PokerRoom implements LiveRoom {
     // clock is torn down — otherwise dipping in for a second costs the lot.
     this.refundUnusedTimeBank(playerId);
     this.clearActionClock();
-    await this.game!.handleAction(playerId, action);
+    try {
+      await this.game!.handleAction(playerId, action);
+    } catch (err) {
+      // An illegal action throws BEFORE the hand completes; only a settlement failure throws after
+      // (TexasGame.settle transitions to SETTLING, then throws from fc.settleTableHand before touching
+      // any stack). playedHand().isComplete is true exactly in that second case — the engine only sets
+      // it once the hand itself (not the settlement) has finished.
+      if (this.game?.playedHand()?.isComplete) {
+        await this.abandonHand(err);
+        return;
+      }
+      throw err;
+    }
 
     if (seat && label) {
       // All-in is decided by the engine, not by comparing numbers here: a call
@@ -1536,6 +1548,59 @@ export class PokerRoom implements LiveRoom {
     this.showdownTimer = setTimeout(() => {
       this.showdownTimer = undefined;
       void this.enqueue(() => this.endShowdown());
+    }, this.config.showdownDelayMs);
+  }
+
+  /**
+   * Settlement failed (BUG-03): `TexasGame.settle` transitions to SETTLING and only THEN awaits
+   * `fc.settleTableHand`, so a throw from there — network error, 5xx, 409, or `settleTableHand`'s own
+   * deliberate throw on `applied: false` — lands here with the hand stuck mid-settle and no money
+   * moved. Same narrow recovery as `BaseLiveRoom.abandonRound`: nothing is paid and nothing is
+   * reversed, because nothing was applied.
+   *
+   * MONEY CHECK (see PR): `seat.stack` in this room is never touched while a hand is in progress —
+   * the only writer is `finishHand`, which copies `game.seatedStacks()` after `handleAction` returns
+   * successfully. `TexasGame.settle` is the same shape: it mutates `this.table[].stack` only AFTER
+   * `fc.settleTableHand` resolves. So a throw from settlement means every seat here still holds
+   * exactly what it held when the hand was dealt — "chips returned" is really "chips never moved".
+   */
+  private async abandonHand(err: unknown): Promise<void> {
+    const roundId = this.game?.roundInfo()?.roundId;
+    console.error(`[room ${this.config.id}] hand ${roundId ?? '?'} failed to settle — nothing paid or reversed:`, err);
+    // Fire-and-forget, exactly like BaseLiveRoom.abandonRound and the CB3 anomaly report — the
+    // recovery below must not wait on the alert.
+    if (this.fc.reportSettlementFailure) {
+      void this.fc
+        .reportSettlementFailure({
+          tableId: this.config.id,
+          reason: err instanceof Error ? err.message : String(err),
+          ...(roundId ? { roundId } : {}),
+        })
+        .catch((e) => console.error(`[room ${this.config.id}] settlement-failure report to FC failed:`, e));
+    }
+    this.clearActionClock();
+    this.game = undefined;
+    this.winners = [];
+    this.revealed.clear();
+    this.message = 'This hand could not be settled — chips returned, dealing again';
+    // Same two loops finishHand's normal counterpart (endShowdown) runs: clear the hand off every
+    // seat first, then release whoever asked to leave. No stack was touched above, so there is no
+    // "busted" check to redo here — nobody's stack could have changed.
+    for (const seat of this.occupied()) {
+      seat.inHand = false;
+      delete seat.lastAction;
+    }
+    for (const seat of this.occupied()) {
+      if (seat.leaveAfterHand) await this.releaseSeat(seat.index);
+    }
+    this.phase = 'WAITING';
+    this.push();
+    // Hold the failure message on screen for the same span a real result would (showdownDelayMs),
+    // then hand off to maybeStartHand exactly like endShowdown does — which is also what lets a
+    // pending close_table finish closing instead of dealing again.
+    this.startTimer = setTimeout(() => {
+      this.startTimer = undefined;
+      void this.enqueue(() => this.maybeStartHand());
     }, this.config.showdownDelayMs);
   }
 
