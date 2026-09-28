@@ -123,6 +123,21 @@ export async function ensureJackpotAccounts(
         if (matching) return; // the benign race: someone else's insert won, the account is there
         const conflicting = await AccountModel.findOne({ _id: ids[tier] });
         if (conflicting) {
+          if (conflicting.accountType === JACKPOT_TYPE[tier]) {
+            // A stranded legacy pool: this IS the tier's pool for this table, just under an
+            // owner/id convention the (accountType, ownerId, scope) match above does not reach.
+            // Two live shapes do this — pools created before b1bd93c sit under their TIER as owner
+            // (`jp:mini:<table>`, ownerId "mini"; see jackpot-pool-audit.ts), and pools created at
+            // table creation (settle-round.ts's JackpotAccounts, scripts/smoke.ts) can carry a
+            // random default _id under an arbitrary owner. Either way, transfer() addresses the pool
+            // by `_id`, so reusing it by _id hits the right account exactly as it always has — no
+            // migration needed, just don't throw on a pool this tier already owns.
+            console.warn('ensureJackpotAccounts: reusing legacy jackpot pool under a stranded owner', {
+              _id: ids[tier],
+              ownerId: conflicting.ownerId,
+            });
+            return;
+          }
           throw new Error(
             `ensureJackpotAccounts: _id ${ids[tier]} for ${tier} tier of table ${tableId} already ` +
               `belongs to a different account (type=${conflicting.accountType}, ` +

@@ -130,8 +130,8 @@ describe('ensureJackpotAccounts', () => {
   // BUG-05 follow-up: the catch above used to treat ANY E11000 as success, without checking that a
   // matching (accountType, ownerId, scope) account actually exists. That is right for the benign
   // upsert race (above), but wrong for a genuine id collision — `ids[tier]` colliding with some
-  // OTHER account's `_id` (wrong type/owner/scope) is a real bug and must not be swallowed as if it
-  // were the same race.
+  // OTHER, non-jackpot account's `_id` is a real bug and must not be swallowed as if it were the
+  // same race.
   it('rethrows when the _id collision is a genuine conflict, not the benign upsert race', async () => {
     const FRESH_TABLE = 'tx-test-conflict';
     const ids = {
@@ -140,12 +140,12 @@ describe('ensureJackpotAccounts', () => {
       major: `jp:major:${FRESH_TABLE}`,
       grand: `jp:grand:${FRESH_TABLE}`,
     };
-    // Some unrelated account already holds the exact id this table's mini pool would use — a
-    // different table's pool that happened to collide on id shape, say. Not this table's mini
-    // account by any (accountType, ownerId, scope) reading.
+    // Some unrelated, non-jackpot account already holds the exact id this table's mini pool would
+    // use. Not this table's mini pool by any reading — not even a stranded legacy one, since a
+    // legacy pool is still a JACKPOT_MINI account (see the legacy-pool test below).
     await AccountModel.create({
       _id: ids.mini,
-      accountType: AccountType.JACKPOT_MINI,
+      accountType: AccountType.PLAYER,
       ownerId: 'some-other-table',
       scope: PLATFORM_SCOPE,
     });
@@ -153,6 +153,58 @@ describe('ensureJackpotAccounts', () => {
     await expect(ensureJackpotAccounts(FRESH_TABLE, ids)).rejects.toThrow();
     // The three uncontested tiers still got created — only the conflicting one is loud.
     expect(await AccountModel.countDocuments({ ownerId: FRESH_TABLE })).toBe(3);
+  });
+
+  // BUG-05 follow-up: live databases hold jackpot pools created before b1bd93c under tier-named
+  // owners (see jackpot-pool-audit.ts) — e.g. `_id: 'jp:mini:niu-niu', accountType: JACKPOT_MINI,
+  // ownerId: 'mini'`. For such a pool the (accountType, ownerId, scope) match above finds nothing
+  // (ownerId is "mini", not the table), the upsert inserts the same _id, gets E11000, and
+  // `conflicting` is that legacy doc. It IS this tier's pool — just stranded under the old owner
+  // convention — so this must resolve, not throw, and must not create a second JACKPOT_MINI account
+  // owned by the table.
+  it('accepts a legacy jackpot pool created under a tier-named owner, without creating a duplicate', async () => {
+    const TABLE_ID = 'T';
+    const ids = {
+      mini: `jp:mini:${TABLE_ID}`,
+      minor: `jp:minor:${TABLE_ID}`,
+      major: `jp:major:${TABLE_ID}`,
+      grand: `jp:grand:${TABLE_ID}`,
+    };
+    await AccountModel.create({
+      _id: ids.mini,
+      accountType: AccountType.JACKPOT_MINI,
+      ownerId: 'mini',
+      scope: PLATFORM_SCOPE,
+    });
+
+    await expect(ensureJackpotAccounts(TABLE_ID, ids)).resolves.toBeUndefined();
+
+    const jackpotDocs = await AccountModel.find({ _id: { $in: Object.values(ids) } }).lean();
+    expect(jackpotDocs).toHaveLength(4);
+    expect(await AccountModel.countDocuments({ accountType: AccountType.JACKPOT_MINI, ownerId: TABLE_ID })).toBe(0);
+  });
+
+  // The same acceptance, without the tier-named-owner shape — a pool created at table creation
+  // (settle-round.ts's JackpotAccounts, scripts/smoke.ts) can carry a random default _id under an
+  // arbitrary owner unrelated to any tier name. Same-type, different-owner is still "this tier's
+  // pool", not a conflict, whatever the owner string looks like.
+  it('accepts a same-tier jackpot doc under an unrelated owner as an existing pool, not a conflict', async () => {
+    const TABLE_ID = 'tx-test-legacy-owner';
+    const ids = {
+      mini: `jp:mini:${TABLE_ID}`,
+      minor: `jp:minor:${TABLE_ID}`,
+      major: `jp:major:${TABLE_ID}`,
+      grand: `jp:grand:${TABLE_ID}`,
+    };
+    await AccountModel.create({
+      _id: ids.mini,
+      accountType: AccountType.JACKPOT_MINI,
+      ownerId: 'demo-table', // arbitrary owner, not a tier name and not TABLE_ID
+      scope: PLATFORM_SCOPE,
+    });
+
+    await expect(ensureJackpotAccounts(TABLE_ID, ids)).resolves.toBeUndefined();
+    expect(await AccountModel.countDocuments({ accountType: AccountType.JACKPOT_MINI, ownerId: TABLE_ID })).toBe(0);
   });
 });
 

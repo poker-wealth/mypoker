@@ -162,14 +162,11 @@ describe('Financial Core HTTP API (/api/v1)', () => {
       availableBalance: Decimal128.fromString('1000'),
     });
     await AccountModel.create({ accountType: 'TREASURY', ownerId: 'PLATFORM' });
-    // _id follows the real `jp:<table>:<tier>` shape so /internal/settlements' `jackpotPoolOwner`
-    // (BUG-05 follow-up) derives the same owner ('t') these accounts already carry — a mismatched
-    // shape here would make ensureJackpotAccounts see a genuine id conflict, not this table's pools.
     const pools = {
-      mini: (await AccountModel.create({ _id: 'jp:t:mini', accountType: 'JACKPOT_MINI', ownerId: 't' }))._id,
-      minor: (await AccountModel.create({ _id: 'jp:t:minor', accountType: 'JACKPOT_MINOR', ownerId: 't' }))._id,
-      major: (await AccountModel.create({ _id: 'jp:t:major', accountType: 'JACKPOT_MAJOR', ownerId: 't' }))._id,
-      grand: (await AccountModel.create({ _id: 'jp:t:grand', accountType: 'JACKPOT_GRAND', ownerId: 't' }))._id,
+      mini: (await AccountModel.create({ accountType: 'JACKPOT_MINI', ownerId: 't' }))._id,
+      minor: (await AccountModel.create({ accountType: 'JACKPOT_MINOR', ownerId: 't' }))._id,
+      major: (await AccountModel.create({ accountType: 'JACKPOT_MAJOR', ownerId: 't' }))._id,
+      grand: (await AccountModel.create({ accountType: 'JACKPOT_GRAND', ownerId: 't' }))._id,
     };
     const res = await post(
       '/internal/settlements',
@@ -242,10 +239,8 @@ describe('Financial Core HTTP API (/api/v1)', () => {
     await mk('tp0', '1000');
     await mk('tp1', '1000');
     await AccountModel.create({ accountType: 'TREASURY', ownerId: 'PLATFORM' });
-    // _id follows the real `jp:<table>:<tier>` shape so `jackpotPoolOwner` derives the same owner
-    // ('tt') these accounts already carry, instead of reading a genuine id conflict (BUG-05 follow-up).
-    const pool = async (t: string, tier: string): Promise<string> =>
-      (await AccountModel.create({ _id: `jp:tt:${tier}`, accountType: t, ownerId: 'tt' }))._id;
+    const pool = async (t: string): Promise<string> =>
+      (await AccountModel.create({ accountType: t, ownerId: 'tt' }))._id;
 
     const res = await post(
       '/internal/table-settlements',
@@ -257,10 +252,10 @@ describe('Financial Core HTTP API (/api/v1)', () => {
         rake: '50',
         jackpot: { mini: '0', minor: '0', major: '0', grand: '0' },
         jackpotAccounts: {
-          mini: await pool('JACKPOT_MINI', 'mini'),
-          minor: await pool('JACKPOT_MINOR', 'minor'),
-          major: await pool('JACKPOT_MAJOR', 'major'),
-          grand: await pool('JACKPOT_GRAND', 'grand'),
+          mini: await pool('JACKPOT_MINI'),
+          minor: await pool('JACKPOT_MINOR'),
+          major: await pool('JACKPOT_MAJOR'),
+          grand: await pool('JACKPOT_GRAND'),
         },
       },
       internal,
@@ -312,10 +307,8 @@ describe('Financial Core HTTP API (/api/v1)', () => {
     expect(parseFloat(platformAcctAfterBuyIn!.lockedBalance.toString())).toBe(0); // untouched by the LEAGUE buy-in
     expect(parseFloat(platformAcctAfterBuyIn!.availableBalance.toString())).toBe(1000);
 
-    // _id follows the real `jp:<table>:<tier>` shape so `jackpotPoolOwner` derives the same owner
-    // ('lg-scope-test-table') these accounts already carry (BUG-05 follow-up).
-    const pool = async (t: string, tier: string): Promise<string> =>
-      (await AccountModel.create({ _id: `jp:lg-scope-test-table:${tier}`, accountType: t, ownerId: 'lg-scope-test-table' }))._id;
+    const pool = async (t: string): Promise<string> =>
+      (await AccountModel.create({ accountType: t, ownerId: 'lg-scope-test-table' }))._id;
     const settle = await post(
       '/internal/table-settlements',
       {
@@ -327,10 +320,10 @@ describe('Financial Core HTTP API (/api/v1)', () => {
         rake: '10',
         jackpot: { mini: '0', minor: '0', major: '0', grand: '0' },
         jackpotAccounts: {
-          mini: await pool('JACKPOT_MINI', 'mini'),
-          minor: await pool('JACKPOT_MINOR', 'minor'),
-          major: await pool('JACKPOT_MAJOR', 'major'),
-          grand: await pool('JACKPOT_GRAND', 'grand'),
+          mini: await pool('JACKPOT_MINI'),
+          minor: await pool('JACKPOT_MINOR'),
+          major: await pool('JACKPOT_MAJOR'),
+          grand: await pool('JACKPOT_GRAND'),
         },
       },
       internal,
