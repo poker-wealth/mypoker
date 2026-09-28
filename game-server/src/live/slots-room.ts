@@ -24,6 +24,13 @@ export class SlotsRoom extends BaseLiveRoom<SlotsRoomConfig, RoomSeat> {
   private readonly adapter: ThirdPartyAdapter;
   /** Kept so the jackpot can draw on the seed a spin was actually generated from. */
   private readonly provider: SlotsProvider;
+  /**
+   * Whether the vendor account's float actually funded. Against the real FC the vendor PLAYER
+   * account starts at 0, and a 409 from `buyIn` used to be swallowed silently — a winning spin
+   * would then fail because the vendor could not pay it out, while a losing spin settled into the
+   * vendor account as if nothing were wrong. Spins are refused until this is true.
+   */
+  private vendorFunded = false;
 
   constructor(config: SlotsRoomConfig, deps: RoomDeps) {
     super(config, deps);
@@ -32,7 +39,12 @@ export class SlotsRoom extends BaseLiveRoom<SlotsRoomConfig, RoomSeat> {
     const vendorId = `acc-slots-vendor:${config.id}`;
     this.directory.ensure?.(vendorId, { displayName: 'Slots Vendor' });
     (this.directory as any).topUp?.(vendorId, 100_000);
-    void this.fc.buyIn(vendorId, '10000').catch(() => {});
+    void this.fc
+      .buyIn(vendorId, '10000')
+      .then(() => {
+        this.vendorFunded = true;
+      })
+      .catch((err) => console.error(`[room ${config.id}] slots vendor float not funded — spins refused:`, err));
 
     const secret = config.secret ?? process.env.SLOTS_PROVIDER_SECRET ?? 'slots-live-secret';
     const provider = new SlotsProvider(secret);
@@ -69,6 +81,7 @@ export class SlotsRoom extends BaseLiveRoom<SlotsRoomConfig, RoomSeat> {
   }
 
   protected async handleAct(playerId: string, action: { type: string; amount?: number }): Promise<void> {
+    if (!this.vendorFunded) throw new RoomError('slots are unavailable — vendor float not funded');
     const seat = this.seatOf(playerId);
     if (!seat) throw new RoomError('not seated');
 
