@@ -570,6 +570,8 @@ export function buildRouter(): Router {
     /** Decimal string, table currency. */
     amount: z.string().min(1),
     roundId: z.string().min(1),
+    tableType: z.nativeEnum(TableType).optional(),
+    leagueId: z.string().min(1).optional(),
   });
   r.post(
     '/internal/jackpot-payouts',
@@ -582,7 +584,11 @@ export function buildRouter(): Router {
         major: b.tier === 'major' ? b.jackpotAccountId : `jp:${b.tableId}:major`,
         grand: b.tier === 'grand' ? b.jackpotAccountId : `jp:${b.tableId}:grand`,
       });
-      const player = await getOrCreatePlayerAccount(b.playerId);
+      // A league jackpot pays into the WINNER'S league wallet, the same scope
+      // table-settlements resolves winners into (below) — an unscoped lookup here
+      // always lands the win in the player's platform wallet, so a league jackpot
+      // hit would silently leak funds out of the league (BUG-16).
+      const player = await getOrCreatePlayerAccount(b.playerId, playerScope(b.tableType, b.leagueId));
       const result = await transfer({
         fromAccountId: b.jackpotAccountId,
         toAccountId: player._id,

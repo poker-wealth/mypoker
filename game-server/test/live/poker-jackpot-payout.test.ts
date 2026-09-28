@@ -68,8 +68,10 @@ interface Harness {
  * client, so the test exercises the actual `/^\d+$/` gate instead of a dev fake that would let a
  * fractional amount through silently.
  */
-function harness(opts: { payoutApplied?: boolean } = {}): Harness {
-  const { payoutApplied = true } = opts;
+function harness(
+  opts: { payoutApplied?: boolean; tableType?: 'PLATFORM' | 'LEAGUE'; leagueId?: string } = {},
+): Harness {
+  const { payoutApplied = true, tableType, leagueId } = opts;
   const players = new DevPlayers({ startingChips: 10_000 });
   const alice = players.create('Alice').id;
   const bob = players.create('Bob').id;
@@ -108,10 +110,16 @@ function harness(opts: { payoutApplied?: boolean } = {}): Harness {
     },
   };
 
-  const room = new PokerRoom({ ...FAST, id: 'jackpot-payout-t1', name: 'Test table' } as PokerRoomConfig, {
-    directory: players,
-    fc,
-  });
+  const room = new PokerRoom(
+    {
+      ...FAST,
+      id: 'jackpot-payout-t1',
+      name: 'Test table',
+      ...(tableType ? { tableType } : {}),
+      ...(leagueId ? { leagueId } : {}),
+    } as PokerRoomConfig,
+    { directory: players, fc },
+  );
   return { room, players, alice, bob, jackpotCalls };
 }
 
@@ -299,6 +307,62 @@ describe('PokerRoom announces only paid jackpots and never seeds the draw from t
     expect(drawCalled).toBe(false);
     expect(h.jackpotCalls).toHaveLength(0);
     expect(h.room.snapshotFor(h.alice).jackpot).toBeNull();
+    h.room.dispose();
+  });
+});
+
+/**
+ * BUG-16: FC resolved `/internal/jackpot-payouts`' winner with no scope, always the PLATFORM wallet
+ * — a league jackpot hit paid into the wrong wallet even though the pool it left was funded from
+ * league play. The room's side of the fix is sending its own (tableType, leagueId) — the same
+ * `walletScope()` buy-ins/releases already send — on every jackpotPayout call, so FC's `playerScope`
+ * has what it needs to route a league hit to the league wallet.
+ */
+describe('PokerRoom sends its wallet scope on a jackpot payout (BUG-16)', () => {
+  it('a LEAGUE table sends {tableType: LEAGUE, leagueId} on jackpotPayout', async () => {
+    const h = harness({ tableType: 'LEAGUE', leagueId: 'lg-jackpot-test' });
+    const forcedHit: JackpotHit = {
+      tier: 'MINI',
+      playerId: h.alice,
+      amount: 5_000_000, // 5 chips
+      roundId: 'engine-round-irrelevant',
+      at: Date.now(),
+      poolAfter: 0,
+      animationMs: 400,
+      seed: 'seed-1',
+    };
+    (h.room as unknown as { jackpotEngine: JackpotEngine }).jackpotEngine = stubEngine(forcedHit);
+
+    await seatBoth(h);
+    await playToShowdown(h);
+    await until(() => h.room.snapshotFor(h.alice).phase === 'SHOWDOWN');
+
+    expect(h.jackpotCalls).toHaveLength(1);
+    expect(h.jackpotCalls[0]).toMatchObject({ tableType: 'LEAGUE', leagueId: 'lg-jackpot-test' });
+    h.room.dispose();
+  });
+
+  it('a PLATFORM table sends {tableType: PLATFORM} and no leagueId', async () => {
+    const h = harness();
+    const forcedHit: JackpotHit = {
+      tier: 'MINI',
+      playerId: h.alice,
+      amount: 5_000_000,
+      roundId: 'engine-round-irrelevant',
+      at: Date.now(),
+      poolAfter: 0,
+      animationMs: 400,
+      seed: 'seed-1',
+    };
+    (h.room as unknown as { jackpotEngine: JackpotEngine }).jackpotEngine = stubEngine(forcedHit);
+
+    await seatBoth(h);
+    await playToShowdown(h);
+    await until(() => h.room.snapshotFor(h.alice).phase === 'SHOWDOWN');
+
+    expect(h.jackpotCalls).toHaveLength(1);
+    expect(h.jackpotCalls[0]!.tableType).toBe('PLATFORM');
+    expect(h.jackpotCalls[0]!.leagueId).toBeUndefined();
     h.room.dispose();
   });
 });

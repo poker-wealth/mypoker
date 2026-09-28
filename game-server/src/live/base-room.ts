@@ -416,6 +416,10 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
               playerId: hit.playerId,
               amount: String(hitChips),
               jackpotAccountId: acctKey,
+              // Non-poker rooms have no league concept today — every base-room table is PLATFORM.
+              // Explicit rather than left absent, so this stays true on purpose rather than by
+              // accident of an unset optional field (BUG-16).
+              tableType: 'PLATFORM',
             });
             if (result.applied) {
               const winnerSeat = this.seatOf(hit.playerId);

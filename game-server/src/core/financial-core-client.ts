@@ -119,7 +119,13 @@ export interface InsuranceReserveFacts {
   todayPaidOut: string;
 }
 
-export interface JackpotPayoutRequest {
+/**
+ * `Partial<WalletScope>` — a jackpot payout is scoped like a buy-in/release (same (tableType,
+ * leagueId) FC's `playerScope` resolves), but unlike those, callers that predate leagues (and the
+ * dev `ChipBank` fake) still send neither field and default to PLATFORM. Absent tableType/leagueId
+ * credits the player's platform wallet, exactly as before.
+ */
+export interface JackpotPayoutRequest extends Partial<WalletScope> {
   tableId: string;
   tier: 'mini' | 'minor' | 'major' | 'grand';
   jackpotAccountId: string;

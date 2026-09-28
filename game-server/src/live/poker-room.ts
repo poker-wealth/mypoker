@@ -1882,6 +1882,9 @@ export class PokerRoom implements LiveRoom {
           playerId: hit.playerId,
           amount: String(amountChips),
           roundId: req.roundId,
+          // A league table's jackpot pays into the winner's LEAGUE wallet, not their platform one
+          // (BUG-16) — same scope buy-ins/releases already lock and unlock through.
+          ...this.walletScope(),
         }));
       } catch (err) {
         console.error('[room] jackpot payout refused by ledger — hit not shown:', err);
