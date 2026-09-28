@@ -165,6 +165,18 @@ export class NiuNiuRoom extends BaseLiveRoom<NiuNiuRoomConfig, RoomSeat> {
     if (!BET_MULTIPLIERS.includes(multiplier)) throw new RoomError('bet multiplier must be 1x, 2x or 5x');
     if (amount <= 0 || amount > seat.stack) throw new RoomError('invalid bet amount');
 
+    // The stake alone is not what a bettor can lose: settlement multiplies it by their own
+    // multiplier, the bank's winning bid, and — if the banker's hand is the winner — that hand's
+    // multiplier (up to Five Small, MAX_HAND_MULTIPLIER). FC refuses a loser debit above
+    // lockedBalance, which used to void the whole round for every player at the table rather than
+    // just refusing the one bet that could not be covered.
+    const worstLoss = amount * multiplier * this.bankerMultiplier * MAX_HAND_MULTIPLIER;
+    if (worstLoss > seat.stack) {
+      throw new RoomError(
+        `a ${multiplier}x bet against a ${this.bankerMultiplier}x bank can lose ${worstLoss} chips — your stack is ${seat.stack}`,
+      );
+    }
+
     const banker = this.occupiedSeats().find((s) => s.isBanker);
     if (banker) {
       // What this bet can actually cost the bank: the stake, the bettor's multiplier, the bank's
