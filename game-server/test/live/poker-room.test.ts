@@ -2,7 +2,7 @@ import { ChipBank } from '../../src/live/chip-bank';
 import { DevPlayers } from '../../src/live/players';
 import { DEFAULT_ROOM, PokerRoom, type PokerRoomConfig } from '../../src/live/poker-room';
 import type { TableSnapshot } from '../../src/live/room-state';
-import type { TableSettlementRequest } from '../../src/core/financial-core-client';
+import type { TableSettlementRequest, WalletScope } from '../../src/core/financial-core-client';
 
 /**
  * Two people, two devices, one table. These tests drive the room exactly as the client does —
@@ -185,6 +185,47 @@ describe('PokerRoom — a table real people sit at', () => {
 
     expect(settled!.tableType).toBe('PLATFORM');
     expect(settled!.leagueId).toBeUndefined();
+    h.room.dispose();
+  });
+
+  // BUG-02: a league table locked and released the PLATFORM wallet while settlement resolved the
+  // LEAGUE wallet — the buy-in came from an account settlement never touched. buyIn/release must
+  // carry the same (tableType, leagueId) scope settlement already does.
+  it('a league table sends its wallet scope on buyIn and release', async () => {
+    const h = harness({ tableType: 'LEAGUE', leagueId: 'league-7' });
+    const buyInScopes: (WalletScope | undefined)[] = [];
+    const releaseScopes: (WalletScope | undefined)[] = [];
+    const realBuyIn = h.bank.buyIn.bind(h.bank);
+    const realRelease = h.bank.release.bind(h.bank);
+    h.bank.buyIn = (playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> => {
+      buyInScopes.push(scope);
+      return realBuyIn(playerAccountId, amount, scope);
+    };
+    h.bank.release = (playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> => {
+      releaseScopes.push(scope);
+      return realRelease(playerAccountId, amount, scope);
+    };
+
+    await h.room.command(h.alice, { kind: 'sit', seat: 0, buyIn: 2_000 });
+    await h.room.command(h.alice, { kind: 'stand' });
+
+    expect(buyInScopes).toEqual([{ tableType: 'LEAGUE', leagueId: 'league-7' }]);
+    expect(releaseScopes).toEqual([{ tableType: 'LEAGUE', leagueId: 'league-7' }]);
+    h.room.dispose();
+  });
+
+  it('a platform table sends the PLATFORM scope, with no leagueId', async () => {
+    const h = harness(); // default config — no tableType set
+    const buyInScopes: (WalletScope | undefined)[] = [];
+    const realBuyIn = h.bank.buyIn.bind(h.bank);
+    h.bank.buyIn = (playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> => {
+      buyInScopes.push(scope);
+      return realBuyIn(playerAccountId, amount, scope);
+    };
+
+    await h.room.command(h.alice, { kind: 'sit', seat: 0, buyIn: 2_000 });
+
+    expect(buyInScopes).toEqual([{ tableType: 'PLATFORM' }]);
     h.room.dispose();
   });
 

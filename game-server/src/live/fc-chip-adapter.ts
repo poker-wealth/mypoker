@@ -6,6 +6,7 @@ import type {
   SettleRoundRequest,
   SettlementReceipt,
   TableSettlementRequest,
+  WalletScope,
 } from '../core/financial-core-client';
 import { chipsToUsdt } from './chip-currency';
 
@@ -21,12 +22,12 @@ import { chipsToUsdt } from './chip-currency';
 export class ChipDenominatedFc implements FinancialCoreClient {
   constructor(private readonly inner: FinancialCoreClient) {}
 
-  buyIn(playerAccountId: string, amount: string): Promise<void> {
-    return this.inner.buyIn(playerAccountId, chipsToUsdt(amount));
+  buyIn(playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> {
+    return this.inner.buyIn(playerAccountId, chipsToUsdt(amount), scope);
   }
 
-  release(playerAccountId: string, amount: string): Promise<void> {
-    return this.inner.release(playerAccountId, chipsToUsdt(amount));
+  release(playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> {
+    return this.inner.release(playerAccountId, chipsToUsdt(amount), scope);
   }
 
   settleRound(req: SettleRoundRequest): Promise<SettlementReceipt> {

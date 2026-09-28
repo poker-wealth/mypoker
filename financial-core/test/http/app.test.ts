@@ -4,6 +4,7 @@ import { Decimal128 } from 'bson';
 import { createApp } from '../../src/http/app';
 import { signToken } from '../../src/http/jwt';
 import { AccountModel } from '../../src/wallet/account.model';
+import { PLATFORM_SCOPE } from '../../src/domain/account-types';
 import { LedgerModel } from '../../src/wallet/ledger.model';
 import { SecurityLogModel } from '../../src/security/security-log.model';
 import { SettlementModel } from '../../src/settlement/settlement.model';
@@ -222,6 +223,82 @@ describe('Financial Core HTTP API (/api/v1)', () => {
     );
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ roundId: 'rt-1', applied: true });
+  });
+
+  // BUG-02: a league table's buy-in/release used to lock and unlock the PLATFORM wallet while
+  // settlement resolved the LEAGUE wallet — the account settlement debited was never the one the
+  // buy-in locked. tableType/leagueId on buy-ins must route to the SAME account settlement uses.
+  it('a LEAGUE buy-in locks the league wallet, and settlement debits that same account — the platform wallet is never touched', async () => {
+    const player = 'league-player-1';
+    const winner = 'league-player-2';
+    const leagueId = 'lg-scope-test';
+
+    // Seed each player's LEAGUE-scoped wallet directly (there is no league deposit path) and a
+    // PLATFORM-scoped wallet for the same playerId, so a mistaken PLATFORM lock/debit is visible.
+    await AccountModel.create({
+      accountType: 'PLAYER', ownerId: player, scope: leagueId,
+      availableBalance: Decimal128.fromString('1000'),
+    });
+    await AccountModel.create({
+      accountType: 'PLAYER', ownerId: player, scope: PLATFORM_SCOPE,
+      availableBalance: Decimal128.fromString('1000'),
+    });
+    await AccountModel.create({
+      accountType: 'PLAYER', ownerId: winner, scope: leagueId,
+      availableBalance: Decimal128.fromString('1000'),
+    });
+
+    const buyIn = await post(
+      '/internal/buy-ins',
+      { playerAccountId: player, amount: '200', tableType: 'LEAGUE', leagueId },
+      internal,
+    );
+    expect(buyIn.status).toBe(200);
+    const winnerBuyIn = await post(
+      '/internal/buy-ins',
+      { playerAccountId: winner, amount: '200', tableType: 'LEAGUE', leagueId },
+      internal,
+    );
+    expect(winnerBuyIn.status).toBe(200);
+
+    const leagueAcctAfterBuyIn = await AccountModel.findOne({ accountType: 'PLAYER', ownerId: player, scope: leagueId }).lean();
+    expect(parseFloat(leagueAcctAfterBuyIn!.lockedBalance.toString())).toBe(200);
+    expect(parseFloat(leagueAcctAfterBuyIn!.availableBalance.toString())).toBe(800);
+    const platformAcctAfterBuyIn = await AccountModel.findOne({ accountType: 'PLAYER', ownerId: player, scope: PLATFORM_SCOPE }).lean();
+    expect(parseFloat(platformAcctAfterBuyIn!.lockedBalance.toString())).toBe(0); // untouched by the LEAGUE buy-in
+    expect(parseFloat(platformAcctAfterBuyIn!.availableBalance.toString())).toBe(1000);
+
+    const pool = async (t: string): Promise<string> =>
+      (await AccountModel.create({ accountType: t, ownerId: 'lg-scope-test-table' }))._id;
+    const settle = await post(
+      '/internal/table-settlements',
+      {
+        roundId: 'rt-league-scope-1',
+        tableType: 'LEAGUE',
+        leagueId,
+        losers: [{ playerAccountId: player, amount: '200' }],
+        winners: [{ playerAccountId: winner, amount: '190' }],
+        rake: '10',
+        jackpot: { mini: '0', minor: '0', major: '0', grand: '0' },
+        jackpotAccounts: {
+          mini: await pool('JACKPOT_MINI'),
+          minor: await pool('JACKPOT_MINOR'),
+          major: await pool('JACKPOT_MAJOR'),
+          grand: await pool('JACKPOT_GRAND'),
+        },
+      },
+      internal,
+    );
+    expect(settle.status).toBe(200);
+    expect(await settle.json()).toMatchObject({ roundId: 'rt-league-scope-1', applied: true });
+
+    // The LOCKED league balance is what settlement debited: the loser's stake left the league wallet.
+    const leagueAcctAfterSettle = await AccountModel.findOne({ accountType: 'PLAYER', ownerId: player, scope: leagueId }).lean();
+    expect(parseFloat(leagueAcctAfterSettle!.lockedBalance.toString())).toBe(0);
+    // The platform wallet for the same playerId never moved, before or after settlement.
+    const platformAcctAfterSettle = await AccountModel.findOne({ accountType: 'PLAYER', ownerId: player, scope: PLATFORM_SCOPE }).lean();
+    expect(parseFloat(platformAcctAfterSettle!.availableBalance.toString())).toBe(1000);
+    expect(parseFloat(platformAcctAfterSettle!.lockedBalance.toString())).toBe(0);
   });
 
   /**

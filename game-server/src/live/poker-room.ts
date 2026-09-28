@@ -1,7 +1,7 @@
 import { EventBus } from '../core/event-bus';
 import { positionOf } from '../history/hand-record';
 import { recordHand } from '../history/hand-store';
-import type { FinancialCoreClient } from '../core/financial-core-client';
+import type { FinancialCoreClient, WalletScope } from '../core/financial-core-client';
 import { FakeChainClient } from '../fairness';
 import type { ChainClient } from '../fairness';
 import type { RoundNotary } from '../fairness/round-notary';
@@ -324,7 +324,19 @@ export class PokerRoom implements LiveRoom {
       rules: pokerTableRules({ variantId: this.config.variantId, rake: this.config.rake }),
     };
   }
+
   private readonly spec: PokerVariant;
+
+  /**
+   * Which wallet this table's buy-ins/releases lock and unlock — same (tableType, leagueId) settlement
+   * already routes rake and payouts through. Absent/`'PLATFORM'` is the platform wallet.
+   */
+  walletScope(): WalletScope {
+    return {
+      tableType: this.config.tableType ?? 'PLATFORM',
+      ...(this.config.leagueId ? { leagueId: this.config.leagueId } : {}),
+    };
+  }
 
   private readonly seats: (RoomSeat | null)[];
   private readonly viewers = new Map<string, Set<RoomClient>>();
@@ -700,10 +712,15 @@ export class PokerRoom implements LiveRoom {
     // First time we've seen this player id, the directory gets to create their record.
     const player = this.directory.ensure?.(playerId, profile) ?? this.directory.find(playerId);
     if (!player) throw new RoomError('unknown player');
-    if (player.available < buyIn) throw new RoomError('not enough chips');
+    // The directory only ever caches the PLATFORM balance (see fc-directory.ts), so this pre-check
+    // means nothing for a LEAGUE table — FC's own overdraft guard on the league wallet is what
+    // actually protects the buy-in below.
+    if (this.walletScope().tableType === 'PLATFORM' && player.available < buyIn) {
+      throw new RoomError('not enough chips');
+    }
 
     // Money first: if the lock fails, no seat is created.
-    await this.fc.buyIn(playerId, String(buyIn));
+    await this.fc.buyIn(playerId, String(buyIn), this.walletScope());
     this.seats[seatIndex] = {
       index: seatIndex,
       playerId,
@@ -897,7 +914,7 @@ export class PokerRoom implements LiveRoom {
     const player = this.directory.find(playerId);
     if (!player || player.available < amount) throw new RoomError('not enough chips');
 
-    await this.fc.buyIn(playerId, String(amount));
+    await this.fc.buyIn(playerId, String(amount), this.walletScope());
     seat.stack += amount;
     // Counted here too, or a topped-up player reads as winning: their stack
     // grew without them having won a chip of it.
@@ -1646,7 +1663,7 @@ export class PokerRoom implements LiveRoom {
       this.clearActionClock();
     }
     this.clearAwayTimers(seat);
-    if (seat.stack > 0) await this.fc.release(seat.playerId, String(seat.stack));
+    if (seat.stack > 0) await this.fc.release(seat.playerId, String(seat.stack), this.walletScope());
     this.behavior.delete(seat.playerId); // the seat's behaviour session ends when they leave
     this.seats[index] = null;
   }

@@ -4,6 +4,7 @@ import type {
   SettleRoundRequest,
   SettlementReceipt,
   TableSettlementRequest,
+  WalletScope,
 } from '../core/financial-core-client';
 import type { ChipLedger } from './players';
 
@@ -28,11 +29,13 @@ export class ChipBank implements FinancialCoreClient {
 
   constructor(private readonly ledger: ChipLedger) {}
 
-  async buyIn(playerAccountId: string, amount: string): Promise<void> {
+  // Scope is accepted for interface compatibility and ignored: this is the play-chip ledger, which
+  // has no PLATFORM/LEAGUE wallet split to route between.
+  async buyIn(playerAccountId: string, amount: string, _scope?: WalletScope): Promise<void> {
     this.ledger.lock(playerAccountId, toChips(amount));
   }
 
-  async release(playerAccountId: string, amount: string): Promise<void> {
+  async release(playerAccountId: string, amount: string, _scope?: WalletScope): Promise<void> {
     this.ledger.unlock(playerAccountId, toChips(amount));
   }
 

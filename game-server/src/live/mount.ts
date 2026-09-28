@@ -5,7 +5,7 @@ import { TableHub, type TokenVerifier } from './table-hub';
 import type { GameSocketServerConfig } from '../transport/ws-server';
 import { ChipDenominatedFc } from './fc-chip-adapter';
 import { FcPlayerDirectory } from './fc-directory';
-import { HttpFinancialCoreClient, type FinancialCoreClient } from '../core/financial-core-client';
+import { HttpFinancialCoreClient, type FinancialCoreClient, type WalletScope } from '../core/financial-core-client';
 import { chainClientFromEnv } from '../fairness/chain-from-env';
 import { MerkleRoundNotary, type RoundNotary } from '../fairness/round-notary';
 import type { LiveRoom } from './live-room';
@@ -140,7 +140,11 @@ export function mountLiveTables(app: Express, opts: MountLiveOptions): MountedLi
   });
 
   /** Your buy-in budget, in chips. Identity comes from the token the Mini App already holds; in
-   *  real-money mode this is a fresh read of the Financial Core available balance. */
+   *  real-money mode this is a fresh read of the Financial Core available balance.
+   *
+   *  `?tableId=` is optional and, when given, selects the wallet scope: a LEAGUE table's budget is
+   *  that league's wallet, not the platform one, or the figure shown means nothing to the buy-in
+   *  it is meant to guide. Absent/unknown/non-poker table id reads the platform wallet, as before. */
   app.get('/api/live/chips', (req: Request, res: Response): void => {
     const header = req.headers.authorization;
     if (!header?.startsWith('Bearer ')) {
@@ -154,8 +158,13 @@ export function mountLiveTables(app: Express, opts: MountLiveOptions): MountedLi
       res.status(401).json({ error: 'invalid token' });
       return;
     }
+    const tableId = typeof req.query.tableId === 'string' ? req.query.tableId : undefined;
+    const room = tableId ? hub.room(tableId) : undefined;
+    // Same duck-typing as anchorTableRules above: only PokerRoom carries a wallet scope, and this
+    // route has no business knowing about poker specifically.
+    const scope = (room as { walletScope?: () => WalletScope } | undefined)?.walletScope?.();
     const available = fcDirectory
-      ? fcDirectory.availableChips(playerId)
+      ? fcDirectory.availableChips(playerId, scope)
       : Promise.resolve(devPlayers!.ensure(playerId).available);
     available
       .then((chips) => res.json({ playerId, available: chips }))

@@ -61,11 +61,22 @@ export interface TableSettlementRequest {
   jackpotAccounts: JackpotAccounts;
 }
 
+/**
+ * Which wallet a buy-in/release should lock or unlock. Mirrors the (tableType, leagueId) scope
+ * settlement already resolves server-side (FC routes.ts `playerScope`) — a league table's chips must
+ * lock and release the SAME account settlement pays from, or a league hand settles an account that
+ * was never actually locked. Absent/`'PLATFORM'` is the platform wallet, unchanged from today.
+ */
+export interface WalletScope {
+  tableType: 'PLATFORM' | 'LEAGUE';
+  leagueId?: string;
+}
+
 export interface FinancialCoreClient {
   /** Lock a player's buy-in at a table (available → locked). */
-  buyIn(playerAccountId: string, amount: string): Promise<void>;
+  buyIn(playerAccountId: string, amount: string, scope?: WalletScope): Promise<void>;
   /** Release a player's stack on leaving (locked → available). */
-  release(playerAccountId: string, amount: string): Promise<void>;
+  release(playerAccountId: string, amount: string, scope?: WalletScope): Promise<void>;
   /** Settle a finished hand (jackpot inject → rake). Idempotent on roundId. */
   settleRound(req: SettleRoundRequest): Promise<SettlementReceipt>;
   /** Settle a full multi-party table hand (losers/winners/rake/jackpot). Idempotent on roundId. */
@@ -118,6 +129,11 @@ export interface JackpotPayoutRequest {
   roundId: string;
 }
 
+/** Build the wire fields for a wallet scope — `{}` when absent, so an unscoped call is byte-identical
+ *  to today's request and defaults to PLATFORM exactly as FC's routes already do. */
+const scopeFields = (s?: WalletScope): { tableType?: 'PLATFORM' | 'LEAGUE'; leagueId?: string } =>
+  s ? { tableType: s.tableType, ...(s.leagueId ? { leagueId: s.leagueId } : {}) } : {};
+
 export class FinancialCoreError extends Error {
   constructor(
     public readonly status: number,
@@ -159,12 +175,12 @@ export class HttpFinancialCoreClient implements FinancialCoreClient {
     return (await res.json()) as T;
   }
 
-  async buyIn(playerAccountId: string, amount: string): Promise<void> {
-    await this.post('/internal/buy-ins', { playerAccountId, amount });
+  async buyIn(playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> {
+    await this.post('/internal/buy-ins', { playerAccountId, amount, ...scopeFields(scope) });
   }
 
-  async release(playerAccountId: string, amount: string): Promise<void> {
-    await this.post('/internal/releases', { playerAccountId, amount });
+  async release(playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> {
+    await this.post('/internal/releases', { playerAccountId, amount, ...scopeFields(scope) });
   }
 
   async settleRound(req: SettleRoundRequest): Promise<SettlementReceipt> {

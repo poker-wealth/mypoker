@@ -1256,12 +1256,20 @@ export function buildRouter(): Router {
   // (service-secret) — unlike /me/balance it is not JWT-scoped, because the caller is the table
   // service acting on a token it already verified. Creates a zero account on first sight, so a
   // brand-new player reads ₮0 rather than 404.
+  //
+  // tableType/leagueId select the scope, same as /internal/buy-ins — a LEAGUE caller reads that
+  // league's wallet, not the platform one, or the balance shown means nothing to the table using it.
+  const balanceQuery = z.object({
+    tableType: z.nativeEnum(TableType).optional(),
+    leagueId: z.string().min(1).optional(),
+  });
   r.get(
     '/internal/accounts/:id/balance',
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
       const id = accountId.parse(req.params.id);
-      const acc = await getOrCreatePlayerAccount(id);
+      const { tableType, leagueId } = balanceQuery.parse(req.query);
+      const acc = await getOrCreatePlayerAccount(id, playerScope(tableType, leagueId));
       res.json({
         accountId: id,
         available: Money.fromDecimal128(acc.availableBalance).toString(),
