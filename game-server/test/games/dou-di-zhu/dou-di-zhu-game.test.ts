@@ -139,7 +139,7 @@ describe('DouDiZhuGame — settlement & roundId counter', () => {
 
     expect(g.getWinner()).toBe('p0');
     expect(capturedReq).toBeDefined();
-    expect(capturedReq.roundId).toBe('ddz-table-d1');
+    expect(capturedReq.roundId).toMatch(/^ddz-table-d1-[0-9a-f]{8}$/);
 
     // Hand 2 counter increment check
     await g.start(players);
@@ -155,7 +155,7 @@ describe('DouDiZhuGame — settlement & roundId counter', () => {
         await g.pass('p2');
       }
     }
-    expect(capturedReq.roundId).toBe('ddz-table-d2');
+    expect(capturedReq.roundId).toMatch(/^ddz-table-d2-[0-9a-f]{8}$/);
 
     // Conservation check
     const paidIn = capturedReq.losers.reduce((a: number, l: any) => a + Number(l.amount), 0);

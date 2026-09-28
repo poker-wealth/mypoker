@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { settleNet, toTableSettlementRequest } from '../games/texas/settlement';
 import { BaseLiveRoom, RoomError, tableJackpotAccounts, type BaseRoomSeat } from './base-room';
 import type { LiveTableConfig, RoomDeps } from './live-room';
@@ -233,7 +234,10 @@ export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSea
     if (netByUser.size > 0) {
       const settlement = settleNet(netByUser, { rakeBps: rakeOf(this.config) });
       const request = toTableSettlementRequest(settlement, {
-        roundId: `${this.config.id}-tc-${this.handNumber}`,
+        // The suffix is not cosmetic: FC treats a repeated roundId as a settlement replay (idempotency
+        // key) and returns applied:false without moving money. handNumber alone repeats across room
+        // instances sharing a config.id, so a random component is load-bearing here.
+        roundId: `${this.config.id}-tc-${this.handNumber}-${randomUUID().slice(0, 8)}`,
         gameId: 'texas-cowboy',
         tableType: 'PLATFORM',
         accountOf: (playerId) => playerId,

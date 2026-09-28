@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { SlotsProvider } from '../games/slots/slots-provider';
 import { ThirdPartyAdapter } from '../games/third-party/adapter';
 import { BaseLiveRoom, RoomError, tableJackpotAccounts, type BaseRoomSeat } from './base-room';
@@ -75,7 +76,10 @@ export class SlotsRoom extends BaseLiveRoom<SlotsRoomConfig, RoomSeat> {
     if (wager <= 0 || wager > seat.stack) throw new RoomError('invalid wager amount');
 
     this.handNumber++;
-    const roundId = `${this.config.id}-spin-${this.handNumber}`;
+    // The suffix is not cosmetic: FC treats a repeated roundId as a settlement replay (idempotency
+    // key) and returns applied:false without moving money. handNumber alone repeats across room
+    // instances sharing a config.id, so a random component is load-bearing here.
+    const roundId = `${this.config.id}-spin-${this.handNumber}-${randomUUID().slice(0, 8)}`;
 
     const receipt = await this.adapter.play(playerId, roundId, wager);
 

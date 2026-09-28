@@ -220,6 +220,11 @@ export class HttpFinancialCoreClient implements FinancialCoreClient {
       req,
     );
 
+    if (!result.applied) {
+      // game-server never retries a settlement, so a replay can only mean a reused round id.
+      throw new FinancialCoreError(409, `settlement for ${req.roundId} was already applied — round id reused`);
+    }
+
     // Both AFTER the money has settled and only if it did. Recording volume or
     // announcing a win for a hand that failed to settle would report something
     // that did not happen.

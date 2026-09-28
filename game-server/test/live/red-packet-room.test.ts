@@ -3,6 +3,35 @@ import { DevPlayers } from '../../src/live/players';
 import { RedPacketRoom } from '../../src/live/red-packet-room';
 import { TableHub } from '../../src/live/table-hub';
 import { defaultTables } from '../../src/live/server';
+import type {
+  FinancialCoreClient,
+  TableSettlementRequest,
+} from '../../src/core/financial-core-client';
+
+/** Captures the roundId of every settleTableHand call, without regard to whether it was applied. */
+function recordingFc(): { fc: FinancialCoreClient; roundIds: string[] } {
+  const roundIds: string[] = [];
+  return {
+    roundIds,
+    fc: {
+      async buyIn() {},
+      async release() {},
+      async settleRound(req) {
+        return {
+          roundId: req.roundId,
+          sequence: [],
+          amounts: { jackpot: '0', rake: '0', payout: '0' },
+          accounts: {},
+          hash: '',
+        };
+      },
+      async settleTableHand(req: TableSettlementRequest) {
+        roundIds.push(req.roundId);
+        return { roundId: req.roundId, applied: true };
+      },
+    },
+  };
+}
 
 /**
  * RED PACKET — the room-level conservation test the table never had (ESTHER_V2 task 2).
@@ -127,6 +156,57 @@ describe('RedPacketRoom — Live Room Integration', () => {
       await until(() => room.snapshotFor(ids[0]!).phase === 'SHOWDOWN', 10_000);
       expect(players.totalChips() + bank.sinkTotal()).toBe(startingTotal);
     }
+
+    room.dispose();
+  }, 30_000);
+
+  // BUG-01: the room builds a fresh RedPacketGame every round with the SAME config.id as roomId.
+  // Before the fix that made FC's per-round roundId collide across rounds — a repeat FC treats as an
+  // already-applied settlement (idempotency key), replaying chips silently instead of moving new ones.
+  it('sends a different roundId to FC on each of two consecutive rounds', async () => {
+    const players = new DevPlayers({ startingChips: 50_000 });
+    const { fc, roundIds } = recordingFc();
+    const ids = [players.create('A').id, players.create('B').id, players.create('C').id];
+
+    const room = new RedPacketRoom(
+      {
+        id: 'red-packet-roundid',
+        name: 'Test Red Packet',
+        game: 'red-packet',
+        size: 25,
+        mineCount: 5,
+        minBuyIn: 1_000,
+        maxBuyIn: 50_000,
+        maxSeats: 8,
+        rakeBps: 500,
+        bettingTimeMs: 5_000,
+        showdownDelayMs: 20,
+      },
+      { directory: players, fc },
+    );
+
+    for (const [i, id] of ids.entries()) {
+      await room.command(id, { kind: 'sit', seat: i, buyIn: BUY_IN });
+    }
+
+    for (let round = 0; round < 2; round++) {
+      const target = round + 1;
+      await until(() => {
+        const s = room.snapshotFor(ids[0]!);
+        return s.handNumber === target && s.phase === 'IN_HAND';
+      }, 10_000);
+
+      const banker = room.snapshotFor(ids[0]!).seats.find((s) => s.isDealer)?.playerId;
+      for (const [i, id] of ids.entries()) {
+        if (id === banker) continue;
+        await room.command(id, { kind: 'act', action: { type: String(i + 3), amount: 100 } });
+      }
+
+      await until(() => room.snapshotFor(ids[0]!).phase === 'SHOWDOWN', 10_000);
+    }
+
+    expect(roundIds).toHaveLength(2);
+    expect(roundIds[0]).not.toBe(roundIds[1]);
 
     room.dispose();
   }, 30_000);

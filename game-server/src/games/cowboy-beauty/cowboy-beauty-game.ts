@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { BaseGame, InvalidActionError } from '../../core/base-game';
 import { EventBus } from '../../core/event-bus';
 import type { FinancialCoreClient, JackpotAccounts } from '../../core/financial-core-client';
@@ -90,7 +91,9 @@ export class CowboyBeautyGame extends BaseGame<CowboyPhase, CowboyAction, Cowboy
     });
     this.cfg = cfg;
     this.chain = chain;
-    this.roundId = `${roomId}-cb`;
+    // Many rooms build a new CowboyBeautyGame per round with the same roomId, so the roomId alone is
+    // not enough to keep FC's settlement idempotency key (roundId) unique — a random suffix is.
+    this.roundId = `${roomId}-cb-${randomUUID()}`;
   }
 
   placeBet(playerId: string, side: Side, amount: number): void {

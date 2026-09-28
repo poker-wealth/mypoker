@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { BaseGame, InvalidActionError } from '../../core/base-game';
 import { EventBus } from '../../core/event-bus';
 import type { FinancialCoreClient, JackpotAccounts } from '../../core/financial-core-client';
@@ -146,7 +147,10 @@ export class TexasGame extends BaseGame<TexasPhase, Action, TexasGameEvents> {
     if (this.table.length < this.minPlayers) throw new InvalidActionError('not enough players');
     if (!this.sm.is('WAITING')) throw new InvalidActionError('a hand is already in progress');
 
-    const roundId = `${this.roomId}-h${++this.handCounter}`;
+    // The suffix is not cosmetic: FC treats a repeated roundId as a settlement replay (idempotency
+    // key) and returns applied:false without moving money. The in-memory counter alone repeats
+    // across instances sharing a roomId, so a random component is load-bearing here.
+    const roundId = `${this.roomId}-h${++this.handCounter}-${randomUUID().slice(0, 8)}`;
     const { serverSeed, serverCommit } = generateServerCommitment();
     // A player's supplied seed is their entropy; only if they gave none does the server generate one.
     const seats: SeatedClientSeed[] = this.table.map((seat, i) => ({

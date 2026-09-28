@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { BaseGame, InvalidActionError } from '../../core/base-game';
 import { EventBus } from '../../core/event-bus';
 import type { FinancialCoreClient, JackpotAccounts } from '../../core/financial-core-client';
@@ -100,7 +101,9 @@ export class LotteryGame extends BaseGame<LotteryPhase, LotteryAction, LotteryGa
     super(roomId, fc, events, { initial: 'OPEN', transitions: { OPEN: ['DRAWN'], DRAWN: [] } });
     this.cfg = cfg;
     this.chain = chain;
-    this.roundId = `${roomId}-lot`;
+    // Many rooms build a new LotteryGame per round with the same roomId, so the roomId alone is not
+    // enough to keep FC's settlement idempotency key (roundId) unique — a random suffix is.
+    this.roundId = `${roomId}-lot-${randomUUID()}`;
   }
 
   buyTicket(playerId: string, num: number, amount: number): void {

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { BaseGame, InvalidActionError } from '../../core/base-game';
 import { EventBus } from '../../core/event-bus';
 import type { FinancialCoreClient, JackpotAccounts } from '../../core/financial-core-client';
@@ -128,7 +129,9 @@ export class RedEnvelopeGame extends BaseGame<
     }
 
     this.cfg = cfg;
-    this.roundId = `${roomId}-re`;
+    // Many rooms build a new RedEnvelopeGame per round with the same roomId, so the roomId alone is
+    // not enough to keep FC's settlement idempotency key (roundId) unique — a random suffix is.
+    this.roundId = `${roomId}-re-${randomUUID()}`;
     // Split fixed and committed at construction — BEFORE any claim.
     this.serverSeed = cfg.serverSeed ?? generateServerCommitment().serverSeed;
     this.commit = splitCommit(this.serverSeed);

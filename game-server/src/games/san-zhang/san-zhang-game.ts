@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { BaseGame, InvalidActionError } from '../../core/base-game';
 import { EventBus } from '../../core/event-bus';
 import type { FinancialCoreClient, JackpotAccounts } from '../../core/financial-core-client';
@@ -99,7 +100,10 @@ export class SanZhangGame extends BaseGame<SanZhangPhase, SanZhangAction, SanZha
     if (!this.banker) throw new InvalidActionError('no banker designated');
     if (this.bets.size === 0) throw new InvalidActionError('no bets placed');
 
-    this.roundId = `${this.roomId}-s${++this.handCounter}`;
+    // The suffix is not cosmetic: FC treats a repeated roundId as a settlement replay (idempotency
+    // key) and returns applied:false without moving money. The in-memory counter alone repeats
+    // across instances sharing a roomId, so a random component is load-bearing here.
+    this.roundId = `${this.roomId}-s${++this.handCounter}-${randomUUID().slice(0, 8)}`;
     const participants = [this.banker, ...this.bets.keys()];
     const { serverSeed } = generateServerCommitment();
     const seats: SeatedClientSeed[] = participants.map((_, i) => ({

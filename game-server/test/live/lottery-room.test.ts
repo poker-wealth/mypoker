@@ -3,6 +3,35 @@ import { DevPlayers } from '../../src/live/players';
 import { LotteryRoom } from '../../src/live/lottery-room';
 import { TableHub } from '../../src/live/table-hub';
 import { defaultTables } from '../../src/live/server';
+import type {
+  FinancialCoreClient,
+  TableSettlementRequest,
+} from '../../src/core/financial-core-client';
+
+/** Captures the roundId of every settleTableHand call, without regard to whether it was applied. */
+function recordingFc(): { fc: FinancialCoreClient; roundIds: string[] } {
+  const roundIds: string[] = [];
+  return {
+    roundIds,
+    fc: {
+      async buyIn() {},
+      async release() {},
+      async settleRound(req) {
+        return {
+          roundId: req.roundId,
+          sequence: [],
+          amounts: { jackpot: '0', rake: '0', payout: '0' },
+          accounts: {},
+          hash: '',
+        };
+      },
+      async settleTableHand(req: TableSettlementRequest) {
+        roundIds.push(req.roundId);
+        return { roundId: req.roundId, applied: true };
+      },
+    },
+  };
+}
 
 const BUY_IN = 2_000;
 
@@ -75,4 +104,51 @@ describe('LotteryRoom — Live Room Integration', () => {
 
     room.dispose();
   }, 15_000);
+
+  // BUG-01: `maybeStartRound` builds a fresh LotteryGame every round with the SAME config.id as
+  // roomId. Before the fix that made FC's per-round roundId collide across rounds, not just across
+  // room instances — a repeat FC treats as an already-applied settlement (idempotency key), replaying
+  // chips silently instead of moving new ones.
+  it('sends a different roundId to FC on each of two consecutive rounds', async () => {
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const { fc, roundIds } = recordingFc();
+    const alice = players.create('Alice').id;
+    const bob = players.create('Bob').id;
+
+    const room = new LotteryRoom(
+      {
+        id: 'lottery-roundid',
+        name: 'Test Lottery',
+        game: 'lottery',
+        // range: 2 with one ticket on each number guarantees exactly one winner and one loser every
+        // draw — never a void round — so settleTableHand fires deterministically each time.
+        range: 2,
+        minBuyIn: 1_000,
+        maxBuyIn: 50_000,
+        maxSeats: 6,
+        rakeBps: 500,
+        bettingTimeMs: 5_000,
+        showdownDelayMs: 20,
+      },
+      { directory: players, fc },
+    );
+
+    for (let round = 0; round < 2; round++) {
+      const target = round + 1;
+      await until(() => {
+        const s = room.snapshotFor(alice);
+        return s.handNumber === target && s.phase === 'IN_HAND';
+      }, 10_000);
+
+      await room.command(alice, { kind: 'act', action: { type: '0', amount: 100 } });
+      await room.command(bob, { kind: 'act', action: { type: '1', amount: 100 } });
+
+      await until(() => room.snapshotFor(alice).phase === 'SHOWDOWN', 10_000);
+    }
+
+    expect(roundIds).toHaveLength(2);
+    expect(roundIds[0]).not.toBe(roundIds[1]);
+
+    room.dispose();
+  }, 20_000);
 });

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { BaseGame, InvalidActionError } from '../../core/base-game';
 import { EventBus } from '../../core/event-bus';
 import type { FinancialCoreClient, JackpotAccounts } from '../../core/financial-core-client';
@@ -127,7 +128,10 @@ export class DouDiZhuGame extends BaseGame<DdzPhase, DdzAction, DdzGameEvents> {
       this.sm.transition('BIDDING');
     }
     this.players = [...players];
-    this.roundId = `${this.roomId}-d${++this.handCounter}`;
+    // The suffix is not cosmetic: FC treats a repeated roundId as a settlement replay (idempotency
+    // key) and returns applied:false without moving money. The in-memory counter alone repeats
+    // across instances sharing a roomId, so a random component is load-bearing here.
+    this.roundId = `${this.roomId}-d${++this.handCounter}-${randomUUID().slice(0, 8)}`;
     this.winner = undefined;
     this.current = undefined;
     this.passes = 0;

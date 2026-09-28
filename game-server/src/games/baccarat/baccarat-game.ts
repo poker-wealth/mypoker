@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { BaseGame, InvalidActionError } from '../../core/base-game';
 import { EventBus } from '../../core/event-bus';
 import type { FinancialCoreClient, JackpotAccounts } from '../../core/financial-core-client';
@@ -123,7 +124,10 @@ export class BaccaratGame extends BaseGame<BaccaratPhase, BaccaratAction, Baccar
     if (!this.banker) throw new InvalidActionError('no banker designated');
     if (this.bets.size === 0) throw new InvalidActionError('no bets placed');
 
-    this.roundId = `${this.roomId}-b${++this.handCounter}`;
+    // The suffix is not cosmetic: FC treats a repeated roundId as a settlement replay (idempotency
+    // key) and returns applied:false without moving money. The in-memory counter alone repeats
+    // across instances sharing a roomId, so a random component is load-bearing here.
+    this.roundId = `${this.roomId}-b${++this.handCounter}-${randomUUID().slice(0, 8)}`;
     const { serverSeed } = generateServerCommitment();
     const seats: SeatedClientSeed[] = [...this.bets.keys()].map((_, i) => ({
       seatOrder: i,
