@@ -8,7 +8,7 @@ import type {
   TableSettlementRequest,
   WalletScope,
 } from '../core/financial-core-client';
-import { chipsToUsdt } from './chip-currency';
+import { chipsToUsdt, usdtToChips } from './chip-currency';
 
 /**
  * Wraps a real `FinancialCoreClient` so the room keeps speaking chips while the ledger receives USDT.
@@ -28,6 +28,14 @@ export class ChipDenominatedFc implements FinancialCoreClient {
 
   release(playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> {
     return this.inner.release(playerAccountId, chipsToUsdt(amount), scope);
+  }
+
+  async lockedBalance(playerAccountId: string, scope?: WalletScope): Promise<string> {
+    if (!this.inner.lockedBalance) return '0';
+    const usdt = await this.inner.lockedBalance(playerAccountId, scope);
+    // The inner client (the real ledger) speaks USDT; the room speaks chips — convert at this same
+    // boundary every other amount crosses, just in the read direction.
+    return String(usdtToChips(usdt));
   }
 
   settleRound(req: SettleRoundRequest): Promise<SettlementReceipt> {

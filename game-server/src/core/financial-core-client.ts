@@ -77,6 +77,13 @@ export interface FinancialCoreClient {
   buyIn(playerAccountId: string, amount: string, scope?: WalletScope): Promise<void>;
   /** Release a player's stack on leaving (locked → available). */
   release(playerAccountId: string, amount: string, scope?: WalletScope): Promise<void>;
+  /**
+   * An account's currently locked balance — what it already has buy-in'd/reserved. A provider-vendor
+   * float (slots-room, BUG-10 follow-up) reads this to top itself up to a target rather than locking
+   * a fresh float on every boot, which otherwise only grows and eventually 409s. Optional so demo/test
+   * fakes need not implement it — a caller without it treats "locked" as unknown, never as zero.
+   */
+  lockedBalance?(playerAccountId: string, scope?: WalletScope): Promise<string>;
   /** Settle a finished hand (jackpot inject → rake). Idempotent on roundId. */
   settleRound(req: SettleRoundRequest): Promise<SettlementReceipt>;
   /** Settle a full multi-party table hand (losers/winners/rake/jackpot). Idempotent on roundId. */
@@ -187,6 +194,21 @@ export class HttpFinancialCoreClient implements FinancialCoreClient {
 
   async release(playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> {
     await this.post('/internal/releases', { playerAccountId, amount, ...scopeFields(scope) });
+  }
+
+  async lockedBalance(playerAccountId: string, scope?: WalletScope): Promise<string> {
+    const params = new URLSearchParams(scopeFields(scope) as Record<string, string>);
+    const qs = params.toString();
+    const res = await this.doFetch(
+      `${this.baseUrl}/internal/accounts/${encodeURIComponent(playerAccountId)}/balance${qs ? `?${qs}` : ''}`,
+      { headers: { 'x-internal-secret': this.secret } },
+    );
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new FinancialCoreError(res.status, detail);
+    }
+    const body = (await res.json()) as { locked: string };
+    return body.locked;
   }
 
   async settleRound(req: SettleRoundRequest): Promise<SettlementReceipt> {

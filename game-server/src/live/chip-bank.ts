@@ -39,6 +39,11 @@ export class ChipBank implements FinancialCoreClient {
     this.ledger.unlock(playerAccountId, toChips(amount));
   }
 
+  // Play-chip ledger, so no USDT conversion — same chip units in and out, mirroring buyIn/release.
+  async lockedBalance(playerAccountId: string, _scope?: WalletScope): Promise<string> {
+    return String(this.ledger.locked(playerAccountId));
+  }
+
   async settleTableHand(req: TableSettlementRequest): Promise<{ roundId: string; applied: boolean }> {
     if (this.settled.has(req.roundId)) return { roundId: req.roundId, applied: false };
 

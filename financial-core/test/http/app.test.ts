@@ -153,6 +153,36 @@ describe('Financial Core HTTP API (/api/v1)', () => {
     expect(res.status).toBe(409);
   });
 
+  /**
+   * `GET /internal/accounts/:id/balance` already reports `locked` alongside `available` — game-server
+   * callers (slots-room's vendor float top-up, BUG-10 follow-up) read it via
+   * `FinancialCoreClient.lockedBalance`. This pins the field in place so a future change to the route
+   * cannot silently drop it out from under that caller.
+   */
+  it('GET /internal/accounts/:id/balance reports available, locked and clearing', async () => {
+    await post(
+      '/internal/deposits',
+      {
+        playerId: 'p-balance',
+        amount: '500',
+        txHash: 'tx-balance-1',
+        contractAddress: OFFICIAL_USDT_TRC20_CONTRACT,
+        confirmations: 20,
+      },
+      internal,
+    );
+    await post('/internal/buy-ins', { playerAccountId: 'p-balance', amount: '200' }, internal);
+
+    const res = await fetch(url('/internal/accounts/p-balance/balance'), { headers: internal });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      accountId: 'p-balance',
+      available: '300.000000',
+      locked: '200.000000',
+      clearing: '0.000000',
+    });
+  });
+
   it('runs the internal settlement endpoint', async () => {
     // Fund a winner account directly, create treasury + jackpot pools, then settle. The settlement
     // route resolves the winner by playerId (owner_id) → account, so the body passes 'w', not the _id.

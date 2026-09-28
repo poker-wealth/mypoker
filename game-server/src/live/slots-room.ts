@@ -20,31 +20,51 @@ interface RoomSeat extends BaseRoomSeat {
   reels?: string[] | undefined;
 }
 
+/**
+ * The vendor float this room tries to keep the vendor account holding. Chosen so a full-cap payout
+ * (maxPayoutMultiple × a table-sized wager) can be paid without the vendor going into overdraft.
+ */
+const VENDOR_FLOAT = 10_000;
+
+/** A round may never pay more than wager × this. Shared with the exposure cap below it funds. */
+const MAX_PAYOUT_MULTIPLE = 100;
+
 export class SlotsRoom extends BaseLiveRoom<SlotsRoomConfig, RoomSeat> {
   private readonly adapter: ThirdPartyAdapter;
   /** Kept so the jackpot can draw on the seed a spin was actually generated from. */
   private readonly provider: SlotsProvider;
+  private readonly vendorId: string;
   /**
-   * Whether the vendor account's float actually funded. Against the real FC the vendor PLAYER
-   * account starts at 0, and a 409 from `buyIn` used to be swallowed silently — a winning spin
-   * would then fail because the vendor could not pay it out, while a losing spin settled into the
-   * vendor account as if nothing were wrong. Spins are refused until this is true.
+   * Whether the vendor account's float actually funded at least once. Against the real FC the
+   * vendor PLAYER account starts at 0, and a 409 from `buyIn` used to be swallowed silently — a
+   * winning spin would then fail because the vendor could not pay it out, while a losing spin
+   * settled into the vendor account as if nothing were wrong. Spins are refused until this is true.
    */
   private vendorFunded = false;
+  /**
+   * The vendor's locked chips as this room last knew them — what it can actually pay out. Drops by
+   * a spin's net win, rises when `ensureVendorFunded` tops it back up. Checked before every spin so
+   * a payout the vendor cannot cover is refused up front rather than failing at FC after the
+   * provider has already produced a signed win.
+   */
+  private vendorFloat = 0;
+  /** Single-flight guard: at most one funding attempt (initial or top-up) in the air at a time. */
+  private funding: Promise<void> | null = null;
 
   constructor(config: SlotsRoomConfig, deps: RoomDeps) {
     super(config, deps);
     this.requireNumbers('commissionBps');
 
-    const vendorId = `acc-slots-vendor:${config.id}`;
-    this.directory.ensure?.(vendorId, { displayName: 'Slots Vendor' });
-    (this.directory as any).topUp?.(vendorId, 100_000);
-    void this.fc
-      .buyIn(vendorId, '10000')
-      .then(() => {
-        this.vendorFunded = true;
-      })
-      .catch((err) => console.error(`[room ${config.id}] slots vendor float not funded — spins refused:`, err));
+    this.vendorId = `acc-slots-vendor:${config.id}`;
+    this.directory.ensure?.(this.vendorId, { displayName: 'Slots Vendor' });
+    (this.directory as any).topUp?.(this.vendorId, 100_000);
+    // Fire-and-forget at boot so the room does not block startup on FC being reachable — but a
+    // failure here used to be the end of it (vendorFunded stayed false forever, even once FC came
+    // back). `ensureVendorFunded` resets its single-flight lock on rejection, so the first spin
+    // after a failed boot attempt retries rather than finding a permanently unfunded room.
+    void this.ensureVendorFunded().catch(() => {
+      // Already logged inside ensureVendorFunded — this catch only stops an unhandled rejection.
+    });
 
     const secret = config.secret ?? process.env.SLOTS_PROVIDER_SECRET ?? 'slots-live-secret';
     const provider = new SlotsProvider(secret);
@@ -53,13 +73,53 @@ export class SlotsRoom extends BaseLiveRoom<SlotsRoomConfig, RoomSeat> {
     this.adapter = new ThirdPartyAdapter(this.fc, {
       provider,
       secret,
-      providerAccountId: vendorId,
-      maxPayoutMultiple: 100,
+      providerAccountId: this.vendorId,
+      maxPayoutMultiple: MAX_PAYOUT_MULTIPLE,
       commissionBps: config.commissionBps,
       tableType: 'PLATFORM',
       accountOf: (p) => p,
       jackpotAccounts: tableJackpotAccounts(config.id),
     });
+  }
+
+  /**
+   * Make sure the vendor holds at least `VENDOR_FLOAT` in locked chips, topping up rather than
+   * locking a fresh float every time: an unconditional `buyIn(VENDOR_FLOAT)` on every boot or retry
+   * only ever grows what is locked, and nothing ever releases it, so eventually the vendor's
+   * available balance runs out and every future boot 409s forever.
+   *
+   * Single-flight: concurrent callers (boot + an early spin) share the one funding attempt in
+   * flight. A rejection clears the lock so the very next call starts a fresh attempt — that is the
+   * retry. Once funded, a call is a no-op UNLESS `vendorFloat` has since dropped below the float
+   * (a win paid out since the last top-up), in which case it tops back up.
+   */
+  private ensureVendorFunded(): Promise<void> {
+    if (this.vendorFunded && this.vendorFloat >= VENDOR_FLOAT) return Promise.resolve();
+    if (!this.funding) {
+      this.funding = this.fundVendor()
+        .then(() => {
+          this.funding = null;
+        })
+        .catch((err) => {
+          this.funding = null;
+          console.error(`[room ${this.config.id}] slots vendor float not funded — spins refused:`, err);
+          throw err;
+        });
+    }
+    return this.funding;
+  }
+
+  private async fundVendor(): Promise<void> {
+    let locked = 0;
+    if (this.fc.lockedBalance) {
+      locked = Number(await this.fc.lockedBalance(this.vendorId));
+    }
+    const need = VENDOR_FLOAT - locked;
+    if (need > 0) {
+      await this.fc.buyIn(this.vendorId, String(need));
+    }
+    this.vendorFloat = Math.max(locked, VENDOR_FLOAT);
+    this.vendorFunded = true;
   }
 
   protected createSeatRecord(
@@ -81,12 +141,26 @@ export class SlotsRoom extends BaseLiveRoom<SlotsRoomConfig, RoomSeat> {
   }
 
   protected async handleAct(playerId: string, action: { type: string; amount?: number }): Promise<void> {
-    if (!this.vendorFunded) throw new RoomError('slots are unavailable — vendor float not funded');
+    try {
+      await this.ensureVendorFunded();
+    } catch {
+      throw new RoomError('slots are unavailable — vendor float not funded');
+    }
     const seat = this.seatOf(playerId);
     if (!seat) throw new RoomError('not seated');
 
     const wager = action.amount ?? 100;
     if (wager <= 0 || wager > seat.stack) throw new RoomError('invalid wager amount');
+
+    // The vendor's worst case on this spin is wager × (MAX_PAYOUT_MULTIPLE − 1) net (payout capped
+    // at wager × MAX_PAYOUT_MULTIPLE, minus the wager itself). Refuse up front rather than letting
+    // the provider produce a signed win the vendor cannot actually pay — that used to fail at
+    // settlement, after the round was already decided.
+    const worstCaseNet = wager * (MAX_PAYOUT_MULTIPLE - 1);
+    if (worstCaseNet > this.vendorFloat) {
+      const maxStake = Math.floor(this.vendorFloat / (MAX_PAYOUT_MULTIPLE - 1));
+      throw new RoomError(`wager too large for the vendor float — max stake is ${maxStake} chips`);
+    }
 
     this.handNumber++;
     // The suffix is not cosmetic: FC treats a repeated roundId as a settlement replay (idempotency
@@ -95,6 +169,10 @@ export class SlotsRoom extends BaseLiveRoom<SlotsRoomConfig, RoomSeat> {
     const roundId = `${this.config.id}-spin-${this.handNumber}-${randomUUID().slice(0, 8)}`;
 
     const receipt = await this.adapter.play(playerId, roundId, wager);
+    // The vendor's own account moves the opposite of the player's net — what the player wins, the
+    // vendor's float loses, and vice versa. Tracked locally so the next spin's cap check (above)
+    // and `ensureVendorFunded`'s top-up decision (below) don't need a round trip to FC every time.
+    this.vendorFloat -= receipt.net;
 
     const outcome = receipt.outcome as { reels?: string[] } | undefined;
     seat.reels = outcome?.reels;

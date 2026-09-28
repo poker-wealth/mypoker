@@ -102,3 +102,11 @@ Also update, or they will still point at the old host:
 ## Not in this pass (follow-ons)
 - Table server (live gameplay) — its own Heroku app, or fold the hub into the gateway (one origin for HTTP + WS). Recommended before players play.
 - Mainnet chain + real keys, 3-node — the W11 items.
+- **Slots vendor float.** Slots is player-vs-vendor, not player-vs-house: every payout is paid out
+  of the vendor account's own balance (`acc-slots-vendor:<tableId>` — `acc-slots-vendor:slots` for
+  the default `slots` table), and that account starts at $0 like any other player account. The room
+  locks up to a 10,000-chip ($100.00) float into it on its own, retrying if FC isn't reachable yet
+  and topping the float back up out of what it locks as spins settle — but it can only lock chips
+  that are actually sitting in the account's AVAILABLE balance. Until someone deposits at least
+  $100.00 into `acc-slots-vendor:slots` (the same deposit path a player uses), spins stay refused
+  (`RoomError: slots are unavailable — vendor float not funded`).
