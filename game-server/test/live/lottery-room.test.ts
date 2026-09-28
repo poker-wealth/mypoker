@@ -133,6 +133,9 @@ describe('LotteryRoom — Live Room Integration', () => {
       { directory: players, fc },
     );
 
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(bob, { kind: 'sit', seat: 1, buyIn: BUY_IN });
+
     for (let round = 0; round < 2; round++) {
       const target = round + 1;
       await until(() => {
