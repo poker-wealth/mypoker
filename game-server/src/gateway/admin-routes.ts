@@ -269,11 +269,18 @@ export function buildAdminRouter(config: GatewayConfig): Router {
     post('/internal/withdrawals/:id/approve', (req) => ({ approverId: actor(req) })),
   );
 
+  /**
+   * BUG-09 follow-up: `chainChecked` is forwarded straight through, never invented here. financial-core
+   * refuses to refund a withdrawal with an unresolved broadcast (`pendingTxId` set) unless the caller
+   * explicitly confirms they checked the chain — an admin ticking the confirm dialog in
+   * ReviewSheet/UnresolvedSend is the only source of that flag, never a default this layer supplies.
+   */
   r.post(
     '/withdrawals/:id/reject',
     post('/internal/withdrawals/:id/reject', (req) => ({
       rejectedBy: actor(req),
       reason: (req.body as { reason?: string }).reason,
+      chainChecked: (req.body as { chainChecked?: unknown }).chainChecked === true,
     })),
   );
 
@@ -282,9 +289,28 @@ export function buildAdminRouter(config: GatewayConfig): Router {
   // is the mechanical broadcast of a decision already made and audited. On a
   // missing hot-wallet key financial-core answers 500 and the withdrawal stays
   // APPROVED for a retry, which surfaces to the admin as a failed send.
+  //
+  // BUG-09: a failed BROADCAST (as opposed to a failed build/sign) does NOT roll the withdrawal back —
+  // it is ambiguous whether the tx is live, so financial-core keeps the hold and sets `pendingTxId`,
+  // surfacing here as a 409 (WithdrawalBroadcastPendingError) rather than a stranded balance. The queue
+  // then shows an "unresolved send" state (below) instead of the ordinary "Send on-chain" button.
   r.post(
     '/withdrawals/:id/send',
     post('/internal/withdrawals/:id/sign-broadcast', () => ({})),
+  );
+
+  /**
+   * BUG-09 follow-up (D4d): resolve an unresolved send. Same shape as financial-core's own
+   * `/internal/withdrawals/:id/broadcast` — an admin who has confirmed a `pendingTxId` landed on-chain
+   * (via the explorer link the queue shows) marks it sent with the txHash they read there. No actor in
+   * the body, same reasoning as `/send`: this records a decision already made by checking the chain,
+   * not a new authorization.
+   */
+  r.post(
+    '/withdrawals/:id/broadcast',
+    post('/internal/withdrawals/:id/broadcast', (req) => ({
+      txHash: (req.body as { txHash?: string }).txHash,
+    })),
   );
 
   /** Screen 4 — Leagues. */
@@ -1147,6 +1173,9 @@ interface QueuedWithdrawalShape {
   approvals: string[];
   cumulativeEffective: number;
   requestedAt: string;
+  /** BUG-09 follow-up: set while a broadcast is unresolved — see the `/withdrawals` route doc comment. */
+  pendingTxId?: string;
+  pendingTxExpiration?: string;
 }
 
 /** One player row as financial-core returns it, before this layer adds identity. */

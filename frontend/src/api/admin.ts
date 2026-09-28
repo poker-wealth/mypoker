@@ -354,6 +354,15 @@ export interface QueuedWithdrawal {
   vipTier: string;
   vipTitle: string;
   requestedAt: string;
+  /**
+   * BUG-09 follow-up: set while a broadcast was sent but its result is unknown — TronGrid may have
+   * accepted it and lost the response. While set, the transfer may already be live on-chain, so the
+   * screen must not offer an ordinary "Send on-chain" (that would risk a second real transfer) and
+   * "Reject" must not silently refund without the admin having checked the chain first.
+   */
+  pendingTxId?: string;
+  /** ISO timestamp — when the signed transaction behind pendingTxId expires on-chain. */
+  pendingTxExpiration?: string;
 }
 
 export const fetchWithdrawalQueue = (): Promise<{ withdrawals: QueuedWithdrawal[] }> =>
@@ -376,20 +385,46 @@ export interface WithdrawalApproval {
 export const approveWithdrawal = (id: string): Promise<WithdrawalApproval> =>
   api.post<WithdrawalApproval>(`/admin/withdrawals/${encodeURIComponent(id)}/approve`, {});
 
-export const rejectWithdrawal = (id: string, reason: string): Promise<{ state: string }> =>
-  api.post<{ state: string }>(`/admin/withdrawals/${encodeURIComponent(id)}/reject`, { reason });
+/**
+ * `chainChecked` is only ever `true` when the admin has explicitly confirmed, on the chain itself,
+ * that an unresolved send (`pendingTxId`) never landed or has expired — see UnresolvedSend in
+ * Withdrawals.tsx. Omitted (or false) for an ordinary reject, which is the common case and needs no
+ * chain-checking because there is nothing ambiguous to check.
+ */
+export const rejectWithdrawal = (
+  id: string,
+  reason: string,
+  chainChecked?: boolean,
+): Promise<{ state: string }> =>
+  api.post<{ state: string }>(`/admin/withdrawals/${encodeURIComponent(id)}/reject`, {
+    reason,
+    ...(chainChecked ? { chainChecked: true } : {}),
+  });
 
 /**
- * Take an APPROVED withdrawal on-chain: sign + broadcast the USDT transfer from
- * the hot wallet, moving it to BROADCASTING with a real tx hash. On any failure
- * the withdrawal rolls back (the clearing hold is released), so a failed send
- * never strands the player's money.
+ * Take an APPROVED withdrawal on-chain: sign + broadcast the USDT transfer from the hot wallet, moving
+ * it to BROADCASTING with a real tx hash.
+ *
+ * BUG-09: NOT "on any failure the withdrawal rolls back" — that was the bug. A build/sign failure
+ * (nothing ever reached the chain) does roll back. A BROADCAST failure is ambiguous — TronGrid may have
+ * accepted the transfer and lost the response — so it does NOT roll back: the hold stays, and the
+ * withdrawal comes back with `pendingTxId` set (see `QueuedWithdrawal`), which the queue then shows as
+ * an unresolved send rather than offering this action again.
  */
 export const sendWithdrawal = (id: string): Promise<{ state: string; txHash: string }> =>
   api.post<{ state: string; txHash: string }>(
     `/admin/withdrawals/${encodeURIComponent(id)}/send`,
     {},
   );
+
+/**
+ * Resolve an unresolved send: mark a withdrawal broadcast as confirmed-landed with the txHash the
+ * admin read off the chain explorer. Always called with `pendingTxId` as the txHash — this is not a
+ * general "set any tx hash" escape hatch, it is how an admin closes out the one send that is actually
+ * pending (the gateway/financial-core reject a mismatched hash).
+ */
+export const broadcastWithdrawal = (id: string, txHash: string): Promise<{ state: string }> =>
+  api.post<{ state: string }>(`/admin/withdrawals/${encodeURIComponent(id)}/broadcast`, { txHash });
 
 // ── Admins ───────────────────────────────────────────────────────────────────
 

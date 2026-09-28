@@ -32,6 +32,15 @@ export interface QueuedWithdrawal {
   /** For the VIP filter; the gateway turns it into a tier. */
   cumulativeEffective: number;
   requestedAt: string;
+  /**
+   * BUG-09 follow-up: the txID of a broadcast whose result is unknown — set just before the on-chain
+   * send, cleared once it's confirmed one way or the other. While set, the admin screen has to show
+   * "check the chain" rather than offer "Send on-chain" again, since a second send here would risk the
+   * double-pay the whole fix exists to prevent.
+   */
+  pendingTxId?: string;
+  /** When the signed transaction behind pendingTxId expires on-chain (ms epoch), ISO string. */
+  pendingTxExpiration?: string;
 }
 
 /**
@@ -73,6 +82,8 @@ export async function getWithdrawalQueue(limit = 200): Promise<QueuedWithdrawal[
         approvals: r.approvals ?? [],
         cumulativeEffective: volume.cumulativeEffective,
         requestedAt: r.createdAt.toISOString(),
+        ...(r.pendingTxId ? { pendingTxId: r.pendingTxId } : {}),
+        ...(r.pendingTxExpiration ? { pendingTxExpiration: r.pendingTxExpiration.toISOString() } : {}),
       };
     }),
   );

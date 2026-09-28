@@ -19,6 +19,7 @@ import {
   approveWithdrawal,
   rejectWithdrawal,
   sendWithdrawal,
+  broadcastWithdrawal,
   fetchAdmins,
   createAdmin,
   fetchUsers,
@@ -981,10 +982,17 @@ export function useWithdrawalActions() {
   return {
     approve: useMutation({ mutationFn: approveWithdrawal, onSuccess: after }),
     reject: useMutation({
-      mutationFn: ({ id, reason }: { id: string; reason: string }) => rejectWithdrawal(id, reason),
+      mutationFn: ({ id, reason, chainChecked }: { id: string; reason: string; chainChecked?: boolean }) =>
+        rejectWithdrawal(id, reason, chainChecked),
       onSuccess: after,
     }),
     // Sign + broadcast an APPROVED withdrawal on-chain.
     send: useMutation({ mutationFn: sendWithdrawal, onSuccess: after }),
+    // BUG-09 follow-up: resolve an unresolved send — mark it confirmed-landed with the pendingTxId the
+    // admin read off the chain explorer.
+    markSent: useMutation({
+      mutationFn: ({ id, txHash }: { id: string; txHash: string }) => broadcastWithdrawal(id, txHash),
+      onSuccess: after,
+    }),
   };
 }

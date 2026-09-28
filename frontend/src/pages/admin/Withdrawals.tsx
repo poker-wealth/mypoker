@@ -32,6 +32,16 @@ import type { QueuedWithdrawal } from '@/api/admin';
 /** The spec's threshold, mirrored for display only — the server decides. */
 const SECOND_APPROVAL_THRESHOLD = 10_000;
 
+/**
+ * The TRON explorer link for a broadcast tx (BUG-09 follow-up). There is no existing helper for this
+ * in the frontend — `lib/fairness.ts`'s `explorerUrl` covers Solana/Polygon notarization only, an
+ * unrelated chain — and no client-side signal of testnet vs. mainnet (that choice lives entirely in
+ * financial-core's env, server-side). Mainnet tronscan.org is used unconditionally; on a testnet
+ * deployment this link simply won't resolve, the same caveat every other hardcoded mainnet constant in
+ * this codebase already carries (e.g. financial-core's default USDT contract).
+ */
+const tronscanUrl = (txId: string): string => `https://tronscan.org/#/transaction/${txId}`;
+
 type Filter = 'all' | 'large' | 'awaiting-second' | 'approved';
 
 export function AdminWithdrawals() {
@@ -152,7 +162,12 @@ export function AdminWithdrawals() {
 }
 
 function StateBadge({ withdrawal }: { withdrawal: QueuedWithdrawal }) {
-  if (withdrawal.state === 'APPROVED') return <Badge tone="success">held</Badge>;
+  if (withdrawal.state === 'APPROVED') {
+    // An unresolved send needs to stand out from an ordinary held withdrawal — it is the one an
+    // operator is most likely to skip past, because "held" reads as routine and this is not.
+    if (withdrawal.pendingTxId) return <Badge tone="warn">unresolved send</Badge>;
+    return <Badge tone="success">held</Badge>;
+  }
   if (withdrawal.approvals.length > 0) return <Badge tone="warn">1 of 2</Badge>;
   return <Badge tone="neutral">pending</Badge>;
 }
@@ -171,9 +186,9 @@ function ReviewSheet({
   withdrawal: QueuedWithdrawal | null;
   onClose: () => void;
 }) {
-  const { approve, reject, send } = useWithdrawalActions();
+  const { approve, reject, send, markSent } = useWithdrawalActions();
   const { confirm, prompt, sheet: confirmSheet } = useConfirmSheet();
-  const busy = approve.isPending || reject.isPending || send.isPending;
+  const busy = approve.isPending || reject.isPending || send.isPending || markSent.isPending;
   if (!withdrawal) return null;
 
   const isLarge = Number(withdrawal.amount) > SECOND_APPROVAL_THRESHOLD;
@@ -245,6 +260,69 @@ function ReviewSheet({
       },
       onError: (e) => toast.error(e instanceof Error ? e.message : 'Send failed'),
     });
+  };
+
+  // BUG-09 follow-up: resolve an unresolved send. Both actions require the admin to have actually
+  // looked at the chain — the confirm dialogs say so explicitly rather than asking a generic "are you
+  // sure", because the two outcomes (mark sent vs. refuse) are opposite and getting the wrong one wrong
+  // is exactly the double-pay this whole feature exists to prevent.
+  const onMarkSent = async (txId: string): Promise<void> => {
+    const ok = await confirm({
+      title: 'Mark as sent',
+      confirmLabel: 'Confirm — it landed',
+      danger: true,
+      body: (
+        <>
+          Only confirm this if you have checked <span className="break-all font-mono">{txId}</span> on
+          a TRON explorer and it shows a SUCCESSFUL transfer of{' '}
+          <strong className="text-text">{moneyFromDecimal(withdrawal.amount)}</strong> to{' '}
+          <span className="break-all font-mono">{withdrawal.address}</span>.
+          <br />
+          <br />
+          This records the send as confirmed — it does not broadcast anything new.
+        </>
+      ),
+    });
+    if (!ok) return;
+
+    markSent.mutate(
+      { id: withdrawal.withdrawalId, txHash: txId },
+      {
+        onSuccess: () => {
+          toast.success('Recorded as sent.');
+          onClose();
+        },
+        onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+      },
+    );
+  };
+
+  const onRefuseAfterCheck = async (txId: string): Promise<void> => {
+    const reason = await prompt({
+      title: 'Refuse after checking chain',
+      body: (
+        <>
+          Only refuse if you have checked <span className="break-all font-mono">{txId}</span> on a TRON
+          explorer and confirmed it is ABSENT or EXPIRED — never on a hunch. Refunding a send that
+          actually landed pays the player twice.
+        </>
+      ),
+      confirmLabel: 'Refuse — it never landed',
+      danger: true,
+      withInput: { label: 'Reason', placeholder: 'e.g. checked tronscan, tx absent, expired', required: true },
+    });
+    if (!reason) return;
+
+    reject.mutate(
+      { id: withdrawal.withdrawalId, reason, chainChecked: true },
+      {
+        onSuccess: () => {
+          toast.success('Refused. The hold has been released.');
+          onClose();
+        },
+        onError: (e) => toast.error(e instanceof Error ? e.message : 'Failed'),
+      },
+    );
   };
 
   return (
@@ -328,7 +406,45 @@ function ReviewSheet({
           </div>
         )}
 
-        {withdrawal.state === 'APPROVED' && (
+        {withdrawal.state === 'APPROVED' && withdrawal.pendingTxId && (
+          // BUG-09 follow-up: a broadcast was sent but its result is unknown — it may already be live
+          // on-chain. "Send on-chain" is withheld entirely (a second real transfer is exactly the
+          // double-pay this fix exists to prevent); the two actions here both require the admin to have
+          // actually looked at the chain, not guessed.
+          <div className="space-y-2">
+            <div className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-[0.66rem] leading-relaxed text-danger">
+              Unresolved send — tx{' '}
+              <a
+                href={tronscanUrl(withdrawal.pendingTxId)}
+                target="_blank"
+                rel="noreferrer"
+                className="break-all font-mono underline"
+              >
+                {withdrawal.pendingTxId}
+              </a>{' '}
+              — check on chain before doing anything else.
+            </div>
+            <div className="flex gap-2">
+              <Button
+                className="flex-1"
+                disabled={busy}
+                onClick={() => void onMarkSent(withdrawal.pendingTxId!)}
+              >
+                Mark as sent
+              </Button>
+              <Button
+                variant="ghost"
+                className="flex-1"
+                disabled={busy}
+                onClick={() => void onRefuseAfterCheck(withdrawal.pendingTxId!)}
+              >
+                Refuse after checking chain
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {withdrawal.state === 'APPROVED' && !withdrawal.pendingTxId && (
           <div className="space-y-2">
             <p className="text-[0.66rem] leading-relaxed text-dim">
               Funds are held in clearing and no longer spendable. Broadcast the USDT transfer from
