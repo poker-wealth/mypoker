@@ -72,6 +72,51 @@ describe('ensureJackpotAccounts', () => {
     await ensureJackpotAccounts(TABLE, POOLS);
     expect(await AccountModel.countDocuments({ ownerId: TABLE })).toBe(4);
   });
+
+  // BUG-05: the game server names a table's pools two different ways (base-room.ts:
+  // `jp:<tier>:<table>`; poker-room.ts: `jp:<table>:<tier>`), and the jackpot-payout route guesses a
+  // third shape for the tiers it isn't paying. Whichever shape asks first wins the real `_id`; every
+  // later call under a DIFFERENT shape for the same (accountType, ownerId, scope) must reuse that
+  // same real account, not attempt to insert a second document under its own guessed id.
+  it('reuses the existing pool account whatever id shape a later caller names it with', async () => {
+    const shapeA = { mini: `jp:mini:${TABLE}`, minor: `jp:minor:${TABLE}`, major: `jp:major:${TABLE}`, grand: `jp:grand:${TABLE}` };
+    const shapeB = { mini: `jp:${TABLE}:mini`, minor: `jp:${TABLE}:minor`, major: `jp:${TABLE}:major`, grand: `jp:${TABLE}:grand` };
+
+    await ensureJackpotAccounts(TABLE, shapeA);
+    await ensureJackpotAccounts(TABLE, shapeB); // must not throw E11000, and must not create a second set
+
+    expect(await AccountModel.countDocuments({ ownerId: TABLE })).toBe(4);
+    // The real accounts kept shapeA's ids — the first caller's shape won, not shapeB's.
+    const mini = await AccountModel.findById(shapeA.mini).lean();
+    expect(mini?.accountType).toBe(AccountType.JACKPOT_MINI);
+    expect(await AccountModel.findById(shapeB.mini).lean()).toBeNull();
+  });
+
+  it('treats a duplicate-key error from a racing insert as success, not failure', async () => {
+    const FRESH_TABLE = 'tx-test-race';
+    const ids = {
+      mini: `jp:mini:${FRESH_TABLE}`,
+      minor: `jp:minor:${FRESH_TABLE}`,
+      major: `jp:major:${FRESH_TABLE}`,
+      grand: `jp:grand:${FRESH_TABLE}`,
+    };
+    // Simulates what two callers racing to ensure the same brand-new table's pools produce: both miss
+    // the match, both attempt an insert, and the unique (accountType, ownerId, scope) index accepts
+    // one and rejects the other with a duplicate-key error — a real race is timing-dependent and not
+    // reliable to force through the public API against a real (if in-memory) Mongo, so this drives
+    // the exact failure `updateOne` can throw directly.
+    const duplicateKey = Object.assign(new Error('E11000 duplicate key error'), { code: 11000 });
+    const spy = jest.spyOn(AccountModel, 'updateOne').mockImplementationOnce(() => {
+      throw duplicateKey;
+    });
+    try {
+      await expect(ensureJackpotAccounts(FRESH_TABLE, ids)).resolves.toBeUndefined();
+    } finally {
+      spy.mockRestore();
+    }
+    // The other three tiers (not intercepted) were created normally by the same call.
+    expect(await AccountModel.countDocuments({ ownerId: FRESH_TABLE })).toBe(3);
+  });
 });
 
 describe('the payout', () => {

@@ -78,14 +78,38 @@ export async function ensureJackpotAccounts(
   tableId: string,
   ids: { mini: string; minor: string; major: string; grand: string },
 ): Promise<void> {
+  // Match on (accountType, ownerId, scope) — the unique index — not on the caller's `_id`. Two
+  // callers have disagreed about a pool's id shape (the game server's room classes name pools
+  // `jp:<tier>:<table>` in one place and `jp:<table>:<tier>` in another; the jackpot-payout route
+  // also guesses a shape for tiers it isn't paying this round). Matching by `_id` meant a second
+  // caller using the OTHER shape for the same real account tried to INSERT a second document under
+  // the same (type, owner, scope) — which the unique index rejects with E11000, taking the whole
+  // request (and every tier in the same Promise.all) down with it. A table's four pools are keyed by
+  // (accountType, ownerId, scope) here for exactly the same reason ensureRakeAccount below is.
   await Promise.all(
-    (Object.keys(JACKPOT_TYPE) as (keyof typeof ids)[]).map((tier) =>
-      AccountModel.updateOne(
-        { _id: ids[tier] },
-        { $setOnInsert: { _id: ids[tier], accountType: JACKPOT_TYPE[tier], ownerId: tableId } },
-        { upsert: true },
-      ),
-    ),
+    (Object.keys(JACKPOT_TYPE) as (keyof typeof ids)[]).map(async (tier) => {
+      try {
+        await AccountModel.updateOne(
+          { accountType: JACKPOT_TYPE[tier], ownerId: tableId, scope: PLATFORM_SCOPE },
+          {
+            $setOnInsert: {
+              _id: ids[tier],
+              accountType: JACKPOT_TYPE[tier],
+              ownerId: tableId,
+              scope: PLATFORM_SCOPE,
+            },
+          },
+          { upsert: true },
+        );
+      } catch (err) {
+        // Two first-settlements for the same brand-new table can race: both miss the match, both
+        // try to insert, the unique index accepts one and rejects the other with a duplicate-key
+        // error. The account exists either way, which is all this function promises — so a
+        // duplicate key here is success, not failure (same treatment as getOrCreatePlayerAccount /
+        // getOrCreateExternalAccount above).
+        if (!isDuplicateKeyError(err)) throw err;
+      }
+    }),
   );
 }
 
