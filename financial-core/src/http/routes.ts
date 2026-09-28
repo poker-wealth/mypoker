@@ -1801,20 +1801,36 @@ export function buildRouter(): Router {
    * refuse one, nothing could ask it to. From REQUESTED there is nothing held
    * to release; from APPROVED the clearing hold returns to spendable, which is
    * the part a player notices.
+   *
+   * BUG-09 guard: if `pendingTxId` is set, a broadcast was sent and its result is unknown — it may
+   * already be live on-chain. Refunding here without checking the chain risks a double-pay (refund +
+   * the on-chain transfer landing anyway), so this refuses unless the caller explicitly confirms they
+   * checked, the same way other admin routes require an explicit flag rather than assuming intent.
    */
   const rejectWithdrawalBody = z.object({
     rejectedBy: z.string().min(1),
     reason: z.string().min(1).max(200),
+    chainChecked: z.boolean().optional(),
   });
   r.post(
     '/internal/withdrawals/:id/reject',
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
       const b = rejectWithdrawalBody.parse(req.body);
+      const id = String(req.params.id);
+      const w = await WithdrawalModel.findById(id);
+      if (!w) throw new ApiError(404, `withdrawal not found: ${id}`);
+      if (w.pendingTxId && b.chainChecked !== true) {
+        throw new ApiError(
+          409,
+          `withdrawal ${id} has an unresolved broadcast (${w.pendingTxId}) — check it on-chain and ` +
+            're-send with chainChecked:true, or resolve via /broadcast + /confirm if it landed',
+        );
+      }
       // The refusing administrator is recorded in the reason, since the
       // withdrawal document has no rejectedBy field of its own.
-      await rollbackWithdrawal(String(req.params.id), `${b.reason} (refused by ${b.rejectedBy})`);
-      res.json({ state: await currentState(String(req.params.id)) });
+      await rollbackWithdrawal(id, `${b.reason} (refused by ${b.rejectedBy})`);
+      res.json({ state: await currentState(id) });
     }),
   );
 

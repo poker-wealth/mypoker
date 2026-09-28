@@ -145,13 +145,21 @@ export async function approveWithdrawal(
   return { state: WithdrawalState.APPROVED, approvals, required };
 }
 
-/** BROADCASTING: record the on-chain tx hash. Funds remain held in clearing. */
+/**
+ * BROADCASTING: record the on-chain tx hash. Funds remain held in clearing.
+ *
+ * Also clears `pendingTxId` (BUG-09): once a txHash is recorded here, the send is no longer
+ * ambiguous — either this call is the normal auto sign-broadcast follow-through (pendingTxId ===
+ * txHash), or it's an admin resolving a stuck ambiguous send via the manual `/broadcast` route after
+ * checking the chain, in which case pendingTxId has done its job (blocking a re-send) and should stop
+ * blocking anything further.
+ */
 export async function broadcastWithdrawal(withdrawalId: string, txHash: string): Promise<void> {
   const w = await loadOrThrow(withdrawalId);
   assertTransition(w.state, WithdrawalState.BROADCASTING);
   const moved = await WithdrawalModel.updateOne(
     { _id: withdrawalId, state: WithdrawalState.APPROVED },
-    { $set: { state: WithdrawalState.BROADCASTING, txHash } },
+    { $set: { state: WithdrawalState.BROADCASTING, txHash }, $unset: { pendingTxId: '' } },
   );
   if (moved.matchedCount === 0) {
     throw new InvalidWithdrawalTransitionError(w.state, WithdrawalState.BROADCASTING);

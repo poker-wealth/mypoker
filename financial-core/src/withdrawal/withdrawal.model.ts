@@ -22,6 +22,15 @@ export interface WithdrawalDoc {
    * names rather than a counter.
    */
   approvals?: string[];
+  /**
+   * The txID of a signed transfer that has been sent to `broadcasttransaction` but whose result is
+   * NOT known — either the call is still in flight, or it threw without telling us whether TronGrid's
+   * node accepted it first (BUG-09). Set just before broadcasting, from APPROVED; cleared once the
+   * withdrawal reaches BROADCASTING with a confirmed txHash. While set, a re-send must refuse — the
+   * transaction may already be live on-chain, and admin must confirm/reject by checking the chain,
+   * never by trying again.
+   */
+  pendingTxId?: string;
   txHash?: string;
   failureReason?: string;
   createdAt: Date;
@@ -54,6 +63,7 @@ const withdrawalSchema = new Schema<WithdrawalDoc>(
      * name.
      */
     approvals: { type: [String], default: [] },
+    pendingTxId: { type: String, required: false },
     txHash: { type: String, required: false },
     failureReason: { type: String, required: false },
   },
