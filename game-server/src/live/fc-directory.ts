@@ -74,8 +74,12 @@ export class FcPlayerDirectory implements PlayerDirectory {
   /** The live buy-in budget for `GET /api/live/chips` — always a fresh read. */
   async availableChips(playerId: string, scope?: WalletScope): Promise<number> {
     const available = await this.fetchAvailableChips(playerId, scope);
-    const entry = this.cache.get(playerId);
-    if (entry) entry.available = available;
+    // The cache is the PLATFORM balance (sit()'s pre-check relies on that); never overwrite it
+    // with a league wallet's figure.
+    if (!scope || scope.tableType === 'PLATFORM') {
+      const entry = this.cache.get(playerId);
+      if (entry) entry.available = available;
+    }
     return available;
   }
 

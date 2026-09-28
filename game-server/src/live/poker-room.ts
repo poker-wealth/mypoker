@@ -912,7 +912,12 @@ export class PokerRoom implements LiveRoom {
       throw new RoomError(`a stack may not exceed ${this.config.maxBuyIn}`);
     }
     const player = this.directory.find(playerId);
-    if (!player || player.available < amount) throw new RoomError('not enough chips');
+    if (!player) throw new RoomError('unknown player');
+    // Same caveat as sit(): the directory caches only the PLATFORM balance, so the pre-check is
+    // meaningless for a LEAGUE table — FC's overdraft guard on the league wallet protects the buy-in.
+    if (this.walletScope().tableType === 'PLATFORM' && player.available < amount) {
+      throw new RoomError('not enough chips');
+    }
 
     await this.fc.buyIn(playerId, String(amount), this.walletScope());
     seat.stack += amount;

@@ -117,7 +117,10 @@ export class TexasGame extends BaseGame<TexasPhase, Action, TexasGameEvents> {
   async seatPlayer(playerId: string, chips: number): Promise<void> {
     if (this.table.some((s) => s.id === playerId)) return;
     if (this.table.length >= this.maxPlayers) throw new InvalidActionError('table full');
-    await this.fc.buyIn(this.cfg.accountOf(playerId), String(chips));
+    await this.fc.buyIn(this.cfg.accountOf(playerId), String(chips), {
+      tableType: this.cfg.tableType,
+      ...(this.cfg.leagueId ? { leagueId: this.cfg.leagueId } : {}),
+    });
     this.table.push({ id: playerId, stack: chips });
   }
 

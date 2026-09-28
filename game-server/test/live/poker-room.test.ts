@@ -3,6 +3,7 @@ import { DevPlayers } from '../../src/live/players';
 import { DEFAULT_ROOM, PokerRoom, type PokerRoomConfig } from '../../src/live/poker-room';
 import type { TableSnapshot } from '../../src/live/room-state';
 import type { TableSettlementRequest, WalletScope } from '../../src/core/financial-core-client';
+import type { PlayerDirectory, TablePlayer } from '../../src/live/players';
 
 /**
  * Two people, two devices, one table. These tests drive the room exactly as the client does —
@@ -212,6 +213,49 @@ describe('PokerRoom — a table real people sit at', () => {
     expect(buyInScopes).toEqual([{ tableType: 'LEAGUE', leagueId: 'league-7' }]);
     expect(releaseScopes).toEqual([{ tableType: 'LEAGUE', leagueId: 'league-7' }]);
     h.room.dispose();
+  });
+
+  // D1: topUp had the same bug sit() did before BUG-02 — it read `player.available` from the
+  // directory, which only ever caches the PLATFORM balance, and refused a top-up on a LEAGUE table
+  // whose real (league-wallet) balance the directory has no way to know. The directory here reports
+  // 0 regardless of what the ledger actually holds, so a league top-up must go through anyway —
+  // FC's own overdraft guard on the league wallet is what actually protects it.
+  it('a league table tops up even when the directory reports 0 available, and sends the league scope', async () => {
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = new ChipBank(players);
+    const alice = players.create('Alice').id;
+
+    const zeroBalance: TablePlayer = {
+      id: alice,
+      displayName: 'Alice',
+      available: 0,
+      reputationScore: 1000,
+    };
+    const zeroBalanceDirectory: PlayerDirectory = {
+      find: () => zeroBalance,
+      ensure: () => zeroBalance,
+    };
+
+    const room = new PokerRoom(
+      { ...FAST, id: 't-league-topup', name: 'Test table', tableType: 'LEAGUE', leagueId: 'league-7' } as PokerRoomConfig,
+      { directory: zeroBalanceDirectory, fc: bank },
+    );
+
+    const buyInScopes: (WalletScope | undefined)[] = [];
+    const realBuyIn = bank.buyIn.bind(bank);
+    bank.buyIn = (playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> => {
+      buyInScopes.push(scope);
+      return realBuyIn(playerAccountId, amount, scope);
+    };
+
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: 2_000 });
+    await expect(room.command(alice, { kind: 'buyIn', amount: 500 })).resolves.toBeUndefined();
+
+    expect(buyInScopes).toEqual([
+      { tableType: 'LEAGUE', leagueId: 'league-7' },
+      { tableType: 'LEAGUE', leagueId: 'league-7' },
+    ]);
+    room.dispose();
   });
 
   it('a platform table sends the PLATFORM scope, with no leagueId', async () => {
