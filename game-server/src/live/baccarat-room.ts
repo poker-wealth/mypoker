@@ -24,7 +24,7 @@ interface RoomSeat extends BaseRoomSeat {
 }
 
 export class BaccaratRoom extends BaseLiveRoom<BaccaratRoomConfig, RoomSeat> {
-  private readonly game: BaccaratGame;
+  private game: BaccaratGame;
   private bettingTimer: NodeJS.Timeout | null = null;
   private showdownTimer: NodeJS.Timeout | null = null;
 
@@ -105,6 +105,25 @@ export class BaccaratRoom extends BaseLiveRoom<BaccaratRoomConfig, RoomSeat> {
     if (this.phase !== 'WAITING') return;
     const occupied = this.occupiedSeats();
     if (occupied.length < 2) return;
+
+    // A fresh game per round, not a reused one advanced by `nextRound()`: after an abandoned round
+    // (settlement failed, or a later step like the jackpot threw) the old instance is left holding
+    // stale bets and a state machine that never left BETTING/RESOLVED — the next round's setBanker
+    // or placeBet would throw forever. Rebuilding here, exactly like lottery-room.ts, means the
+    // round that follows an abandon starts clean regardless of how the previous one died.
+    this.game = new BaccaratGame(
+      this.config.id,
+      this.fc,
+      new EventBus(),
+      this.chain,
+      {
+        rakeBps: this.config.rakeBps,
+        tiePayout: this.config.tiePayout,
+        tableType: 'PLATFORM',
+        accountOf: (p) => p,
+        jackpotAccounts: tableJackpotAccounts(this.config.id),
+      },
+    );
 
     let banker = occupied.find((s) => s.isBanker);
     if (!banker) {
@@ -203,7 +222,6 @@ export class BaccaratRoom extends BaseLiveRoom<BaccaratRoomConfig, RoomSeat> {
 
     this.showdownTimer = setTimeout(() => {
       void this.enqueue(() => {
-        this.game.nextRound();
         this.phase = 'WAITING';
         this.push();
         this.maybeStartRound();

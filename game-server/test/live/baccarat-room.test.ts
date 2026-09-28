@@ -158,4 +158,145 @@ describe('BaccaratRoom — settlement failure recovery (BUG-11)', () => {
     );
     room.dispose();
   }, 15_000);
+
+  /**
+   * The auditor rejected the original fix: it reused one `BaccaratGame` for the room's whole
+   * lifetime and only advanced it with `nextRound()` on the success path. After an abandon the
+   * instance was left holding the failed round's bets and a state machine stuck in
+   * BETTING/RESOLVED, so the *next* round either settled stale bets for players who never
+   * re-bet, or threw 'betting is closed' forever. A fresh `BaccaratGame` per round (built in
+   * `maybeStartRound`, same as lottery-room.ts) means round 2 never sees round 1's leftovers
+   * regardless of how round 1 died.
+   */
+  it('a round that fails settlement is followed by a round that settles only who actually bet', async () => {
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = new ChipBank(players);
+    const alice = players.create('Alice').id;
+    const bob = players.create('Bob').id;
+    const carol = players.create('Carol').id;
+
+    const realSettle = bank.settleTableHand.bind(bank);
+    let calls = 0;
+    const requests: TableSettlementRequest[] = [];
+    bank.settleTableHand = (req: TableSettlementRequest): Promise<{ roundId: string; applied: boolean }> => {
+      calls += 1;
+      requests.push(req);
+      if (calls === 1) return Promise.reject(new Error('financial-core unreachable'));
+      return realSettle(req);
+    };
+
+    const room = new BaccaratRoom(
+      {
+        id: 'baccarat-bug11-stale-bets',
+        name: 'Test Baccarat',
+        game: 'baccarat',
+        minBuyIn: 1_000,
+        maxBuyIn: 50_000,
+        maxSeats: 6,
+        rakeBps: 500,
+        tiePayout: 8,
+        bettingTimeMs: 200,
+        showdownDelayMs: 20,
+      },
+      { directory: players, fc: bank },
+    );
+
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(bob, { kind: 'sit', seat: 1, buyIn: BUY_IN });
+    await room.command(carol, { kind: 'sit', seat: 2, buyIn: BUY_IN });
+    await until(() => room.snapshotFor(alice).phase === 'IN_HAND');
+
+    // Round 1: both bettors bet — the settle for this round fails (calls === 1).
+    await room.command(bob, { kind: 'act', action: { type: 'player', amount: 200 } });
+    await room.command(carol, { kind: 'act', action: { type: 'tie', amount: 100 } });
+
+    // Round 2: only Bob bets this time. Carol stands there un-bet, so resolution has to come from
+    // the betting timer expiring, not the "everyone has bet" trigger — exactly the case where a
+    // reused game would still be holding Carol's round-1 bet.
+    await until(
+      () => room.snapshotFor(alice).phase === 'IN_HAND' && room.snapshotFor(alice).handNumber === 2,
+      10_000,
+    );
+    const carolStackBeforeRound2 = room.snapshotFor(alice).seats.find((s) => s.playerId === carol)!.stack;
+    await room.command(bob, { kind: 'act', action: { type: 'player', amount: 200 } });
+
+    await until(() => room.snapshotFor(alice).phase === 'SHOWDOWN', 10_000);
+
+    expect(calls).toBe(2);
+    const secondRequest = requests[1]!;
+    const secondRequestPlayers = [...secondRequest.losers, ...secondRequest.winners].map((p) => p.playerAccountId);
+    expect(secondRequestPlayers).not.toContain(carol);
+
+    const carolStackAfter = room.snapshotFor(alice).seats.find((s) => s.playerId === carol)!.stack;
+    expect(carolStackAfter).toBe(carolStackBeforeRound2);
+
+    room.dispose();
+  }, 15_000);
+
+  /**
+   * The second way the reused-game bug bit: settlement itself can succeed and a LATER step (the
+   * jackpot draw) still throw. That left the state machine RESOLVED with `nextRound()` never
+   * called, so the next round's `setBanker` threw 'betting is closed' forever. A fresh game per
+   * round sidesteps this the same way — round 2 gets a brand-new instance in BETTING regardless
+   * of what state round 1's instance was abandoned in.
+   */
+  it('deals and settles round 2 after round 1 settles but a later step throws', async () => {
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = new ChipBank(players);
+    const alice = players.create('Alice').id;
+    const bob = players.create('Bob').id;
+
+    let settleCalls = 0;
+    const realSettle = bank.settleTableHand.bind(bank);
+    bank.settleTableHand = (req: TableSettlementRequest): Promise<{ roundId: string; applied: boolean }> => {
+      settleCalls += 1;
+      return realSettle(req);
+    };
+
+    const room = new BaccaratRoom(
+      {
+        id: 'baccarat-bug11-post-settle-throw',
+        name: 'Test Baccarat',
+        game: 'baccarat',
+        minBuyIn: 1_000,
+        maxBuyIn: 50_000,
+        maxSeats: 6,
+        rakeBps: 500,
+        tiePayout: 8,
+        bettingTimeMs: 5_000,
+        showdownDelayMs: 20,
+      },
+      { directory: players, fc: bank },
+    );
+
+    let jackpotCalls = 0;
+    const realProcessJackpot = (room as unknown as { processJackpot: (...a: unknown[]) => Promise<void> })
+      .processJackpot.bind(room);
+    (room as unknown as { processJackpot: (...a: unknown[]) => Promise<void> }).processJackpot = async (
+      ...args: unknown[]
+    ): Promise<void> => {
+      jackpotCalls += 1;
+      if (jackpotCalls === 1) throw new Error('jackpot pool unavailable');
+      return realProcessJackpot(...args);
+    };
+
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(bob, { kind: 'sit', seat: 1, buyIn: BUY_IN });
+    await until(() => room.snapshotFor(alice).phase === 'IN_HAND');
+
+    await room.command(bob, { kind: 'act', action: { type: 'player', amount: 200 } });
+
+    // Round 1's settlement went through (money moved) but the jackpot step threw, so the room
+    // abandons — WAITING, then it deals round 2 on its own.
+    await until(
+      () => room.snapshotFor(alice).phase === 'IN_HAND' && room.snapshotFor(alice).handNumber === 2,
+      10_000,
+    );
+
+    await room.command(bob, { kind: 'act', action: { type: 'player', amount: 200 } });
+    await until(() => room.snapshotFor(alice).phase === 'SHOWDOWN', 10_000);
+
+    expect(settleCalls).toBe(2);
+    room.dispose();
+  }, 15_000);
 });

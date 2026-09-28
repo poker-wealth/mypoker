@@ -89,7 +89,7 @@ export function bankerMinimumFor(seats: number, minStake: number): number {
  * played by two sets of rules in two places, and this is the one that settles through `deps.fc`.
  */
 export class NiuNiuRoom extends BaseLiveRoom<NiuNiuRoomConfig, RoomSeat> {
-  private readonly game: NiuNiuGame;
+  private game: NiuNiuGame;
   private bettingTimer: NodeJS.Timeout | null = null;
   private showdownTimer: NodeJS.Timeout | null = null;
   /** Which half of the round we are in: the bank auction, or betting against the winner of it. */
@@ -237,6 +237,26 @@ export class NiuNiuRoom extends BaseLiveRoom<NiuNiuRoomConfig, RoomSeat> {
     const occupied = this.occupiedSeats();
     if (occupied.length < 2) return;
 
+    // A fresh game per round, not a reused one advanced by `nextRound()`: after an abandoned round
+    // (settlement failed, or a later step like the jackpot threw) the old instance is left holding
+    // a banker claim and stale bets, with a state machine that never left BETTING/RESOLVED — the
+    // next round's claimBanker would throw BankerTakenError, or placeBet 'betting is closed'.
+    // Rebuilding here, exactly like lottery-room.ts, means the round that follows an abandon
+    // starts clean regardless of how the previous one died. Room-level round state (isBanker,
+    // bids, multipliers, net) is reset below regardless — that part was already correct.
+    this.game = new NiuNiuGame(
+      this.config.id,
+      this.fc,
+      new EventBus(),
+      this.chain,
+      {
+        rakeBps: this.config.rakeBps,
+        tableType: 'PLATFORM',
+        accountOf: (p) => p,
+        jackpotAccounts: tableJackpotAccounts(this.config.id),
+      },
+    );
+
     this.phase = 'IN_HAND';
     this.stage = 'BIDDING';
     this.handNumber++;
@@ -338,7 +358,6 @@ export class NiuNiuRoom extends BaseLiveRoom<NiuNiuRoomConfig, RoomSeat> {
 
     this.showdownTimer = setTimeout(() => {
       void this.enqueue(() => {
-        this.game.nextRound();
         this.phase = 'WAITING';
         this.stage = null;
         this.push();
