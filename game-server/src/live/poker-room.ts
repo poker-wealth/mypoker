@@ -475,7 +475,20 @@ export class PokerRoom implements LiveRoom {
         const result = await this.fc.settleTableHand(req);
         // Trigger evaluation rides the settlement: this is the one moment the
         // winner's profit is known and the money has actually moved.
-        if (result.applied) await this.evaluateJackpots(req);
+        //
+        // By this point FC has already committed the settlement — a throw from here is no longer a
+        // settlement failure, so it must never be allowed to look like one. Left uncaught, it would
+        // propagate out of this wrapper exactly like `settleTableHand` itself throwing, and
+        // `TexasGame.settle` cannot tell the two apart: `applyAction` would see `playedHand().isComplete`
+        // and run `abandonHand`, which reports a false "settlement failed" alarm and reasons about the
+        // hand as if nothing was paid — when the ledger has, in fact, already moved.
+        if (result.applied) {
+          try {
+            await this.evaluateJackpots(req);
+          } catch (err) {
+            console.error(`[room ${this.config.id}] jackpot evaluation failed after settlement:`, err);
+          }
+        }
         return result;
       },
     };
@@ -1590,10 +1603,28 @@ export class PokerRoom implements LiveRoom {
       seat.inHand = false;
       delete seat.lastAction;
     }
-    for (const seat of this.occupied()) {
-      if (seat.leaveAfterHand) await this.releaseSeat(seat.index);
-    }
+    // phase/push land BEFORE the release loop, not after: abandonHand's usual trigger is FC being
+    // down, and releaseSeat's own call into FC (below) can fail for exactly the same reason. If it
+    // did and this were still queued after the release loop, the table would land right back in the
+    // frozen state this function exists to escape — IN_HAND forever, no timer, nobody able to act.
     this.phase = 'WAITING';
+    this.push();
+    // Release whoever asked to leave, one seat at a time — mirroring finishClose's own per-seat
+    // try/catch, for the same reason: one seat's FC call failing must not strand the table, and must
+    // not strand the OTHER seats waiting to be released either. A seat whose release fails keeps its
+    // chair and its (locked) chips — the ledger-true state — but is forced sittingOut so it is never
+    // dealt into the next hand, and leaveAfterHand stays set so a later `stand` (or a pending
+    // finishClose, which releases every occupied seat regardless of this flag) retries the same call.
+    for (const seat of this.occupied()) {
+      if (!seat.leaveAfterHand) continue;
+      try {
+        await this.releaseSeat(seat.index);
+      } catch (err) {
+        console.error(`[room ${this.config.id}] seat ${seat.index} failed to release after an abandoned hand:`, err);
+        seat.sittingOut = true;
+        seat.leaveAfterHand = true;
+      }
+    }
     this.push();
     // Hold the failure message on screen for the same span a real result would (showdownDelayMs),
     // then hand off to maybeStartHand exactly like endShowdown does — which is also what lets a

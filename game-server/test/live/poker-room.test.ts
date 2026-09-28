@@ -379,6 +379,20 @@ describe('PokerRoom — settlement failure recovery (BUG-03)', () => {
     return state;
   }
 
+  /** Reject the FIRST `release` call for one specific player, then let every later one through for real. */
+  function failReleaseOnce(h: Harness, playerId: string): { calls: number } {
+    const state = { calls: 0 };
+    const realRelease = h.bank.release.bind(h.bank);
+    h.bank.release = (playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> => {
+      if (playerAccountId === playerId) {
+        state.calls += 1;
+        if (state.calls === 1) return Promise.reject(new Error('financial-core unreachable (release)'));
+      }
+      return realRelease(playerAccountId, amount, scope);
+    };
+    return state;
+  }
+
   it('recovers to WAITING with every stack unchanged, reports the failure, and deals again', async () => {
     const h = harness();
     failFirstSettlement(h);
@@ -487,6 +501,93 @@ describe('PokerRoom — settlement failure recovery (BUG-03)', () => {
     // Not abandoned: same hand, still in progress, nobody's chips moved.
     expect(h.room.snapshotFor(h.alice).phase).toBe('IN_HAND');
     expect(h.room.snapshotFor(h.alice).handNumber).toBe(1);
+    h.room.dispose();
+  });
+
+  it('keeps a stuck leaveAfterHand seat sittingOut when its release fails, and deals on for the others', async () => {
+    const h = harness();
+    const charlie = h.players.create('Charlie').id;
+    failFirstSettlement(h);
+    failReleaseOnce(h, h.bob);
+
+    await h.room.command(h.alice, { kind: 'sit', seat: 0, buyIn: 2_000 });
+    await h.room.command(h.bob, { kind: 'sit', seat: 1, buyIn: 2_000 });
+    await h.room.command(charlie, { kind: 'sit', seat: 2, buyIn: 2_000 });
+    await until(() => h.room.snapshotFor(h.alice).phase === 'IN_HAND');
+
+    // Queue bob to leave — same as any mid-hand stand — so abandonHand's release loop reaches him.
+    await h.room.command(h.bob, { kind: 'stand' });
+
+    const seatOf: Record<number, string> = { 0: h.alice, 1: h.bob, 2: charlie };
+    await playToShowdown(h, seatOf);
+    await until(() => h.room.snapshotFor(h.alice).phase === 'WAITING');
+
+    // Bob is still seated — the failed release must not have silently dropped him — and marked
+    // sittingOut so the room reports him correctly and does not try to deal him into the next hand.
+    expect(h.room.hasSeated(h.bob)).toBe(true);
+    const bobSeat = h.room.snapshotFor(h.alice).seats.find((s) => s.playerId === h.bob)!;
+    expect(bobSeat.status).toBe('sittingout');
+    expect(h.players.available(h.bob)).toBeLessThan(10_000); // chips still locked, not returned
+
+    // The table keeps dealing for the two players who are not stuck.
+    await until(
+      () => h.room.snapshotFor(h.alice).phase === 'IN_HAND' && h.room.snapshotFor(h.alice).handNumber === 2,
+    );
+    expect(h.room.snapshotFor(h.alice).seats.find((s) => s.playerId === h.bob)!.inHand).toBe(false);
+    expect(h.room.snapshotFor(h.alice).seats.find((s) => s.playerId === h.alice)!.inHand).toBe(true);
+    expect(h.room.snapshotFor(h.alice).seats.find((s) => s.playerId === charlie)!.inHand).toBe(true);
+
+    // A later stand retries the same release, which now succeeds — chips returned.
+    await h.room.command(h.bob, { kind: 'stand' });
+    expect(h.room.hasSeated(h.bob)).toBe(false);
+    expect(h.players.available(h.bob)).toBe(10_000);
+
+    h.room.dispose();
+  });
+
+  it('still lets a pending close finish even when a leaving seat failed to release during the abandoned hand', async () => {
+    const h = harness();
+    (h.room.config as { ownerId?: string }).ownerId = h.alice;
+    failFirstSettlement(h);
+
+    await seatBoth(h, 0, 1);
+    const toAct = h.room.snapshotFor(h.alice).toActSeat!;
+    const notToAct = toAct === 0 ? h.bob : h.alice;
+    failReleaseOnce(h, notToAct);
+    // Not their turn, so this only queues leaveAfterHand — it does not fold them, and the hand plays
+    // on normally with close_table queued right after, same as a normal pending close.
+    await h.room.command(notToAct, { kind: 'stand' });
+    await h.room.command(h.alice, { kind: 'close_table' }); // queued — the hand in progress finishes first
+
+    await playToShowdown(h, { 0: h.alice, 1: h.bob });
+
+    // The pending close still finishes: finishClose releases every occupied seat regardless of
+    // leaveAfterHand, which retries the seat whose release failed inside abandonHand — and this time
+    // it succeeds.
+    await until(() => h.room.snapshotFor(h.alice).seats.length === 0);
+    expect(h.players.available(h.alice)).toBe(10_000);
+    expect(h.players.available(h.bob)).toBe(10_000);
+    h.room.dispose();
+  });
+
+  it('does not abandon the hand when evaluateJackpots throws after a successful settlement', async () => {
+    const h = harness();
+    (h.room as unknown as { evaluateJackpots: () => Promise<void> }).evaluateJackpots = jest
+      .fn<Promise<void>, []>()
+      .mockRejectedValue(new Error('jackpot engine exploded'));
+
+    await seatBoth(h, 0, 1);
+    await playToShowdown(h, { 0: h.alice, 1: h.bob });
+
+    // Settled normally — not the abandon path's "could not be settled" recovery.
+    await until(() => h.room.snapshotFor(h.alice).phase === 'SHOWDOWN');
+    const view = h.room.snapshotFor(h.alice);
+    expect(view.message).toMatch(/wins/);
+    expect(view.handNumber).toBe(1);
+
+    // The settlement itself was applied: total chips are conserved (some moved to the winner / rake
+    // sink), which the abandon path's "nothing paid" recovery would not produce.
+    expect(h.players.totalChips() + h.bank.sinkTotal()).toBe(h.startingTotal);
     h.room.dispose();
   });
 });
