@@ -11,6 +11,14 @@ import { signToken } from '../../src/gateway/tokens';
  *  - the new `/withdrawals/:id/broadcast` passthrough (an admin marking an unresolved send as
  *    confirmed-landed) is behind the SAME admin auth as every other withdrawal action — a queue screen
  *    that can resolve a stuck send is exactly the kind of route that must not be left open by mistake.
+ *
+ * BUG-09 second follow-up (D9/D10), gateway layer:
+ *
+ *  - `/withdrawals/:id/send` and `/withdrawals/:id/broadcast` both attach the acting admin
+ *    (`sentBy`/`resolvedBy`) from the verified token, never the body — same rule as `approverId` and
+ *    `rejectedBy`.
+ *  - `/withdrawals/:id/broadcast` always sets `requirePending: true` — this action exists only to
+ *    resolve the ONE send actually pending on a withdrawal, never to record an arbitrary txHash.
  */
 
 const JWT_SECRET = 'test-secret-withdrawal-broadcast';
@@ -119,6 +127,40 @@ describe('POST /admin/withdrawals/:id/broadcast — resolve an unresolved send',
       [string, RequestInit],
     ];
     expect(calledUrl).toContain(`/internal/withdrawals/${WITHDRAWAL_ID}/broadcast`);
-    expect(JSON.parse(String(calledInit.body))).toEqual({ txHash: 'a'.repeat(64) });
+    // D9: resolvedBy comes from the verified token, never the body. D10: requirePending is always set
+    // on this action — it resolves the one send actually pending, never an arbitrary txHash.
+    expect(JSON.parse(String(calledInit.body))).toEqual({
+      txHash: 'a'.repeat(64),
+      resolvedBy: 'admin-1',
+      requirePending: true,
+    });
+  });
+});
+
+describe('POST /admin/withdrawals/:id/send — sign + broadcast, attributed to the acting admin', () => {
+  let calls: { url: string; body: unknown }[];
+
+  beforeEach(() => {
+    calls = [];
+    global.fetch = jest.fn(async (url: unknown, init?: RequestInit) => {
+      calls.push({ url: String(url), body: init?.body ? JSON.parse(String(init.body)) : undefined });
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ state: 'APPROVED', txHash: 'a'.repeat(64) }),
+      };
+    }) as unknown as typeof fetch;
+  });
+
+  it('forwards sentBy from the verified token, never the body', async () => {
+    const res = await request(app())
+      .post(`/admin/withdrawals/${WITHDRAWAL_ID}/send`)
+      .set('authorization', `Bearer ${opsToken}`)
+      .send({ sentBy: 'someone-else' }); // ignored — must come from the token
+
+    expect(res.status).toBe(200);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.url).toContain(`/internal/withdrawals/${WITHDRAWAL_ID}/sign-broadcast`);
+    expect(calls[0]!.body).toEqual({ sentBy: 'admin-1' });
   });
 });

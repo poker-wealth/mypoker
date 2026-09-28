@@ -36,11 +36,23 @@ const SECOND_APPROVAL_THRESHOLD = 10_000;
  * The TRON explorer link for a broadcast tx (BUG-09 follow-up). There is no existing helper for this
  * in the frontend — `lib/fairness.ts`'s `explorerUrl` covers Solana/Polygon notarization only, an
  * unrelated chain — and no client-side signal of testnet vs. mainnet (that choice lives entirely in
- * financial-core's env, server-side). Mainnet tronscan.org is used unconditionally; on a testnet
- * deployment this link simply won't resolve, the same caveat every other hardcoded mainnet constant in
- * this codebase already carries (e.g. financial-core's default USDT contract).
+ * financial-core's env, server-side). Mainnet tronscan.org is used by default; on a testnet deployment
+ * `VITE_TRON_EXPLORER_BASE` can point this at the right explorer instead of the link simply not
+ * resolving, the same escape hatch every other hardcoded mainnet constant in this codebase would
+ * benefit from but none currently has (e.g. financial-core's default USDT contract).
  */
-const tronscanUrl = (txId: string): string => `https://tronscan.org/#/transaction/${txId}`;
+const TRON_EXPLORER_BASE =
+  import.meta.env.VITE_TRON_EXPLORER_BASE ?? 'https://tronscan.org/#/transaction/';
+const tronscanUrl = (txId: string): string => `${TRON_EXPLORER_BASE}${txId}`;
+
+/**
+ * BUG-09 follow-up (D8): mirrors financial-core's PENDING_TX_GRACE_MS (withdrawal-watcher.ts) — the
+ * grace period past a signed tx's own on-chain expiration before it is safe to treat as dead. Display
+ * only: disabling the button early here is a courtesy that saves an admin a doomed click and a
+ * confusing 409, never the control — the server re-checks this itself and remains authoritative,
+ * because a stale queue poll or a wrong client clock must not be able to let a refund through early.
+ */
+const PENDING_TX_GRACE_MS = 3 * 60 * 1000;
 
 type Filter = 'all' | 'large' | 'awaiting-second' | 'approved';
 
@@ -193,6 +205,16 @@ function ReviewSheet({
 
   const isLarge = Number(withdrawal.amount) > SECOND_APPROVAL_THRESHOLD;
   const alreadySigned = withdrawal.approvals.length > 0;
+
+  // BUG-09 follow-up (D8): the server refuses a chainChecked refuse until the pending send's own
+  // signed expiration plus its grace period has passed — before that, TronGrid could still mine it at
+  // any moment. `refusableAt` mirrors that purely for display (a countdown, and disabling the button
+  // early saves an admin a doomed click); the server re-checks this itself on every request and
+  // remains the actual gate. No recorded expiration (a legacy row) means the server allows the refuse
+  // straight through, so the button is never disabled for that reason here either.
+  const pendingExpiresAt = withdrawal.pendingTxExpiration ? new Date(withdrawal.pendingTxExpiration) : null;
+  const refusableAt = pendingExpiresAt ? new Date(pendingExpiresAt.getTime() + PENDING_TX_GRACE_MS) : null;
+  const canRefusePendingTx = !refusableAt || Date.now() >= refusableAt.getTime();
 
   const onApprove = async (): Promise<void> => {
     // The figure and the destination, not "are you sure" — someone who has
@@ -424,6 +446,12 @@ function ReviewSheet({
               </a>{' '}
               — check on chain before doing anything else.
             </div>
+            {pendingExpiresAt && refusableAt && (
+              <p className="text-[0.62rem] leading-relaxed text-dim">
+                Signed tx expires {pendingExpiresAt.toLocaleTimeString()}; can be refused after{' '}
+                {refusableAt.toLocaleTimeString()}.
+              </p>
+            )}
             <div className="flex gap-2">
               <Button
                 className="flex-1"
@@ -435,7 +463,7 @@ function ReviewSheet({
               <Button
                 variant="ghost"
                 className="flex-1"
-                disabled={busy}
+                disabled={busy || !canRefusePendingTx}
                 onClick={() => void onRefuseAfterCheck(withdrawal.pendingTxId!)}
               >
                 Refuse after checking chain

@@ -285,10 +285,10 @@ export function buildAdminRouter(config: GatewayConfig): Router {
   );
 
   // Take an APPROVED withdrawal on-chain — sign + broadcast from the hot wallet.
-  // No actor in the body: the approval already recorded who authorised it; this
-  // is the mechanical broadcast of a decision already made and audited. On a
-  // missing hot-wallet key financial-core answers 500 and the withdrawal stays
-  // APPROVED for a retry, which surfaces to the admin as a failed send.
+  // The approval already recorded who authorised the withdrawal itself; `sentBy` (D9) is a distinct
+  // fact — who actually pushed the send button — taken from the verified token, same rule as
+  // everywhere else here. On a missing hot-wallet key financial-core answers 500 and the withdrawal
+  // stays APPROVED for a retry, which surfaces to the admin as a failed send.
   //
   // BUG-09: a failed BROADCAST (as opposed to a failed build/sign) does NOT roll the withdrawal back —
   // it is ambiguous whether the tx is live, so financial-core keeps the hold and sets `pendingTxId`,
@@ -296,20 +296,25 @@ export function buildAdminRouter(config: GatewayConfig): Router {
   // then shows an "unresolved send" state (below) instead of the ordinary "Send on-chain" button.
   r.post(
     '/withdrawals/:id/send',
-    post('/internal/withdrawals/:id/sign-broadcast', () => ({})),
+    post('/internal/withdrawals/:id/sign-broadcast', (req) => ({ sentBy: actor(req) })),
   );
 
   /**
    * BUG-09 follow-up (D4d): resolve an unresolved send. Same shape as financial-core's own
    * `/internal/withdrawals/:id/broadcast` — an admin who has confirmed a `pendingTxId` landed on-chain
-   * (via the explorer link the queue shows) marks it sent with the txHash they read there. No actor in
-   * the body, same reasoning as `/send`: this records a decision already made by checking the chain,
-   * not a new authorization.
+   * (via the explorer link the queue shows) marks it sent with the txHash they read there.
+   *
+   * `resolvedBy` (D9) is the verified token, for the audit trail, same as everywhere else. `requirePending:
+   * true` (D10) is always set here — this action exists ONLY to resolve the one send actually pending
+   * on this withdrawal, never to record an arbitrary txHash, so financial-core is told to refuse unless
+   * the txHash the admin read off the chain is exactly the withdrawal's own `pendingTxId`.
    */
   r.post(
     '/withdrawals/:id/broadcast',
     post('/internal/withdrawals/:id/broadcast', (req) => ({
       txHash: (req.body as { txHash?: string }).txHash,
+      resolvedBy: actor(req),
+      requirePending: true,
     })),
   );
 
