@@ -200,4 +200,101 @@ describe('POST /internal/withdrawals/:id/reject', () => {
     const w = await WithdrawalModel.findById(id);
     expect(w!.state).toBe(WithdrawalState.ROLLED_BACK);
   });
+
+  // D13: `allowPendingTx` alone used to drop the pendingTxId guard from rollbackWithdrawal's filter
+  // entirely — it matched ANY pendingTxId, not just the one an admin actually chain-checked. These pin
+  // the fix: the route now names the exact tx it read (`pendingAtRead`) and the filter refuses to match
+  // if that tx changes before the write lands, surfacing a 409 instead of refunding a live send.
+  //
+  // The race is injected with a spy on WithdrawalModel.findById: the route's own read is call #1, and
+  // rollbackWithdrawal's internal read-then-write (inside loadOrThrow) is call #2 — the mutation lands
+  // immediately after call #2 resolves, in the exact gap between that read and the atomic write.
+  it('BUG-09 D13: a pendingTxId CAS between the route read and the rollback write refuses, no refund', async () => {
+    const { id, player } = await approvedWithdrawalWithPlayer(); // no pendingTxId at read time
+
+    const original = WithdrawalModel.findById.bind(WithdrawalModel);
+    let calls = 0;
+    const spy = jest.spyOn(WithdrawalModel, 'findById').mockImplementation(
+      ((...args: Parameters<typeof original>) =>
+        (async () => {
+          calls++;
+          const doc = await original(...args);
+          if (calls === 2) {
+            // A re-send CAS (withdrawal-broadcast.ts) lands a fresh, LIVE pendingTxId in the gap —
+            // there was nothing pending when the route read this withdrawal moments ago.
+            await WithdrawalModel.updateOne({ _id: id }, { $set: { pendingTxId: 'f'.repeat(64) } });
+          }
+          return doc;
+        })()) as unknown as typeof original,
+    );
+    try {
+      const res = await post(`/internal/withdrawals/${id}/reject`, {
+        rejectedBy: 'ops-1',
+        reason: 'refused',
+        chainChecked: true,
+      });
+      expect(res.status).toBe(409);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toMatch(/changed while being refused/);
+    } finally {
+      spy.mockRestore();
+    }
+
+    const w = await WithdrawalModel.findById(id);
+    expect(w!.state).toBe(WithdrawalState.APPROVED); // untouched — no refund
+    expect(w!.pendingTxId).toBe('f'.repeat(64)); // the live send is still there, unrefunded
+    expect(await balances(player)).toEqual({ available: 700, clearing: 300 }); // no double-pay
+  });
+
+  it('BUG-09 D13: the chain-checked tx being swapped for a different one before the write refuses, no refund', async () => {
+    const id = await approvedWithdrawal();
+    const player = (await WithdrawalModel.findById(id))!.playerAccountId;
+    const expiredTx = 'a'.repeat(64);
+    await WithdrawalModel.updateOne(
+      { _id: id },
+      {
+        $set: {
+          pendingTxId: expiredTx,
+          pendingTxExpiration: new Date(Date.now() - 10 * 60_000), // well past expiration + grace
+        },
+      },
+    );
+
+    const original = WithdrawalModel.findById.bind(WithdrawalModel);
+    let calls = 0;
+    const spy = jest.spyOn(WithdrawalModel, 'findById').mockImplementation(
+      ((...args: Parameters<typeof original>) =>
+        (async () => {
+          calls++;
+          const doc = await original(...args);
+          if (calls === 2) {
+            // The tx this admin chain-checked (expiredTx) is gone — a watcher release followed by a
+            // re-send CAS replaced it with a fresh, LIVE tx (freshTx) in the gap before this write.
+            await WithdrawalModel.updateOne(
+              { _id: id },
+              { $unset: { pendingTxId: '', pendingTxExpiration: '' } },
+            );
+            await WithdrawalModel.updateOne({ _id: id }, { $set: { pendingTxId: 'c'.repeat(64) } });
+          }
+          return doc;
+        })()) as unknown as typeof original,
+    );
+    try {
+      const res = await post(`/internal/withdrawals/${id}/reject`, {
+        rejectedBy: 'ops-1',
+        reason: 'confirmed never landed on-chain',
+        chainChecked: true,
+      });
+      expect(res.status).toBe(409);
+      const body = (await res.json()) as { error: string };
+      expect(body.error).toMatch(/changed while being refused/);
+    } finally {
+      spy.mockRestore();
+    }
+
+    const w = await WithdrawalModel.findById(id);
+    expect(w!.state).toBe(WithdrawalState.APPROVED); // untouched — no refund
+    expect(w!.pendingTxId).toBe('c'.repeat(64)); // the fresh live send is still there, unrefunded
+    expect(await balances(player)).toEqual({ available: 700, clearing: 300 }); // no double-pay
+  });
 });

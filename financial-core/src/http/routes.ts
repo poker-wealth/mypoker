@@ -28,6 +28,7 @@ import {
   withdrawableAt,
   WithdrawalAddressError,
 } from '../withdrawal/withdrawal-address';
+import { InvalidWithdrawalTransitionError } from '../wallet/errors';
 import {
   getOrCreatePlayerAccount,
   ensureJackpotAccounts,
@@ -1821,6 +1822,16 @@ export function buildRouter(): Router {
    * tx could actually be dead — before its own expiration (+ the watcher's grace period) TronGrid could
    * still mine it at any moment, and an admin ticking the box seconds after the send (before there was
    * anything real to check) would refund funds that then land anyway.
+   *
+   * BUG-09 follow-up (D13): `pendingAtRead` below snapshots `pendingTxId` at the SAME read the checks
+   * above reason about — the tx an admin actually chain-checked — and is passed to `rollbackWithdrawal`
+   * as `expectedPendingTxId`, pinning the refund to that exact tx. Without it, `allowPendingTx` alone
+   * used to drop the pendingTxId guard entirely: state stays APPROVED across a watcher release (an
+   * expired `pendingTxId` reconciled away) and a re-send CAS (withdrawal-broadcast.ts) landing a fresh,
+   * LIVE `pendingTxId` in the gap before BROADCASTING — a chain-checked refund could then match that row
+   * and pay out both the refund and the live send. A mismatch (the filter inside `rollbackWithdrawal`
+   * misses) is a lost race, not a server fault — mapped below to a 409 naming the reload, not left to
+   * surface as the generic `InvalidWithdrawalTransitionError` message.
    */
   const rejectWithdrawalBody = z.object({
     rejectedBy: z.string().min(1),
@@ -1835,6 +1846,9 @@ export function buildRouter(): Router {
       const id = String(req.params.id);
       const w = await WithdrawalModel.findById(id);
       if (!w) throw new ApiError(404, `withdrawal not found: ${id}`);
+      // D13: the exact tx this admin is chain-checking, snapshotted at this read — never recomputed
+      // from a later, possibly-changed `w`.
+      const pendingAtRead = w.pendingTxId;
 
       // D7: a live broadcast — only the watcher, having actually checked the chain, ever refunds one.
       if (w.state === WithdrawalState.BROADCASTING) {
@@ -1887,18 +1901,34 @@ export function buildRouter(): Router {
       // The refusing administrator is recorded in the reason (readable audit text) and in the
       // withdrawal's own `rejectedBy` field (D9, structured — the document previously had none).
       //
-      // allowPendingTx mirrors chainChecked straight through: the early check above is a fast,
-      // friendly 409 for the common case, but the real guard is the atomic filter inside
-      // rollbackWithdrawal itself (D1) — a pendingTxId that appears between that read and this call
-      // (a concurrent send) is still caught, because allowPendingTx is false unless the caller said so.
+      // allowPendingTx mirrors chainChecked straight through, but (D13) only when there was actually a
+      // tx read above to chain-check — otherwise it stays false and the ordinary "no pendingTxId" filter
+      // arm applies. expectedPendingTxId pins the refund to `pendingAtRead` specifically: the early
+      // check above is a fast, friendly 409 for the common case, but the real guard is the atomic filter
+      // inside rollbackWithdrawal itself (D1/D13) — a pendingTxId that appears, or changes, between that
+      // read and this call is still caught, because the filter now matches only that exact value.
       // fromStates (D7) is the same kind of belt-and-braces: the BROADCASTING check above reads `w`
       // once, up front; rollbackWithdrawal's own fromStates check re-reads and re-checks state right
       // before it writes, so a row that reaches BROADCASTING in the gap between the two is still caught.
-      await rollbackWithdrawal(id, `${b.reason} (refused by ${b.rejectedBy})`, {
-        allowPendingTx: b.chainChecked === true,
-        fromStates: [WithdrawalState.REQUESTED, WithdrawalState.APPROVED],
-        rejectedBy: b.rejectedBy,
-      });
+      try {
+        await rollbackWithdrawal(id, `${b.reason} (refused by ${b.rejectedBy})`, {
+          allowPendingTx: b.chainChecked === true && !!pendingAtRead,
+          ...(pendingAtRead ? { expectedPendingTxId: pendingAtRead } : {}),
+          fromStates: [WithdrawalState.REQUESTED, WithdrawalState.APPROVED],
+          rejectedBy: b.rejectedBy,
+        });
+      } catch (err) {
+        // D13: a filter miss here is a lost race (the withdrawal changed between this route's read and
+        // the atomic write below it — a fresh pendingTxId, or a state that moved on) — a conflict for
+        // the caller to retry against fresh data, not a server fault.
+        if (err instanceof InvalidWithdrawalTransitionError) {
+          throw new ApiError(
+            409,
+            `withdrawal ${id} changed while being refused — reload and check again`,
+          );
+        }
+        throw err;
+      }
       res.json({ state: await currentState(id) });
     }),
   );

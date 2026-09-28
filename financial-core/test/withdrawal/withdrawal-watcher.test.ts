@@ -236,4 +236,35 @@ describe('withdrawal watcher — unresolved pendingTxId reconciliation (BUG-09 D
     expect(w2!.state).toBe(WithdrawalState.BROADCASTING);
     expect(w2!.txHash).toBe(normalTxId);
   });
+
+  // D14: the SAME race as D12 above, but the tx that mined while the refund landed reverted on-chain
+  // (FAILED) rather than succeeding — it moved no funds, so the refund was the only thing that moved
+  // money. That is not a double-pay, and must not be alerted as one.
+  it('D14: a row rolled back mid-pass whose raced tx mined FAILED does not alert DOUBLE PAY', async () => {
+    const raceTxId = 'f'.repeat(64);
+    const raced = await approvedWithdrawalWithPendingTx(new Date(Date.now() + 60_000), raceTxId, 'p1');
+
+    const alerts: { message: string; context: AlertContext | undefined }[] = [];
+    setAlertHandler((message, context) => {
+      alerts.push({ message, context });
+    });
+    const infoSpy = jest.spyOn(console, 'info').mockImplementation(() => {});
+
+    const racyRevertedSource: WithdrawalTxSource = async (txHash) => {
+      if (txHash === raceTxId) {
+        await WithdrawalModel.updateOne({ _id: raced }, { $set: { state: WithdrawalState.ROLLED_BACK } });
+      }
+      return { status: 'FAILED', confirmations: 0 };
+    };
+
+    await checkWithdrawalsOnce(racyRevertedSource);
+
+    // Assert on the spy's recorded calls BEFORE restoring — mockRestore() also clears call history.
+    expect(alerts.find((a) => /DOUBLE PAY/.test(a.message))).toBeUndefined();
+    expect(infoSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/refunded; tx reverted on chain — consistent/),
+    );
+    infoSpy.mockRestore();
+    expect((await WithdrawalModel.findById(raced))!.state).toBe(WithdrawalState.ROLLED_BACK);
+  });
 });

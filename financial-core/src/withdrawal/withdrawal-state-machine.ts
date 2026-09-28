@@ -355,6 +355,19 @@ export interface RollbackWithdrawalOptions {
    * doing it. Every other caller (the watcher itself, build/sign's own rollback) passes nothing.
    */
   fromStates?: WithdrawalState[];
+  /**
+   * BUG-09 follow-up (D13): required whenever `allowPendingTx` is true — the EXACT `pendingTxId` the
+   * caller chain-checked. Without this, `allowPendingTx` used to drop the pendingTxId guard from the
+   * filter entirely (matching ANY pendingTxId), which refunds whatever happens to be pending by the
+   * time the write lands, not the one the caller actually looked at: a watcher release (reconcile
+   * clearing an expired `pendingTxId`, state staying APPROVED) followed by a re-send CAS
+   * (withdrawal-broadcast.ts's `claimed` update) can plant a fresh, LIVE `pendingTxId` in the gap
+   * between an admin's chain-check and this call. The atomic filter below now pins on
+   * `expectedPendingTxId` instead of dropping the guard, so a `pendingTxId` that changes in that gap
+   * fails to match and falls into the ordinary `matchedCount === 0` branch — refund refused, not a
+   * tx nobody ever chain-checked.
+   */
+  expectedPendingTxId?: string;
   /** BUG-09 follow-up (D9): the admin who refused this withdrawal, for the audit trail. */
   rejectedBy?: string;
   /**
@@ -373,12 +386,22 @@ export interface RollbackWithdrawalOptions {
  * reading the withdrawal first and deciding whether to call this. A read-then-decide check has a race
  * — a send can CAS `pendingTxId` onto the withdrawal between that read and this call — so the filter
  * itself refuses to match a row that has since grown a `pendingTxId` the caller never saw or OK'd.
+ *
+ * BUG-09 follow-up (D13): `allowPendingTx` alone is not enough to authorize a refund — it must name
+ * the exact tx (`expectedPendingTxId`) it was told is safe. Passing `allowPendingTx` without it is a
+ * caller bug (a chain-check that never actually named the tx it checked) and throws immediately,
+ * before touching the database.
  */
 export async function rollbackWithdrawal(
   withdrawalId: string,
   reason: string,
   opts?: RollbackWithdrawalOptions,
 ): Promise<void> {
+  if (opts?.allowPendingTx && !opts.expectedPendingTxId) {
+    throw new Error(
+      'rollbackWithdrawal: allowPendingTx requires expectedPendingTxId naming the pendingTxId that was chain-checked',
+    );
+  }
   const w = await loadOrThrow(withdrawalId);
   assertTransition(w.state, WithdrawalState.ROLLED_BACK);
   if (opts?.fromStates && !opts.fromStates.includes(w.state)) {
@@ -407,7 +430,12 @@ export async function rollbackWithdrawal(
       {
         _id: withdrawalId,
         state: w.state,
-        ...(opts?.allowPendingTx ? {} : { pendingTxId: { $exists: false } }),
+        // D13: allowPendingTx pins the filter to the EXACT tx the caller named, rather than dropping
+        // the pendingTxId guard entirely — a mismatch (the tx changed since the caller chain-checked
+        // it) falls through to matchedCount === 0 below, same as any other lost race.
+        ...(opts?.allowPendingTx
+          ? { pendingTxId: opts.expectedPendingTxId }
+          : { pendingTxId: { $exists: false } }),
       },
       {
         $set: {

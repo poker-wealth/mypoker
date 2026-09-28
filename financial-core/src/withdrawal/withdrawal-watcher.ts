@@ -177,15 +177,23 @@ async function reconcilePendingBroadcasts(source: WithdrawalTxSource): Promise<v
         } catch (err) {
           // D12: the row moved under us since it was read into `unresolved` above — most plausibly an
           // admin's chainChecked reject won a race against THIS tx actually mining. If that's what
-          // happened, the withdrawal is now refunded AND the transfer landed: a double-pay, and it
+          // happened, whether it's a double-pay depends on which way the tx actually mined (D14):
+          //  - SUCCESS: funds moved on-chain AND the refund moved funds back — a real double-pay.
+          //  - FAILED: the tx reverted, so it moved no funds — the refund was correct, nothing doubled.
           // needs a human right now, not a log line indistinguishable from any other transient failure.
           const reloaded = await WithdrawalModel.findById(w._id).lean();
           if (reloaded?.state === WithdrawalState.ROLLED_BACK) {
-            await alertOps('withdrawal refunded but its pending tx MINED — DOUBLE PAY, investigate', {
-              withdrawalId: w._id,
-              txId: w.pendingTxId,
-              onChainStatus: st.status,
-            });
+            if (st.status === 'SUCCESS') {
+              await alertOps('withdrawal refunded but its pending tx MINED — DOUBLE PAY, investigate', {
+                withdrawalId: w._id,
+                txId: w.pendingTxId,
+                onChainStatus: st.status,
+              });
+            } else {
+              console.info(
+                `[withdrawal-watcher] ${w._id} refunded; tx reverted on chain — consistent (${w.pendingTxId})`,
+              );
+            }
           } else {
             console.error(
               `[withdrawal-watcher] failed to record resolved pending send ${w._id}:`,
