@@ -184,6 +184,38 @@ describe('ensureJackpotAccounts', () => {
     expect(await AccountModel.countDocuments({ accountType: AccountType.JACKPOT_MINI, ownerId: TABLE_ID })).toBe(0);
   });
 
+  // BUG-05 follow-up: the legacy-pool console.warn above used to fire every time this branch was
+  // hit — every hand, on every legacy table, forever. It must log once per process per pool, not
+  // once per call.
+  it('logs the legacy-pool reuse warning once per process, not once per call', async () => {
+    const TABLE_ID = 'tx-test-legacy-log-once';
+    const ids = {
+      mini: `jp:mini:${TABLE_ID}`,
+      minor: `jp:minor:${TABLE_ID}`,
+      major: `jp:major:${TABLE_ID}`,
+      grand: `jp:grand:${TABLE_ID}`,
+    };
+    await AccountModel.create({
+      _id: ids.mini,
+      accountType: AccountType.JACKPOT_MINI,
+      ownerId: 'mini',
+      scope: PLATFORM_SCOPE,
+    });
+
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      await ensureJackpotAccounts(TABLE_ID, ids);
+      await ensureJackpotAccounts(TABLE_ID, ids);
+
+      const matchingCalls = warnSpy.mock.calls.filter((call) =>
+        typeof call[0] === 'string' && call[0].includes(ids.mini),
+      );
+      expect(matchingCalls).toHaveLength(1);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   // The same acceptance, without the tier-named-owner shape — a pool created at table creation
   // (settle-round.ts's JackpotAccounts, scripts/smoke.ts) can carry a random default _id under an
   // arbitrary owner unrelated to any tier name. Same-type, different-owner is still "this tier's

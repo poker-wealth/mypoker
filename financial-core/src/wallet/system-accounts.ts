@@ -74,6 +74,8 @@ const JACKPOT_TYPE: Record<string, AccountType> = {
   grand: AccountType.JACKPOT_GRAND,
 };
 
+const reportedLegacyPools = new Set<string>();
+
 export async function ensureJackpotAccounts(
   tableId: string,
   ids: { mini: string; minor: string; major: string; grand: string },
@@ -132,10 +134,13 @@ export async function ensureJackpotAccounts(
             // random default _id under an arbitrary owner. Either way, transfer() addresses the pool
             // by `_id`, so reusing it by _id hits the right account exactly as it always has — no
             // migration needed, just don't throw on a pool this tier already owns.
-            console.warn('ensureJackpotAccounts: reusing legacy jackpot pool under a stranded owner', {
-              _id: ids[tier],
-              ownerId: conflicting.ownerId,
-            });
+            if (!reportedLegacyPools.has(ids[tier])) {
+              reportedLegacyPools.add(ids[tier]);
+              console.warn(
+                `[jackpot] reusing legacy ${tier} pool ${ids[tier]} for table ${tableId} under stranded owner ` +
+                  `"${conflicting.ownerId}" — run scripts/jackpot-pool-audit.ts and migrate; logged once per process`,
+              );
+            }
             return;
           }
           throw new Error(
