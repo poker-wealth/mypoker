@@ -109,11 +109,16 @@ describe('ChipDenominatedFc.lockedBalance', () => {
       },
     };
     const fc = new ChipDenominatedFc(inner);
+    expect(fc.lockedBalance).toBeDefined();
     // $0.01 = 1 chip (chip-currency.ts), so $40.00 locked is 4,000 chips.
-    await expect(fc.lockedBalance('acc-vendor')).resolves.toBe('4000');
+    await expect(fc.lockedBalance!('acc-vendor')).resolves.toBe('4000');
   });
 
-  it('reports "0" when the inner client has no lockedBalance at all', async () => {
+  // BUG-10 follow-up B: `lockedBalance` absent means UNKNOWN (per the interface doc on
+  // `FinancialCoreClient.lockedBalance`), never zero — a caller reading `fc.lockedBalance` as a
+  // presence check (slots-room's `fundVendor`) must see it genuinely absent, not a method that
+  // lies with '0', when the inner client cannot answer the question at all.
+  it('leaves lockedBalance unset when the inner client has no lockedBalance at all', async () => {
     const inner: FinancialCoreClient = {
       buyIn: async () => {},
       release: async () => {},
@@ -123,6 +128,6 @@ describe('ChipDenominatedFc.lockedBalance', () => {
       settleTableHand: async () => ({ roundId: 'x', applied: true }),
     };
     const fc = new ChipDenominatedFc(inner);
-    await expect(fc.lockedBalance('acc-vendor')).resolves.toBe('0');
+    expect(fc.lockedBalance).toBeUndefined();
   });
 });

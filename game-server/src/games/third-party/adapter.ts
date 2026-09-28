@@ -74,6 +74,16 @@ export interface Receipt {
   payout: number;
   /** Player's net for the round (payout − wager). */
   net: number;
+  /**
+   * The exact amount FC moves for the PROVIDER'S OWN account this round — not the player's net
+   * (BUG-10 follow-up A). On a player win the provider is the loser in `settleNet` below and pays
+   * the raw amount (no deduction — rake/jackpot are only ever taken off a WINNER's side), so this
+   * equals `-net`. On a player loss the provider is the WINNER in `settleNet`, so rake and the
+   * jackpot injection come off ITS credit first — this is strictly less than `-net` in magnitude.
+   * Read straight off the settlement request we are about to send, so it can never drift from what
+   * FC actually applies. Zero when `net === 0` (a push settles nothing).
+   */
+  providerDelta: number;
   outcome: unknown;
   replayed: boolean;
 }
@@ -149,6 +159,7 @@ export class ThirdPartyAdapter {
     }
 
     const net = result.payout - wager;
+    let providerDelta = 0;
     if (net !== 0) {
       // Player ⇄ provider account. Sums to zero; the platform only rakes a commission.
       const grossNets = new Map<string, number>([
@@ -162,6 +173,16 @@ export class ThirdPartyAdapter {
         accountOf: (p) => (p === this.providerPlayerId ? this.cfg.providerAccountId : this.cfg.accountOf(p)),
         jackpotAccounts: this.cfg.jackpotAccounts,
       });
+
+      // The exact amount FC is about to move for the provider's own account — read straight off
+      // the request we are sending, not recomputed independently, so it can never drift from what
+      // actually gets applied. The provider appears in exactly one of losers/winners (never both,
+      // never neither, since net !== 0 here): a loser's `amount` is what leaves its balance, a
+      // winner's is what lands after rake + jackpot are deducted from it.
+      const providerLoss = request.losers.find((l) => l.playerAccountId === this.cfg.providerAccountId);
+      const providerWin = request.winners.find((w) => w.playerAccountId === this.cfg.providerAccountId);
+      providerDelta = providerLoss ? -Number(providerLoss.amount) : providerWin ? Number(providerWin.amount) : 0;
+
       await this.fc.settleTableHand(request);
     }
 
@@ -171,6 +192,7 @@ export class ThirdPartyAdapter {
       wager,
       payout: result.payout,
       net,
+      providerDelta,
       outcome: result.outcome,
       replayed: false,
     };

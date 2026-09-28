@@ -318,3 +318,153 @@ describe('SlotsRoom — vendor float retries, tops up, and caps stakes (BUG-10 f
     room.dispose();
   });
 });
+
+/**
+ * BUG-10 follow-up A. `receipt.net` is the PLAYER's net, not what FC actually moves for the
+ * vendor's own account. On a player LOSS the vendor is the WINNER in the adapter's settlement, and
+ * a winner's credit is trimmed by rake + the jackpot injection — so crediting the room's tracked
+ * float with the full `|net|` (the old `vendorFloat -= receipt.net`) overstated every losing spin
+ * by exactly that trim, drifting the tracked float upward forever versus what the vendor's real
+ * locked balance actually holds. `receipt.providerDelta` fixes this by reading the exact amount off
+ * the settlement request itself.
+ */
+describe('SlotsRoom — vendor float follows the real ledger, not the player\'s net (BUG-10 follow-up A)', () => {
+  const baseConfig = {
+    name: 'Test Slots',
+    game: 'slots' as const,
+    minBuyIn: 1_000,
+    maxBuyIn: 50_000,
+    maxSeats: 6,
+    commissionBps: 500,
+  };
+
+  it('tracks losing spins at the rake-trimmed amount the vendor is actually credited, matching FC exactly', async () => {
+    const players = new DevPlayers({ startingChips: 100_000 });
+    const bank = new ChipBank(players);
+    const alice = players.create('Alice').id;
+    const tableId = 'slots-provider-delta';
+
+    const SECRET = 'slots-provider-delta-test-secret';
+    const room = new SlotsRoom(
+      { id: tableId, ...baseConfig, secret: SECRET },
+      { directory: players, fc: bank },
+    );
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: 20_000 });
+
+    // Force every spin to lose outright (signed payout 0), same technique as the top-up test above
+    // — a signature made with the room's own configured secret, so it verifies exactly as a real
+    // provider result would.
+    (room as unknown as { provider: { playRound(req: RoundRequest): Promise<SignedRoundResult> } })
+      .provider.playRound = async (req: RoundRequest): Promise<SignedRoundResult> => {
+        const payout = 0;
+        return {
+          result: { roundId: req.roundId, payout, outcome: { reels: ['BAR', 'BAR', 'LEMON'] } },
+          signature: signResult(SECRET, { ...req, payout }),
+        };
+      };
+
+    // Five 100-chip losing spins. Each one: the player loses 100 outright; the vendor is the
+    // WINNER of that 100 in the adapter's settlement, so at commissionBps 500 (5%) and the default
+    // 0.5% jackpot rate it is credited 100 − 5 (rake) − 0 (floor(100×0.5%)) = 95, not the full 100.
+    for (let i = 0; i < 5; i++) {
+      await room.command(alice, { kind: 'act', action: { type: 'spin', amount: 100 } });
+    }
+
+    const vendorId = `acc-slots-vendor:${tableId}`;
+    const realLocked = Number(await bank.lockedBalance(vendorId));
+    const trackedFloat = (room as unknown as { vendorFloat: number }).vendorFloat;
+
+    // 10,000 initial float + 5 × 95 credited — never 10,000 + 5 × 100, which is what the pre-fix
+    // `vendorFloat -= receipt.net` would have tracked.
+    expect(realLocked).toBe(10_475);
+    expect(trackedFloat).toBe(realLocked);
+
+    room.dispose();
+  });
+});
+
+/**
+ * BUG-10 follow-up B. `financial-core-client.ts` documents `lockedBalance` as absent meaning the
+ * caller should treat "locked" as UNKNOWN, never as zero — but `fundVendor` used to read `locked =
+ * 0` whenever `this.fc.lockedBalance` was undefined, so it bought the FULL float on every single
+ * top-up (stacking on top of whatever was already locked) instead of just the shortfall.
+ */
+describe('SlotsRoom — fundVendor when the locked balance is unknown (BUG-10 follow-up B)', () => {
+  const baseConfig = {
+    name: 'Test Slots',
+    game: 'slots' as const,
+    minBuyIn: 1_000,
+    maxBuyIn: 50_000,
+    maxSeats: 6,
+    commissionBps: 500,
+  };
+
+  function spyVendorBuyIn(bank: ChipBank): { amounts: string[] } {
+    const state = { amounts: [] as string[] };
+    const realBuyIn = bank.buyIn.bind(bank);
+    bank.buyIn = (accountId: string, amount: string, scope?: WalletScope): Promise<void> => {
+      if (accountId.startsWith('acc-slots-vendor:')) state.amounts.push(amount);
+      return realBuyIn(accountId, amount, scope);
+    };
+    return state;
+  }
+
+  /** Simulates a client (like `ChipDenominatedFc` fronting an inner client with no `lockedBalance`
+   *  at all) where the field is genuinely absent — UNKNOWN, never zero. */
+  function bankWithUnknownLockedBalance(players: DevPlayers): ChipBank {
+    const bank = new ChipBank(players);
+    (bank as unknown as { lockedBalance?: unknown }).lockedBalance = undefined;
+    return bank;
+  }
+
+  it('buys the whole float on first funding, since nothing can be locked yet', async () => {
+    const players = new DevPlayers({ startingChips: 20_000 });
+    const bank = bankWithUnknownLockedBalance(players);
+    const alice = players.create('Alice').id;
+    const buyIns = spyVendorBuyIn(bank);
+
+    const room = new SlotsRoom({ id: 'slots-unknown-first', ...baseConfig }, { directory: players, fc: bank });
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(alice, { kind: 'act', action: { type: 'spin', amount: 100 } });
+
+    expect(buyIns.amounts).toEqual(['10000']);
+    room.dispose();
+  });
+
+  it('tops up only the local shortfall on a later top-up — never the full float again', async () => {
+    const players = new DevPlayers({ startingChips: 100_000 });
+    const bank = bankWithUnknownLockedBalance(players);
+    const alice = players.create('Alice').id;
+    const buyIns = spyVendorBuyIn(bank);
+
+    const SECRET = 'slots-unknown-locked-test-secret';
+    const room = new SlotsRoom(
+      { id: 'slots-unknown-topup', ...baseConfig, secret: SECRET },
+      { directory: players, fc: bank },
+    );
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: 20_000 });
+
+    (room as unknown as { provider: { playRound(req: RoundRequest): Promise<SignedRoundResult> } })
+      .provider.playRound = async (req: RoundRequest): Promise<SignedRoundResult> => {
+        const payout = req.wager * 90; // within the 100x cap, well past what the float alone covers twice
+        return {
+          result: { roundId: req.roundId, payout, outcome: { reels: ['SEVEN', 'SEVEN', 'SEVEN'], multiplier: 90 } },
+          signature: signResult(SECRET, { ...req, payout }),
+        };
+      };
+
+    // Spin 1: first funding (locked unknown) buys the whole 10,000 float. The forced win pays
+    // 9,000 (net 8,900) — the vendor is the loser here, so it pays the raw amount, no rake trim —
+    // dropping the room's tracked float to 1,100.
+    await room.command(alice, { kind: 'act', action: { type: 'spin', amount: 100 } });
+    expect(buyIns.amounts).toEqual(['10000']);
+
+    // Spin 2: ensureVendorFunded tops back up. With no real locked balance to read, it must buy
+    // exactly the shortfall against what THIS room tracked (10,000 − 1,100 = 8,900) — not another
+    // full 10,000 stacked on top, which is what the pre-fix `locked = 0` fallback would have bought.
+    await room.command(alice, { kind: 'act', action: { type: 'spin', amount: 50 } });
+    expect(buyIns.amounts).toEqual(['10000', '8900']);
+
+    room.dispose();
+  });
+});

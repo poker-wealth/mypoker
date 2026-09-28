@@ -107,6 +107,36 @@ Also update, or they will still point at the old host:
   the default `slots` table), and that account starts at $0 like any other player account. The room
   locks up to a 10,000-chip ($100.00) float into it on its own, retrying if FC isn't reachable yet
   and topping the float back up out of what it locks as spins settle — but it can only lock chips
-  that are actually sitting in the account's AVAILABLE balance. Until someone deposits at least
-  $100.00 into `acc-slots-vendor:slots` (the same deposit path a player uses), spins stay refused
-  (`RoomError: slots are unavailable — vendor float not funded`).
+  that are actually sitting in the account's AVAILABLE balance. Until it has at least $100.00
+  available, spins stay refused (`RoomError: slots are unavailable — vendor float not funded`).
+
+  Fund it by having ops POST directly to FC's internal deposit route — there is no player-facing
+  deposit UI for a vendor account:
+
+  ```
+  POST /internal/deposits
+  headers: x-internal-secret: <the FC internal service secret>
+  body: {
+    "playerId": "acc-slots-vendor:slots",
+    "amount": "100.00",
+    "txHash": "<the on-chain tx hash>",
+    "contractAddress": "<the official USDT-TRC20 contract address>",
+    "confirmations": <int, >= the confirmation threshold>
+  }
+  ```
+
+  Field names are `routes.ts`'s `depositBody` schema (`playerId`, `amount`, `txHash`,
+  `contractAddress`, `confirmations`) — this is a real on-chain deposit, not a synthetic credit, so
+  it only clears `processConfirmedDeposit`'s checks (`deposit-credit.ts`) when `contractAddress` is
+  the official USDT-TRC20 contract (`usdtContract()` in `config/chain.ts`, default
+  `TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t`, overridable via `USDT_TRC20_CONTRACT`) and
+  `confirmations` is at least the required threshold (`requiredConfirmations()`, default 20,
+  overridable via `DEPOSIT_CONFIRMATIONS`). It credits the account's PLATFORM-scope AVAILABLE
+  balance (`getOrCreatePlayerAccount(playerId)` with no scope defaults to `PLATFORM_SCOPE`) — the
+  room then locks it from there into the float itself.
+
+  $100.00 only OPENS the table, it does not size it: one spin's max win (wager ×
+  `maxPayoutMultiple`, 100×) can drain the whole float in a single payout, and the very next
+  top-up then needs that much sitting in AVAILABLE again or spins refuse once more. Size the
+  vendor's actual working balance to expected payout volume, not to the $100.00 minimum that merely
+  unblocks the first spin.

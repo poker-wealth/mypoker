@@ -110,15 +110,33 @@ export class SlotsRoom extends BaseLiveRoom<SlotsRoomConfig, RoomSeat> {
   }
 
   private async fundVendor(): Promise<void> {
-    let locked = 0;
     if (this.fc.lockedBalance) {
-      locked = Number(await this.fc.lockedBalance(this.vendorId));
+      const locked = Number(await this.fc.lockedBalance(this.vendorId));
+      const need = VENDOR_FLOAT - locked;
+      if (need > 0) {
+        await this.fc.buyIn(this.vendorId, String(need));
+      }
+      this.vendorFloat = Math.max(locked, VENDOR_FLOAT);
+      this.vendorFunded = true;
+      return;
     }
-    const need = VENDOR_FLOAT - locked;
-    if (need > 0) {
-      await this.fc.buyIn(this.vendorId, String(need));
+
+    // The inner client cannot answer "how much is actually locked" at all — that is UNKNOWN, never
+    // zero (BUG-10 follow-up B: `ChipDenominatedFc.lockedBalance` used to report '0' here, which
+    // made this buy the full float on every top-up on top of whatever was already locked). With no
+    // ground truth to read, fall back to this room's own tracking: buy the whole float on the very
+    // first funding (nothing can be locked yet), or just the shortfall against what this room has
+    // tracked locally on a later top-up.
+    if (!this.vendorFunded) {
+      await this.fc.buyIn(this.vendorId, String(VENDOR_FLOAT));
+      this.vendorFloat = VENDOR_FLOAT;
+    } else {
+      const need = VENDOR_FLOAT - this.vendorFloat;
+      if (need > 0) {
+        await this.fc.buyIn(this.vendorId, String(need));
+        this.vendorFloat += need;
+      }
     }
-    this.vendorFloat = Math.max(locked, VENDOR_FLOAT);
     this.vendorFunded = true;
   }
 
@@ -169,10 +187,13 @@ export class SlotsRoom extends BaseLiveRoom<SlotsRoomConfig, RoomSeat> {
     const roundId = `${this.config.id}-spin-${this.handNumber}-${randomUUID().slice(0, 8)}`;
 
     const receipt = await this.adapter.play(playerId, roundId, wager);
-    // The vendor's own account moves the opposite of the player's net — what the player wins, the
-    // vendor's float loses, and vice versa. Tracked locally so the next spin's cap check (above)
-    // and `ensureVendorFunded`'s top-up decision (below) don't need a round trip to FC every time.
-    this.vendorFloat -= receipt.net;
+    // `receipt.providerDelta`, NOT `-receipt.net` (BUG-10 follow-up A): on a player LOSS the vendor
+    // is the WINNER in the adapter's settlement, so rake + the jackpot injection come off the
+    // vendor's own credit first — crediting the full `|net|` here drifted the tracked float upward
+    // forever, eventually admitting stakes the vendor's real locked balance could not pay. Tracked
+    // locally so the next spin's cap check (above) and `ensureVendorFunded`'s top-up decision
+    // (below) don't need a round trip to FC every time.
+    this.vendorFloat += receipt.providerDelta;
 
     const outcome = receipt.outcome as { reels?: string[] } | undefined;
     seat.reels = outcome?.reels;

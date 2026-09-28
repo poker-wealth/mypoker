@@ -20,7 +20,27 @@ import { chipsToUsdt, usdtToChips } from './chip-currency';
  * not one line of room, game, or settlement code changes.
  */
 export class ChipDenominatedFc implements FinancialCoreClient {
-  constructor(private readonly inner: FinancialCoreClient) {}
+  /**
+   * Declared as an optional PROPERTY, not a prototype method, so it can be left entirely unset
+   * below (BUG-10 follow-up B). `FinancialCoreClient.lockedBalance` is documented as: absent means
+   * the caller should treat "locked" as UNKNOWN, never as zero. A method that always exists and
+   * quietly returns '0' when the inner client can't answer breaks that contract for anyone reading
+   * `fc.lockedBalance` as a presence check (slots-room's `fundVendor` does exactly that) — they'd
+   * see a real function and trust its lying zero instead of falling back to their own tracking.
+   */
+  lockedBalance?: (playerAccountId: string, scope?: WalletScope) => Promise<string>;
+
+  constructor(private readonly inner: FinancialCoreClient) {
+    if (inner.lockedBalance) {
+      const innerLockedBalance = inner.lockedBalance.bind(inner);
+      this.lockedBalance = async (playerAccountId: string, scope?: WalletScope): Promise<string> => {
+        const usdt = await innerLockedBalance(playerAccountId, scope);
+        // The inner client (the real ledger) speaks USDT; the room speaks chips — convert at this
+        // same boundary every other amount crosses, just in the read direction.
+        return String(usdtToChips(usdt));
+      };
+    }
+  }
 
   buyIn(playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> {
     return this.inner.buyIn(playerAccountId, chipsToUsdt(amount), scope);
@@ -28,14 +48,6 @@ export class ChipDenominatedFc implements FinancialCoreClient {
 
   release(playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> {
     return this.inner.release(playerAccountId, chipsToUsdt(amount), scope);
-  }
-
-  async lockedBalance(playerAccountId: string, scope?: WalletScope): Promise<string> {
-    if (!this.inner.lockedBalance) return '0';
-    const usdt = await this.inner.lockedBalance(playerAccountId, scope);
-    // The inner client (the real ledger) speaks USDT; the room speaks chips — convert at this same
-    // boundary every other amount crosses, just in the read direction.
-    return String(usdtToChips(usdt));
   }
 
   settleRound(req: SettleRoundRequest): Promise<SettlementReceipt> {
