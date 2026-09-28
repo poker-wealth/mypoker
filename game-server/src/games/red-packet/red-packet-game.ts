@@ -139,6 +139,13 @@ export class RedPacketGame extends BaseGame<RedPacketPhase, RedPacketAction, Red
   getNet(): Map<string, number> {
     return new Map(this.net);
   }
+  /**
+   * The FC settlement round id this instance was minted with — so a caller (the jackpot payout)
+   * can share the exact id `settleTableHand` used instead of minting a second, divergent one.
+   */
+  getRoundId(): string {
+    return this.roundId;
+  }
   /** Revealed only after the round resolves. */
   reveal(): { serverSeed: string; mines: number[] } | null {
     return this.sm.is('RESOLVED')

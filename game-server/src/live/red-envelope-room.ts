@@ -255,7 +255,10 @@ export class RedEnvelopeRoom extends BaseLiveRoom<RedEnvelopeRoomConfig, RoomSea
         if (net > 0) winnerProfit += net;
       }
 
-      const roundId = `${this.config.id}-re-${this.handNumber}`;
+      // Share the settlement's own round id rather than minting a second one from handNumber: two
+      // rooms with the same config.id (or a restart resetting handNumber) used to collide, and FC's
+      // idempotency key is `${roundId}:jackpot:${tier}` — a collision silently skips the payout.
+      const roundId = this.game.getRoundId();
       // Drawn on the seed the split was generated from, so the jackpot is as verifiable as the
       // game. No fallback: without a real seed the draw is SKIPPED rather than run on a
       // guessable one, which is the bug rather than the backstop.

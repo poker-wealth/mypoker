@@ -161,7 +161,10 @@ export class SanZhangRoom extends BaseLiveRoom<SanZhangRoomConfig, RoomSeat> {
         if (net > 0) winnerProfit += net;
       }
 
-      const roundId = `${this.config.id}-sz-${this.handNumber}`;
+      // Share the settlement's own round id rather than minting a second one from handNumber: two
+      // rooms with the same config.id (or a restart resetting handNumber) used to collide, and FC's
+      // idempotency key is `${roundId}:jackpot:${tier}` — a collision silently skips the payout.
+      const roundId = this.game.getRoundId();
       // The jackpot draws on the seed the round was actually generated from, so a player can
       // verify the draw the same way they verify the game. It used to draw on `${roundId}:seed`,
       // which anyone holding a round id can reproduce — a predictable jackpot.

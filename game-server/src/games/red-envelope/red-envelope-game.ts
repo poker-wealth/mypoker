@@ -246,6 +246,13 @@ export class RedEnvelopeGame extends BaseGame<
   getNet(): Map<string, number> {
     return new Map(this.net);
   }
+  /**
+   * The FC settlement round id this instance was minted with — so a caller (the jackpot payout)
+   * can share the exact id `settleTableHand` used instead of minting a second, divergent one.
+   */
+  getRoundId(): string {
+    return this.roundId;
+  }
 
   claimOf(playerId: string): ClaimResult | null {
     return this.claims.get(playerId) ?? null;
