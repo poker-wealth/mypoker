@@ -167,6 +167,44 @@ describe('withdrawal state machine', () => {
     expect((await WithdrawalModel.findById(id))!.state).toBe(WithdrawalState.ROLLED_BACK);
   });
 
+  it('BUG-09 D1: refuses to rollback (and refund) a withdrawal with an unresolved pendingTxId', async () => {
+    const player = await makePlayer('1000');
+    const id = await requestWithdrawal({
+      playerAccountId: player,
+      amount: Money.fromDecimalString('300'),
+      address: 'TXaddr',
+    });
+    await approveWithdrawal(id, 'ops-1');
+    // Simulates a send whose broadcast is unresolved — the CAS a real send performs
+    // (withdrawal-broadcast.ts) before ever calling broadcasttransaction.
+    await WithdrawalModel.updateOne({ _id: id }, { $set: { pendingTxId: 'a'.repeat(64) } });
+
+    // The pendingTxId guard is enforced by the atomic filter itself (D1), not by a caller reading the
+    // withdrawal first — so this refuses even though nothing here re-checked pendingTxId beforehand.
+    await expect(rollbackWithdrawal(id, 'refused')).rejects.toThrow(InvalidWithdrawalTransitionError);
+
+    const w = await WithdrawalModel.findById(id);
+    expect(w!.state).toBe(WithdrawalState.APPROVED); // untouched — no refund
+    expect(await balances(player)).toEqual({ available: 700, clearing: 300 });
+  });
+
+  it('BUG-09 D1: allowPendingTx lets the rollback through once the caller has confirmed it is safe', async () => {
+    const player = await makePlayer('1000');
+    const id = await requestWithdrawal({
+      playerAccountId: player,
+      amount: Money.fromDecimalString('300'),
+      address: 'TXaddr',
+    });
+    await approveWithdrawal(id, 'ops-1');
+    await WithdrawalModel.updateOne({ _id: id }, { $set: { pendingTxId: 'a'.repeat(64) } });
+
+    await rollbackWithdrawal(id, 'confirmed never landed on-chain', { allowPendingTx: true });
+
+    const w = await WithdrawalModel.findById(id);
+    expect(w!.state).toBe(WithdrawalState.ROLLED_BACK);
+    expect(await balances(player)).toEqual({ available: 1000, clearing: 0 });
+  });
+
   it('rejects an illegal transition (cannot confirm a REQUESTED withdrawal)', async () => {
     const player = await makePlayer('1000');
     const id = await requestWithdrawal({

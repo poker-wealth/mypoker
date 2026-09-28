@@ -1829,7 +1829,14 @@ export function buildRouter(): Router {
       }
       // The refusing administrator is recorded in the reason, since the
       // withdrawal document has no rejectedBy field of its own.
-      await rollbackWithdrawal(id, `${b.reason} (refused by ${b.rejectedBy})`);
+      //
+      // allowPendingTx mirrors chainChecked straight through: the early check above is a fast,
+      // friendly 409 for the common case, but the real guard is the atomic filter inside
+      // rollbackWithdrawal itself (D1) — a pendingTxId that appears between that read and this call
+      // (a concurrent send) is still caught, because allowPendingTx is false unless the caller said so.
+      await rollbackWithdrawal(id, `${b.reason} (refused by ${b.rejectedBy})`, {
+        allowPendingTx: b.chainChecked === true,
+      });
       res.json({ state: await currentState(id) });
     }),
   );
@@ -1866,9 +1873,14 @@ export function buildRouter(): Router {
     }),
   );
   // Take an APPROVED withdrawal on-chain: sign + broadcast the USDT transfer from the hot wallet and
-  // record the real txHash. On any failure the withdrawal rolls back (clearing hold released), so a
-  // failed send never strands the player's money. Needs TRON_HOT_WALLET_KEY (else 500 with a clear
-  // message, and the withdrawal stays APPROVED for a retry once the key is set).
+  // record the real txHash. Needs TRON_HOT_WALLET_KEY (else 500 with a clear message, and the
+  // withdrawal stays APPROVED for a retry once the key is set).
+  //
+  // BUG-09: NOT "on any failure the withdrawal rolls back" — that was true before the fix and is the
+  // bug it fixed. Build/sign failing (nothing reached the chain) rolls back; broadcast failing is
+  // ambiguous (may be live on-chain) and does NOT roll back — the withdrawal stays APPROVED with
+  // pendingTxId set, blocking a re-send until a human resolves it via /broadcast or /reject. See
+  // signAndBroadcastWithdrawal's doc comment in withdrawal-broadcast.ts.
   r.post(
     '/internal/withdrawals/:id/sign-broadcast',
     internalAuth,

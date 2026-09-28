@@ -137,6 +137,17 @@ export interface SignedTransfer {
 }
 
 /**
+ * `raw_data.expiration` off a built transaction — TronGrid sets it in MILLISECOND epoch (not seconds,
+ * despite most other TRON timestamps), default ~60s out from build time. Used to know when a
+ * `pendingTxId` (BUG-09) is safe to treat as expired rather than still possibly in flight. `undefined`
+ * if the shape is ever not what TronGrid documents, so a caller can alert instead of misreading it.
+ */
+export function txExpirationMs(tx: { raw_data: unknown }): number | undefined {
+  const raw = tx.raw_data as { expiration?: unknown } | null | undefined;
+  return typeof raw?.expiration === 'number' ? raw.expiration : undefined;
+}
+
+/**
  * Build (TronGrid) → sign (local key / KMS, behind the {@link TronSigner} port) a USDT transfer.
  * Nothing leaves the wallet here — no network write touches the chain, so a failure here is always
  * safe to roll back. Split out from the broadcast step (BUG-09) so a caller can persist `tx.txID` as

@@ -15,6 +15,7 @@ import {
   AccountNotFoundError,
   InsufficientBalanceError,
   InvalidWithdrawalTransitionError,
+  WithdrawalBroadcastPendingError,
   WithdrawalNotFoundError,
 } from '../wallet/errors';
 import { WithdrawalModel, type WithdrawalDoc } from './withdrawal.model';
@@ -153,13 +154,32 @@ export async function approveWithdrawal(
  * txHash), or it's an admin resolving a stuck ambiguous send via the manual `/broadcast` route after
  * checking the chain, in which case pendingTxId has done its job (blocking a re-send) and should stop
  * blocking anything further.
+ *
+ * BUG-09 follow-up (D3): if `pendingTxId` is set to something OTHER than `txHash`, this refuses. The
+ * manual `/broadcast` route lets an admin confirm a send with a txHash they read off the chain — without
+ * this guard they could type (or the client could send) any txHash while a real broadcast is still
+ * unresolved, silently discarding the actual pending send and recording a fabricated one instead.
  */
 export async function broadcastWithdrawal(withdrawalId: string, txHash: string): Promise<void> {
   const w = await loadOrThrow(withdrawalId);
   assertTransition(w.state, WithdrawalState.BROADCASTING);
+  if (w.pendingTxId && w.pendingTxId !== txHash) {
+    throw new WithdrawalBroadcastPendingError(
+      withdrawalId,
+      `withdrawal ${withdrawalId} has a pending broadcast ${w.pendingTxId} — txHash ${txHash} does not ` +
+        'match it, refusing (resolve the actual pending send, or reject with chainChecked:true)',
+    );
+  }
+  // Filter accepts either no pendingTxId at all, or one that matches txHash exactly — atomically, so a
+  // concurrent CAS onto pendingTxId between the read above and this write cannot slip a mismatched
+  // txHash through.
   const moved = await WithdrawalModel.updateOne(
-    { _id: withdrawalId, state: WithdrawalState.APPROVED },
-    { $set: { state: WithdrawalState.BROADCASTING, txHash }, $unset: { pendingTxId: '' } },
+    {
+      _id: withdrawalId,
+      state: WithdrawalState.APPROVED,
+      $or: [{ pendingTxId: { $exists: false } }, { pendingTxId: txHash }],
+    },
+    { $set: { state: WithdrawalState.BROADCASTING, txHash }, $unset: { pendingTxId: '', pendingTxExpiration: '' } },
   );
   if (moved.matchedCount === 0) {
     throw new InvalidWithdrawalTransitionError(w.state, WithdrawalState.BROADCASTING);
@@ -276,11 +296,30 @@ export async function confirmWithdrawal(withdrawalId: string): Promise<void> {
   }
 }
 
+export interface RollbackWithdrawalOptions {
+  /**
+   * BUG-09 (D1): by default, rollback refuses a withdrawal with an unresolved broadcast
+   * (`pendingTxId` set) — it may already be live on-chain, and refunding it risks a double-pay. Pass
+   * `true` only once the caller has explicitly confirmed (chain-checked) it's safe — mirrors the
+   * `chainChecked` flag on the reject route, the only caller that ever sets this.
+   */
+  allowPendingTx?: boolean;
+}
+
 /**
  * ROLLED_BACK: terminal failure. If the amount was held in clearing (APPROVED/BROADCASTING),
  * release it back to available. From REQUESTED there is nothing to release.
+ *
+ * BUG-09 (D1): the `pendingTxId` guard is enforced IN the atomic filter below, not only by a caller
+ * reading the withdrawal first and deciding whether to call this. A read-then-decide check has a race
+ * — a send can CAS `pendingTxId` onto the withdrawal between that read and this call — so the filter
+ * itself refuses to match a row that has since grown a `pendingTxId` the caller never saw or OK'd.
  */
-export async function rollbackWithdrawal(withdrawalId: string, reason: string): Promise<void> {
+export async function rollbackWithdrawal(
+  withdrawalId: string,
+  reason: string,
+  opts?: RollbackWithdrawalOptions,
+): Promise<void> {
   const w = await loadOrThrow(withdrawalId);
   assertTransition(w.state, WithdrawalState.ROLLED_BACK);
   const amountD = w.amount;
@@ -298,7 +337,11 @@ export async function rollbackWithdrawal(withdrawalId: string, reason: string): 
     }
 
     const moved = await WithdrawalModel.updateOne(
-      { _id: withdrawalId, state: w.state },
+      {
+        _id: withdrawalId,
+        state: w.state,
+        ...(opts?.allowPendingTx ? {} : { pendingTxId: { $exists: false } }),
+      },
       { $set: { state: WithdrawalState.ROLLED_BACK, failureReason: reason } },
       { session },
     );

@@ -1,9 +1,15 @@
 import { Money } from '../domain/money';
 import { WithdrawalState } from '../domain/withdrawal-types';
-import { WithdrawalNotFoundError } from '../wallet/errors';
+import { WithdrawalBroadcastPendingError, WithdrawalNotFoundError } from '../wallet/errors';
 import { WithdrawalModel } from './withdrawal.model';
 import { broadcastWithdrawal, rollbackWithdrawal } from './withdrawal-state-machine';
-import { buildAndSignTransfer, broadcastSigned, usdtToUnits, type SignerConfig } from './tron-signer';
+import {
+  buildAndSignTransfer,
+  broadcastSigned,
+  txExpirationMs,
+  usdtToUnits,
+  type SignerConfig,
+} from './tron-signer';
 import { signerFromEnv } from './signer-from-env';
 import { tronApiUrl, tronApiKey, usdtContract, withdrawalFeeLimitSun } from '../config/chain';
 import { alertOps } from '../lib/alert';
@@ -61,7 +67,8 @@ export async function signAndBroadcastWithdrawal(
   // A previous attempt left an unresolved broadcast — never build a second transfer on top of it.
   // A human must confirm (it landed) or reject (it's expired/never landed) it first.
   if (w.pendingTxId) {
-    throw new Error(
+    throw new WithdrawalBroadcastPendingError(
+      withdrawalId,
       `withdrawal ${withdrawalId} already broadcast ${w.pendingTxId} — confirm or reject it, never re-send`,
     );
   }
@@ -81,12 +88,23 @@ export async function signAndBroadcastWithdrawal(
   // last saw it (APPROVED, nobody else's pendingTxId already sitting here). This is a CAS, not a
   // courtesy check: two concurrent sign-broadcast calls both pass the state check above, but only one
   // can win this updateOne, and the loser must not go on to broadcast.
+  //
+  // pendingTxExpiration rides along (D4): raw_data.expiration is TronGrid's own ms-epoch expiry for
+  // this signed tx (~60s from build) — the withdrawal watcher uses it to know when an unresolved send
+  // has stopped being "maybe still in flight" and started being "never going to land".
+  const expirationMs = txExpirationMs(signed.tx);
   const claimed = await WithdrawalModel.updateOne(
     { _id: withdrawalId, state: WithdrawalState.APPROVED, pendingTxId: { $exists: false } },
-    { $set: { pendingTxId: signed.tx.txID } },
+    {
+      $set: {
+        pendingTxId: signed.tx.txID,
+        ...(expirationMs !== undefined ? { pendingTxExpiration: new Date(expirationMs) } : {}),
+      },
+    },
   );
   if (claimed.modifiedCount !== 1) {
-    throw new Error(
+    throw new WithdrawalBroadcastPendingError(
+      withdrawalId,
       `withdrawal ${withdrawalId} changed under us (state or pendingTxId) — refusing to broadcast a second transfer`,
     );
   }
@@ -97,8 +115,8 @@ export async function signAndBroadcastWithdrawal(
     // AMBIGUOUS: broadcastSigned's own doc comment explains why this is not safe to assume-failed.
     // The clearing hold stays put — do NOT roll back — and a human reconciles `pendingTxId` against
     // the chain. (A signed TRON tx also expires — raw_data.expiration, ~60s from build here — so once
-    // that has passed AND the chain confirms it never landed, this is safe to roll back; that check is
-    // manual for now, not automated here.)
+    // that has passed AND the chain confirms it never landed, this is safe to roll back; the withdrawal
+    // watcher automates exactly that check — see checkWithdrawalsOnce's second scan.)
     await alertOps('withdrawal broadcast ambiguous — manual check', {
       withdrawalId,
       txId: signed.tx.txID,
@@ -106,6 +124,20 @@ export async function signAndBroadcastWithdrawal(
     });
     throw err;
   }
-  await broadcastWithdrawal(withdrawalId, signed.tx.txID);
+
+  try {
+    await broadcastWithdrawal(withdrawalId, signed.tx.txID);
+  } catch (err) {
+    // D2: the on-chain send SUCCEEDED (broadcastSigned above returned) but recording that (the state
+    // write to BROADCASTING) failed — a DB blip, a concurrent writer, anything. This is a worse blind
+    // spot than the ambiguous-broadcast case above: here we KNOW the tx is live, and without this catch
+    // nobody would ever be told. The withdrawal stays APPROVED with pendingTxId still set (blocking a
+    // re-send, same as the ambiguous case), and ops gets the txID to resolve manually via /broadcast.
+    await alertOps('withdrawal broadcast SENT but state write failed — resolve via /broadcast', {
+      withdrawalId,
+      txId: signed.tx.txID,
+    });
+    throw err;
+  }
   return signed.tx.txID;
 }

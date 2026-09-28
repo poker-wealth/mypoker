@@ -1,14 +1,28 @@
 import { Decimal128 } from 'bson';
 import { AccountModel } from '../../src/wallet/account.model';
 import { WithdrawalModel } from '../../src/withdrawal/withdrawal.model';
-import { requestWithdrawal, approveWithdrawal } from '../../src/withdrawal/withdrawal-state-machine';
+import {
+  requestWithdrawal,
+  approveWithdrawal,
+  broadcastWithdrawal,
+} from '../../src/withdrawal/withdrawal-state-machine';
 import { signAndBroadcastWithdrawal } from '../../src/withdrawal/withdrawal-broadcast';
 import { LocalPrivateKeySigner, type SignerConfig } from '../../src/withdrawal/tron-signer';
 import { WithdrawalState } from '../../src/domain/withdrawal-types';
 import { Money } from '../../src/domain/money';
 import { AccountType } from '../../src/domain/account-types';
+import { WithdrawalBroadcastPendingError } from '../../src/wallet/errors';
 import { setAlertHandler, resetAlertHandler, type AlertContext } from '../../src/lib/alert';
 import { startTestDb, stopTestDb, clearCollections, ensureIndexes } from '../db-helper';
+
+// D2: broadcastWithdrawal (the state-machine transition write) is mocked to fail ONCE, in a single
+// test below, to exercise the "on-chain send succeeded but the state write failed" branch — a case a
+// fake TronGrid can't produce on its own, since as far as TronGrid is concerned the send worked fine.
+// Every other test gets the real implementation via the actual-module passthrough.
+jest.mock('../../src/withdrawal/withdrawal-state-machine', () => {
+  const actual = jest.requireActual('../../src/withdrawal/withdrawal-state-machine');
+  return { ...actual, broadcastWithdrawal: jest.fn(actual.broadcastWithdrawal) };
+});
 
 /**
  * BUG-09: an ambiguous withdrawal broadcast (TronGrid may have accepted the tx and lost the response)
@@ -123,12 +137,32 @@ describe('signAndBroadcastWithdrawal (BUG-09)', () => {
     const w = await WithdrawalModel.findById(id);
     expect(w!.state).toBe(WithdrawalState.APPROVED);
     expect(w!.pendingTxId).toBe('a'.repeat(64));
+    // D4(a): the CAS also records when the signed tx itself expires, so the watcher can later tell
+    // "maybe still in flight" from "definitely never landing".
+    expect(w!.pendingTxExpiration).toBeInstanceOf(Date);
     // The clearing hold is untouched either way — no refund, no second movement.
     expect(await balances(player)).toEqual({ available: 700, clearing: 300 });
 
     expect(alerts).toHaveLength(1);
     expect(alerts[0]!.message).toMatch(/ambiguous/i);
     expect(alerts[0]!.context).toMatchObject({ withdrawalId: id, txId: 'a'.repeat(64) });
+  });
+
+  // D6: a DEFINITIVE node rejection (result:false — TronGrid actually answered "no") must be treated
+  // exactly the same as a dropped/timed-out response. Both reach us the same way (broadcastSigned
+  // throws) and both are ambiguous from the caller's side: TronGrid could still be wrong, or a retry
+  // path elsewhere could double-send if this were ever read as "safe to refund".
+  it('BUG-09 D6: a definitive node rejection (result:false) is also ambiguous — hold kept, not refunded', async () => {
+    const { id, player } = await approvedWithdrawal('150');
+
+    await expect(
+      signAndBroadcastWithdrawal(id, cfg(fakeFetch({ broadcast: 'rejected' }))),
+    ).rejects.toThrow(/tron broadcast rejected/);
+
+    const w = await WithdrawalModel.findById(id);
+    expect(w!.state).toBe(WithdrawalState.APPROVED);
+    expect(w!.pendingTxId).toBe('a'.repeat(64));
+    expect(await balances(player)).toEqual({ available: 850, clearing: 150 });
   });
 
   it('refuses a second send while a broadcast is unresolved', async () => {
@@ -138,12 +172,38 @@ describe('signAndBroadcastWithdrawal (BUG-09)', () => {
     ).rejects.toThrow();
 
     // Retry, as the admin's sign-broadcast route would on a second click.
-    await expect(
-      signAndBroadcastWithdrawal(id, cfg(fakeFetch({ broadcast: 'ok' }))),
-    ).rejects.toThrow(/already broadcast/);
+    const retry = signAndBroadcastWithdrawal(id, cfg(fakeFetch({ broadcast: 'ok' })));
+    await expect(retry).rejects.toThrow(/already broadcast/);
+    await expect(retry).rejects.toBeInstanceOf(WithdrawalBroadcastPendingError); // D4(c)
 
     const w = await WithdrawalModel.findById(id);
     expect(w!.state).toBe(WithdrawalState.APPROVED); // still untouched
+  });
+
+  // D2: the send genuinely landed (broadcastSigned succeeded) but recording that — the state write to
+  // BROADCASTING — then fails. Without its own alert this is the worst blind spot of all: the money IS
+  // moving and nobody is told. It must NOT be reinterpreted as "safe to roll back" (that would be the
+  // double-pay this whole bug is about) — the hold stays, pendingTxId stays, ops gets the txID.
+  it('BUG-09 D2: the on-chain send succeeds but the state write fails — alerts ops, hold and pendingTxId stay', async () => {
+    const { id, player } = await approvedWithdrawal('200');
+    (broadcastWithdrawal as jest.Mock).mockRejectedValueOnce(new Error('mongo write failed'));
+    const alerts: { message: string; context: AlertContext | undefined }[] = [];
+    setAlertHandler((message, context) => {
+      alerts.push({ message, context });
+    });
+
+    await expect(
+      signAndBroadcastWithdrawal(id, cfg(fakeFetch({ broadcast: 'ok' }))),
+    ).rejects.toThrow('mongo write failed');
+
+    const w = await WithdrawalModel.findById(id);
+    expect(w!.state).toBe(WithdrawalState.APPROVED);
+    expect(w!.pendingTxId).toBe('a'.repeat(64));
+    expect(await balances(player)).toEqual({ available: 800, clearing: 200 });
+
+    const sentAlert = alerts.find((a) => /state write failed/i.test(a.message));
+    expect(sentAlert).toBeDefined();
+    expect(sentAlert!.context).toMatchObject({ withdrawalId: id, txId: 'a'.repeat(64) });
   });
 
   it('a build/sign failure is safe to assume-failed — rolls back and returns the funds', async () => {

@@ -31,6 +31,12 @@ export interface WithdrawalDoc {
    * never by trying again.
    */
   pendingTxId?: string;
+  /**
+   * When the signed transaction behind `pendingTxId` expires on-chain (TronGrid's `raw_data.expiration`,
+   * ms epoch — ~60s from build). Set alongside `pendingTxId`; used by the withdrawal watcher to decide
+   * when an unresolved broadcast is safe to alert-and-release rather than leave waiting forever.
+   */
+  pendingTxExpiration?: Date;
   txHash?: string;
   failureReason?: string;
   createdAt: Date;
@@ -64,6 +70,7 @@ const withdrawalSchema = new Schema<WithdrawalDoc>(
      */
     approvals: { type: [String], default: [] },
     pendingTxId: { type: String, required: false },
+    pendingTxExpiration: { type: Date, required: false },
     txHash: { type: String, required: false },
     failureReason: { type: String, required: false },
   },
