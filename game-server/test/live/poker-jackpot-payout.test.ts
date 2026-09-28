@@ -68,7 +68,8 @@ interface Harness {
  * client, so the test exercises the actual `/^\d+$/` gate instead of a dev fake that would let a
  * fractional amount through silently.
  */
-function harness(): Harness {
+function harness(opts: { payoutApplied?: boolean } = {}): Harness {
+  const { payoutApplied = true } = opts;
   const players = new DevPlayers({ startingChips: 10_000 });
   const alice = players.create('Alice').id;
   const bob = players.create('Bob').id;
@@ -88,7 +89,7 @@ function harness(): Harness {
       return { roundId: req.roundId, applied: true };
     },
     async jackpotPayout() {
-      return { applied: true };
+      return { applied: payoutApplied };
     },
   };
   const adapter = new ChipDenominatedFc(inner);
@@ -130,6 +131,21 @@ async function playToShowdown(h: Harness): Promise<void> {
     await h.room.command(playerId, { kind: 'act', action: legal.canCheck ? { type: 'check' } : { type: 'call' } });
   }
   throw new Error('hand did not finish');
+}
+
+/**
+ * Patches the room's live hand so `roundInfo().finalSeed` reads as absent — the one case
+ * `evaluateJackpots` cannot get a verifiable seed for. Must be called once the hand exists (after
+ * `seatBoth`) and before the settling action of `playToShowdown`.
+ */
+function blankOutFinalSeed(h: Harness): void {
+  const game = (h.room as unknown as { game?: { roundInfo(): Record<string, unknown> | undefined } }).game;
+  if (!game) throw new Error('no hand in progress to patch');
+  const original = game.roundInfo.bind(game);
+  game.roundInfo = () => {
+    const real = original();
+    return real ? { ...real, finalSeed: undefined } : real;
+  };
 }
 
 describe('PokerRoom jackpot payouts use whole chips (BUG-04)', () => {
@@ -183,6 +199,104 @@ describe('PokerRoom jackpot payouts use whole chips (BUG-04)', () => {
     await playToShowdown(h);
     await until(() => h.room.snapshotFor(h.alice).phase === 'SHOWDOWN');
 
+    expect(h.jackpotCalls).toHaveLength(0);
+    expect(h.room.snapshotFor(h.alice).jackpot).toBeNull();
+    h.room.dispose();
+  });
+});
+
+/**
+ * BUG-19: `evaluateJackpots` discarded `applied` from `fc.jackpotPayout` and announced every hit
+ * unconditionally — a replayed payout (applied:false, no chips moved, per FC's idempotency key
+ * `${roundId}:jackpot:${tier}`) still told a player they won. It also seeded the draw with
+ * `finalSeed ?? req.roundId`, a round id anyone at the table can already see, so a missing seed
+ * used to fall back to a guessable one instead of skipping the draw. Both fixed to match the
+ * pattern base-room.processJackpot already uses (c5b4548).
+ */
+describe('PokerRoom announces only paid jackpots and never seeds the draw from the round id (BUG-19)', () => {
+  it('does not announce a jackpot payout FC reports as a replay (applied:false)', async () => {
+    const h = harness({ payoutApplied: false });
+    const forcedHit: JackpotHit = {
+      tier: 'MINI',
+      playerId: h.alice,
+      amount: 5_000_000, // 5 chips — comfortably above the floor-to-zero floor
+      roundId: 'engine-round-irrelevant',
+      at: Date.now(),
+      poolAfter: 0,
+      animationMs: 400,
+      seed: 'seed-1',
+    };
+    (h.room as unknown as { jackpotEngine: JackpotEngine }).jackpotEngine = stubEngine(forcedHit);
+
+    await seatBoth(h);
+    await playToShowdown(h);
+    await until(() => h.room.snapshotFor(h.alice).phase === 'SHOWDOWN');
+
+    // Exactly one payout attempt — FC was asked once, refused it as a replay, and that is the end
+    // of it. Not announced: nothing was actually paid.
+    expect(h.jackpotCalls).toHaveLength(1);
+    expect(h.room.snapshotFor(h.alice).jackpot).toBeNull();
+    h.room.dispose();
+  });
+
+  it('announces a jackpot payout FC confirms was applied', async () => {
+    const h = harness({ payoutApplied: true });
+    const forcedHit: JackpotHit = {
+      tier: 'MINOR',
+      playerId: h.bob,
+      amount: 5_000_000,
+      roundId: 'engine-round-irrelevant',
+      at: Date.now(),
+      poolAfter: 0,
+      animationMs: 400,
+      seed: 'seed-1',
+    };
+    (h.room as unknown as { jackpotEngine: JackpotEngine }).jackpotEngine = stubEngine(forcedHit);
+
+    await seatBoth(h);
+    await playToShowdown(h);
+    await until(() => h.room.snapshotFor(h.alice).phase === 'SHOWDOWN');
+
+    expect(h.jackpotCalls).toHaveLength(1);
+    const snap = h.room.snapshotFor(h.alice);
+    expect(snap.jackpot).not.toBeNull();
+    expect(snap.jackpot!.tier).toBe('MINOR');
+    expect(snap.jackpot!.playerId).toBe(h.bob);
+    h.room.dispose();
+  });
+
+  it('skips the draw — no hit, no payout call — when the round has no verifiable finalSeed', async () => {
+    const h = harness();
+    // A hit the engine would force if it were ever asked to draw. It must NOT be asked: with no
+    // finalSeed, evaluateJackpots has to skip onRoundSettled entirely rather than seed it off the
+    // (guessable) round id.
+    const wouldBeHit: JackpotHit = {
+      tier: 'MINI',
+      playerId: h.alice,
+      amount: 5_000_000,
+      roundId: 'engine-round-irrelevant',
+      at: Date.now(),
+      poolAfter: 0,
+      animationMs: 400,
+      seed: 'seed-1',
+    };
+    let drawCalled = false;
+    (h.room as unknown as { jackpotEngine: JackpotEngine }).jackpotEngine = {
+      inject: () => {},
+      isFrozen: () => false,
+      triggersLastHour: () => 0,
+      onRoundSettled: () => {
+        drawCalled = true;
+        return [wouldBeHit];
+      },
+    } as unknown as JackpotEngine;
+
+    await seatBoth(h);
+    blankOutFinalSeed(h);
+    await playToShowdown(h);
+    await until(() => h.room.snapshotFor(h.alice).phase === 'SHOWDOWN');
+
+    expect(drawCalled).toBe(false);
     expect(h.jackpotCalls).toHaveLength(0);
     expect(h.room.snapshotFor(h.alice).jackpot).toBeNull();
     h.room.dispose();

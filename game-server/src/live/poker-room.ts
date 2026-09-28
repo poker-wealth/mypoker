@@ -1811,34 +1811,48 @@ export class PokerRoom implements LiveRoom {
     const engine = this.jackpot();
     const now = Date.now();
     const wasFrozen = engine.isFrozen();
-    const hits = engine.onRoundSettled({
-      roundId: req.roundId,
-      seed: this.game?.roundInfo()?.finalSeed ?? req.roundId,
-      now,
-      candidates: seatIds.map((playerId) => ({
-        playerId,
-        baseWeight: 1,
-        /**
-         * The seat's real behaviour, not a constant.
-         *
-         * The weights module was wired up but fed `NORMAL` for everyone, so a bot and a person had
-         * exactly the same chance at a jackpot — the scoring existed and decided nothing. This is
-         * the input side of it: `behaviorStatusFor` reads the reaction times and bet sizing the
-         * room records per turn and returns FLAGGED once a seat crosses the review threshold,
-         * which halves its jackpot weight.
-         *
-         * FLAGGED weights a draw and nothing else (§8.3): it never bans, never touches reputation
-         * and never blocks a withdrawal.
-         */
-        behavior: this.behaviorStatusFor(playerId),
-        /**
-         * Left alone deliberately. `associated` and COLLUDING come from the collusion and
-         * association pipeline, which is a different signal from per-seat timing — this change
-         * must not start asserting things that pipeline is responsible for.
-         */
-        associated: false,
-      })),
-    });
+    // The draw has to run on the round's own verifiable seed, so a player can check it the same way
+    // they check the deal. This used to fall back to `req.roundId` when the game had no finalSeed
+    // yet — a round id is not a secret (it is right there in the snapshot), so that fallback drew on
+    // a seed anyone at the table could predict in advance. No fallback on purpose: without a real
+    // seed the draw is SKIPPED, because running it on a guessable one is the bug, not the backstop.
+    const finalSeed = this.game?.roundInfo()?.finalSeed;
+    let hits: JackpotHit[];
+    if (finalSeed) {
+      hits = engine.onRoundSettled({
+        roundId: req.roundId,
+        seed: finalSeed,
+        now,
+        candidates: seatIds.map((playerId) => ({
+          playerId,
+          baseWeight: 1,
+          /**
+           * The seat's real behaviour, not a constant.
+           *
+           * The weights module was wired up but fed `NORMAL` for everyone, so a bot and a person had
+           * exactly the same chance at a jackpot — the scoring existed and decided nothing. This is
+           * the input side of it: `behaviorStatusFor` reads the reaction times and bet sizing the
+           * room records per turn and returns FLAGGED once a seat crosses the review threshold,
+           * which halves its jackpot weight.
+           *
+           * FLAGGED weights a draw and nothing else (§8.3): it never bans, never touches reputation
+           * and never blocks a withdrawal.
+           */
+          behavior: this.behaviorStatusFor(playerId),
+          /**
+           * Left alone deliberately. `associated` and COLLUDING come from the collusion and
+           * association pipeline, which is a different signal from per-seat timing — this change
+           * must not start asserting things that pipeline is responsible for.
+           */
+          associated: false,
+        })),
+      });
+    } else {
+      console.error(
+        `[room ${this.config.id}] round ${req.roundId} has no verifiable seed — jackpot draw skipped rather than drawn on a predictable one`,
+      );
+      hits = [];
+    }
 
     // CB3 edge — the engine froze THIS round (three jackpots inside an hour on this table, a farming
     // signature). It has already stopped paying locally; report it to FC so the freeze lands in the
@@ -1859,17 +1873,27 @@ export class PokerRoom implements LiveRoom {
       // worth minting a fifth currency unit over, and a hit that floors to zero pays nothing.
       const amountChips = Math.floor(hit.amount / CHIPS_TO_MICROS); // micros → table currency
       if (amountChips <= 0) continue;
+      let applied: boolean;
       try {
-        await this.fc.jackpotPayout({
+        ({ applied } = await this.fc.jackpotPayout({
           tableId: this.config.id,
           tier: tierKey,
           jackpotAccountId: pools[tierKey],
           playerId: hit.playerId,
           amount: String(amountChips),
           roundId: req.roundId,
-        });
+        }));
       } catch (err) {
         console.error('[room] jackpot payout refused by ledger — hit not shown:', err);
+        continue;
+      }
+      if (!applied) {
+        // FC's idempotency key is `${roundId}:jackpot:${tierKey}` — applied:false means this exact
+        // payout already happened (a reused round id, most likely). No chips moved, so announcing it
+        // again would tell a player they won money that never arrived.
+        console.error(
+          `[room ${this.config.id}] jackpot payout for ${req.roundId}:${tierKey} was a replay — not announced`,
+        );
         continue;
       }
       this.announceJackpot(hit, amountChips);
