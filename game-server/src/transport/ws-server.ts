@@ -25,21 +25,48 @@ import {
 export interface ClientContext {
   readonly session: Session;
   /**
-   * Where this connection comes from: the first hop of `x-forwarded-for` when
-   * a proxy (Heroku's router) put one there, else the socket's own address.
-   * Read at the upgrade — never from anything the client sends afterwards.
-   * Undefined only when the socket is gone before we asked.
+   * Where this connection comes from: the trusted-hop entry of
+   * `x-forwarded-for` when a proxy (Heroku's router) put one there, else the
+   * socket's own address. Read at the upgrade — never from anything the
+   * client sends afterwards. Undefined only when the socket is gone before we
+   * asked.
    */
   readonly ip?: string;
   send(msg: Outbound): void;
   close(reason?: string): void;
 }
 
-/** The connection's network address, proxy-aware. Exported for the tests. */
-export function connectionIp(req: IncomingMessage | undefined): string | undefined {
-  const forwarded = req?.headers['x-forwarded-for'];
-  const first = (Array.isArray(forwarded) ? forwarded[0] : forwarded)?.split(',')[0]?.trim();
-  return first || req?.socket?.remoteAddress || undefined;
+/**
+ * The connection's network address, proxy-aware (BUG-27).
+ *
+ * `trustProxyHops` mirrors the HTTP side's `trust proxy` (see
+ * `gateway/config.ts` and `gateway/app.ts`): with N hops trusted, the real
+ * client is the Nth entry from the RIGHT of `X-Forwarded-For` — a real proxy
+ * only ever APPENDS its own hop, it never forwards what a client already put
+ * there, so the rightmost N entries are the ones actually added by trusted
+ * proxies and nothing further left can have come from anywhere but the
+ * client itself. Taking the FIRST (leftmost) hop, as this used to, reads
+ * exactly what a client can freely put in its own request header — trivially
+ * spoofable.
+ *
+ * Falls back to the socket's own address when no hop is trusted (0, the
+ * default with no proxy in front) or the header holds fewer entries than
+ * that — a short/missing header is never treated as "trust whatever is
+ * there instead".
+ */
+export function connectionIp(req: IncomingMessage | undefined, trustProxyHops = 0): string | undefined {
+  if (trustProxyHops > 0) {
+    const forwarded = req?.headers['x-forwarded-for'];
+    const header = Array.isArray(forwarded) ? forwarded.join(',') : forwarded;
+    const hops = header
+      ?.split(',')
+      .map((hop) => hop.trim())
+      .filter(Boolean);
+    if (hops && hops.length >= trustProxyHops) {
+      return hops[hops.length - trustProxyHops];
+    }
+  }
+  return req?.socket?.remoteAddress || undefined;
 }
 
 export interface GameSocketServerConfig {
@@ -72,6 +99,13 @@ export interface GameSocketServerConfig {
    * arrived — which is exactly the case you need to tell apart when a table "won't connect".
    */
   onEvent?: (event: { type: 'open' | 'ready' | 'closed'; playerId?: string; reason?: string }) => void;
+  /**
+   * How many reverse-proxy hops in front of this process to trust when
+   * deriving a connection's IP — see `connectionIp` (BUG-27). Should match
+   * the HTTP side's `GatewayConfig.trustProxyHops` exactly, since both sit
+   * behind the same proxy. Defaults to 0 (no proxy trusted).
+   */
+  trustProxyHops?: number;
 }
 
 export class GameSocketServer {
@@ -110,7 +144,7 @@ export class GameSocketServer {
   }
 
   private handleConnection(ws: WebSocket, req?: IncomingMessage): void {
-    const ip = connectionIp(req);
+    const ip = connectionIp(req, this.config.trustProxyHops);
     const { privateKey, publicKeyB64 } = generateEphemeralKeyPair();
     const connectionId = randomUUID();
     let session: Session | undefined;

@@ -172,6 +172,10 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
       // suspended player kept playing until their token expired and could open
       // a fresh socket the whole time (docs/TRAPS.md §23).
       authorizeSession: (playerId) => userStore.canHoldSession(playerId),
+      // Same proxy, same trust (BUG-27): the socket is folded onto this same
+      // origin, so a connection's derived IP must agree with the HTTP side's
+      // `req.ip` about how many hops in front of the process are real.
+      trustProxyHops: config.trustProxyHops,
     });
     app.locals.tableHub = mounted.hub;
 

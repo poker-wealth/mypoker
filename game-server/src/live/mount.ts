@@ -46,6 +46,14 @@ export interface MountLiveOptions {
    * leaves it out and keeps today's behaviour.
    */
   authorizeSession?: GameSocketServerConfig['authorizeSession'];
+  /**
+   * How many reverse-proxy hops to trust when deriving a socket connection's
+   * IP — see `GameSocketServerConfig.trustProxyHops` (BUG-27). The folded
+   * gateway passes its own `GatewayConfig.trustProxyHops` through here so the
+   * socket and the HTTP API agree about the same proxy in front of them; the
+   * standalone table server has no such config and leaves it out (0).
+   */
+  trustProxyHops?: number;
 }
 
 export interface MountedLive {
@@ -132,6 +140,7 @@ export function mountLiveTables(app: Express, opts: MountLiveOptions): MountedLi
     // never heard of (the fixed lobby tables, league tables) are allowed
     // through; see gateway/table-access.ts on why that is scope, not fail-open.
     (tableId, playerId): boolean => tableAccess.mayJoin(tableId, playerId),
+    opts.trustProxyHops,
   );
   for (const table of opts.tables) anchorTableRules(hub.addTable(table));
 

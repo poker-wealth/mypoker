@@ -61,6 +61,13 @@ export class TableHub {
     authorizeSession?: GameSocketServerConfig['authorizeSession'],
     /** Optional private-table guard — see `TableGuard`. */
     private readonly mayJoin?: TableGuard,
+    /**
+     * How many reverse-proxy hops to trust when deriving a connection's IP —
+     * see `GameSocketServerConfig.trustProxyHops` (BUG-27). Should match the
+     * gateway's own `GatewayConfig.trustProxyHops`, since the socket is folded
+     * behind the same proxy as the HTTP API. Defaults to 0.
+     */
+    trustProxyHops?: number,
   ) {
     this.socket = new GameSocketServer({
       verifyToken,
@@ -68,6 +75,7 @@ export class TableHub {
       onClose: (ctx): void => this.onClose(ctx),
       ...(onEvent ? { onEvent } : {}),
       ...(authorizeSession ? { authorizeSession } : {}),
+      ...(trustProxyHops ? { trustProxyHops } : {}),
     });
   }
 
