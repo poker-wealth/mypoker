@@ -361,6 +361,11 @@ describe('NiuNiuRoom — settlement recovery from a lost response (BUG-20)', () 
       expect(seat.stack).toBe(players.locked(seat.playerId));
     }
 
+    // Recovered all the way through, not just the stacks: the game's own state machine reached
+    // RESOLVED too (BUG-20 follow-up) — pre-fix, `start()` threw before `sm.transition('RESOLVED')`
+    // ever ran, leaving a recovered round's game instance stuck in BETTING forever.
+    expect((room as unknown as { game: { state: string } }).game.state).toBe('RESOLVED');
+
     room.dispose();
   }, 15_000);
 });

@@ -157,6 +157,11 @@ export class LotteryRoom extends BaseLiveRoom<LotteryRoomConfig, RoomSeat> {
         const nets = this.game.getNet();
         const attempted = nets.size > 0 ? settleNet(nets, { rakeBps: this.config.rakeBps }) : undefined;
         if (!attempted || !(await this.settledDespite(err, this.game.getRoundId(), attempted))) throw err;
+        // Recovered: FC already committed this settlement, but `start()` threw before reaching its
+        // own post-settle lines — without this the round stays stuck in OPEN forever, which
+        // `getPublicState`'s `winningNumber` would see as undrawn even though the ledger already
+        // paid it (BUG-20 follow-up).
+        this.game.resolveSettled();
       }
 
       const grossNets = this.game.getNet();

@@ -184,6 +184,11 @@ export class RedPacketRoom extends BaseLiveRoom<RedPacketRoomConfig, RoomSeat> {
         const nets = this.game.getNet();
         const attempted = nets.size > 0 ? settleNet(nets, { rakeBps: this.config.rakeBps }) : undefined;
         if (!attempted || !(await this.settledDespite(err, this.game.getRoundId(), attempted))) throw err;
+        // Recovered: FC already committed this settlement, but `start()` threw before reaching its
+        // own post-settle lines — without this `this.game.reveal()` below stays null (it is gated on
+        // RESOLVED), so the jackpot draw is skipped for lack of a seed and the provably-fair mines
+        // stay withheld from a round the ledger already paid out (BUG-20 follow-up).
+        this.game.resolveSettled();
       }
 
       const grossNets = this.game.getNet();

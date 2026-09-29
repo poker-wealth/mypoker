@@ -172,12 +172,24 @@ export class CowboyBeautyGame extends BaseGame<CowboyPhase, CowboyAction, Cowboy
       await this.fc.settleTableHand(request);
     }
 
+    this.resolveSettled();
+  }
+
+  /**
+   * The state transition and the public reveal, split out from `start()` so a caller who confirmed
+   * via FC that a lost-response settlement actually committed (BUG-20's `settledDespite`) can drive
+   * the round to RESOLVED and publish the reveal without re-running `fc.settleTableHand` — that call
+   * already happened; this only finishes what it was interrupted before reaching. Idempotent: called
+   * again on an already-RESOLVED round (the ordinary success path already got here), it does nothing.
+   */
+  resolveSettled(): void {
+    if (this.sm.is('RESOLVED')) return;
     this.sm.transition('RESOLVED');
     this.events.emit('drawn', {
       roundId: this.roundId,
-      cowboyCard,
-      beautyCard,
-      winner: this.winner,
+      cowboyCard: this.cards!.cowboy,
+      beautyCard: this.cards!.beauty,
+      winner: this.winner!,
       net: Object.fromEntries(this.net),
     });
   }

@@ -192,6 +192,11 @@ export class BaccaratRoom extends BaseLiveRoom<BaccaratRoomConfig, RoomSeat> {
         const nets = this.game.getNet();
         const attempted = nets.size > 0 ? settleNet(nets, { rakeBps: this.config.rakeBps }) : undefined;
         if (!attempted || !(await this.settledDespite(err, this.game.getRoundId(), attempted))) throw err;
+        // Recovered: FC already committed this settlement, but `start()` threw before reaching its
+        // own post-settle lines — without this the round stays stuck in BETTING forever, which
+        // `getPublicState`'s reveal (and any future `nextRound()`) would see as unresolved even
+        // though the ledger already paid it (BUG-20 follow-up).
+        this.game.resolveSettled();
       }
 
       const grossNets = this.game.getNet();
