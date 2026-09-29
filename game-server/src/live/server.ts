@@ -6,6 +6,7 @@ import type { LiveTableConfig } from './live-room';
 import type { TableHub } from './table-hub';
 import { mountLiveTables } from './mount';
 import { bankerMinimumFor } from './niu-niu-room';
+import { nonNegativeInt } from '../gateway/config';
 
 /**
  * The live table service — HTTP for the table list, WebSocket for the game.
@@ -37,6 +38,16 @@ export interface TableServerConfig {
   tables: LiveTableConfig[];
   /** Log every socket's fate. On by default: "it won't connect" is otherwise unanswerable. */
   logSockets?: boolean;
+  /**
+   * How many reverse-proxy hops to trust when deriving a socket connection's IP — see
+   * `GameSocketServerConfig.trustProxyHops` (BUG-27). This standalone server has no gateway to
+   * mirror, so it reads its own `TRUST_PROXY_HOPS` (see `startFromEnv`, same
+   * `nonNegativeInt` validation as `GatewayConfig.trustProxyHops`); if this ever runs behind
+   * a real proxy, leaving it unset (default 0) makes `connectionIp` read the proxy's own
+   * address for every connection, and a per-IP guard like `banSameIp` then refuses the
+   * second seat at every table.
+   */
+  trustProxyHops?: number;
 }
 
 export interface TableServer {
@@ -128,6 +139,7 @@ export function createTableServer(config: TableServerConfig): TableServer {
     ...(config.chipsFile ? { chipsFile: config.chipsFile } : {}),
     tables: config.tables,
     ...(config.logSockets !== undefined ? { logSockets: config.logSockets } : {}),
+    ...(config.trustProxyHops !== undefined ? { trustProxyHops: config.trustProxyHops } : {}),
   });
   const { hub } = mounted;
 
@@ -178,6 +190,11 @@ export function startFromEnv(): TableServer {
     throw new Error('JWT_SECRET is required — it must match whatever issues player tokens');
   }
 
+  // Same validation and the same production default as the gateway's own
+  // `GatewayConfig.trustProxyHops` (config.ts) — see the field doc above.
+  const isProduction = process.env.NODE_ENV === 'production';
+  const trustProxyHops = nonNegativeInt('TRUST_PROXY_HOPS', process.env.TRUST_PROXY_HOPS, isProduction ? 1 : 0);
+
   // TABLES_PORT wins locally (the gateway already owns PORT in .env); on a hosting platform only
   // the injected PORT exists, and binding anything else means the health check never passes.
   const port = Number(process.env.TABLES_PORT ?? process.env.PORT ?? 4200);
@@ -199,6 +216,7 @@ export function startFromEnv(): TableServer {
       .map((o) => o.trim())
       .filter(Boolean),
     tables: defaultTables(),
+    trustProxyHops,
   });
 
   void server.listen().then((bound) => {

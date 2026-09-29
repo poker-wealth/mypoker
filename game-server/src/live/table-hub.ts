@@ -75,7 +75,7 @@ export class TableHub {
       onClose: (ctx): void => this.onClose(ctx),
       ...(onEvent ? { onEvent } : {}),
       ...(authorizeSession ? { authorizeSession } : {}),
-      ...(trustProxyHops ? { trustProxyHops } : {}),
+      ...(trustProxyHops !== undefined ? { trustProxyHops } : {}),
     });
   }
 

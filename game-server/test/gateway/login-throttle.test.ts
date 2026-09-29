@@ -202,9 +202,9 @@ describe('POST /auth/login throttling — trust proxy (BUG-15)', () => {
     expect(spoofed.status).toBe(429);
   });
 
-  it('with no trusted hops (the default), X-Forwarded-For is ignored -- every request shares one bucket', async () => {
+  it('with no trusted hops (explicit TRUST_PROXY_HOPS=0), X-Forwarded-For is ignored -- every request shares one bucket', async () => {
     (userStore.verifyPassword as jest.Mock).mockRejectedValue(wrongPassword());
-    const server = app(); // TRUST_PROXY_HOPS unset -> 0, loadConfig's own non-production default
+    const server = app({ TRUST_PROXY_HOPS: '0' }); // same as unset -> 0, loadConfig's own non-production default
 
     for (let i = 0; i < 10; i++) {
       await request(server)
@@ -222,5 +222,34 @@ describe('POST /auth/login throttling — trust proxy (BUG-15)', () => {
       .set('X-Forwarded-For', '9.9.9.9')
       .send({ email: 'grace@example.com', password: 'wrong' });
     expect(stillSameBucket.status).toBe(429);
+  });
+});
+
+/**
+ * TRUST_PROXY_HOPS=0 follow-up: `num()` treats an explicit `0` (and anything
+ * non-numeric or negative) as "unset" and falls back to production's default
+ * of 1, so a production deploy that explicitly has NO proxy in front of it
+ * could never actually configure 0 hops — and 'abc'/'-1' silently became 1
+ * rather than failing loudly, while '1.5' was accepted and would have made
+ * Express (which floors/validates its own `trust proxy` numeric setting
+ * differently) and `connectionIp` (which indexes `hops[length - 1.5]`,
+ * `undefined`) disagree about the client's IP.
+ */
+describe('loadConfig TRUST_PROXY_HOPS validation', () => {
+  const prodEnv = {
+    NODE_ENV: 'production',
+    TELEGRAM_BOT_TOKEN: 'x',
+    JWT_SECRET: 'x',
+  } as NodeJS.ProcessEnv;
+
+  it('accepts an explicit 0 in production instead of silently defaulting to 1', () => {
+    const config = loadConfig({ ...prodEnv, TRUST_PROXY_HOPS: '0' });
+    expect(config.trustProxyHops).toBe(0);
+  });
+
+  it.each(['abc', '1.5', '-1'])('rejects a non-negative-integer value (%s)', (value) => {
+    expect(() => loadConfig({ ...prodEnv, TRUST_PROXY_HOPS: value })).toThrow(
+      /TRUST_PROXY_HOPS must be a non-negative integer/,
+    );
   });
 });

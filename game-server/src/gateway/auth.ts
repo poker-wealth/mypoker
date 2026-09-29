@@ -262,9 +262,12 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
 
   // /auth/login brute-force throttle: a sliding window of recent WRONG-PASSWORD
   // failures, keyed by `${identifier}|${req.ip}` (same shape as table-access.ts's
-  // pinFailures). Neither half alone is the key, so one guessed password sprayed
-  // across many accounts from one IP, or one account probed from many IPs, both
-  // still trip it.
+  // pinFailures). Neither half alone is the key: a password sprayed across many
+  // accounts from one IP only ever fills each account's own bucket by one attempt
+  // per pass, and an account probed from many IPs is throttled per IP — each IP
+  // gets its own bucket, so spreading the guesses across IPs is how an attacker
+  // evades this throttle, not how they trip it. What it does stop cold is
+  // repeated guessing against the SAME account from the SAME IP.
   const loginFailures = new Map<string, number[]>();
 
   /** Drop timestamps older than the window; keep the map from holding dead entries. */

@@ -160,7 +160,7 @@ Also update, or they will still point at the old host:
 - **IP to whitelist** = the outbound IP of the dyno calling them. Heroku dynos have dynamic IPs, so for a stable IP to give the provider you'll need an outbound-IP addon (e.g. QuotaGuard/Fixie) or a small proxy — flagged as a decision, because most providers require a *fixed* egress IP.
 
 ## Not in this pass (follow-ons)
-- Table server (live gameplay) — its own Heroku app, or fold the hub into the gateway (one origin for HTTP + WS). Recommended before players play.
+- Table server (live gameplay) — its own Heroku app, or fold the hub into the gateway (one origin for HTTP + WS). Recommended before players play. If it ever deploys standalone (not folded into the gateway) behind a proxy, it needs its own `TRUST_PROXY_HOPS` set the same way as the gateway's (see above) — left unset behind a real proxy, every connection's derived IP is the proxy's own address, and a per-IP guard like `banSameIp` then refuses the second seat at every table.
 - Mainnet chain + real keys, 3-node — the W11 items.
 - **Slots vendor float.** Slots is player-vs-vendor, not player-vs-house: every payout is paid out
   of the vendor account's own balance (`acc-slots-vendor:<tableId>` — `acc-slots-vendor:slots` for
