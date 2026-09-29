@@ -8,6 +8,7 @@ import {
   requestWithdrawal,
   approveWithdrawal,
   broadcastWithdrawal,
+  confirmWithdrawal,
 } from '../../src/withdrawal/withdrawal-state-machine';
 import { WithdrawalState } from '../../src/domain/withdrawal-types';
 import { Money } from '../../src/domain/money';
@@ -296,5 +297,51 @@ describe('POST /internal/withdrawals/:id/reject', () => {
     expect(w!.state).toBe(WithdrawalState.APPROVED); // untouched — no refund
     expect(w!.pendingTxId).toBe('c'.repeat(64)); // the fresh live send is still there, unrefunded
     expect(await balances(player)).toEqual({ available: 700, clearing: 300 }); // no double-pay
+  });
+
+  // BUG-09 follow-up: a withdrawal already in a terminal state has nothing left to refuse. Before
+  // this, refusing one fell through to rollbackWithdrawal's generic InvalidWithdrawalTransitionError,
+  // remapped to "changed while being refused — reload and check again" — which reads like a race an
+  // admin should retry, when in fact retrying can never succeed.
+  it('BUG-09 follow-up: refuses a second reject of an already-ROLLED_BACK withdrawal with a clear message', async () => {
+    const { id, player } = await approvedWithdrawalWithPlayer();
+    const first = await post(`/internal/withdrawals/${id}/reject`, {
+      rejectedBy: 'ops-1',
+      reason: 'risk flagged',
+    });
+    expect(first.status).toBe(200);
+    expect((await WithdrawalModel.findById(id))!.state).toBe(WithdrawalState.ROLLED_BACK);
+
+    const second = await post(`/internal/withdrawals/${id}/reject`, {
+      rejectedBy: 'ops-2',
+      reason: 'trying again',
+    });
+    expect(second.status).toBe(409);
+    const body = (await second.json()) as { error: string };
+    expect(body.error).toMatch(/already ROLLED_BACK/);
+
+    // Balances are exactly what the first (successful) reject already produced — the
+    // refused second attempt moved nothing.
+    expect(await balances(player)).toEqual({ available: 1000, clearing: 0 });
+  });
+
+  it('BUG-09 follow-up: refuses to reject an already-CONFIRMED withdrawal with a clear message', async () => {
+    const { id, player } = await approvedWithdrawalWithPlayer();
+    await broadcastWithdrawal(id, 'a'.repeat(64));
+    await confirmWithdrawal(id);
+    expect((await WithdrawalModel.findById(id))!.state).toBe(WithdrawalState.CONFIRMED);
+
+    const res = await post(`/internal/withdrawals/${id}/reject`, {
+      rejectedBy: 'ops-1',
+      reason: 'trying to refund a paid withdrawal',
+    });
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/already CONFIRMED/);
+
+    const w = await WithdrawalModel.findById(id);
+    expect(w!.state).toBe(WithdrawalState.CONFIRMED); // untouched
+    // Confirmed money left the platform via clearing → external, not back to the player.
+    expect(await balances(player)).toEqual({ available: 700, clearing: 0 });
   });
 });

@@ -2,7 +2,7 @@ import express, { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { Money } from '../domain/money';
 import { LedgerType, LedgerDirection, PLATFORM_SCOPE } from '../domain/account-types';
-import { WithdrawalState } from '../domain/withdrawal-types';
+import { WithdrawalState, canTransition } from '../domain/withdrawal-types';
 import { LedgerModel } from '../wallet/ledger.model';
 import { transfer } from '../wallet/transfer';
 import { TableType, getRakeDestination } from '../settlement/settlement-domain';
@@ -1848,6 +1848,18 @@ export function buildRouter(): Router {
       const id = String(req.params.id);
       const w = await WithdrawalModel.findById(id);
       if (!w) throw new ApiError(404, `withdrawal not found: ${id}`);
+
+      // BUG-09 follow-up: a withdrawal already in a terminal state (CONFIRMED or
+      // ROLLED_BACK) has no transition to ROLLED_BACK at all — falling through to
+      // rollbackWithdrawal would hit its fromStates/InvalidWithdrawalTransitionError
+      // check below and come back as the generic "changed while being refused —
+      // reload and check again", which reads like a transient race an admin should
+      // retry. It isn't: the withdrawal is done, and retrying will never succeed.
+      // Say so plainly, before D7 even asks whether it's specifically BROADCASTING.
+      if (!canTransition(w.state, WithdrawalState.ROLLED_BACK)) {
+        throw new ApiError(409, `withdrawal ${id} is already ${w.state} — nothing to refuse`);
+      }
+
       // D13: the exact tx this admin is chain-checking, snapshotted at this read — never recomputed
       // from a later, possibly-changed `w`.
       const pendingAtRead = w.pendingTxId;
