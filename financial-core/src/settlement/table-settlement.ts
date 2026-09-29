@@ -112,30 +112,36 @@ export async function settleTableHand(
         );
         if (res.matchedCount === 0) throw new InsufficientBalanceError(l.accountId);
       }
-      // Credit each winner to LOCKED (their table stack grows).
+      // Credit each winner to LOCKED (their table stack grows). A miss here
+      // means input.winners named an account that doesn't exist — silently
+      // dropping the credit while the matching loser debit above already
+      // landed would break the books' conservation invariant with no trace.
       for (const w of input.winners) {
-        await AccountModel.updateOne(
+        const res = await AccountModel.updateOne(
           { _id: w.accountId },
           { $inc: { lockedBalance: w.amount.toDecimal128(), version: 1 } },
           { session },
         );
+        if (res.matchedCount === 0) throw new AccountNotFoundError(w.accountId);
       }
       // Rake to the house (spendable income).
       if (input.rake.isPositive()) {
-        await AccountModel.updateOne(
+        const res = await AccountModel.updateOne(
           { _id: rakeAccount!._id },
           { $inc: { availableBalance: input.rake.toDecimal128(), version: 1 } },
           { session },
         );
+        if (res.matchedCount === 0) throw new AccountNotFoundError(String(rakeAccount!._id));
       }
       // Jackpot to the pools.
       for (const j of jpRows) {
         if (j.amount.isPositive()) {
-          await AccountModel.updateOne(
+          const res = await AccountModel.updateOne(
             { _id: j.account },
             { $inc: { availableBalance: j.amount.toDecimal128(), version: 1 } },
             { session },
           );
+          if (res.matchedCount === 0) throw new AccountNotFoundError(j.account);
         }
       }
 
