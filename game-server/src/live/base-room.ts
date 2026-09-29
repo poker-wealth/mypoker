@@ -277,14 +277,25 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
     this.push();
   }
 
+  /**
+   * Give a seat's chips back and empty the chair.
+   *
+   * The chair is emptied AFTER the release, not before (BUG-07): this used to null the seat first
+   * and call `fc.release` second, so a refused release — FC unreachable, a 409 — lost the seat AND
+   * the money in the same moment. The chips stayed locked in FC with nothing at the table pointing
+   * back at them, and nobody could retry: the chair looked empty and sittable. Mirrors the order
+   * `PokerRoom.releaseSeat` already uses. A throw here now leaves the seat exactly as it was —
+   * still occupied, still holding its stack — so the caller's own retry (a later `stand`, or the
+   * next disconnect-grace check) is what actually clears it.
+   */
   protected async releaseSeat(seatIndex: number): Promise<void> {
     const seat = this.seats[seatIndex];
     if (!seat) return;
-    this.seats[seatIndex] = null;
 
     if (seat.stack > 0) {
       await this.fc.release(seat.playerId, String(seat.stack));
     }
+    this.seats[seatIndex] = null;
 
     if (seat.isBanker) {
       const next = this.occupiedSeats()[0];
