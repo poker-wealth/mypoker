@@ -1,6 +1,7 @@
 import { DevPlayers } from '../../src/live/players';
 import { DEFAULT_ROOM, PokerRoom, type PokerRoomConfig } from '../../src/live/poker-room';
 import { ChipDenominatedFc } from '../../src/live/fc-chip-adapter';
+import { ChipBank } from '../../src/live/chip-bank';
 import { usdtToChips } from '../../src/live/chip-currency';
 import type { JackpotEngine, JackpotHit } from '../../src/jackpot/index';
 import type {
@@ -364,5 +365,87 @@ describe('PokerRoom sends its wallet scope on a jackpot payout (BUG-16)', () => 
     expect(h.jackpotCalls[0]!.tableType).toBe('PLATFORM');
     expect(h.jackpotCalls[0]!.leagueId).toBeUndefined();
     h.room.dispose();
+  });
+});
+
+/**
+ * BUG-23: a jackpot hit is a WALLET credit (available), never a top-up of `seat.stack` — the stack
+ * is a mirror of TexasGame's own stacks, which settlement moves through LOCKED only. Run against a
+ * real `ChipBank` (not the fake `inner` the harness above uses) so the fix in `ChipBank.jackpotPayout`
+ * — crediting available instead of adjusting locked — is actually exercised through a full hand.
+ */
+describe('PokerRoom jackpot payout is a wallet credit via ChipBank (BUG-23)', () => {
+  it('a forced 5-chip MINI hit credits available; locked stays the stack at showdown; stand releases it', async () => {
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = new ChipBank(players);
+    const alice = players.create('Alice').id;
+    const bob = players.create('Bob').id;
+
+    // Seed the mini pool the way a real settlement would — PokerRoom addresses its jackpot payout
+    // to `jp:<tableId>:mini` (its own account-id scheme, distinct from base-room's), so the pool
+    // must be seeded under that same id or ChipBank's overdraft guard refuses the payout.
+    await bank.settleTableHand({
+      roundId: 'seed-bug23',
+      tableType: 'PLATFORM',
+      losers: [],
+      winners: [],
+      rake: '0',
+      jackpot: { mini: '100', minor: '0', major: '0', grand: '0' },
+      jackpotAccounts: {
+        mini: 'jp:jackpot-bug23:mini',
+        minor: 'jp:jackpot-bug23:minor',
+        major: 'jp:jackpot-bug23:major',
+        grand: 'jp:jackpot-bug23:grand',
+      },
+    });
+
+    const room = new PokerRoom({ ...FAST, id: 'jackpot-bug23', name: 'Test table' } as PokerRoomConfig, {
+      directory: players,
+      fc: bank,
+    });
+
+    const forcedHit: JackpotHit = {
+      tier: 'MINI',
+      playerId: alice,
+      amount: 5_000_000, // micro-USD: 5 chips at CHIPS_TO_MICROS=1_000_000
+      roundId: 'engine-round-irrelevant',
+      at: Date.now(),
+      poolAfter: 0,
+      animationMs: 400,
+      seed: 'seed-1',
+    };
+    (room as unknown as { jackpotEngine: JackpotEngine }).jackpotEngine = stubEngine(forcedHit);
+
+    const availableBeforeBuyIn = players.available(alice); // full 10_000 — nobody has sat down yet
+
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(bob, { kind: 'sit', seat: 1, buyIn: BUY_IN });
+    await until(() => room.snapshotFor(alice).phase === 'IN_HAND');
+
+    const seatOf: Record<number, string> = { 0: alice, 1: bob };
+    for (let guard = 0; guard < 200; guard++) {
+      const view = room.snapshotFor(alice);
+      if (view.phase !== 'IN_HAND' || view.toActSeat === null) break;
+      const playerId = seatOf[view.toActSeat]!;
+      const legal = room.snapshotFor(playerId).legal!;
+      await room.command(playerId, { kind: 'act', action: legal.canCheck ? { type: 'check' } : { type: 'call' } });
+    }
+    await until(() => room.snapshotFor(alice).phase === 'SHOWDOWN');
+
+    const snap = room.snapshotFor(alice);
+    expect(snap.jackpot).toMatchObject({ tier: 'MINI', playerId: alice, amount: 5 });
+
+    // Whatever the hand itself did (win or lose), settlement only moves LOCKED — the buy-in lock and
+    // the jackpot's +5 are the only two things that ever touch available.
+    expect(players.available(alice)).toBe(availableBeforeBuyIn - BUY_IN + 5);
+    const aliceSeat = snap.seats.find((s) => s.playerId === alice)!;
+    expect(players.locked(alice)).toBe(aliceSeat.stack); // stack mirrors locked exactly — never inflated
+
+    const totalBefore = players.totalChips() + bank.sinkTotal();
+    await room.command(alice, { kind: 'stand' });
+    expect(players.locked(alice)).toBe(0);
+    expect(players.totalChips() + bank.sinkTotal()).toBe(totalBefore); // conservation across the release
+
+    room.dispose();
   });
 });

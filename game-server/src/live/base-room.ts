@@ -655,6 +655,11 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
               tableType: 'PLATFORM',
             });
             if (result.applied) {
+              // The prize is in the winner's wallet (FC: availableBalance via transfer(); ChipBank:
+              // credit()). Deliberately NOT added to seat.stack: the stack mirrors the LOCKED balance
+              // and the release on leave unlocks exactly seat.stack — inflating it would over-draw
+              // that release and strand the seat. The winner may already have left; the wallet
+              // credit does not need the seat (BUG-23).
               const winnerSeat = this.seatOf(hit.playerId);
               this.lastJackpotWin = {
                 tier: hit.tier,

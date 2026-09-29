@@ -8,6 +8,7 @@ import { LedgerModel } from '../../src/wallet/ledger.model';
 import { SecurityLogModel } from '../../src/security/security-log.model';
 import { SettlementModel } from '../../src/settlement/settlement.model';
 import { WithdrawalModel } from '../../src/withdrawal/withdrawal.model';
+import { lockForBuyIn } from '../../src/wallet/seat-funds';
 import { startTestDb, stopTestDb, clearCollections, ensureIndexes } from '../db-helper';
 
 /**
@@ -61,26 +62,26 @@ async function seedPool(
   return pool._id;
 }
 
+beforeAll(async () => {
+  process.env.INTERNAL_API_SECRET = INTERNAL_SECRET;
+  await startTestDb();
+  await ensureIndexes(AccountModel, LedgerModel, SecurityLogModel, SettlementModel, WithdrawalModel);
+  const app = createApp();
+  await new Promise<void>((resolve) => {
+    server = app.listen(0, resolve);
+  });
+  const { port } = server.address() as AddressInfo;
+  base = `http://127.0.0.1:${port}/api/v1`;
+});
+
+afterAll(async () => {
+  await new Promise<void>((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
+  await stopTestDb();
+});
+
+afterEach(clearCollections);
+
 describe('a LEAGUE jackpot payout credits the winner\'s league wallet, not their platform one (BUG-16)', () => {
-  beforeAll(async () => {
-    process.env.INTERNAL_API_SECRET = INTERNAL_SECRET;
-    await startTestDb();
-    await ensureIndexes(AccountModel, LedgerModel, SecurityLogModel, SettlementModel, WithdrawalModel);
-    const app = createApp();
-    await new Promise<void>((resolve) => {
-      server = app.listen(0, resolve);
-    });
-    const { port } = server.address() as AddressInfo;
-    base = `http://127.0.0.1:${port}/api/v1`;
-  });
-
-  afterAll(async () => {
-    await new Promise<void>((resolve, reject) => server.close((err) => (err ? reject(err) : resolve())));
-    await stopTestDb();
-  });
-
-  afterEach(clearCollections);
-
   it('pays a LEAGUE jackpot into the league wallet; the platform wallet for the same playerId is untouched', async () => {
     const TABLE = 'bug16-table';
     const LEAGUE = 'lg-bug16';
@@ -136,5 +137,56 @@ describe('a LEAGUE jackpot payout credits the winner\'s league wallet, not their
       accountType: 'PLAYER', ownerId: player, scope: PLATFORM_SCOPE,
     }).lean();
     expect(Money.fromDecimal128(platformAcct!.availableBalance).toString()).toBe('5.000000');
+  });
+});
+
+/**
+ * BUG-23: a jackpot hit is a WALLET credit — `transfer()` moves it into the winner's AVAILABLE
+ * balance, same as any other payout, and must never touch a buy-in already sitting in LOCKED. The
+ * game-server's play-chip `ChipBank` used to credit locked instead (fixed alongside this test); this
+ * pins the real Financial Core route as the reference behaviour both implementations must match.
+ */
+describe('a jackpot payout credits available and leaves an existing locked buy-in untouched (BUG-23)', () => {
+  it('locked stays exactly the buy-in; the jackpot lands in available; a release only unlocks the buy-in', async () => {
+    const TABLE = 'bug23-table';
+    const player = 'bug23-winner';
+
+    // Seed a wallet with exactly enough to buy in, then lock it all — mirrors a player already
+    // seated at a table when the jackpot hits.
+    const acct = await AccountModel.create({
+      accountType: 'PLAYER',
+      ownerId: player,
+      scope: PLATFORM_SCOPE,
+      availableBalance: Money.fromDecimalString('50').toDecimal128(),
+    });
+    await lockForBuyIn(acct._id, Money.fromDecimalString('50')); // available 0, locked 50
+
+    const miniPool = await seedPool(TABLE, 'mini', '100');
+
+    const payoutRes = await post('/internal/jackpot-payouts', {
+      tableId: TABLE,
+      tier: 'mini',
+      jackpotAccountId: miniPool,
+      playerId: player,
+      amount: '15',
+      roundId: 'bug23-r1',
+    });
+    expect(payoutRes.status).toBe(200);
+    expect(await payoutRes.json()).toMatchObject({ applied: true });
+
+    const afterPayout = await AccountModel.findOne({
+      accountType: 'PLAYER', ownerId: player, scope: PLATFORM_SCOPE,
+    }).lean();
+    expect(Money.fromDecimal128(afterPayout!.availableBalance).toString()).toBe('15.000000'); // 0 + jackpot
+    expect(Money.fromDecimal128(afterPayout!.lockedBalance).toString()).toBe('50.000000'); // untouched buy-in
+
+    const releaseRes = await post('/internal/releases', { playerAccountId: player, amount: '50' });
+    expect(releaseRes.status).toBe(200);
+
+    const afterRelease = await AccountModel.findOne({
+      accountType: 'PLAYER', ownerId: player, scope: PLATFORM_SCOPE,
+    }).lean();
+    expect(Money.fromDecimal128(afterRelease!.availableBalance).toString()).toBe('65.000000'); // 15 + released 50
+    expect(Money.fromDecimal128(afterRelease!.lockedBalance).toString()).toBe('0.000000');
   });
 });

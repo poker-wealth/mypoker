@@ -88,8 +88,8 @@ export interface FinancialCoreClient {
   settleRound(req: SettleRoundRequest): Promise<SettlementReceipt>;
   /** Settle a full multi-party table hand (losers/winners/rake/jackpot). Idempotent on roundId. */
   settleTableHand(req: TableSettlementRequest): Promise<{ roundId: string; applied: boolean }>;
-  /** Pay a jackpot hit from a pool account to a player. Idempotent per round+tier.
-   *  Optional so demo/test fakes need not implement it. */
+  /** Pay a jackpot hit from a pool account into the player's WALLET (available) — not their table
+   *  stack. Idempotent per round+tier. Optional so demo/test fakes need not implement it. */
   jackpotPayout?(req: JackpotPayoutRequest): Promise<{ applied: boolean }>;
   /** Insurance reserve facts for one system (PLATFORM or a leagueId).
    *  Optional for the same reason; a room without it offers no insurance. */

@@ -83,7 +83,9 @@ export class ChipBank implements FinancialCoreClient {
   }
 
   /**
-   * Pay a jackpot hit from its pool sink to the winner's stack.
+   * Pay a jackpot hit from its pool sink to the winner's WALLET (available), never locked — the
+   * same destination FC's transfer() uses. The table stack is unchanged, so the release on stand
+   * still unlocks exactly seat.stack (BUG-23).
    *
    * The same conservation as settlement: chips leave the sink and land on a
    * player, so ledger.totalChips() + sinkTotal() is unchanged. A pool that
@@ -100,7 +102,7 @@ export class ChipBank implements FinancialCoreClient {
       throw new Error(`jackpot pool ${req.jackpotAccountId} holds ${pool}, cannot pay ${amount}`);
     }
     this.sinks.set(req.jackpotAccountId, pool - amount);
-    this.ledger.adjustLocked(req.playerId, amount);
+    this.ledger.credit(req.playerId, amount);
     this.settled.add(key);
     return { applied: true };
   }

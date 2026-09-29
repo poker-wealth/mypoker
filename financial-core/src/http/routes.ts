@@ -565,7 +565,9 @@ export function buildRouter(): Router {
   // The clearing rules have whitelisted JACKPOT_* -> PLAYER from the start;
   // this is the first caller. transfer() runs the full guard set — whitelist,
   // idempotency, overdraft — so a pool can never pay more than it holds, and a
-  // replayed trigger cannot pay twice.
+  // replayed trigger cannot pay twice. transfer() credits the winner's AVAILABLE
+  // balance: a jackpot goes to the wallet, not the table stack, and the room
+  // must never mirror it into seat.stack (BUG-23).
   const jackpotPayoutBody = z.object({
     tableId: z.string().min(1),
     tier: z.enum(['mini', 'minor', 'major', 'grand']),

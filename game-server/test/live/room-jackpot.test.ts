@@ -4,6 +4,8 @@ import { LotteryRoom } from '../../src/live/lottery-room';
 import { RedPacketRoom } from '../../src/live/red-packet-room';
 import { SanZhangRoom } from '../../src/live/san-zhang-room';
 import { RedEnvelopeRoom } from '../../src/live/red-envelope-room';
+import { ChipBank } from '../../src/live/chip-bank';
+import { tableJackpotAccounts } from '../../src/live/base-room';
 import type { FinancialCoreClient, TableSettlementRequest, JackpotPayoutRequest } from '../../src/core/financial-core-client';
 import type { JackpotHit } from '../../src/jackpot/jackpot-engine';
 
@@ -250,6 +252,75 @@ describe('BaseLiveRoom.processJackpot — replay handling (BUG-01 follow-up)', (
       playerId: alice,
       amount: 5,
     });
+
+    room.dispose();
+  });
+});
+
+/**
+ * BUG-23: a jackpot hit is a WALLET credit (available), never a top-up of `seat.stack` — the stack
+ * mirrors the LOCKED balance, and the release on `stand` unlocks exactly `seat.stack`. Run against a
+ * real `ChipBank` (not a stub `fc`) so the fix in `ChipBank.jackpotPayout` (credit, not adjustLocked)
+ * is actually exercised end to end: announced, stack unchanged, available up, locked unchanged, and
+ * standing still releases the whole (untouched) stack with chip conservation held throughout.
+ */
+describe('BaseLiveRoom.processJackpot pays into the wallet, not the seat stack (BUG-23)', () => {
+  it('credits available, leaves stack/locked unchanged, and stand releases the stack unharmed', async () => {
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = new ChipBank(players);
+    const alice = players.create('Alice').id;
+
+    const accounts = tableJackpotAccounts('lottery-bug23');
+    // Seed the room's mini pool the way a real settlement would — no losers/winners, so only the
+    // sink moves.
+    await bank.settleTableHand({
+      roundId: 'seed-bug23',
+      tableType: 'PLATFORM',
+      losers: [],
+      winners: [],
+      rake: '0',
+      jackpot: { mini: '100', minor: '0', major: '0', grand: '0' },
+      jackpotAccounts: accounts,
+    });
+
+    const room = new LotteryRoom(
+      {
+        id: 'lottery-bug23',
+        name: 'Test Lottery',
+        game: 'lottery',
+        range: 2,
+        minBuyIn: 1_000,
+        maxBuyIn: 50_000,
+        maxSeats: 6,
+        rakeBps: 500,
+        bettingTimeMs: 5_000,
+        showdownDelayMs: 20,
+      },
+      { directory: players, fc: bank },
+    );
+
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+
+    const forcedHit: JackpotHit = { ...FORCED_HIT, playerId: alice };
+    (room as unknown as { roomJackpot: { evaluateHand: () => JackpotHit[] } }).roomJackpot.evaluateHand = () => [
+      forcedHit,
+    ];
+
+    await (
+      room as unknown as { processJackpot(profit: number, roundId: string, seed: string): Promise<void> }
+    ).processJackpot(1_000, 'settlement-bug23', 'seed-1');
+
+    expect(room.snapshotFor(alice).jackpot).toMatchObject({ tier: 'MINI', playerId: alice, amount: 5 });
+    const seat = room.snapshotFor(alice).seats.find((s) => s.playerId === alice);
+    expect(seat!.stack).toBe(BUY_IN); // unchanged — the prize is a wallet credit, not a stack top-up
+    expect(players.available(alice)).toBe(10_000 - BUY_IN + 5);
+    expect(players.locked(alice)).toBe(BUY_IN);
+
+    const totalBefore = players.totalChips() + bank.sinkTotal();
+    await room.command(alice, { kind: 'stand' });
+    expect(players.locked(alice)).toBe(0);
+    expect(players.available(alice)).toBe(10_000 + 5);
+    expect(players.totalChips() + bank.sinkTotal()).toBe(totalBefore); // conservation across the release
 
     room.dispose();
   });
