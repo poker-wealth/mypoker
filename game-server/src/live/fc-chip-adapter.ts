@@ -5,6 +5,7 @@ import type {
   JackpotPayoutRequest,
   SettleRoundRequest,
   SettlementReceipt,
+  SettlementStatus,
   TableSettlementRequest,
   WalletScope,
 } from '../core/financial-core-client';
@@ -30,6 +31,13 @@ export class ChipDenominatedFc implements FinancialCoreClient {
    */
   lockedBalance?: (playerAccountId: string, scope?: WalletScope) => Promise<string>;
 
+  /**
+   * Same optional-property shape as `lockedBalance` above, and for the same reason (BUG-20): absent
+   * means the caller (settlement-recovery's `confirmSettled`) should treat a lost response as
+   * unconfirmable, never as a silent "can't have happened".
+   */
+  settlementStatus?: (roundId: string) => Promise<SettlementStatus>;
+
   constructor(private readonly inner: FinancialCoreClient) {
     if (inner.lockedBalance) {
       const innerLockedBalance = inner.lockedBalance.bind(inner);
@@ -38,6 +46,24 @@ export class ChipDenominatedFc implements FinancialCoreClient {
         // The inner client (the real ledger) speaks USDT; the room speaks chips — convert at this
         // same boundary every other amount crosses, just in the read direction.
         return String(usdtToChips(usdt));
+      };
+    }
+    if (inner.settlementStatus) {
+      const innerSettlementStatus = inner.settlementStatus.bind(inner);
+      this.settlementStatus = async (roundId: string): Promise<SettlementStatus> => {
+        const status = await innerSettlementStatus(roundId);
+        if (!status.settled || !status.receipt) return status;
+        const r = status.receipt;
+        return {
+          settled: true,
+          receipt: {
+            ...r,
+            rake: String(usdtToChips(r.rake)),
+            jackpotTotal: String(usdtToChips(r.jackpotTotal)),
+            losers: r.losers.map((p) => ({ ...p, amount: String(usdtToChips(p.amount)) })),
+            winners: r.winners.map((p) => ({ ...p, amount: String(usdtToChips(p.amount)) })),
+          },
+        };
       };
     }
   }

@@ -37,6 +37,31 @@ export interface TableSettlementParty {
 }
 
 /**
+ * The receipt FC hands back for a table settlement it already committed — from
+ * `settleTableHand`'s own response shape, or from `settlementStatus` below (BUG-20). Amounts are in
+ * the client's own units: the HTTP client returns FC's decimal strings unchanged; `ChipDenominatedFc`
+ * converts them to chip-integer strings, same as every other amount it wraps.
+ */
+export interface TableSettlementReceipt {
+  type: 'table';
+  roundId: string;
+  rake: string;
+  jackpotTotal: string;
+  losers: TableSettlementParty[];
+  winners: TableSettlementParty[];
+  hash: string;
+}
+
+/**
+ * Whether a round settled, as FC's own record says — not as this process remembers trying. `settled:
+ * true` with no `receipt` means FC has a record but it is not a table settlement (or not one this
+ * client can parse); the caller treats that the same as "can't confirm" (BUG-20).
+ */
+export type SettlementStatus =
+  | { settled: false }
+  | { settled: true; receipt?: TableSettlementReceipt };
+
+/**
  * Multi-party table-hand settlement: each loser's locked balance drops, each winner's rises, the
  * rake goes to the house, and the jackpot is injected. Σ(losers) = Σ(winners) + rake + Σ(jackpot).
  */
@@ -88,6 +113,11 @@ export interface FinancialCoreClient {
   settleRound(req: SettleRoundRequest): Promise<SettlementReceipt>;
   /** Settle a full multi-party table hand (losers/winners/rake/jackpot). Idempotent on roundId. */
   settleTableHand(req: TableSettlementRequest): Promise<{ roundId: string; applied: boolean }>;
+  /** Whether a round already settled, per FC's own record (BUG-20) — a room calls this after
+   *  `settleTableHand` throws, to tell a lost response apart from a genuine refusal before
+   *  abandoning a hand FC may have already paid. Optional: absent means a lost response is treated
+   *  as a failure, same as before this existed. */
+  settlementStatus?(roundId: string): Promise<SettlementStatus>;
   /** Pay a jackpot hit from a pool account into the player's WALLET (available) — not their table
    *  stack. Idempotent per round+tier. Optional so demo/test fakes need not implement it. */
   jackpotPayout?(req: JackpotPayoutRequest): Promise<{ applied: boolean }>;
@@ -285,7 +315,9 @@ export class HttpFinancialCoreClient implements FinancialCoreClient {
     );
 
     if (!result.applied) {
-      // game-server never retries a settlement, so a replay can only mean a reused round id.
+      // game-server never retries a settlement, so a replay can only mean a reused round id. The
+      // room checks FC's stored receipt before deciding whether this was our own settlement
+      // (BUG-20) or a reused id.
       throw new FinancialCoreError(409, `settlement for ${req.roundId} was already applied — round id reused`);
     }
 
@@ -297,6 +329,22 @@ export class HttpFinancialCoreClient implements FinancialCoreClient {
       await this.announceHand(req);
     }
     return result;
+  }
+
+  /** Whether a round already settled, per FC's own record (BUG-20). See the interface doc. */
+  async settlementStatus(roundId: string): Promise<SettlementStatus> {
+    const res = await this.doFetch(
+      `${this.baseUrl}/internal/table-settlements/${encodeURIComponent(roundId)}`,
+      {
+        headers: { 'x-internal-secret': this.secret },
+        signal: AbortSignal.timeout(this.timeoutMs),
+      },
+    );
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new FinancialCoreError(res.status, detail);
+    }
+    return (await res.json()) as SettlementStatus;
   }
 
   /**

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { settleNet, toTableSettlementRequest } from '../games/texas/settlement';
 import { BaseLiveRoom, RoomError, tableJackpotAccounts, type BaseRoomSeat } from './base-room';
+import { confirmSettled } from './settlement-recovery';
 import type { LiveTableConfig, RoomDeps } from './live-room';
 import type { TableSnapshot } from './room-state';
 import { TexasCowboyEngine } from '../games/texas-cowboy/engine';
@@ -265,23 +266,36 @@ export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSea
         jackpotAccounts: tableJackpotAccounts(this.config.id),
       });
 
+      // Mirror what the ledger did: winners up by their net, losers down by theirs. Hoisted so both
+      // the normal success path and BUG-20 recovery (below) call the exact same mirror, once.
+      const mirror = (): void => {
+        for (const loser of settlement.losers) {
+          const seat = this.seatOf(loser.playerId);
+          if (seat) seat.stack -= loser.amount;
+        }
+        for (const winner of settlement.winners) {
+          const seat = this.seatOf(winner.playerId);
+          if (seat) seat.stack += winner.amount;
+        }
+      };
+
       try {
         const receipt = await this.fc.settleTableHand(request);
-        if (receipt.applied) {
-          // Mirror what the ledger just did: winners up by their net, losers down by theirs.
-          for (const loser of settlement.losers) {
-            const seat = this.seatOf(loser.playerId);
-            if (seat) seat.stack -= loser.amount;
-          }
-          for (const winner of settlement.winners) {
-            const seat = this.seatOf(winner.playerId);
-            if (seat) seat.stack += winner.amount;
-          }
-        }
+        if (receipt.applied) mirror();
       } catch (err) {
-        // A refused settlement is not a paid one. Say so, change nothing, and let the next round
-        // start — the stakes are still on the seats because they were never taken off them.
-        console.error(`[room ${this.config.id}] settlement refused, nothing paid:`, err);
+        // BUG-20: the settlement may have committed in FC even though this call threw (a lost
+        // response, not a refusal). `request` is the exact object just sent — ask FC whether it
+        // matches what it has on file before treating the round as unpaid.
+        if (await confirmSettled(this.fc, request, `[room ${this.config.id}]`)) {
+          console.error(
+            `[room ${this.config.id}] settlement response lost for round ${request.roundId} but FC confirms it committed — mirroring`,
+          );
+          mirror();
+        } else {
+          // A refused settlement is not a paid one. Say so, change nothing, and let the next round
+          // start — the stakes are still on the seats because they were never taken off them.
+          console.error(`[room ${this.config.id}] settlement refused, nothing paid:`, err);
+        }
       }
     }
 

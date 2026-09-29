@@ -9,6 +9,7 @@ import { TexasGame } from '../games/texas/texas-game';
 import { variant, type PokerVariant } from '../games/texas/variants';
 import type { Action, SeatPublic, Street } from '../games/texas/betting';
 import { isInsuranceEligible, underwrite } from '../games/texas/underwriting';
+import { confirmSettled } from './settlement-recovery';
 import { JackpotEngine, TIER_CONFIG } from '../jackpot/index';
 import type { JackpotHit } from '../jackpot/index';
 import type { TableSettlementRequest } from '../core/financial-core-client';
@@ -1456,6 +1457,10 @@ export class PokerRoom implements LiveRoom {
       // any stack). playedHand().isComplete is true exactly in that second case — the engine only sets
       // it once the hand itself (not the settlement) has finished.
       if (this.game?.playedHand()?.isComplete) {
+        if (await this.recoverSettlement(err)) {
+          await this.finishHand();
+          return;
+        }
         await this.abandonHand(err);
         return;
       }
@@ -1678,6 +1683,41 @@ export class PokerRoom implements LiveRoom {
       this.showdownTimer = undefined;
       void this.enqueue(() => this.endShowdown());
     }, this.config.showdownDelayMs);
+  }
+
+  /**
+   * BUG-20 — `TexasGame.settle`'s own `fc.settleTableHand` call (inside `handFc`, above) can throw
+   * even after FC already committed the settlement: a lost response, not a refusal. Before
+   * `abandonHand` tells the table (and the players) a hand failed that the ledger actually paid, ask
+   * FC whether `game.pendingSettlementRequest()` — the EXACT request `settle()` sent, not a
+   * reconstruction of it — is the one FC has on file for this round.
+   *
+   * `false` means "abandon exactly as before this existed": no pending request (the throw came from
+   * somewhere else in `handleAction`, not settlement), or FC's own record does not match.
+   */
+  private async recoverSettlement(err: unknown): Promise<boolean> {
+    const game = this.game;
+    const req = game?.pendingSettlementRequest();
+    if (!game || !req) return false;
+    if (!(await confirmSettled(this.fc, req, `[room ${this.config.id}]`))) return false;
+
+    console.error(
+      `[room ${this.config.id}] settlement response lost for round ${req.roundId} but FC confirms it committed — applying it`,
+      err,
+    );
+    // Applies the exact stack deltas and result `settle()` had already computed — never a guess.
+    game.finalizeSettled();
+    // `handFc.settleTableHand` (constructor, above) only runs `evaluateJackpots` after its OWN call
+    // to `fc.settleTableHand` returns — which never happened here, because that call is what threw.
+    // Run it here instead, exactly once: jackpot payouts are idempotent per
+    // `${roundId}:jackpot:${tier}`, so this can never double-pay even if FC's reply arrives late and
+    // some other path also ends up retrying it.
+    try {
+      await this.evaluateJackpots(req);
+    } catch (jpErr) {
+      console.error(`[room ${this.config.id}] jackpot evaluation failed after recovered settlement:`, jpErr);
+    }
+    return true;
   }
 
   /**

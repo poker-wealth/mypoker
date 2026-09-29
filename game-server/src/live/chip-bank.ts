@@ -3,6 +3,7 @@ import type {
   JackpotPayoutRequest,
   SettleRoundRequest,
   SettlementReceipt,
+  SettlementStatus,
   TableSettlementRequest,
   WalletScope,
 } from '../core/financial-core-client';
@@ -26,6 +27,10 @@ export class ChipBank implements FinancialCoreClient {
   private readonly sinks = new Map<string, number>();
   /** Round ids already applied — settlement is idempotent on retry. */
   private readonly settled = new Set<string>();
+  /** The exact request each applied round settled with — `settlementStatus` (BUG-20) reads this back
+   *  the way the real FC reads back its stored receipt, so recovery tests can drive both clients the
+   *  same way. */
+  private readonly receipts = new Map<string, TableSettlementRequest>();
 
   constructor(private readonly ledger: ChipLedger) {}
 
@@ -67,7 +72,30 @@ export class ChipBank implements FinancialCoreClient {
     this.toSink(req.jackpotAccounts.grand, toChips(req.jackpot.grand));
 
     this.settled.add(req.roundId);
+    this.receipts.set(req.roundId, req);
     return { roundId: req.roundId, applied: true };
+  }
+
+  /** Whether a round already settled, per this bank's own record (BUG-20) — mirrors the real FC's
+   *  GET /internal/table-settlements/:roundId for tests exercising the recovery path against the
+   *  play-chip ledger. */
+  async settlementStatus(roundId: string): Promise<SettlementStatus> {
+    const req = this.receipts.get(roundId);
+    if (!req) return { settled: false };
+    const jackpotTotal =
+      toChips(req.jackpot.mini) + toChips(req.jackpot.minor) + toChips(req.jackpot.major) + toChips(req.jackpot.grand);
+    return {
+      settled: true,
+      receipt: {
+        type: 'table',
+        roundId,
+        rake: req.rake,
+        jackpotTotal: String(jackpotTotal),
+        losers: req.losers,
+        winners: req.winners,
+        hash: '',
+      },
+    };
   }
 
   async settleRound(req: SettleRoundRequest): Promise<SettlementReceipt> {

@@ -275,3 +275,81 @@ describe('ThirdPartyAdapter — replay protection', () => {
     expect(called).toBe(false);
   });
 });
+
+/**
+ * BUG-20: `fc.settleTableHand` can throw even after FC already committed it — a lost response, not
+ * a refusal. `lostResponseFc` models exactly that: it records the request it received (as FC's own
+ * store would) before throwing on the first call for each round, and answers `settlementStatus`
+ * from that record — the same shape the real HTTP client gets back from
+ * `GET /internal/table-settlements/:roundId`.
+ */
+describe('ThirdPartyAdapter — settlement recovery from a lost response (BUG-20)', () => {
+  function lostResponseFc(): FinancialCoreClient & { calls: number } {
+    const committed = new Map<string, TableSettlementRequest>();
+    const client = {
+      calls: 0,
+      async buyIn() {},
+      async release() {},
+      async settleRound(req: { roundId: string }) {
+        return { roundId: req.roundId, sequence: [], amounts: { jackpot: '0', rake: '0', payout: '0' }, accounts: {}, hash: '' };
+      },
+      async settleTableHand(req: TableSettlementRequest) {
+        client.calls++;
+        committed.set(req.roundId, req);
+        if (client.calls === 1) throw new Error('socket hang up');
+        return { roundId: req.roundId, applied: true };
+      },
+      async settlementStatus(roundId: string) {
+        const req = committed.get(roundId);
+        if (!req) return { settled: false as const };
+        const jackpotTotal =
+          Number(req.jackpot.mini) + Number(req.jackpot.minor) + Number(req.jackpot.major) + Number(req.jackpot.grand);
+        return {
+          settled: true as const,
+          receipt: {
+            type: 'table' as const,
+            roundId,
+            rake: req.rake,
+            jackpotTotal: String(jackpotTotal),
+            losers: req.losers,
+            winners: req.winners,
+            hash: '',
+          },
+        };
+      },
+    };
+    return client;
+  }
+
+  it('finishes the round when the response is lost but FC confirms it committed — receipt cached, replay on the second call', async () => {
+    const myFc = lostResponseFc();
+    const a = new ThirdPartyAdapter(myFc, { ...cfg, provider: new TestProvider(() => 500) });
+
+    const first = await a.play('p1', 'r-bug20', 100);
+    expect(first.replayed).toBe(false);
+    expect(myFc.calls).toBe(1); // the lost-response call was not silently retried
+
+    const second = await a.play('p1', 'r-bug20', 100);
+    expect(second.replayed).toBe(true);
+    expect(second.payout).toBe(first.payout);
+    expect(myFc.calls).toBe(1); // still one call into FC — the second `play` never reached it at all
+  });
+
+  it('throws when FC genuinely has no record of the round (settled: false)', async () => {
+    const myFc: FinancialCoreClient = {
+      async buyIn() {},
+      async release() {},
+      async settleRound(req) {
+        return { roundId: req.roundId, sequence: [], amounts: { jackpot: '0', rake: '0', payout: '0' }, accounts: {}, hash: '' };
+      },
+      async settleTableHand() {
+        throw new Error('socket hang up');
+      },
+      async settlementStatus() {
+        return { settled: false };
+      },
+    };
+    const a = new ThirdPartyAdapter(myFc, { ...cfg, provider: new TestProvider(() => 500) });
+    await expect(a.play('p1', 'r-bug20-2', 100)).rejects.toThrow('socket hang up');
+  });
+});

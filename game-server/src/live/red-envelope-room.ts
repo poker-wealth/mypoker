@@ -256,7 +256,15 @@ export class RedEnvelopeRoom extends BaseLiveRoom<RedEnvelopeRoomConfig, RoomSea
     // Anything from here can throw — the ledger refusing, a jackpot pool failing to open. If it
     // does the table returns to WAITING rather than sitting in IN_HAND forever; see `abandonRound`.
     try {
-      await this.game.start();
+      try {
+        await this.game.start();
+      } catch (err) {
+        // BUG-20: the settlement may have committed in FC even though this call threw (a lost
+        // response, not a refusal). Ask before abandoning a hand the ledger already paid.
+        const nets = this.game.getNet();
+        const attempted = nets.size > 0 ? settleNet(nets, { rakeBps: this.config.rakeBps }) : undefined;
+        if (!attempted || !(await this.settledDespite(err, this.game.getRoundId(), attempted))) throw err;
+      }
 
       const grossNets = this.game.getNet();
       const settlement = settleNet(grossNets, { rakeBps: this.config.rakeBps });

@@ -3,6 +3,7 @@ import { DevPlayers } from '../../src/live/players';
 import { DouDiZhuRoom } from '../../src/live/dou-di-zhu-room';
 import { TableHub } from '../../src/live/table-hub';
 import { defaultTables } from '../../src/live/server';
+import type { TableSettlementRequest } from '../../src/core/financial-core-client';
 
 const BUY_IN = 2_000;
 
@@ -454,4 +455,106 @@ describe('DouDiZhuRoom — a failed settlement on the final play does not crash 
 
     room.dispose();
   });
+});
+
+/**
+ * BUG-20: the winning `play()`'s settlement can throw even after FC already committed it — a lost
+ * response, not a refusal. Before this fix the BUG-25 catch treated every throw on the winning play
+ * as a genuine refusal and abandoned the round, even one the ledger had actually already paid.
+ */
+describe('DouDiZhuRoom — settlement recovery from a lost response (BUG-20)', () => {
+  class LostResponseBank extends ChipBank {
+    private failedOnce = false;
+    override async settleTableHand(
+      req: TableSettlementRequest,
+    ): Promise<{ roundId: string; applied: boolean }> {
+      const result = await super.settleTableHand(req);
+      if (!this.failedOnce) {
+        this.failedOnce = true;
+        throw new Error('socket hang up');
+      }
+      return result;
+    }
+  }
+
+  it('resolves the round (mirrors stacks, draws the jackpot) once FC confirms the lost settlement actually committed', async () => {
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = new LostResponseBank(players);
+    const p0 = players.create('P0').id;
+    const p1 = players.create('P1').id;
+    const p2 = players.create('P2').id;
+    const startingTotal = players.totalChips();
+
+    const room = new DouDiZhuRoom(
+      {
+        id: 'dou-di-zhu-bug20',
+        name: 'Test Dou Di Zhu',
+        game: 'dou-di-zhu',
+        baseStake: 100,
+        minBuyIn: 1_000,
+        maxBuyIn: 50_000,
+        maxSeats: 3,
+        rakeBps: 500,
+        showdownDelayMs: 20,
+      },
+      { directory: players, fc: bank },
+    );
+
+    const noop = { sendSnapshot: () => {} };
+    room.join(p0, noop);
+    room.join(p1, noop);
+    room.join(p2, noop);
+
+    await room.command(p0, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(p1, { kind: 'sit', seat: 1, buyIn: BUY_IN });
+    await room.command(p2, { kind: 'sit', seat: 2, buyIn: BUY_IN });
+
+    await until(() => room.snapshotFor(p0).phase === 'IN_HAND');
+
+    for (let step = 0; step < 5; step++) {
+      const snap = room.snapshotFor(p0);
+      if (snap.stage !== 'BIDDING') break;
+      const toActSeat = snap.toActSeat;
+      if (toActSeat === null) break;
+      const pid = toActSeat === 0 ? p0 : toActSeat === 1 ? p1 : p2;
+      await room.command(pid, { kind: 'act', action: { type: step === 0 ? 'bid-3' : 'bid-0' } });
+    }
+
+    // Same terminating line of play as the happy-path test above: whoever holds the trick leads
+    // their lowest card, the others always pass — the leader empties their hand and wins, which is
+    // exactly the play `LostResponseBank` turns into a lost response on.
+    const seatPlayer = [p0, p1, p2];
+    for (let step = 0; step < 300; step++) {
+      const snap = room.snapshotFor(p0);
+      if (snap.phase !== 'IN_HAND') break;
+      const toActSeat = snap.toActSeat;
+      if (toActSeat === null) break;
+
+      const pid = seatPlayer[toActSeat]!;
+      const holdsTheTrick = snap.board.length === 0;
+      if (holdsTheTrick) {
+        const hand = (room.snapshotFor(pid).seats.find((s) => s.isYou)!.cards ?? []).filter(
+          (c): c is string => typeof c === 'string',
+        );
+        await room.command(pid, { kind: 'act', action: { type: 'play', cards: [hand[0]!] } });
+      } else {
+        await room.command(pid, { kind: 'act', action: { type: 'pass' } });
+      }
+    }
+
+    await until(() => room.snapshotFor(p0).phase === 'SHOWDOWN');
+
+    // Conserved (the ledger always reflects the real settlement here, since `LostResponseBank` calls
+    // `super` before throwing) AND correctly mirrored: every seat's room-side stack equals what the
+    // ledger actually has locked for that player — the assertion that is false pre-fix, when a lost
+    // response on the winning play sent the round through `abandonRoundAndRedeal` instead.
+    expect(players.totalChips() + bank.sinkTotal()).toBe(startingTotal);
+    for (const seat of room.snapshotFor(p0).seats) {
+      if (!seat.playerId) continue;
+      expect(seat.stack).toBe(players.locked(seat.playerId));
+    }
+    expect(room.snapshotFor(p0).message ?? '').toMatch(/wins/);
+
+    room.dispose();
+  }, 20_000);
 });

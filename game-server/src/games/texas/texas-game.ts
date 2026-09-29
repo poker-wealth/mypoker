@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { BaseGame, InvalidActionError } from '../../core/base-game';
 import { EventBus } from '../../core/event-bus';
-import type { FinancialCoreClient, JackpotAccounts } from '../../core/financial-core-client';
+import type { FinancialCoreClient, JackpotAccounts, TableSettlementRequest } from '../../core/financial-core-client';
 import {
   generateServerCommitment,
   generateClientSeed,
@@ -13,7 +13,7 @@ import {
 } from '../../fairness';
 import { TexasHand, type HandResult } from './texas-hand';
 import type { PokerVariant } from './variants';
-import { computeSettlement, toTableSettlementRequest, type RakeConfig } from './settlement';
+import { computeSettlement, toTableSettlementRequest, type RakeConfig, type TableSettlement } from './settlement';
 import type { Action, SeatPublic, Street } from './betting';
 
 /**
@@ -97,6 +97,14 @@ export class TexasGame extends BaseGame<TexasPhase, Action, TexasGameEvents> {
   private handCounter = 0;
   /** The result of the most recently settled hand — for showdown reveal in a client. */
   private lastResult: HandResult | undefined;
+  /**
+   * The settlement `settle()` sent to FC, held from just before `fc.settleTableHand` is called until
+   * `applySettled()` clears it — the window `fc.settleTableHand` can throw in even though FC already
+   * committed it (BUG-20: a lost response, not a refusal). `pendingSettlementRequest()` lets a caller
+   * hand this exact request to FC's `settlementStatus` to verify it; `finalizeSettled()` applies it
+   * once that verification has actually happened. Never read or trusted on its own.
+   */
+  private pending: { request: TableSettlementRequest; settlement: TableSettlement; result: HandResult } | undefined;
 
   constructor(
     roomId: string,
@@ -220,20 +228,63 @@ export class TexasGame extends BaseGame<TexasPhase, Action, TexasGameEvents> {
       accountOf: this.cfg.accountOf,
       jackpotAccounts: this.cfg.jackpotAccounts,
     });
+    // Set BEFORE the call, not after (BUG-20): if `settleTableHand` throws after FC has actually
+    // committed it (a lost response), `pending` is what lets a caller ask FC to verify this EXACT
+    // request and, only then, finish the hand as if this call had succeeded.
+    this.pending = { request, settlement, result };
     await this.fc.settleTableHand(request);
+    this.applySettled();
+  }
+
+  /**
+   * The post-settle work, shared by the normal path (`settle()`, right after `fc.settleTableHand`
+   * returns) and BUG-20 recovery (`finalizeSettled()`, after a caller has independently verified with
+   * FC that `pending`'s request committed). Applies `pending` exactly once either way — `pending` is
+   * cleared here, so calling this twice for the same hand throws in `finalizeSettled` rather than
+   * mirroring stacks a second time.
+   */
+  private applySettled(): void {
+    const pending = this.pending!;
 
     // Reflect the NET outcome in the seated chip stacks (rake + jackpot have left the table).
     const net = new Map<string, number>();
-    for (const w of settlement.winners) net.set(w.playerId, w.amount);
-    for (const l of settlement.losers) net.set(l.playerId, -l.amount);
+    for (const w of pending.settlement.winners) net.set(w.playerId, w.amount);
+    for (const l of pending.settlement.losers) net.set(l.playerId, -l.amount);
     for (const seat of this.table) seat.stack += net.get(seat.id) ?? 0;
 
-    this.lastResult = result;
+    this.lastResult = pending.result;
+    this.pending = undefined;
     this.sm.transition('WAITING');
     this.events.emit('handSettled', {
-      roundId: round.roundId,
-      payouts: Object.fromEntries(result.payouts),
+      roundId: pending.request.roundId,
+      payouts: Object.fromEntries(pending.result.payouts),
     });
+  }
+
+  /**
+   * The settlement request in flight, for a caller recovering from a `fc.settleTableHand` throw
+   * (BUG-20) to verify against FC's own record. Only meaningful while `SETTLING` — the one window
+   * between `settle()` building the request and `applySettled()` clearing it — so a stale request
+   * from a hand that has already resolved (successfully or via a prior recovery) can never be handed
+   * out and re-applied.
+   */
+  pendingSettlementRequest(): TableSettlementRequest | undefined {
+    return this.sm.is('SETTLING') ? this.pending?.request : undefined;
+  }
+
+  /**
+   * Apply the pending settlement as though `settle()`'s own `fc.settleTableHand` call had succeeded.
+   *
+   * NEVER call this without first verifying, against FC's own stored receipt, that `pending`'s exact
+   * request committed (BUG-20) — this method itself does no verification at all; it trusts the caller
+   * completely. Throws unless there is actually a pending settlement to finalize, so a caller cannot
+   * apply stack deltas for a hand that was never in this state.
+   */
+  finalizeSettled(): void {
+    if (!this.sm.is('SETTLING') || !this.pending) {
+      throw new InvalidActionError('no pending settlement to finalize');
+    }
+    this.applySettled();
   }
 
   /** The most recently settled hand's result (community, showdown, payouts) — undefined before any. */

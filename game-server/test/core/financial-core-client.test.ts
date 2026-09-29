@@ -89,6 +89,55 @@ describe('HttpFinancialCoreClient.lockedBalance', () => {
 });
 
 /**
+ * BUG-20: after `settleTableHand` throws, a room asks FC whether that exact round already
+ * settled before abandoning the hand. This is the HTTP half of that question —
+ * GET /internal/table-settlements/:roundId, with the same shared secret every internal route uses.
+ */
+describe('HttpFinancialCoreClient.settlementStatus', () => {
+  it('requests the round by id (URL-encoded), with the shared secret', async () => {
+    let requestedUrl = '';
+    let requestedHeaders: Record<string, string> = {};
+    const fetchImpl = (async (url: unknown, init?: RequestInit) => {
+      requestedUrl = String(url);
+      requestedHeaders = (init?.headers as Record<string, string>) ?? {};
+      return { ok: true, json: async () => ({ settled: false }) };
+    }) as unknown as typeof fetch;
+
+    const client = new HttpFinancialCoreClient({ baseUrl: 'http://fc.test', internalSecret: 'my-secret', fetchImpl });
+    const status = await client.settlementStatus('round with spaces');
+
+    expect(status).toEqual({ settled: false });
+    expect(requestedUrl).toBe('http://fc.test/internal/table-settlements/round%20with%20spaces');
+    expect(requestedHeaders['x-internal-secret']).toBe('my-secret');
+  });
+
+  it('returns a settled receipt verbatim', async () => {
+    const receipt = {
+      type: 'table',
+      roundId: 'r1',
+      rake: '1',
+      jackpotTotal: '0',
+      losers: [{ playerAccountId: 'p1', amount: '10' }],
+      winners: [{ playerAccountId: 'p2', amount: '9' }],
+      hash: 'h',
+    };
+    const fetchImpl = (async () => ({
+      ok: true,
+      json: async () => ({ settled: true, receipt }),
+    })) as unknown as typeof fetch;
+    const client = new HttpFinancialCoreClient({ baseUrl: 'http://fc.test', internalSecret: 'secret', fetchImpl });
+
+    await expect(client.settlementStatus('r1')).resolves.toEqual({ settled: true, receipt });
+  });
+
+  it('throws FinancialCoreError on a non-ok response', async () => {
+    const fetchImpl = (async () => ({ ok: false, status: 503, text: async () => 'down' })) as unknown as typeof fetch;
+    const client = new HttpFinancialCoreClient({ baseUrl: 'http://fc.test', internalSecret: 'secret', fetchImpl });
+    await expect(client.settlementStatus('r1')).rejects.toThrow(FinancialCoreError);
+  });
+});
+
+/**
  * `ChipDenominatedFc` is the boundary between chip-speaking rooms and the USDT-speaking FC. Every
  * other amount it forwards is converted at this exact seam (chip-currency.ts); `lockedBalance` is a
  * read going the other way — USDT in from the inner client, chips out to the room — and needs the
@@ -133,6 +182,82 @@ describe('ChipDenominatedFc.lockedBalance', () => {
 });
 
 /**
+ * BUG-20: same one-boundary conversion as `lockedBalance` above, in both directions — every amount
+ * on the receipt (rake, jackpotTotal, every party's amount) is USDT coming in and must be chips
+ * going out, or a room comparing it against its own chip-denominated request would compare the
+ * wrong units and never match.
+ */
+describe('ChipDenominatedFc.settlementStatus', () => {
+  it('converts every amount on a settled receipt from USDT to chips', async () => {
+    const inner: FinancialCoreClient = {
+      buyIn: async () => {},
+      release: async () => {},
+      settleRound: async () => {
+        throw new Error('not used');
+      },
+      settleTableHand: async () => ({ roundId: 'x', applied: true }),
+      settlementStatus: async (roundId: string) => ({
+        settled: true,
+        receipt: {
+          type: 'table',
+          roundId,
+          rake: '10.000000',
+          jackpotTotal: '5.000000',
+          losers: [{ playerAccountId: 'p1', amount: '10.000000' }],
+          winners: [{ playerAccountId: 'p2', amount: '5.000000' }],
+          hash: 'h',
+        },
+      }),
+    };
+    const fc = new ChipDenominatedFc(inner);
+    expect(fc.settlementStatus).toBeDefined();
+
+    const status = await fc.settlementStatus!('r1');
+    expect(status).toEqual({
+      settled: true,
+      receipt: {
+        type: 'table',
+        roundId: 'r1',
+        rake: '1000',
+        jackpotTotal: '500',
+        losers: [{ playerAccountId: 'p1', amount: '1000' }],
+        winners: [{ playerAccountId: 'p2', amount: '500' }],
+        hash: 'h',
+      },
+    });
+  });
+
+  it('passes settled:false through unconverted', async () => {
+    const inner: FinancialCoreClient = {
+      buyIn: async () => {},
+      release: async () => {},
+      settleRound: async () => {
+        throw new Error('not used');
+      },
+      settleTableHand: async () => ({ roundId: 'x', applied: true }),
+      settlementStatus: async () => ({ settled: false }),
+    };
+    const fc = new ChipDenominatedFc(inner);
+    await expect(fc.settlementStatus!('r1')).resolves.toEqual({ settled: false });
+  });
+
+  // Same reasoning as `lockedBalance` (BUG-10 follow-up B): absent means the caller must treat this
+  // as genuinely unconfirmable, never as a lying "not settled".
+  it('leaves settlementStatus unset when the inner client has no settlementStatus at all', async () => {
+    const inner: FinancialCoreClient = {
+      buyIn: async () => {},
+      release: async () => {},
+      settleRound: async () => {
+        throw new Error('not used');
+      },
+      settleTableHand: async () => ({ roundId: 'x', applied: true }),
+    };
+    const fc = new ChipDenominatedFc(inner);
+    expect(fc.settlementStatus).toBeUndefined();
+  });
+});
+
+/**
  * D7 (BUG-07 follow-up): a hung FC call must not block a room's queue — and, downstream,
  * `drain()` — for the whole shutdown window, so `post()` now aborts after `timeoutMs`. Real `fetch`
  * rejects with an AbortError once its `signal` fires; this fake mirrors that instead of ever
@@ -157,6 +282,19 @@ describe('HttpFinancialCoreClient — fetch timeout (D7)', () => {
     });
 
     await expect(client.buyIn('p1', '10')).rejects.toThrow(/abort/i);
+  });
+
+  // BUG-20: settlementStatus is a room's recovery path AFTER a settlement call has already timed
+  // out or errored — it must not itself hang forever on a still-unresponsive FC.
+  it('aborts a hung settlementStatus call after the configured timeoutMs', async () => {
+    const client = new HttpFinancialCoreClient({
+      baseUrl: 'http://fc.test',
+      internalSecret: 'secret',
+      fetchImpl: hangingFetch(),
+      timeoutMs: 20,
+    });
+
+    await expect(client.settlementStatus('r1')).rejects.toThrow(/abort/i);
   });
 
   it('gives settleTableHand a longer timeout than the default, so it is not cut off by it', async () => {

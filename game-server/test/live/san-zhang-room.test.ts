@@ -239,3 +239,67 @@ describe('SanZhangRoom — a fresh game per round survives an abandon (BUG-26)',
     room.dispose();
   }, 15_000);
 });
+
+/**
+ * BUG-20: `fc.settleTableHand` can throw even after FC already committed it — a lost response, not
+ * a refusal. `seat.stack` (the room's own mirror) must equal `players.locked` (the ledger's real
+ * record) after settlement either way: pre-fix, the room's catch never mirrored on any throw, so the
+ * two disagree — the ledger moved, the seat did not.
+ */
+describe('SanZhangRoom — settlement recovery from a lost response (BUG-20)', () => {
+  it('mirrors the stacks once FC confirms the lost settlement actually committed', async () => {
+    class LostResponseBank extends ChipBank {
+      private failedOnce = false;
+      override async settleTableHand(
+        req: TableSettlementRequest,
+      ): Promise<{ roundId: string; applied: boolean }> {
+        const result = await super.settleTableHand(req);
+        if (!this.failedOnce) {
+          this.failedOnce = true;
+          throw new Error('socket hang up');
+        }
+        return result;
+      }
+    }
+
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = new LostResponseBank(players);
+    const alice = players.create('Alice').id;
+    const bob = players.create('Bob').id;
+    const startingTotal = players.totalChips();
+
+    const room = new SanZhangRoom(
+      {
+        id: 'san-zhang-bug20',
+        name: 'Test San Zhang',
+        game: 'san-zhang',
+        minBuyIn: 1_000,
+        maxBuyIn: 50_000,
+        maxSeats: 6,
+        rakeBps: 500,
+        bettingTimeMs: 5_000,
+        showdownDelayMs: 20,
+      },
+      { directory: players, fc: bank },
+    );
+
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(bob, { kind: 'sit', seat: 1, buyIn: BUY_IN });
+    await until(() => room.snapshotFor(alice).phase === 'IN_HAND');
+
+    await room.command(bob, { kind: 'act', action: { type: 'bet', amount: 100 } });
+    await until(() => room.snapshotFor(alice).phase === 'SHOWDOWN');
+
+    // Conserved (the ledger always reflects the real settlement here, since `LostResponseBank` calls
+    // `super` before throwing) AND correctly mirrored: every seat's room-side stack equals what the
+    // ledger actually has locked for that player — the assertion that is false pre-fix, when the
+    // mirror never ran.
+    expect(players.totalChips() + bank.sinkTotal()).toBe(startingTotal);
+    for (const seat of room.snapshotFor(alice).seats) {
+      if (!seat.playerId) continue;
+      expect(seat.stack).toBe(players.locked(seat.playerId));
+    }
+
+    room.dispose();
+  }, 15_000);
+});

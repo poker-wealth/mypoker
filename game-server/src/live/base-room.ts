@@ -2,6 +2,8 @@ import type { FinancialCoreClient, JackpotAccounts } from '../core/financial-cor
 import { FakeChainClient, type ChainClient } from '../fairness';
 import type { JackpotCandidate } from '../jackpot/weights';
 import type { GameId } from '../lobby/game-catalog';
+import { toTableSettlementRequest, type TableSettlement } from '../games/texas/settlement';
+import { confirmSettled } from './settlement-recovery';
 import type { LiveRoom, LiveTableConfig, RoomDeps } from './live-room';
 import type { PlayerDirectory } from './players';
 import type { BetAction, RoomPhase, TableCommand, TableSnapshot, TableSummary, JackpotWinSnapshot } from './room-state';
@@ -564,6 +566,46 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
     this.phase = 'WAITING';
     this.actionDeadline = null;
     this.push();
+  }
+
+  /**
+   * BUG-20 — before abandoning a round whose settlement THREW, ask FC whether it actually committed
+   * anyway (a lost response, not a genuine refusal) and recover if so, rather than telling players a
+   * hand failed when the ledger already paid it.
+   *
+   * `settlement` must be EXACTLY what the game's own `settleTableHand` request would have been —
+   * this rebuilds it the same way every base-room game does (`tableType: 'PLATFORM'`, identity
+   * `accountOf`, `tableJackpotAccounts(this.config.id)`, no leagueId), which is what every game
+   * listed on this fix (baccarat, niu-niu, san-zhang, red-packet, red-envelope, cowboy-beauty,
+   * lottery) constructs its own `TableSettlementRequest` with — verified per game against its
+   * `*-game.ts` `toTableSettlementRequest` call. A game whose request this does NOT reproduce must
+   * not use this helper; it should keep abandoning as before.
+   *
+   * False on no roundId or an empty settlement (nothing was actually attempted) — those can only
+   * mean `settledDespite` was reached from a round that never called FC in the first place.
+   */
+  protected async settledDespite(
+    err: unknown,
+    roundId: string | undefined,
+    settlement: TableSettlement,
+  ): Promise<boolean> {
+    if (!roundId) return false;
+    if (settlement.losers.length === 0 && settlement.winners.length === 0) return false;
+
+    const req = toTableSettlementRequest(settlement, {
+      roundId,
+      tableType: 'PLATFORM',
+      accountOf: (p) => p,
+      jackpotAccounts: tableJackpotAccounts(this.config.id),
+    });
+    const ok = await confirmSettled(this.fc, req, `[room ${this.config.id}]`);
+    if (ok) {
+      console.error(
+        `[room ${this.config.id}] settlement response lost for round ${roundId} but FC confirms it committed — applying it`,
+        err,
+      );
+    }
+    return ok;
   }
 
   protected occupiedSeats(): TSeat[] {

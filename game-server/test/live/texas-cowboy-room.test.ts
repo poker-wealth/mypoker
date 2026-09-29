@@ -3,6 +3,7 @@ import { DevPlayers } from '../../src/live/players';
 import { TexasCowboyRoom } from '../../src/live/texas-cowboy-room';
 import { TableHub } from '../../src/live/table-hub';
 import { defaultTables } from '../../src/live/server';
+import type { TableSettlementRequest } from '../../src/core/financial-core-client';
 
 /**
  * Pin the deal so the settlement test below can't land on a TIE (~4% of live runs) -- a tie voids
@@ -296,4 +297,61 @@ describe('TexasCowboyRoom — Live Room Integration', () => {
 
     room.dispose();
   }, 20_000);
+
+  /**
+   * BUG-20: `fc.settleTableHand` can throw even after FC already committed it — a lost response, not
+   * a refusal. Before this fix, `settleRound`'s catch treated every throw as unpaid and left the
+   * stakes exactly where they were, permanently disagreeing with a ledger that had already moved.
+   */
+  it('mirrors the stacks when the settlement response is lost but FC confirms it committed (BUG-20)', async () => {
+    class LostResponseBank extends ChipBank {
+      private failedOnce = false;
+      override async settleTableHand(
+        req: TableSettlementRequest,
+      ): Promise<{ roundId: string; applied: boolean }> {
+        const result = await super.settleTableHand(req);
+        if (!this.failedOnce) {
+          this.failedOnce = true;
+          throw new Error('socket hang up');
+        }
+        return result;
+      }
+    }
+
+    const players = new DevPlayers({ startingChips: 50_000 });
+    const bank = new LostResponseBank(players);
+    const alice = players.create('Alice').id;
+    const bob = players.create('Bob').id;
+    const startingTotal = players.totalChips();
+
+    const room = newRoom('texas-cowboy-bug20', { directory: players, fc: bank });
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(bob, { kind: 'sit', seat: 1, buyIn: BUY_IN });
+    const aliceBeforeBet = players.available(alice) + players.locked(alice);
+    const bobBeforeBet = players.available(bob) + players.locked(bob);
+
+    // Same pinned deal as the conservation test above: alice bets cowboy_win, which wins decisively.
+    await room.command(alice, { kind: 'act', action: { type: 'bet', amount: 2_000, selection: 'cowboy_win' } });
+    await room.command(bob, { kind: 'act', action: { type: 'bet', amount: 2_000, selection: 'cowgirl_win' } });
+
+    await until(() => room.snapshotFor(alice).phase === 'SHOWDOWN', 40_000);
+    await wait(6_000); // settlement runs a beat after showdown
+
+    // The LEDGER always reflects the real settlement here (LostResponseBank calls `super` before
+    // throwing) — conservation on its own would pass even pre-fix. What pre-fix actually gets wrong
+    // is the ROOM's own `seat.stack` mirror, which its catch skipped entirely on any throw: this is
+    // the assertion that is false against the pre-fix code.
+    expect(players.totalChips() + bank.sinkTotal()).toBe(startingTotal);
+    expect(bank.sinkBalances().rake).toBe(100);
+    const aliceSeat = room.snapshotFor(alice).seats.find((s) => s.playerId === alice)!;
+    const bobSeat = room.snapshotFor(alice).seats.find((s) => s.playerId === bob)!;
+    expect(aliceSeat.stack).toBe(BUY_IN + 1_900); // net win mirrored onto the seat
+    expect(bobSeat.stack).toBe(BUY_IN - 2_000); // net loss mirrored onto the seat
+    const aliceAfter = players.available(alice) + players.locked(alice);
+    const bobAfter = players.available(bob) + players.locked(bob);
+    expect(aliceAfter - aliceBeforeBet).toBe(1_900);
+    expect(bobAfter - bobBeforeBet).toBe(-2_000);
+
+    room.dispose();
+  }, 60_000);
 });

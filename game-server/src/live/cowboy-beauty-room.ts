@@ -155,7 +155,15 @@ export class CowboyBeautyRoom extends BaseLiveRoom<CowboyBeautyRoomConfig, RoomS
     // does, the table goes back to WAITING instead of sitting in IN_HAND forever. See
     // `abandonRound`: nothing is paid or reversed here, only the room is made playable again.
     try {
-      await this.game.start();
+      try {
+        await this.game.start();
+      } catch (err) {
+        // BUG-20: the settlement may have committed in FC even though this call threw (a lost
+        // response, not a refusal). Ask before abandoning a hand the ledger already paid.
+        const nets = this.game.getNet();
+        const attempted = nets.size > 0 ? settleNet(nets, { rakeBps: this.config.rakeBps }) : undefined;
+        if (!attempted || !(await this.settledDespite(err, this.game.getRoundId(), attempted))) throw err;
+      }
 
       const grossNets = this.game.getNet();
       let winnerProfit = 0;

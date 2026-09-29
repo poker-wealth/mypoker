@@ -105,6 +105,17 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
         // throw with no winner is the engine rejecting the play itself (state the checks above did
         // not catch, e.g. still bidding) and belongs to the player, not the table.
         if (this.game.getWinner()) {
+          // BUG-20: the settlement may have committed in FC even though `play()` threw (a lost
+          // response, not a refusal). Ask before abandoning a hand the ledger already paid.
+          const nets = this.game.getNet();
+          const attempted = nets.size > 0 ? settleNet(nets, { rakeBps: this.config.rakeBps }) : undefined;
+          if (attempted && (await this.settledDespite(err, this.game.roundInfo()?.roundId, attempted))) {
+            // Proceed exactly as the happy path below would: `resolveRound` mirrors the stacks and
+            // draws the jackpot from the game's own state — it never calls FC again, so this cannot
+            // double-mirror or double-run the jackpot evaluation.
+            await this.resolveRound();
+            return;
+          }
           this.abandonRoundAndRedeal(err);
           return;
         }

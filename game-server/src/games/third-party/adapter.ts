@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { FinancialCoreClient, JackpotAccounts } from '../../core/financial-core-client';
 import { settleNet, toTableSettlementRequest } from '../texas/settlement';
+import { confirmSettled } from '../../live/settlement-recovery';
 
 /**
  * ThirdPartyAdapter — the isolation boundary around an external game provider (Lottery, Slots).
@@ -201,7 +202,15 @@ export class ThirdPartyAdapter {
       const playerWin = request.winners.find((w) => w.playerAccountId === playerAccount);
       playerDelta = playerLoss ? -Number(playerLoss.amount) : playerWin ? Number(playerWin.amount) : 0;
 
-      await this.fc.settleTableHand(request);
+      try {
+        await this.fc.settleTableHand(request);
+      } catch (err) {
+        // BUG-20: the settlement may have committed in FC even though this call threw (a lost
+        // response, not a refusal). `request` here is the exact object we sent — no reconstruction
+        // needed — so ask FC whether it matches what it has on file before treating the round as
+        // failed.
+        if (!(await confirmSettled(this.fc, request, `[adapter ${this.cfg.provider.name}]`))) throw err;
+      }
     }
 
     const receipt: Receipt = {
