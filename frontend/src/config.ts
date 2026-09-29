@@ -35,7 +35,7 @@ export const TABLES_URL = (import.meta.env.VITE_TABLES_URL ?? API_URL ?? '').rep
 /** The game socket, derived from the table server's origin. */
 export const TABLES_WS_URL =
   import.meta.env.VITE_TABLES_WS_URL ??
-  `${(TABLES_URL || window.location.origin).replace(/^http/, 'ws')}/ws`;
+  `${(TABLES_URL || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/^http/, 'ws')}/ws`;
 
 /** Bot username (no @) — used only to derive the default Support chat link. */
 export const TELEGRAM_BOT_NAME = import.meta.env.VITE_TELEGRAM_BOT_NAME ?? 'mypoker777_bot';
