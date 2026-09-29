@@ -156,24 +156,50 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
         const mine = this.seatOf(playerId);
         if (mine) {
           mine.connected = false;
-          if (this.phase === 'WAITING') {
-            this.armDisconnectGrace(mine.playerId);
-          }
+          // Always armed (BUG-07) — it used to arm only when phase === 'WAITING' at the moment of
+          // disconnect, and nothing re-armed it once a round that was running had ended. A player
+          // who dropped mid-round kept their seat, and the money locked behind it, forever: the one
+          // event that could have freed them (join()'s own reconnect path) never fires for someone
+          // who never comes back.
+          this.armDisconnectGrace(mine.playerId);
         }
       }
     };
   }
 
+  /**
+   * The grace timer fires, checks whether it is actually safe to let go of the chair, and either
+   * releases the seat or checks again shortly — it does not just give up (BUG-07).
+   *
+   * "Safe" is phase !== 'WAITING' OR a live bet on this seat, not phase alone: a round in progress
+   * covers most games (niu-niu's banker included — the banker never carries `bet`, but the room is
+   * never WAITING while a hand is live), but texas-cowboy calls its open betting window 'WAITING'
+   * while seats ARE placing real bets into it, so a bet on the seat has to gate the release too or
+   * a disconnect during that window would return chips still at risk.
+   */
   protected armDisconnectGrace(playerId: string, graceMs = 30_000): void {
     if (this.disconnectTimers.has(playerId)) return;
     const timer = setTimeout(() => {
       this.disconnectTimers.delete(playerId);
       void this.enqueue(async () => {
         const seat = this.seatOf(playerId);
-        if (seat && !seat.connected && this.phase === 'WAITING') {
-          await this.releaseSeat(seat.index);
-          this.push();
+        if (!seat || seat.connected) return;
+        if (this.phase !== 'WAITING' || seat.bet > 0) {
+          // A round is live, or this seat is in it — check back shortly rather than dropping the
+          // grace entirely; the player is released as soon as it is actually safe.
+          this.armDisconnectGrace(playerId, 5_000);
+          return;
         }
+        try {
+          await this.releaseSeat(seat.index);
+        } catch (err) {
+          // BUG-07 commit 1: a refused release now leaves the seat exactly as it was. Log and stop
+          // — the seat stays occupied and connected=false, so the NEXT disconnect (a reconnect then
+          // another drop) tries again rather than this timer spinning on a release FC keeps refusing.
+          console.error(`[room ${this.config.id}] seat ${seat.index} failed to release after disconnect grace:`, err);
+          return;
+        }
+        this.push();
       });
     }, graceMs);
     this.disconnectTimers.set(playerId, timer);
