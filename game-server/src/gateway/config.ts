@@ -19,6 +19,26 @@ export interface GatewayConfig {
   /** The gateway's own database (identity/user store). */
   mongoUri: string;
   mongoTls: boolean;
+  /**
+   * How many reverse-proxy hops to trust in front of this process — Express's
+   * `trust proxy` setting (see `app.ts`). Without it `req.ip` is whichever hop
+   * sits directly in front of the process for EVERY request, not the real
+   * client: on Heroku that is the platform router, so `req.ip` was constant
+   * across every visitor and the login throttle's IP half (BUG-15) added no
+   * protection at all (see auth.ts).
+   *
+   * Heroku's router is exactly one hop and always appends the true client
+   * address as the RIGHTMOST entry of `X-Forwarded-For` — it does not forward
+   * whatever a client already put there, it adds to it — so trusting exactly
+   * one hop reads the real client and nothing a client could have spoofed by
+   * sending its own `X-Forwarded-For`. Trusting more hops than actually exist
+   * in front of the process is what makes `X-Forwarded-For` attacker-spoofable
+   * (Express then reads further left, into what the client itself sent).
+   *
+   * Defaults to 1 in production (Heroku) and 0 elsewhere (no proxy in dev/test,
+   * so `req.ip` is already the real connecting socket).
+   */
+  trustProxyHops: number;
 }
 
 function num(value: string | undefined, fallback: number): number {
@@ -45,6 +65,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig 
       .filter(Boolean),
     mongoUri: env.MONGO_URI ?? '',
     mongoTls: env.MONGO_TLS === 'true',
+    trustProxyHops: num(env.TRUST_PROXY_HOPS, isProduction ? 1 : 0),
   };
 
   // A missing JWT secret would mean signing with '' — every token forgeable.

@@ -288,12 +288,25 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
     recent.push(now());
     loginFailures.set(key, recent);
     // An attacker who cycles identifiers (or IPs) rather than repeating one
-    // could otherwise grow this map without bound. Evict the oldest-inserted
-    // entry to cap it — losing a little precision under attack is fine, an
-    // unbounded map is not.
+    // could otherwise grow this map without bound. Over the cap: first sweep
+    // entries whose NEWEST failure has already aged out of the window — dead
+    // weight that `recentLoginFailures` only prunes when something reads that
+    // exact key again, which a cycling attacker never does twice. Only if that
+    // is not enough does the oldest-inserted (still-live) entry get evicted,
+    // trading a little precision under sustained attack for a map that cannot
+    // grow without bound.
     if (loginFailures.size > LOGIN_THROTTLE_MAX_KEYS) {
-      const oldestKey = loginFailures.keys().next().value;
-      if (oldestKey !== undefined) loginFailures.delete(oldestKey);
+      for (const [k, timestamps] of loginFailures) {
+        if (loginFailures.size <= LOGIN_THROTTLE_MAX_KEYS) break;
+        const newest = timestamps[timestamps.length - 1];
+        if (newest === undefined || now() - newest >= LOGIN_FAILURE_WINDOW_MS) {
+          loginFailures.delete(k);
+        }
+      }
+      if (loginFailures.size > LOGIN_THROTTLE_MAX_KEYS) {
+        const oldestKey = loginFailures.keys().next().value;
+        if (oldestKey !== undefined) loginFailures.delete(oldestKey);
+      }
     }
   };
 

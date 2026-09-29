@@ -45,10 +45,36 @@ heroku config:set -a mypoker-gateway \
   FINANCIAL_CORE_URL='https://mypoker-fc.herokuapp.com' \
   GOOGLE_CLIENT_ID='<id>' GOOGLE_CLIENT_SECRET='<secret>' \
   TELEGRAM_BOT_TOKEN='<token>' \
+  TRUST_PROXY_HOPS=1 \
   CORS_ORIGINS='https://mypoker777.com,https://www.mypoker777.com,https://app.mypoker777.com'
 git subtree push --prefix game-server heroku-gw main
 ```
 Public API URL → `https://mypoker-gateway.herokuapp.com`.
+
+**`TRUST_PROXY_HOPS=1` (BUG-15).** Heroku's router is a reverse proxy, and without
+`app.set('trust proxy', ...)` Express reads `req.ip` off the raw socket — the
+router's own address for every request, not the visitor's. The `/auth/login`
+failure throttle keys partly on `req.ip` (`game-server/src/gateway/auth.ts`), so
+behind an untrusted proxy that IP half was constant across every real user and
+added no protection. `1` is correct because the Heroku router is exactly one hop
+and always APPENDS the true client address as the rightmost `X-Forwarded-For`
+entry — trusting exactly that many hops reads the real client and nothing a
+client could spoof by sending its own header. Only raise it to `2` if Cloudflare
+is ever put in front of the Heroku router (one more real hop); trusting hops that
+aren't actually there makes `X-Forwarded-For` attacker-spoofable, which is worse
+than not trusting the proxy at all. Never deploy with it unset in production —
+config.ts defaults to `1` there, but an explicit value here is the deploy's own
+record of the topology, not something to lean on the code default for.
+
+**The login throttle is in-memory, per process.** `loginFailures` in
+`gateway/auth.ts` lives in the Node process's own memory, not in Mongo or Redis.
+Scale the gateway to N dynos and each one tracks its own 10-failures-per-window
+independently — an attacker spread across dynos effectively gets N×10 attempts
+per window, not 10. A dyno restart (a deploy, a crash, Heroku's own periodic
+cycling) also clears whatever that process had counted, for every key it held.
+Fine at one dyno; if the gateway is ever scaled beyond one, this needs a shared
+store (Redis is already a dependency on the FC side) before the throttle's
+numbers mean what they say.
 
 **Shutdown grace period (BUG-07).** The gateway now drains every live table — releasing every
 seated stack back to its wallet — on `SIGTERM`/`SIGINT` before it exits (`gateway/server.ts`), with

@@ -28,12 +28,19 @@ jest.mock('../../src/auth/user-store', () => ({
   },
 }));
 
-function app() {
+/**
+ * `extraEnv` lets the IP-sensitive tests opt into trusting a proxy hop
+ * (`TRUST_PROXY_HOPS`), exactly as production does behind Heroku's router —
+ * see BUG-15. Left out, it defaults to 0, same as `loadConfig`'s own
+ * non-production default, and X-Forwarded-For is ignored entirely.
+ */
+function app(extraEnv: NodeJS.ProcessEnv = {}) {
   return createGatewayApp(
     loadConfig({
       JWT_SECRET: 'test-secret-login-throttle',
       NODE_ENV: 'test',
       FINANCIAL_CORE_URL: 'http://127.0.0.1:9',
+      ...extraEnv,
     } as NodeJS.ProcessEnv),
   );
 }
@@ -133,13 +140,13 @@ describe('POST /auth/login throttling', () => {
 
   it('a different IP for the same identifier is throttled independently', async () => {
     (userStore.verifyPassword as jest.Mock).mockRejectedValue(wrongPassword());
-    const server = app();
-    // Only this test needs distinct apparent IPs, so it opts the app instance
-    // into honouring X-Forwarded-For for itself -- production sets no such
-    // thing (see the deviation note in the commit message), so this proves
-    // the throttle key is IP-sensitive without asserting anything about how
-    // req.ip resolves in a real deployment.
-    server.set('trust proxy', true);
+    // Only this test (and the trust-proxy tests below) need distinct apparent
+    // IPs, so it opts the app instance into trusting exactly one proxy hop —
+    // production's Heroku value (BUG-15) — rather than the old blanket
+    // `server.set('trust proxy', true)`, which trusted the FIRST
+    // X-Forwarded-For hop and would have let a client spoof its own bucket by
+    // sending one itself.
+    const server = app({ TRUST_PROXY_HOPS: '1' });
 
     for (let i = 0; i < 10; i++) {
       await request(server)
@@ -158,5 +165,62 @@ describe('POST /auth/login throttling', () => {
       .set('X-Forwarded-For', '198.51.100.20')
       .send({ email: 'erin@example.com', password: 'wrong' });
     expect(sameIdentifierOtherIp.status).toBe(401);
+  });
+});
+
+/**
+ * BUG-15's actual bug: the gateway never called `app.set('trust proxy', ...)`,
+ * so behind Heroku's router `req.ip` was the router's own address for every
+ * request and the throttle's IP half added no protection. These prove the fix
+ * reads the hop a real proxy appends and nothing a client can spoof by sending
+ * its own `X-Forwarded-For` — and that with no trusted hop configured (the
+ * pre-fix shape, still the correct default with no proxy at all) the header is
+ * ignored outright rather than trusted blindly.
+ */
+describe('POST /auth/login throttling — trust proxy (BUG-15)', () => {
+  it('with one trusted hop, a spoofed leftmost X-Forwarded-For entry does not move the bucket', async () => {
+    (userStore.verifyPassword as jest.Mock).mockRejectedValue(wrongPassword());
+    const server = app({ TRUST_PROXY_HOPS: '1' });
+
+    for (let i = 0; i < 10; i++) {
+      await request(server)
+        .post('/auth/login')
+        .set('X-Forwarded-For', '203.0.113.10')
+        .send({ email: 'frank@example.com', password: 'wrong' });
+    }
+
+    // A real proxy only ever APPENDS to X-Forwarded-For; it never forwards
+    // whatever a client already put there. This is what a client trying to
+    // move its own bucket by prepending a fake hop would send — trusting
+    // exactly one hop reads the RIGHTMOST entry (what the trusted proxy
+    // itself appended), so the spoofed leftmost entry changes nothing and
+    // this still lands in the same, already-tripped bucket.
+    const spoofed = await request(server)
+      .post('/auth/login')
+      .set('X-Forwarded-For', '1.2.3.4, 203.0.113.10')
+      .send({ email: 'frank@example.com', password: 'wrong' });
+    expect(spoofed.status).toBe(429);
+  });
+
+  it('with no trusted hops (the default), X-Forwarded-For is ignored -- every request shares one bucket', async () => {
+    (userStore.verifyPassword as jest.Mock).mockRejectedValue(wrongPassword());
+    const server = app(); // TRUST_PROXY_HOPS unset -> 0, loadConfig's own non-production default
+
+    for (let i = 0; i < 10; i++) {
+      await request(server)
+        .post('/auth/login')
+        .set('X-Forwarded-For', '203.0.113.10')
+        .send({ email: 'grace@example.com', password: 'wrong' });
+    }
+
+    // A different claimed X-Forwarded-For changes nothing when no hop is
+    // trusted -- the throttle keys on the real socket address (constant for
+    // every supertest request here), so this trips the same bucket the ten
+    // failures above already filled rather than opening a fresh one.
+    const stillSameBucket = await request(server)
+      .post('/auth/login')
+      .set('X-Forwarded-For', '9.9.9.9')
+      .send({ email: 'grace@example.com', password: 'wrong' });
+    expect(stillSameBucket.status).toBe(429);
   });
 });

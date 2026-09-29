@@ -33,6 +33,13 @@ import type { LobbyService } from '../lobby';
 export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): Express {
   const app = express();
 
+  // Trust exactly the reverse proxy Heroku puts in front of this process (BUG-15).
+  // Without this, Express reads `req.ip` off the raw socket — the router's own
+  // address for every request behind Heroku — and the login throttle's IP half
+  // degenerates to the identifier alone. See `GatewayConfig.trustProxyHops` for
+  // why the count matters (too many hops makes X-Forwarded-For spoofable).
+  app.set('trust proxy', config.trustProxyHops);
+
   app.disable('x-powered-by');
   app.use(cors(config.corsOrigins));
   app.use(express.json({ limit: '64kb' }));
