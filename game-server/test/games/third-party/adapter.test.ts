@@ -185,6 +185,75 @@ describe('ThirdPartyAdapter — receipt.providerDelta (BUG-10 follow-up)', () =>
   });
 });
 
+/**
+ * BUG-22. `receipt.net` (the raw payout − wager) is NOT what FC actually moves for the PLAYER's
+ * own account on a win: rake + the jackpot injection are deducted from the WINNER's credit (see
+ * `settleNet`), so a winning player is credited less than `net`. `slots-room.ts` used to mirror
+ * `net` straight onto the seat stack, which then ran ahead of what was actually locked for the
+ * player and made `releaseSeat` refuse forever. `playerDelta` must match the settlement request
+ * byte-for-byte: the raw loss amount when the player is a loser (no deduction — rake/jackpot only
+ * ever come off a WINNER's side), and the rake+jackpot-trimmed amount when the player is a winner.
+ */
+describe('ThirdPartyAdapter — receipt.playerDelta (BUG-22)', () => {
+  function adapterCapturing(
+    commissionBps: number,
+    provider: ThirdPartyProvider,
+  ): { adapter: ThirdPartyAdapter; requests: TableSettlementRequest[] } {
+    const requests: TableSettlementRequest[] = [];
+    const capturingFc: FinancialCoreClient = {
+      async buyIn() {},
+      async release() {},
+      async settleRound(req) {
+        return { roundId: req.roundId, sequence: [], amounts: { jackpot: '0', rake: '0', payout: '0' }, accounts: {}, hash: '' };
+      },
+      async settleTableHand(req) {
+        requests.push(req);
+        return { roundId: req.roundId, applied: true };
+      },
+    };
+    return { adapter: new ThirdPartyAdapter(capturingFc, { ...cfg, commissionBps, provider }), requests };
+  }
+
+  it('is 0 on a push — no settlement is even built', async () => {
+    const { adapter: a } = adapterCapturing(500, new TestProvider(() => 100));
+    const r = await a.play('p1', 'r-push', 100);
+    expect(r.net).toBe(0);
+    expect(r.playerDelta).toBe(0);
+  });
+
+  it('on a player loss, the player pays the raw loss — a loser is never trimmed by rake/jackpot', async () => {
+    const { adapter: a, requests } = adapterCapturing(500, new TestProvider(() => 0));
+    const r = await a.play('p1', 'r-loss', 100);
+    expect(r.net).toBe(-100);
+    expect(r.playerDelta).toBe(-100);
+    const loserParty = requests[0]!.losers.find((l) => l.playerAccountId === cfg.accountOf('p1'));
+    expect(loserParty?.amount).toBe('100');
+  });
+
+  it('on a player win, the player is credited less than the raw net — rake + jackpot land on their side', async () => {
+    const { adapter: a, requests } = adapterCapturing(500, new TestProvider(() => 500));
+    const r = await a.play('p1', 'r-win', 100);
+    expect(r.net).toBe(400);
+    // Player's gross win is 400; rake = floor(400×500/10000) = 20, jackpot = floor(400×50/10000) =
+    // 2 (default 0.5% jackpot rate) → credited 378, not 400.
+    expect(r.playerDelta).toBe(378);
+    const winnerParty = requests[0]!.winners.find((w) => w.playerAccountId === cfg.accountOf('p1'));
+    expect(winnerParty?.amount).toBe('378');
+  });
+
+  it('playerDelta always equals exactly what the captured request moves for the player account', async () => {
+    for (const payout of [0, 50, 100, 250, 9000]) {
+      const { adapter: a, requests } = adapterCapturing(500, new TestProvider(() => payout));
+      const r = await a.play('p1', `r-cross-${payout}`, 100);
+      const playerAccount = cfg.accountOf('p1');
+      const loserAmt = requests[0]?.losers.find((l) => l.playerAccountId === playerAccount)?.amount;
+      const winnerAmt = requests[0]?.winners.find((w) => w.playerAccountId === playerAccount)?.amount;
+      const expected = loserAmt !== undefined ? -Number(loserAmt) : winnerAmt !== undefined ? Number(winnerAmt) : 0;
+      expect(r.playerDelta).toBe(expected);
+    }
+  });
+});
+
 describe('ThirdPartyAdapter — replay protection', () => {
   it('settles a round exactly once; resubmits return the original receipt', async () => {
     const a = adapter(new TestProvider(() => 500));

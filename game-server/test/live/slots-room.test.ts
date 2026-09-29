@@ -561,6 +561,124 @@ describe('SlotsRoom — vendor float re-reads FC after a failed spin (BUG-10 fol
 });
 
 /**
+ * BUG-22. `seat.stack += receipt.net` mirrored the player's RAW net (payout − wager), but the
+ * settlement actually sent to FC trims rake + the jackpot injection off the WINNER's credit
+ * (`settleNet` in the adapter, same as every other base room — see `baccarat-room.ts`) — so on a
+ * winning spin the seat stack ran ahead of what FC actually locked for the player. `releaseSeat`
+ * then called `fc.release(seat.playerId, String(seat.stack))`, asking to unlock more than was
+ * actually locked, which `ChipLedger.unlock` always refuses ("cannot release more than is
+ * locked") — so the seat, and the player's money, could never come back, whether the release was
+ * a `stand` or the disconnect-grace path. `receipt.playerDelta` reads the exact trimmed amount off
+ * the same settlement request FC applies, so the seat and the ledger can never disagree.
+ */
+describe('SlotsRoom — a winning spin mirrors the trimmed ledger credit, so the seat always releases (BUG-22)', () => {
+  const baseConfig = {
+    name: 'Test Slots',
+    game: 'slots' as const,
+    minBuyIn: 1_000,
+    maxBuyIn: 50_000,
+    maxSeats: 6,
+    commissionBps: 500,
+  };
+
+  /** Forces the next spin(s) to a deterministic x3 win, signed with the room's own secret. */
+  function forceWin(room: SlotsRoom, secret: string): void {
+    (room as unknown as { provider: { playRound(req: RoundRequest): Promise<SignedRoundResult> } })
+      .provider.playRound = async (req: RoundRequest): Promise<SignedRoundResult> => {
+        const payout = req.wager * 3;
+        return {
+          result: { roundId: req.roundId, payout, outcome: { reels: ['SEVEN', 'SEVEN', 'SEVEN'], multiplier: 3 } },
+          signature: signResult(secret, { ...req, payout }),
+        };
+      };
+  }
+
+  it("a winning spin's stack matches the ledger and the seat releases", async () => {
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = new ChipBank(players);
+    const alice = players.create('Alice').id;
+    const aliceBefore = players.find(alice)!.available;
+
+    const SECRET = 'slots-bug22-stand-secret';
+    const room = new SlotsRoom(
+      { id: 'slots-bug22-stand', ...baseConfig, secret: SECRET },
+      { directory: players, fc: bank },
+    );
+    forceWin(room, SECRET);
+
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(alice, { kind: 'act', action: { type: 'spin', amount: 100 } });
+
+    // wager 100, payout 300 (x3), raw net 200. commissionBps 500 (5%) + the default 0.5% jackpot
+    // rate trim the WINNER's credit by 10 (rake) + 1 (jackpot) = 189 landing, not the raw 200 —
+    // this is what FC actually locked for alice, and what the seat stack must match.
+    const spun = room.snapshotFor(alice).seats.find((s) => s.playerId === alice);
+    expect(spun?.stack).toBe(2_189);
+    expect(Number(await bank.lockedBalance(alice))).toBe(2_189);
+
+    // Pre-fix, this rejected with "cannot release more than is locked" (stack 2,200 vs. 2,189
+    // actually locked) and the seat stayed stuck forever.
+    await room.command(alice, { kind: 'stand' });
+
+    expect(players.find(alice)!.available).toBe(10_189);
+    expect(players.find(alice)!.available).toBe(aliceBefore - BUY_IN + 2_189);
+    expect(await bank.lockedBalance(alice)).toBe('0');
+    expect(room.snapshotFor(alice).seats.find((s) => s.playerId === alice)).toBeUndefined();
+
+    room.dispose();
+  });
+
+  it("a winning spin's stack matches the ledger and the seat releases via the disconnect-grace path", async () => {
+    const wait = (ms: number): Promise<unknown> => new Promise((resolve) => setTimeout(resolve, ms));
+    async function until(condition: () => boolean, timeoutMs = 3_000): Promise<void> {
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        if (condition()) return;
+        await wait(5);
+      }
+      throw new Error('timed out waiting for state');
+    }
+
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = new ChipBank(players);
+    const alice = players.create('Alice').id;
+    const aliceBefore = players.find(alice)!.available;
+
+    const SECRET = 'slots-bug22-grace-secret';
+    const room = new SlotsRoom(
+      { id: 'slots-bug22-grace', ...baseConfig, secret: SECRET },
+      { directory: players, fc: bank },
+    );
+    forceWin(room, SECRET);
+
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(alice, { kind: 'act', action: { type: 'spin', amount: 100 } });
+
+    expect(room.snapshotFor(alice).seats.find((s) => s.playerId === alice)?.stack).toBe(2_189);
+    expect(Number(await bank.lockedBalance(alice))).toBe(2_189);
+
+    const internals = room as unknown as {
+      seats: Array<{ playerId: string; connected: boolean } | null>;
+      armDisconnectGrace(playerId: string, graceMs?: number): void;
+    };
+    const seat = internals.seats.find((s) => s?.playerId === alice);
+    if (!seat) throw new Error('alice is not seated');
+    seat.connected = false;
+    internals.armDisconnectGrace(alice, 15);
+
+    // Pre-fix, the release this grace fires never succeeded (same "cannot release more than is
+    // locked" as the stand path above), so this timed out with the seat stuck forever.
+    await until(() => !room.snapshotFor(alice).seats.some((s) => s.playerId === alice), 3_000);
+
+    expect(players.find(alice)!.available).toBe(10_189);
+    expect(players.find(alice)!.available).toBe(aliceBefore - BUY_IN + 2_189);
+    expect(await bank.lockedBalance(alice)).toBe('0');
+
+    room.dispose();
+  });
+});
+
+/**
  * BUG-07 follow-up, D5. A spin is atomic — fully decided, paid and pushed in one `handleAct` call
  * — but `phase` used to be left at `SHOWDOWN` afterward with nothing ever setting it back, and
  * `seat.bet` left at the wager forever. A disconnected seat then looked permanently mid-round to
@@ -586,6 +704,7 @@ describe('SlotsRoom — disconnect grace releases immediately, a spin is atomic 
     const alice = players.create('Alice').id;
     const aliceBefore = players.find(alice)!.available;
 
+    const SECRET = 'slots-bug07-grace-secret';
     const room = new SlotsRoom(
       {
         id: 'slots-bug07-grace',
@@ -595,9 +714,24 @@ describe('SlotsRoom — disconnect grace releases immediately, a spin is atomic 
         maxBuyIn: 50_000,
         maxSeats: 6,
         commissionBps: 500,
+        secret: SECRET,
       },
       { directory: players, fc: bank },
     );
+
+    // Force a deterministic x3 win instead of the live RNG (BUG-22 cleanup): the live RNG wins
+    // about 15.6% of spins, and this test was flaking at almost exactly that rate — not a timer
+    // racing under load, but this release genuinely failing on a winning spin (BUG-22 itself).
+    // Signed with the room's own configured secret, so it verifies exactly as a real provider
+    // result would.
+    (room as unknown as { provider: { playRound(req: RoundRequest): Promise<SignedRoundResult> } })
+      .provider.playRound = async (req: RoundRequest): Promise<SignedRoundResult> => {
+        const payout = req.wager * 3;
+        return {
+          result: { roundId: req.roundId, payout, outcome: { reels: ['SEVEN', 'SEVEN', 'SEVEN'], multiplier: 3 } },
+          signature: signResult(SECRET, { ...req, payout }),
+        };
+      };
 
     await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
     await room.command(alice, { kind: 'act', action: { type: 'spin', amount: 100 } });
@@ -620,9 +754,7 @@ describe('SlotsRoom — disconnect grace releases immediately, a spin is atomic 
     // Nothing to wait "safe" for — always releases promptly regardless of phase. The spin's
     // outcome (win or lose) already moved the stack before release, same as any other room's
     // settled bet, so what comes back is that stack, not necessarily the original buy-in.
-    // Widened from the default 3s (cleanup, audit fix) — this flaked once under the full suite's
-    // load, a 15ms timer's precision under heavy contention, not a logic race.
-    await until(() => !room.snapshotFor(alice).seats.some((s) => s.playerId === alice), 10_000);
+    await until(() => !room.snapshotFor(alice).seats.some((s) => s.playerId === alice));
     expect(players.find(alice)!.available).toBe(aliceBefore - BUY_IN + stackAfterSpin!);
 
     room.dispose();

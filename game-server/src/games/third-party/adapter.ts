@@ -84,6 +84,15 @@ export interface Receipt {
    * FC actually applies. Zero when `net === 0` (a push settles nothing).
    */
   providerDelta: number;
+  /**
+   * The exact amount FC moves for the PLAYER's own account this round: `-wager` on a loss,
+   * `net - rake - jackpot` on a win (deductions come off the winner's credit, never the loser's —
+   * see `settleNet`), or `0` on a push. This is what a seat mirror must add to its stack and what
+   * is actually locked for the player in FC; `net` (the raw payout − wager) is NOT what lands on a
+   * win, because rake + the jackpot injection are deducted from the winner's side before it does.
+   * Read straight off the settlement request, same as `providerDelta`, so it can never drift.
+   */
+  playerDelta: number;
   outcome: unknown;
   replayed: boolean;
 }
@@ -160,6 +169,7 @@ export class ThirdPartyAdapter {
 
     const net = result.payout - wager;
     let providerDelta = 0;
+    let playerDelta = 0;
     if (net !== 0) {
       // Player ⇄ provider account. Sums to zero; the platform only rakes a commission.
       const grossNets = new Map<string, number>([
@@ -183,6 +193,14 @@ export class ThirdPartyAdapter {
       const providerWin = request.winners.find((w) => w.playerAccountId === this.cfg.providerAccountId);
       providerDelta = providerLoss ? -Number(providerLoss.amount) : providerWin ? Number(providerWin.amount) : 0;
 
+      // Same reasoning as `providerDelta`, for the player's own side: a loser's `amount` is the raw
+      // stake it loses (no deduction — rake/jackpot only ever come off a WINNER's credit), a
+      // winner's is what lands after rake + jackpot are taken out.
+      const playerAccount = this.cfg.accountOf(playerId);
+      const playerLoss = request.losers.find((l) => l.playerAccountId === playerAccount);
+      const playerWin = request.winners.find((w) => w.playerAccountId === playerAccount);
+      playerDelta = playerLoss ? -Number(playerLoss.amount) : playerWin ? Number(playerWin.amount) : 0;
+
       await this.fc.settleTableHand(request);
     }
 
@@ -193,6 +211,7 @@ export class ThirdPartyAdapter {
       payout: result.payout,
       net,
       providerDelta,
+      playerDelta,
       outcome: result.outcome,
       replayed: false,
     };

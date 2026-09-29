@@ -217,14 +217,21 @@ export class SlotsRoom extends BaseLiveRoom<SlotsRoomConfig, RoomSeat> {
     const outcome = receipt.outcome as { reels?: string[] } | undefined;
     seat.reels = outcome?.reels;
     seat.lastWager = wager;
-    seat.net = receipt.net;
-    seat.stack += receipt.net;
+    // `receipt.playerDelta`, NOT `receipt.net` (BUG-22): `net` is the raw payout − wager, but on a
+    // win the settlement sent to FC (`settleNet` in the adapter) deducts rake + the jackpot
+    // injection from the WINNER's credit, so the ledger only ever credits `net − rake − jackpot`.
+    // Mirroring the untrimmed `net` here credited the seat more than FC actually locked, so
+    // `releaseSeat` was later asked to release more than was locked and could never succeed —
+    // the seat, and the player's money, stayed stuck forever. `playerDelta` is read straight off
+    // the same settlement request FC applies, so it can never drift from what is actually credited.
+    seat.net = receipt.playerDelta;
+    seat.stack += receipt.playerDelta;
 
-    if (receipt.net > 0) {
+    if (receipt.playerDelta > 0) {
       // The jackpot draws on the seed the spin itself came from — HMAC(sessionSeed, roundId),
       // the same value the reels are derived from. It used to draw on a seed built from the
       // round id, which any player can reproduce, so a jackpot was predictable before it fired.
-      await this.processJackpot(receipt.net, roundId, this.provider.roundSeed(roundId));
+      await this.processJackpot(receipt.playerDelta, roundId, this.provider.roundSeed(roundId));
     }
 
     // A spin is atomic (D5, BUG-07 follow-up): it is fully decided, paid and pushed in this one
