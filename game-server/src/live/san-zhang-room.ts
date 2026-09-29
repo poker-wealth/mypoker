@@ -22,7 +22,7 @@ interface RoomSeat extends BaseRoomSeat {
 }
 
 export class SanZhangRoom extends BaseLiveRoom<SanZhangRoomConfig, RoomSeat> {
-  private readonly game: SanZhangGame;
+  private game: SanZhangGame;
   private bettingTimer: NodeJS.Timeout | null = null;
   private showdownTimer: NodeJS.Timeout | null = null;
 
@@ -112,6 +112,25 @@ export class SanZhangRoom extends BaseLiveRoom<SanZhangRoomConfig, RoomSeat> {
       if (!banker) return;
       banker.isBanker = true;
     }
+
+    // A fresh game per round, not a reused one advanced by `nextRound()`: after an abandoned round
+    // (settlement failed, or a later step like the jackpot threw) the old instance is left holding
+    // stale bets and a state machine that never left BETTING/RESOLVED — the next round's setBanker
+    // or placeBet would throw forever. Rebuilding here, exactly like baccarat-room.ts and
+    // niu-niu-room.ts, means the round that follows an abandon starts clean regardless of how the
+    // previous one died.
+    this.game = new SanZhangGame(
+      this.config.id,
+      this.fc,
+      new EventBus(),
+      this.chain,
+      {
+        rakeBps: this.config.rakeBps,
+        tableType: 'PLATFORM',
+        accountOf: (p) => p,
+        jackpotAccounts: tableJackpotAccounts(this.config.id),
+      },
+    );
 
     this.phase = 'IN_HAND';
     this.handNumber++;
@@ -207,7 +226,6 @@ export class SanZhangRoom extends BaseLiveRoom<SanZhangRoomConfig, RoomSeat> {
 
     this.showdownTimer = setTimeout(() => {
       void this.enqueue(async () => {
-        this.game.nextRound();
         this.phase = 'WAITING';
         // Frees anyone disconnect grace queued but could not release yet (D4, BUG-07 follow-up)
         // before the next round can claim their seat as still occupied.
