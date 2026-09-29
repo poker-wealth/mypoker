@@ -158,6 +158,22 @@ export class TableHub {
     this.socket.attachTo(server, path);
   }
 
+  /**
+   * Graceful shutdown (BUG-07): return every seated stack, at every table, to its wallet before the
+   * process goes away. Every table drains in parallel — one table's FC call hanging (or one seat's
+   * release being refused) must not hold up every other table's players getting their money back
+   * before the platform's shutdown grace period runs out. Call before `close()`, which only ever
+   * disposed timers and never released a seat.
+   */
+  async drain(): Promise<void> {
+    const results = await Promise.allSettled([...this.rooms.values()].map((room) => room.drain()));
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        console.error('[hub] a table failed to drain during shutdown:', result.reason);
+      }
+    }
+  }
+
   async close(): Promise<void> {
     await this.socket.close();
     for (const room of this.rooms.values()) room.dispose();

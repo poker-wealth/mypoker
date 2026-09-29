@@ -50,6 +50,20 @@ git subtree push --prefix game-server heroku-gw main
 ```
 Public API URL → `https://mypoker-gateway.herokuapp.com`.
 
+**Shutdown grace period (BUG-07).** The gateway now drains every live table — releasing every
+seated stack back to its wallet — on `SIGTERM`/`SIGINT` before it exits (`gateway/server.ts`), with
+a 25s internal hard-exit safety timer so a stuck drain still lets the process die rather than hang.
+That only works if the platform actually gives the process 25s+ to finish before killing it.
+
+Heroku's dyno shutdown window is **fixed at 30 seconds** (SIGTERM → SIGKILL) — this is not a config
+value; there is no Heroku setting that lengthens it (an add-on-less standard/eco/basic dyno cannot
+be given more). The 25s hard-exit timer above is already tuned to that ceiling with a 5s margin;
+raising it closer to 30s narrows that margin against the platform's own clock rather than widening
+it. If gameplay ever moves off Heroku (Render's "Shutdown Grace Period", Fly's `kill_timeout`, or a
+plain Docker host's `docker stop -t <seconds>` / Kubernetes `terminationGracePeriodSeconds`) that
+setting must be **≥ 30s** so the platform doesn't SIGKILL before this process's own 25s timer would
+have exited cleanly anyway.
+
 **All three hosts, each with the scheme.** `CORS_ORIGINS` is an exact-match
 allowlist with no wildcard (`game-server/src/gateway/app.ts`), compared against
 the browser's `Origin` header. `mypoker777.com` without `https://` matches

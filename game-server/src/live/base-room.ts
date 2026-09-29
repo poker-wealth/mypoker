@@ -531,6 +531,31 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
     }
   }
 
+  /**
+   * Graceful shutdown (BUG-07): give every occupied seat's stack back through the same path a
+   * voluntary `stand` uses, one seat at a time so one seat's FC failure doesn't strand the rest —
+   * the same shape as `PokerRoom.finishClose`.
+   *
+   * Unlike a poker hand, a base-room round never has a live pot sitting apart from the seats: every
+   * game here (baccarat, niu-niu, san-zhang, red-packet, red-envelope, cowboy-beauty, dou-di-zhu,
+   * lottery, slots, texas-cowboy) only ever moves chips INTO `seat.stack` at settlement — a bet in
+   * progress lives in `seat.bet`, which is display state the settlement loop reads, not money the
+   * stack has already given up (verified per room for BUG-07: every `.stack +=`/`-=` site outside
+   * `topUp` is inside that room's own settlement code). So `seat.stack` right now is always either
+   * the untouched buy-in (a round mid-flight) or the fully-settled figure — never a value with money
+   * missing from it — and releasing it here is safe to do at any phase, not just between rounds.
+   */
+  async drain(): Promise<void> {
+    for (const seat of this.occupiedSeats()) {
+      try {
+        await this.releaseSeat(seat.index);
+      } catch (err) {
+        console.error(`[room ${this.config.id}] seat ${seat.index} failed to release during drain:`, err);
+      }
+    }
+    this.push();
+  }
+
   dispose(): void {
     for (const timer of this.disconnectTimers.values()) {
       clearTimeout(timer);

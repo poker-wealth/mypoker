@@ -56,6 +56,47 @@ connectDb(config.mongoUri, config.mongoTls)
       console.log(`  live tables      ${hub ? `on — ws /ws (${hub.tables().length} open)` : 'off (no FC secret)'}`);
       console.log(`  cors origins     ${config.corsOrigins.join(', ') || '(none — same-origin only)'}\n`);
     });
+
+    // Graceful shutdown (BUG-07). This is the production entry point — `Procfile` runs
+    // `npm start` → `node dist/gateway/server.js` — and it had no SIGTERM/SIGINT hook at all before
+    // this: a platform stop (deploy, dyno restart, scale-down) killed the process outright, and
+    // `TableHub.close()` was never even reached. `dispose()` alone was never enough anyway — it
+    // stops timers, it does not release a seat — so every seated stack, at every table, stayed
+    // locked in FC until something else happened to stand that player up. `hub.drain()` (added this
+    // change) releases every one of them first.
+    let shuttingDown = false;
+    const shutdown = (signal: NodeJS.Signals): void => {
+      if (shuttingDown) return; // guard against SIGTERM followed by SIGINT, or either one twice
+      shuttingDown = true;
+      console.log(`\n  [shutdown] ${signal} received — draining live tables before exit\n`);
+
+      // Heroku's dyno shutdown window (Procfile: `web: npm start`) is a fixed 30s from SIGTERM to
+      // SIGKILL and is not configurable — see the DEPLOY.md note added alongside this. 25s leaves 5s
+      // of margin for this timer to fire, log, and hand off to process.exit before that happens.
+      const hardExit = setTimeout(() => {
+        console.error('[shutdown] drain/close did not finish within 25s — exiting anyway');
+        process.exit(1);
+      }, 25_000);
+      hardExit.unref();
+
+      // Stop accepting new HTTP/WS connections (a new WS upgrade is an HTTP request on this same
+      // server) before draining — nobody new should be able to sit down while the tables are being
+      // told to empty out. Already-open sockets are unaffected until the hub itself closes them.
+      server.close((err) => {
+        if (err) console.error('[shutdown] http server close error:', err);
+      });
+
+      void (hub ? hub.drain() : Promise.resolve())
+        .catch((err: unknown) => console.error('[shutdown] hub.drain() failed:', err))
+        .then(() => hub?.close())
+        .catch((err: unknown) => console.error('[shutdown] hub.close() failed:', err))
+        .then(() => {
+          clearTimeout(hardExit);
+          process.exit(0);
+        });
+    };
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
   })
   .catch((err: unknown) => {
     console.error('gateway failed to start — database:', err instanceof Error ? err.message : err);

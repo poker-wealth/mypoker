@@ -49,6 +49,16 @@ export interface LiveRoom {
   summary(): TableSummary;
   /** Is this player seated here right now? (the hub uses this to enforce one table at a time.) */
   hasSeated(playerId: string): boolean;
+  /**
+   * Graceful shutdown (BUG-07): return every seated stack to its wallet and stop dealing, without
+   * simply dropping the table where it stands. `dispose()` alone never released a seat — every
+   * process restart or redeploy left every seated stack locked in FC with nobody at the table
+   * anymore, stranded until the next restart happened to reuse the same table id and someone stood
+   * up. Called before `dispose()` during an orderly shutdown; resolves once the room has released
+   * everyone it safely can (a release FC refuses is logged and left for the next start to sort out,
+   * same as any other refused release).
+   */
+  drain(): Promise<void>;
   /** Stop timers and release resources. */
   dispose(): void;
 }

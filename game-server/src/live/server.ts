@@ -149,13 +149,29 @@ export function createTableServer(config: TableServerConfig): TableServer {
         server.listen(config.port, '0.0.0.0', () => resolve(config.port));
       }),
     close: async (): Promise<void> => {
+      // Drain before close (BUG-07): close() alone only ever disposed timers, never released a
+      // seat, so every stack at every table stayed locked in FC. Kept in step with
+      // gateway/server.ts's shutdown hook even though this standalone table server is not the
+      // current production entry (Procfile runs the gateway only — see DEPLOY.md) so that whichever
+      // process ends up owning the hub, now or once the table server deploys on its own, shuts down
+      // the same safe way.
+      await hub.drain();
       await hub.close();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },
   };
 }
 
-/** Read the environment and start. This is the deployed entry point. */
+/**
+ * Read the environment and start.
+ *
+ * NOT the current production entry (BUG-07 audit, Sep 2026): the Procfile runs `npm start` →
+ * `node dist/gateway/server.js` only, and DEPLOY.md lists the standalone table server as a
+ * follow-on ("later — its own app, or folded into the gateway"). In practice it was folded into
+ * the gateway already (`mountLiveTables` inside `createGatewayApp`) — this function is exercised by
+ * `npm run start:tables` / the `tables` script for local dev only. Left working and with the same
+ * graceful-shutdown hook as the gateway in case that changes.
+ */
 export function startFromEnv(): TableServer {
   const jwtSecret = process.env.JWT_SECRET;
   if (!jwtSecret) {

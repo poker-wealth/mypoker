@@ -365,6 +365,9 @@ export class PokerRoom implements LiveRoom {
   private closing = false;
   /** finishClose has run. Guards against a double release of the same seat. */
   private closed = false;
+  /** Memoized by `beginClosing` — the promise `drain()` awaits, resolved by `finishClose` (BUG-07). */
+  private closePromise: Promise<void> | null = null;
+  private closeResolve: (() => void) | null = null;
   private manualStarted = false;
 
   // The last reserve read that succeeded, and when. Null until the first one
@@ -845,12 +848,40 @@ export class PokerRoom implements LiveRoom {
    */
   private close(actorId: string): void {
     this.requireOwner(actorId, 'close the table');
-    if (this.closing) return;
+    void this.beginClosing();
+  }
+
+  /**
+   * Graceful shutdown (BUG-07): give every seated stack back, at pre-hand values if a hand is
+   * mid-flight, without dealing again. Shares `close`'s own machinery rather than a second money
+   * path — `beginClosing` is what both call — so a drained room behaves exactly like an
+   * owner-closed one, just without an owner and with someone left waiting for it to actually finish.
+   */
+  async drain(): Promise<void> {
+    await this.beginClosing();
+  }
+
+  /**
+   * Start closing (idempotent) and return the promise that resolves once every seat is actually
+   * released.
+   *
+   * `close()` used to fire `finishClose` and walk away — nobody needed to know when it finished,
+   * because the room's own `push()` calls told any client that was still watching. `drain()` does
+   * need to know: it is what tells the process it is safe to exit. Memoized on `closePromise` so a
+   * second caller (drain() after the owner already closed the table, or drain() called twice) waits
+   * on the SAME run rather than racing a fresh `finishClose` against one already releasing seats.
+   */
+  private beginClosing(): Promise<void> {
+    if (this.closePromise) return this.closePromise;
     this.closing = true;
     this.push();
+    this.closePromise = new Promise<void>((resolve) => {
+      this.closeResolve = resolve;
+    });
     // Nothing in flight → close now. Otherwise the hand's end reaches
     // maybeStartHand, which picks this up.
     if (this.phase === 'WAITING') void this.finishClose();
+    return this.closePromise;
   }
 
   /**
@@ -881,6 +912,9 @@ export class PokerRoom implements LiveRoom {
       }
     }
     this.push();
+    // Whoever is waiting on beginClosing()'s promise — drain(), if anyone — hears about it now
+    // that every seat is actually gone, not before.
+    this.closeResolve?.();
   }
 
   private async kick(actorId: string, targetId: string): Promise<void> {
