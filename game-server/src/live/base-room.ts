@@ -78,6 +78,9 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
   private readonly roomJackpot: RoomJackpot;
   private readonly disconnectTimers = new Map<string, NodeJS.Timeout>();
   private queue: Promise<unknown> = Promise.resolve();
+  /** Set synchronously by `drain()` (D2, BUG-07 follow-up) — refuses new money (`sit`/`topUp`) and
+   *  new bets (`handleAct`) the instant shutdown starts, before the queue even sees it. */
+  private draining = false;
 
   constructor(config: TConfig, deps: RoomDeps) {
     this.config = config;
@@ -228,6 +231,10 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
         await this.topUp(playerId, cmd.amount);
         break;
       case 'act':
+        // Guarded HERE rather than in each of the ten subclasses' `handleAct` (D2, BUG-07 follow-up):
+        // every one of them is reached only through this dispatch — confirmed none overrides
+        // `command`/`handleCommand` — so one check covers every game's bet/act entry point.
+        if (this.draining) throw new RoomError('this table is closing');
         await this.handleAct(playerId, cmd.action);
         break;
     }
@@ -246,6 +253,9 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
     buyIn: number,
     profile: { displayName?: string; avatarUrl?: string },
   ): Promise<void> {
+    // Shutdown in progress (D2/D3, BUG-07 follow-up) — refuse fresh money the instant `drain()`
+    // starts rather than lock a new buy-in into a table that is about to release every seat.
+    if (this.draining) throw new RoomError('this table is closing');
     if (this.seatOf(playerId)) throw new RoomError('already seated');
     if (seatIndex < 0 || seatIndex >= this.config.maxSeats) throw new RoomError('invalid seat index');
     if (this.seats[seatIndex]) throw new RoomError('seat taken');
@@ -291,6 +301,8 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
   }
 
   protected async topUp(playerId: string, amount: number): Promise<void> {
+    // Same shutdown guard as sit() — a top-up is new money too.
+    if (this.draining) throw new RoomError('this table is closing');
     const seat = this.seatOf(playerId);
     if (!seat) throw new RoomError('not seated');
     if (amount <= 0) throw new RoomError('invalid amount');
@@ -532,9 +544,9 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
   }
 
   /**
-   * Graceful shutdown (BUG-07): give every occupied seat's stack back through the same path a
-   * voluntary `stand` uses, one seat at a time so one seat's FC failure doesn't strand the rest —
-   * the same shape as `PokerRoom.finishClose`.
+   * Graceful shutdown (BUG-07 follow-up — D2): give every occupied seat's stack back through the
+   * same path a voluntary `stand` uses, one seat at a time so one seat's FC failure doesn't strand
+   * the rest — the same shape as `PokerRoom.finishClose`.
    *
    * Unlike a poker hand, a base-room round never has a live pot sitting apart from the seats: every
    * game here (baccarat, niu-niu, san-zhang, red-packet, red-envelope, cowboy-beauty, dou-di-zhu,
@@ -543,17 +555,42 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
    * stack has already given up (verified per room for BUG-07: every `.stack +=`/`-=` site outside
    * `topUp` is inside that room's own settlement code). So `seat.stack` right now is always either
    * the untouched buy-in (a round mid-flight) or the fully-settled figure — never a value with money
-   * missing from it — and releasing it here is safe to do at any phase, not just between rounds.
+   * missing from it — and releasing it here is safe to do at any phase, not just between rounds. A
+   * seat still carrying a live `bet` is voided along with it: that bet never left `seat.stack`, so
+   * releasing the seat's current stack already returns it in full.
+   *
+   * Queued (D2, BUG-07 follow-up): the first version released seats immediately, racing an in-flight
+   * `handleAct` that is itself mid-settlement — `resolveRound`/`settleTableHand` reading or writing a
+   * seat this loop had already emptied. `draining` flips synchronously, before the queue is even
+   * touched, so `sit`/`topUp`/`act` are refused the instant shutdown starts; the release loop itself
+   * runs as a queued task, so it only starts after whatever command or settlement was already in
+   * flight has fully finished.
    */
   async drain(): Promise<void> {
-    for (const seat of this.occupiedSeats()) {
-      try {
-        await this.releaseSeat(seat.index);
-      } catch (err) {
-        console.error(`[room ${this.config.id}] seat ${seat.index} failed to release during drain:`, err);
+    this.draining = true;
+    let failures = 0;
+    await this.enqueue(async () => {
+      const voided = this.occupiedSeats().filter((s) => s.bet > 0);
+      if (voided.length > 0) {
+        console.error(
+          `[room ${this.config.id}] drain voids ${voided.length} unsettled bet(s) — never left seat.stack`,
+        );
       }
+      for (const seat of this.occupiedSeats()) {
+        try {
+          await this.releaseSeat(seat.index);
+        } catch (err) {
+          failures += 1;
+          console.error(`[room ${this.config.id}] seat ${seat.index} failed to release during drain:`, err);
+        }
+      }
+      this.push();
+    });
+    if (failures > 0) {
+      // TableHub.drain (D7) turns this rejection into a failure count the process can act on —
+      // exit 1 instead of a silent 0 when chips were left stranded on shutdown.
+      throw new Error(`[room ${this.config.id}] drain left ${failures} seat(s) unreleased`);
     }
-    this.push();
   }
 
   dispose(): void {

@@ -164,14 +164,23 @@ export class TableHub {
    * release being refused) must not hold up every other table's players getting their money back
    * before the platform's shutdown grace period runs out. Call before `close()`, which only ever
    * disposed timers and never released a seat.
+   *
+   * Returns how many tables failed to fully drain (D7, BUG-07 follow-up): a room's own `drain()`
+   * rejects when one or more of its seats couldn't be released (`BaseLiveRoom`/`PokerRoom`, both
+   * updated for this), so `Promise.allSettled` is what turns "some seat somewhere is still stuck"
+   * into a number `gateway/server.ts` can act on — exit 1 instead of a silent 0 when a deploy left
+   * chips locked in FC with nobody seated anymore.
    */
-  async drain(): Promise<void> {
+  async drain(): Promise<number> {
     const results = await Promise.allSettled([...this.rooms.values()].map((room) => room.drain()));
+    let failures = 0;
     for (const result of results) {
       if (result.status === 'rejected') {
+        failures += 1;
         console.error('[hub] a table failed to drain during shutdown:', result.reason);
       }
     }
+    return failures;
   }
 
   async close(): Promise<void> {

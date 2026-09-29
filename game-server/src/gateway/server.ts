@@ -66,7 +66,14 @@ connectDb(config.mongoUri, config.mongoTls)
     // change) releases every one of them first.
     let shuttingDown = false;
     const shutdown = (signal: NodeJS.Signals): void => {
-      if (shuttingDown) return; // guard against SIGTERM followed by SIGINT, or either one twice
+      if (shuttingDown) {
+        // A second stop signal mid-drain (D7, BUG-07 follow-up): the platform is done waiting —
+        // exit now rather than risk racing whatever drain()/close() is still in flight. This used to
+        // silently no-op a repeat signal, which meant an operator's second Ctrl-C (or the platform's
+        // own SIGTERM-then-SIGKILL-but-something-forwarded-SIGTERM-twice) just sat there.
+        console.error(`\n  [shutdown] ${signal} received again while draining — exiting immediately\n`);
+        process.exit(1);
+      }
       shuttingDown = true;
       console.log(`\n  [shutdown] ${signal} received — draining live tables before exit\n`);
 
@@ -86,13 +93,27 @@ connectDb(config.mongoUri, config.mongoTls)
         if (err) console.error('[shutdown] http server close error:', err);
       });
 
-      void (hub ? hub.drain() : Promise.resolve())
-        .catch((err: unknown) => console.error('[shutdown] hub.drain() failed:', err))
-        .then(() => hub?.close())
-        .catch((err: unknown) => console.error('[shutdown] hub.close() failed:', err))
+      // Exit 1 rather than 0 (D7, BUG-07 follow-up) if any seat, at any table, failed to release —
+      // a "successful" shutdown that actually left chips locked in FC must not look the same to the
+      // platform/ops as a clean one.
+      let hadFailures = false;
+      void (hub ? hub.drain() : Promise.resolve(0))
+        .catch((err: unknown) => {
+          console.error('[shutdown] hub.drain() failed:', err);
+          hadFailures = true;
+          return 0; // still fall through to hub.close() below
+        })
+        .then((failures) => {
+          if (failures > 0) hadFailures = true;
+          return hub?.close();
+        })
+        .catch((err: unknown) => {
+          console.error('[shutdown] hub.close() failed:', err);
+          hadFailures = true;
+        })
         .then(() => {
           clearTimeout(hardExit);
-          process.exit(0);
+          process.exit(hadFailures ? 1 : 0);
         });
     };
     process.on('SIGTERM', () => shutdown('SIGTERM'));

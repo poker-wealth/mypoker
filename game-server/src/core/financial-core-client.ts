@@ -162,24 +162,40 @@ export interface HttpClientOptions {
   baseUrl: string;
   internalSecret: string;
   fetchImpl?: typeof fetch;
+  /**
+   * Abort a hung call after this long (D7, BUG-07 follow-up), so a stuck FC request can't block a
+   * room's queue — and, downstream, `drain()` — for the whole shutdown window. Default 5s. Applies
+   * to every `post()` call EXCEPT settlement, which does real work (rake, jackpot pools, volume,
+   * notifications) and gets `settlementTimeoutMs` instead — a settlement aborted client-side while
+   * FC actually commits it server-side would fail a hand that in fact settled correctly, which is a
+   * worse outcome than a slow shutdown.
+   */
+  timeoutMs?: number;
+  /** Timeout for `settleTableHand`'s own request — see `timeoutMs`. Default 20s. */
+  settlementTimeoutMs?: number;
 }
 
 export class HttpFinancialCoreClient implements FinancialCoreClient {
   private readonly baseUrl: string;
   private readonly secret: string;
   private readonly doFetch: typeof fetch;
+  private readonly timeoutMs: number;
+  private readonly settlementTimeoutMs: number;
 
   constructor(opts: HttpClientOptions) {
     this.baseUrl = opts.baseUrl.replace(/\/$/, '');
     this.secret = opts.internalSecret;
     this.doFetch = opts.fetchImpl ?? fetch;
+    this.timeoutMs = opts.timeoutMs ?? 5_000;
+    this.settlementTimeoutMs = opts.settlementTimeoutMs ?? 20_000;
   }
 
-  private async post<T>(path: string, body: unknown): Promise<T> {
+  private async post<T>(path: string, body: unknown, timeoutMs = this.timeoutMs): Promise<T> {
     const res = await this.doFetch(`${this.baseUrl}${path}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-internal-secret': this.secret },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
@@ -212,7 +228,8 @@ export class HttpFinancialCoreClient implements FinancialCoreClient {
   }
 
   async settleRound(req: SettleRoundRequest): Promise<SettlementReceipt> {
-    return this.post<SettlementReceipt>('/internal/settlements', req);
+    // Same longer timeout as settleTableHand (D7) — a round settlement, not a plain balance write.
+    return this.post<SettlementReceipt>('/internal/settlements', req, this.settlementTimeoutMs);
   }
 
   async insuranceReserve(ownerId: string): Promise<InsuranceReserveFacts> {
@@ -259,9 +276,12 @@ export class HttpFinancialCoreClient implements FinancialCoreClient {
   async settleTableHand(
     req: TableSettlementRequest,
   ): Promise<{ roundId: string; applied: boolean }> {
+    // Longer timeout than the default (D7) — this does real work server-side (rake, jackpot pools,
+    // volume, notifications), unlike a plain buy-in/release write.
     const result = await this.post<{ roundId: string; applied: boolean }>(
       '/internal/table-settlements',
       req,
+      this.settlementTimeoutMs,
     );
 
     if (!result.applied) {

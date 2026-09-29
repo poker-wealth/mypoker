@@ -131,3 +131,56 @@ describe('ChipDenominatedFc.lockedBalance', () => {
     expect(fc.lockedBalance).toBeUndefined();
   });
 });
+
+/**
+ * D7 (BUG-07 follow-up): a hung FC call must not block a room's queue — and, downstream,
+ * `drain()` — for the whole shutdown window, so `post()` now aborts after `timeoutMs`. Real `fetch`
+ * rejects with an AbortError once its `signal` fires; this fake mirrors that instead of ever
+ * resolving on its own, so these tests only pass if the client's `signal` actually gets attached.
+ */
+describe('HttpFinancialCoreClient — fetch timeout (D7)', () => {
+  function hangingFetch(): typeof fetch {
+    return ((_url: unknown, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(new DOMException('This operation was aborted', 'AbortError'));
+        });
+      })) as unknown as typeof fetch;
+  }
+
+  it('aborts a hung buyIn/release call after the configured timeoutMs', async () => {
+    const client = new HttpFinancialCoreClient({
+      baseUrl: 'http://fc.test',
+      internalSecret: 'secret',
+      fetchImpl: hangingFetch(),
+      timeoutMs: 20,
+    });
+
+    await expect(client.buyIn('p1', '10')).rejects.toThrow(/abort/i);
+  });
+
+  it('gives settleTableHand a longer timeout than the default, so it is not cut off by it', async () => {
+    // A short default (`timeoutMs`) that a plain buy-in would blow straight through, alongside a
+    // settlement timeout comfortably longer than the fake's own delay — proving settleTableHand is
+    // NOT bound by the short default.
+    const fetchImpl = (async (url: unknown) => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      const path = String(url);
+      if (path.includes('/internal/notifications') || path.includes('/internal/volume')) {
+        return { ok: true, json: async () => ({}) };
+      }
+      return { ok: true, json: async () => ({ roundId: baseReq.roundId, applied: true }) };
+    }) as unknown as typeof fetch;
+
+    const client = new HttpFinancialCoreClient({
+      baseUrl: 'http://fc.test',
+      internalSecret: 'secret',
+      fetchImpl,
+      timeoutMs: 5,
+      settlementTimeoutMs: 1_000,
+    });
+
+    const result = await client.settleTableHand(baseReq);
+    expect(result).toEqual({ roundId: baseReq.roundId, applied: true });
+  });
+});

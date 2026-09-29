@@ -56,7 +56,8 @@ describe('TableHub.drain — graceful shutdown across every table (BUG-07)', () 
     await poker.command(bob, { kind: 'sit', seat: 1, buyIn: BUY_IN });
     await baccarat.command(carol, { kind: 'sit', seat: 0, buyIn: BUY_IN });
 
-    await hub.drain();
+    // D7 (BUG-07 follow-up): no seat failed, so the failure count is 0.
+    await expect(hub.drain()).resolves.toBe(0);
 
     expect(releaseCalls.sort()).toEqual([alice, bob, carol].sort());
     expect(players.find(alice)!.available).toBe(STARTING);
@@ -105,7 +106,10 @@ describe('TableHub.drain — graceful shutdown across every table (BUG-07)', () 
     await poker.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
     await baccarat.command(carol, { kind: 'sit', seat: 0, buyIn: BUY_IN });
 
-    await expect(hub.drain()).resolves.toBeUndefined(); // must not throw / reject
+    // D7 (BUG-07 follow-up): a room whose own drain() rejects (a seat failed to release) no longer
+    // makes hub.drain() itself reject — Promise.allSettled still lets every other table finish — but
+    // it IS counted, so gateway/server.ts knows to exit 1 instead of a silent 0.
+    await expect(hub.drain()).resolves.toBe(1);
 
     // Carol's table drained fine despite Alice's table failing.
     expect(players.find(carol)!.available).toBe(STARTING);

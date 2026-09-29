@@ -53,7 +53,14 @@ Public API URL → `https://mypoker-gateway.herokuapp.com`.
 **Shutdown grace period (BUG-07).** The gateway now drains every live table — releasing every
 seated stack back to its wallet — on `SIGTERM`/`SIGINT` before it exits (`gateway/server.ts`), with
 a 25s internal hard-exit safety timer so a stuck drain still lets the process die rather than hang.
-That only works if the platform actually gives the process 25s+ to finish before killing it.
+That only works if the platform actually gives the process 25s+ to finish before killing it — which
+in turn only works if the process actually RECEIVES the signal: the `Procfile` above runs
+`web: npm start`, and `npm` does not reliably forward `SIGTERM` to the child process it spawns (a
+well-known npm gotcha — the signal can be swallowed by the `npm` wrapper itself, never reaching
+`node dist/gateway/server.js` at all). `web: node dist/gateway/server.js` — skipping `npm start` —
+avoids that entirely, since Heroku's dyno then sends `SIGTERM` straight to the process holding the
+`SIGTERM`/`SIGINT` handlers below. Left as `npm start` for now (not changed by this pass); switch it
+before relying on the drain in production.
 
 Heroku's dyno shutdown window is **fixed at 30 seconds** (SIGTERM → SIGKILL) — this is not a config
 value; there is no Heroku setting that lengthens it (an add-on-less standard/eco/basic dyno cannot

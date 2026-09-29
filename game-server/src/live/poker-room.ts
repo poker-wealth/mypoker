@@ -718,6 +718,10 @@ export class PokerRoom implements LiveRoom {
     buyIn: number,
     profile: { displayName?: string; avatarUrl?: string },
   ): Promise<void> {
+    // Shutdown in progress (D3, BUG-07 follow-up): `closing` flips synchronously the instant
+    // `drain()` is called, before the queue even sees it, so a buy-in racing the very start of
+    // shutdown is refused rather than locking fresh money into a table about to void its hand.
+    if (this.closing) throw new RoomError('this table is closing');
     if (this.seatOf(playerId)) throw new RoomError('you are already seated');
     if (seatIndex < 0 || seatIndex >= this.config.maxSeats) throw new RoomError('no such seat');
     if (this.seats[seatIndex]) throw new RoomError('seat taken');
@@ -852,13 +856,66 @@ export class PokerRoom implements LiveRoom {
   }
 
   /**
-   * Graceful shutdown (BUG-07): give every seated stack back, at pre-hand values if a hand is
-   * mid-flight, without dealing again. Shares `close`'s own machinery rather than a second money
-   * path — `beginClosing` is what both call — so a drained room behaves exactly like an
-   * owner-closed one, just without an owner and with someone left waiting for it to actually finish.
+   * Graceful shutdown (BUG-07 follow-up — D1): VOID a hand in progress rather than wait it out.
+   *
+   * The first version of this shared `close()`'s own machinery and waited for a live hand to reach
+   * its own showdown. `close()`'s doc comment is right that an OWNER deciding a pot early would be
+   * the owner taking a decision that is the cards' to make — but a hand can legitimately run past a
+   * 25s hard exit (a 20s action clock plus up to 60s of time bank per player), and nobody is
+   * deciding anything by voiding it: the process is about to stop existing either way.
+   *
+   * Voiding is safe here in a way it would not be for an arbitrary abort: `seat.stack` in this room
+   * is never written while a hand is in progress — the only writer is `finishHand`, which copies
+   * `game.seatedStacks()` only AFTER `fc.settleTableHand` resolves (see the MONEY CHECK comment on
+   * `abandonHand`, which relies on the same fact for the same reason). So every occupied seat still
+   * holds exactly its pre-hand stack right now, and releasing it below returns exactly that — never
+   * a value with money missing from it. Settlement itself can never race this: `finishHand` only
+   * ever runs inside a queued task (reached from `applyAction`/`endShowdown`), so a drain task queued
+   * behind it can only observe the hand AFTER settlement has already moved the stacks, never mid-way.
+   *
+   * `closing` flips synchronously, before the queue is even touched, so `sit`/`topUp` refuse the
+   * instant shutdown starts (D3) rather than waiting for whatever is already ahead of drain in the
+   * queue. Everything else — cancelling a hand that hasn't started dealing yet, skipping a showdown
+   * delay for one that already settled, releasing every seat — happens inside the queue, after
+   * whatever command or settlement was already in flight.
    */
   async drain(): Promise<void> {
-    await this.beginClosing();
+    this.closing = true;
+    if (this.startTimer) {
+      clearTimeout(this.startTimer);
+      this.startTimer = undefined;
+    }
+    let failures = 0;
+    await this.enqueue(async () => {
+      if (this.closed) return;
+      if (this.showdownTimer) {
+        clearTimeout(this.showdownTimer);
+        this.showdownTimer = undefined;
+      }
+      const game = this.game;
+      if (this.phase === 'IN_HAND' && game) {
+        const roundId = game.roundInfo()?.roundId;
+        console.error(
+          `[room ${this.config.id}] hand ${roundId ?? '?'} voided by shutdown — no settlement issued, pre-hand stacks returned`,
+        );
+        this.clearActionClock();
+        for (const s of this.occupied()) {
+          s.inHand = false;
+          delete s.lastAction;
+        }
+        this.game = undefined;
+        this.winners = [];
+        this.revealed.clear();
+        this.message = 'Table closed by the server — hand cancelled, chips returned';
+      }
+      this.phase = 'WAITING';
+      failures = await this.finishClose();
+    });
+    if (failures > 0) {
+      // TableHub.drain (D7) turns this rejection into a failure count the process can act on —
+      // exit 1 instead of a silent 0 when chips were left stranded on shutdown.
+      throw new Error(`[room ${this.config.id}] drain left ${failures} seat(s) unreleased`);
+    }
   }
 
   /**
@@ -894,18 +951,24 @@ export class PokerRoom implements LiveRoom {
    *
    * Guarded against re-entry: `maybeStartHand` runs on several edges and this
    * must not start twice and double-release a seat.
+   *
+   * Resolves to how many seats failed to release (D7) — `close()`'s own `void this.finishClose()`
+   * callers ignore it, same as they always ignored the old `Promise<void>`, while `drain()` reads it
+   * to report a failed shutdown upward instead of exiting 0 with chips left stranded.
    */
-  private async finishClose(): Promise<void> {
-    if (this.closed) return;
+  private async finishClose(): Promise<number> {
+    if (this.closed) return 0;
     this.closed = true;
 
     // A copy: releaseSeat mutates the seat list as it goes. Empty chairs are
     // `null` here, not seats with no player, so they are filtered by identity.
     const occupied = [...this.seats].filter((s): s is NonNullable<typeof s> => s !== null);
+    let failures = 0;
     for (const seat of occupied) {
       try {
         await this.releaseSeat(seat.index);
       } catch (err) {
+        failures += 1;
         // One seat failing must not strand the rest — every other player still
         // gets their chips, and the failure is loud rather than silent.
         console.error(`[poker-room] close: seat ${seat.index} failed to release:`, err);
@@ -915,6 +978,7 @@ export class PokerRoom implements LiveRoom {
     // Whoever is waiting on beginClosing()'s promise — drain(), if anyone — hears about it now
     // that every seat is actually gone, not before.
     this.closeResolve?.();
+    return failures;
   }
 
   private async kick(actorId: string, targetId: string): Promise<void> {
@@ -953,6 +1017,9 @@ export class PokerRoom implements LiveRoom {
   }
 
   private async topUp(playerId: string, amount: number): Promise<void> {
+    // Same shutdown guard as sit() (D3) — a top-up is new money locked into a table that is about
+    // to close, exactly like a fresh buy-in.
+    if (this.closing) throw new RoomError('this table is closing');
     const seat = this.requireSeat(playerId);
     if (seat.inHand && this.phase === 'IN_HAND') throw new RoomError('you can top up between hands');
     if (seat.stack + amount > this.config.maxBuyIn) {
