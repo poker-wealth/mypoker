@@ -91,7 +91,25 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
       const hand = [...(this.game.handOf(playerId) ?? [])];
       const res = validateMove(cards, this.comboToBeat(playerId), hand);
       if (!res.valid) throw new RoomError(res.reason ?? 'invalid move');
-      this.game.play(playerId, cards);
+      try {
+        // AWAITED (BUG-25): this used to fire-and-forget. `play()` settles through `finish()` when
+        // it empties a hand, and an unawaited settlement rejection is an unhandled rejection —
+        // process-fatal in Node 15+. Worse, because `winner` is set synchronously before `finish()`
+        // awaits anything, the `getWinner()` check below used to fire and mirror stacks in
+        // `resolveRound` regardless of whether the settlement it raced actually landed.
+        await this.game.play(playerId, cards);
+      } catch (err) {
+        // A throw with the winner already set came from settlement inside `finish()`, not from an
+        // illegal play — the play itself already landed and emptied the hand. Treat it exactly like
+        // `resolveRound`'s own settlement failure: WAITING, nothing mirrored, failure reported. A
+        // throw with no winner is the engine rejecting the play itself (state the checks above did
+        // not catch, e.g. still bidding) and belongs to the player, not the table.
+        if (this.game.getWinner()) {
+          this.abandonRoundAndRedeal(err);
+          return;
+        }
+        throw err;
+      }
     } else if (action.type === 'pass') {
       await this.game.pass(playerId);
     } else {
@@ -206,15 +224,7 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
         );
       }
     } catch (err) {
-      this.abandonRound(err);
-      // WAITING is not enough on its own: nothing else deals the next hand, so the table would
-      // sit idle with players in their seats. Give it the same beat a showdown gets, then try.
-      this.showdownTimer = setTimeout(() => {
-        void this.enqueue(async () => {
-          await this.releaseDeparted();
-          await this.maybeStartRound();
-        });
-      }, this.config.showdownDelayMs ?? 5_000);
+      this.abandonRoundAndRedeal(err);
       return;
     }
 
@@ -228,6 +238,22 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
         // before the next round can claim their seat as still occupied.
         await this.releaseDeparted();
         this.push();
+        await this.maybeStartRound();
+      });
+    }, this.config.showdownDelayMs ?? 5_000);
+  }
+
+  /**
+   * `abandonRound` only puts `phase` back to WAITING — nothing else deals the next hand, so without
+   * this the table would sit idle with players still in their seats. Shared by `resolveRound`'s own
+   * settlement failure and by `handleAct`'s (BUG-25): a settlement can fail either place, and both
+   * need the same redeal beat a showdown gets.
+   */
+  private abandonRoundAndRedeal(err: unknown): void {
+    this.abandonRound(err);
+    this.showdownTimer = setTimeout(() => {
+      void this.enqueue(async () => {
+        await this.releaseDeparted();
         await this.maybeStartRound();
       });
     }, this.config.showdownDelayMs ?? 5_000);

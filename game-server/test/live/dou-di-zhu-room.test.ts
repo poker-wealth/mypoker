@@ -294,3 +294,161 @@ describe('DouDiZhuRoom — Live Room Integration', () => {
     room.dispose();
   }, 20_000);
 });
+
+/**
+ * BUG-25: `handleAct` used to call `this.game.play(playerId, cards)` without awaiting it. `play()`
+ * settles through `finish()` when it empties a hand, so a settlement refusal on the winning play
+ * was an unhandled rejection (process-fatal in Node 15+) — and, because `winner` is set
+ * synchronously before `finish()` ever awaits FC, the room mirrored stacks in `resolveRound`
+ * regardless of whether that settlement actually landed.
+ */
+describe('DouDiZhuRoom — a failed settlement on the final play does not crash the table (BUG-25)', () => {
+  class RefusingBank extends ChipBank {
+    refuse = true;
+    failureReports: Array<{ tableId: string; reason: string }> = [];
+    override async settleTableHand(
+      req: Parameters<ChipBank['settleTableHand']>[0],
+    ): Promise<{ roundId: string; applied: boolean }> {
+      if (this.refuse) throw new Error('settlement refused by the ledger');
+      return super.settleTableHand(req);
+    }
+    async reportSettlementFailure(req: { tableId: string; reason: string }): Promise<void> {
+      this.failureReports.push(req);
+    }
+  }
+
+  it('is caught, not an unhandled rejection, leaves the table WAITING and stacks untouched', async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (err: unknown) => unhandled.push(err);
+    process.on('unhandledRejection', onUnhandled);
+
+    try {
+      const players = new DevPlayers({ startingChips: 10_000 });
+      const bank = new RefusingBank(players);
+      const p0 = players.create('P0').id;
+      const p1 = players.create('P1').id;
+      const p2 = players.create('P2').id;
+
+      const room = new DouDiZhuRoom(
+        {
+          id: 'dou-di-zhu-bug25',
+          name: 'Test Dou Di Zhu',
+          game: 'dou-di-zhu',
+          baseStake: 100,
+          minBuyIn: 1_000,
+          maxBuyIn: 50_000,
+          maxSeats: 3,
+          rakeBps: 500,
+          showdownDelayMs: 5_000,
+        },
+        { directory: players, fc: bank },
+      );
+
+      const noop = { sendSnapshot: () => {} };
+      room.join(p0, noop);
+      room.join(p1, noop);
+      room.join(p2, noop);
+
+      await room.command(p0, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+      await room.command(p1, { kind: 'sit', seat: 1, buyIn: BUY_IN });
+      await room.command(p2, { kind: 'sit', seat: 2, buyIn: BUY_IN });
+
+      await until(() => room.snapshotFor(p0).phase === 'IN_HAND');
+
+      for (let step = 0; step < 5; step++) {
+        const snap = room.snapshotFor(p0);
+        const toActSeat = snap.toActSeat;
+        if (toActSeat === null) break;
+        const pid = toActSeat === 0 ? p0 : toActSeat === 1 ? p1 : p2;
+        try {
+          await room.command(pid, { kind: 'act', action: { type: step === 0 ? 'bid-3' : 'bid-0' } });
+        } catch {
+          break;
+        }
+      }
+
+      // Same terminating line of play as the happy-path test: whoever holds the trick leads their
+      // lowest card, the others always pass, so the leader empties their hand and wins — which is
+      // exactly the play the refusing bank turns down.
+      const seatPlayer = [p0, p1, p2];
+      for (let step = 0; step < 300; step++) {
+        const snap = room.snapshotFor(p0);
+        if (snap.phase !== 'IN_HAND') break;
+        const toActSeat = snap.toActSeat;
+        if (toActSeat === null) break;
+
+        const pid = seatPlayer[toActSeat]!;
+        const holdsTheTrick = snap.board.length === 0;
+        if (holdsTheTrick) {
+          const hand = (room.snapshotFor(pid).seats.find((s) => s.isYou)!.cards ?? []).filter(
+            (c): c is string => typeof c === 'string',
+          );
+          await room.command(pid, { kind: 'act', action: { type: 'play', cards: [hand[0]!] } });
+        } else {
+          await room.command(pid, { kind: 'act', action: { type: 'pass' } });
+        }
+      }
+
+      await until(() => room.snapshotFor(p0).phase === 'WAITING');
+
+      const after = room.snapshotFor(p0);
+      expect(after.phase).toBe('WAITING');
+      // Settlement was refused, so `fc.settleTableHand` never applied — no stack should have moved.
+      for (const seat of after.seats.filter((s) => s.playerId)) expect(seat.stack).toBe(BUY_IN);
+      expect(bank.failureReports.length).toBeGreaterThan(0);
+      expect(bank.failureReports[0]!.tableId).toBe('dou-di-zhu-bug25');
+
+      room.dispose();
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+
+    expect(unhandled).toEqual([]);
+  }, 20_000);
+
+  it('still throws an illegal play to the player instead of treating it as a settlement failure', async () => {
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = new ChipBank(players);
+    const p0 = players.create('P0').id;
+    const p1 = players.create('P1').id;
+    const p2 = players.create('P2').id;
+
+    const room = new DouDiZhuRoom(
+      {
+        id: 'dou-di-zhu-bug25-illegal',
+        name: 'Test Dou Di Zhu',
+        game: 'dou-di-zhu',
+        baseStake: 100,
+        minBuyIn: 1_000,
+        maxBuyIn: 50_000,
+        maxSeats: 3,
+        rakeBps: 500,
+        showdownDelayMs: 20,
+      },
+      { directory: players, fc: bank },
+    );
+
+    await room.command(p0, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(p1, { kind: 'sit', seat: 1, buyIn: BUY_IN });
+    await room.command(p2, { kind: 'sit', seat: 2, buyIn: BUY_IN });
+
+    await until(() => room.snapshotFor(p0).phase === 'IN_HAND');
+
+    // Still BIDDING — the room's own pre-checks (seated, turn, card ownership/legality) do not
+    // catch a 'play' sent before the engine has left bidding, so this reaches `game.play()`, which
+    // rejects with no winner ever set. That must surface to the player, not be swallowed as a
+    // settlement failure.
+    const toActSeat = room.snapshotFor(p0).toActSeat!;
+    const pid = toActSeat === 0 ? p0 : toActSeat === 1 ? p1 : p2;
+    const hand = (room.snapshotFor(pid).seats.find((s) => s.isYou)!.cards ?? []).filter(
+      (c): c is string => typeof c === 'string',
+    );
+
+    await expect(
+      room.command(pid, { kind: 'act', action: { type: 'play', cards: [hand[0]!] } }),
+    ).rejects.toThrow(/not in play/);
+    expect(room.snapshotFor(p0).phase).toBe('IN_HAND');
+
+    room.dispose();
+  });
+});
