@@ -327,4 +327,69 @@ describe('BaseLiveRoom — a leaving seat is never dealt in, banked, or bet for 
 
     room.dispose();
   }, 10_000);
+
+  /**
+   * Cleanup (audit fix on BUG-07 follow-up): the grace timer used to set `seat.leaving = 'disconnect'`
+   * unconditionally on every fire, overwriting a sticky `'stand'` (or `'drain'`) tag from a release
+   * that already failed once. That is a real downgrade — `'disconnect'` clears on reconnect,
+   * `'stand'`/`'drain'` do not — so a player who tried to stand, had it refused by FC, and then
+   * merely dropped connection could have their ACTUAL exit request silently erased by the very next
+   * grace tick, and a later reconnect would then wrongly look like they never asked to leave at all.
+   */
+  it('the grace timer does not overwrite a sticky stand-origin leaving tag', async () => {
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = new ChipBank(players);
+    const alice = players.create('Alice').id;
+
+    const realRelease = bank.release.bind(bank);
+    let calls = 0;
+    bank.release = (playerAccountId: string, amount: string): Promise<void> => {
+      calls += 1;
+      if (calls === 1) return Promise.reject(new Error('financial-core unreachable'));
+      return realRelease(playerAccountId, amount);
+    };
+
+    const room = new BaccaratRoom(
+      {
+        id: 'baccarat-leaving-sticky-tag',
+        name: 'Test Baccarat',
+        game: 'baccarat',
+        minBuyIn: 1_000,
+        maxBuyIn: 50_000,
+        maxSeats: 6,
+        rakeBps: 500,
+        tiePayout: 8,
+        bettingTimeMs: 5_000,
+        showdownDelayMs: 20,
+      },
+      { directory: players, fc: bank },
+    );
+
+    // Alone — phase stays WAITING throughout, isolating the tag itself from the round machinery.
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+
+    // First stand attempt: FC refuses. The seat stays, tagged 'stand'.
+    await expect(room.command(alice, { kind: 'stand' })).rejects.toThrow(/unreachable/);
+
+    const internals = room as unknown as {
+      seats: Array<{ playerId: string; connected: boolean; leaving?: string } | null>;
+      armDisconnectGrace(playerId: string, graceMs?: number): void;
+    };
+    const seat = internals.seats.find((s) => s?.playerId === alice);
+    if (!seat) throw new Error('alice is not seated');
+    expect(seat.leaving).toBe('stand');
+
+    // She then drops connection too (on top of the failed stand) — the grace timer fires and must
+    // not relabel her exit as a mere disconnect.
+    seat.connected = false;
+    internals.armDisconnectGrace(alice, 15);
+    await wait(40);
+    expect(seat.leaving).toBe('stand');
+
+    // Reconnecting must not look like "never asked to leave" — 'stand' stays sticky through it.
+    room.join(alice, { sendSnapshot: () => {} });
+    expect(seat.leaving).toBe('stand');
+
+    room.dispose();
+  });
 });

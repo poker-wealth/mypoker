@@ -620,7 +620,9 @@ describe('SlotsRoom — disconnect grace releases immediately, a spin is atomic 
     // Nothing to wait "safe" for — always releases promptly regardless of phase. The spin's
     // outcome (win or lose) already moved the stack before release, same as any other room's
     // settled bet, so what comes back is that stack, not necessarily the original buy-in.
-    await until(() => !room.snapshotFor(alice).seats.some((s) => s.playerId === alice));
+    // Widened from the default 3s (cleanup, audit fix) — this flaked once under the full suite's
+    // load, a 15ms timer's precision under heavy contention, not a logic race.
+    await until(() => !room.snapshotFor(alice).seats.some((s) => s.playerId === alice), 10_000);
     expect(players.find(alice)!.available).toBe(aliceBefore - BUY_IN + stackAfterSpin!);
 
     room.dispose();

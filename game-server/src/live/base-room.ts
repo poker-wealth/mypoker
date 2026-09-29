@@ -252,7 +252,11 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
           this.departing.delete(playerId);
           return;
         }
-        seat.leaving = 'disconnect';
+        // Never overwrite a sticky 'stand'/'drain' tag with 'disconnect' — those mean the player or
+        // the room already asked to leave, which is a stronger and stickier reason than merely
+        // being offline right now, and only a reconnect's own `'disconnect'`-specific clear should
+        // ever touch this (cleanup, audit fix on BUG-07 follow-up).
+        if (!seat.leaving) seat.leaving = 'disconnect';
         if (!this.graceReleaseSafe(seat)) {
           // Not this seat's table-wide idle moment, and it is still carrying something — check back
           // shortly rather than dropping the grace entirely. Queued in `departing` too, so the next
@@ -308,6 +312,10 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
       // Kept explicit rather than relied on implicitly, so a future caller of `releaseDeparted` from
       // a different point in a room's cycle cannot silently release a seat still mid-round.
       if (!this.graceReleaseSafe(seat)) continue;
+      // Re-checked right before releasing (cleanup, audit fix, optional): `join()` runs outside the
+      // queue, so a reconnect can land between the snapshot above and this seat's own turn in the
+      // loop — this catches one that arrived in that window.
+      if (!seat.leaving && !this.departing.has(seat.playerId)) continue;
       const playerId = seat.playerId;
       try {
         await this.releaseSeat(index);
@@ -337,6 +345,10 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
     let released = false;
     for (const seat of leaving) {
       if (!this.graceReleaseSafe(seat)) continue;
+      // Re-checked right before releasing (cleanup, audit fix, optional): `join()` runs outside the
+      // queue, so a reconnect can land between the snapshot above and this seat's own turn in the
+      // loop — this catches one that arrived in that window.
+      if (!seat.leaving && !this.departing.has(seat.playerId)) continue;
       try {
         await this.releaseSeat(seat.index);
         released = true;
@@ -448,7 +460,15 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
     // `IN_HAND`. Reusing `graceReleaseSafe` asks the exact question the grace timer already answers
     // for a disconnected seat: is this seat actually uncommitted right now, this room's own way.
     if (!this.graceReleaseSafe(seat)) {
-      throw new RoomError('you have a live bet this round — you can leave when it settles');
+      // Honest about which of the two it actually is (cleanup, audit fix): SHOWDOWN means the
+      // round already resolved and settled — nothing is "live" any more, it is just not this
+      // room's idle phase yet, so the seat's own commitment (a banker, or a stale `bet` not reset
+      // until the next round starts) reads as committed for the length of `showdownDelayMs`.
+      throw new RoomError(
+        this.phase === 'SHOWDOWN'
+          ? 'the round is settling — you can leave in a moment'
+          : 'you have a live bet this round — you can leave when it settles',
+      );
     }
 
     // Set BEFORE the release, not after (D6): a refused release leaves the seat occupied, and it
