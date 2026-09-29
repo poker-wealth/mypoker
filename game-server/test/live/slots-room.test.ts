@@ -559,3 +559,70 @@ describe('SlotsRoom — vendor float re-reads FC after a failed spin (BUG-10 fol
     room.dispose();
   });
 });
+
+/**
+ * BUG-07 follow-up, D5. A spin is atomic — fully decided, paid and pushed in one `handleAct` call
+ * — but `phase` used to be left at `SHOWDOWN` afterward with nothing ever setting it back, and
+ * `seat.bet` left at the wager forever. A disconnected seat then looked permanently mid-round to
+ * `seatCommitted`/the grace check, the same table-wide-phase trap BUG-07 hit everywhere else.
+ * Fixed: `phase` returns to `WAITING` and `bet` to 0 at the end of every spin (the wager moves to
+ * `lastWager`, display-only), and `seatCommitted` is a flat `false` — nothing is ever "in progress"
+ * here between calls.
+ */
+describe('SlotsRoom — disconnect grace releases immediately, a spin is atomic (BUG-07 follow-up, D5)', () => {
+  const wait = (ms: number): Promise<unknown> => new Promise((resolve) => setTimeout(resolve, ms));
+  async function until(condition: () => boolean, timeoutMs = 3_000): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (condition()) return;
+      await wait(5);
+    }
+    throw new Error('timed out waiting for state');
+  }
+
+  it('phase returns to WAITING and bet to 0 after a spin, and a disconnected seat is released', async () => {
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = new ChipBank(players);
+    const alice = players.create('Alice').id;
+    const aliceBefore = players.find(alice)!.available;
+
+    const room = new SlotsRoom(
+      {
+        id: 'slots-bug07-grace',
+        name: 'Test Slots',
+        game: 'slots',
+        minBuyIn: 1_000,
+        maxBuyIn: 50_000,
+        maxSeats: 6,
+        commissionBps: 500,
+      },
+      { directory: players, fc: bank },
+    );
+
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(alice, { kind: 'act', action: { type: 'spin', amount: 100 } });
+
+    // This used to stick at SHOWDOWN forever — asserted directly, not just through the release.
+    const spun = room.snapshotFor(alice);
+    expect(spun.phase).toBe('WAITING');
+    const stackAfterSpin = spun.seats.find((s) => s.playerId === alice)?.stack;
+    expect(spun.seats.find((s) => s.playerId === alice)?.bet).toBe(0);
+
+    const internals = room as unknown as {
+      seats: Array<{ playerId: string; connected: boolean } | null>;
+      armDisconnectGrace(playerId: string, graceMs?: number): void;
+    };
+    const seat = internals.seats.find((s) => s?.playerId === alice);
+    if (!seat) throw new Error('alice is not seated');
+    seat.connected = false;
+    internals.armDisconnectGrace(alice, 15);
+
+    // Nothing to wait "safe" for — always releases promptly regardless of phase. The spin's
+    // outcome (win or lose) already moved the stack before release, same as any other room's
+    // settled bet, so what comes back is that stack, not necessarily the original buy-in.
+    await until(() => !room.snapshotFor(alice).seats.some((s) => s.playerId === alice));
+    expect(players.find(alice)!.available).toBe(aliceBefore - BUY_IN + stackAfterSpin!);
+
+    room.dispose();
+  });
+});

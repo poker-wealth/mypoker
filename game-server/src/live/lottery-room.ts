@@ -190,7 +190,10 @@ export class LotteryRoom extends BaseLiveRoom<LotteryRoomConfig, RoomSeat> {
       // WAITING is not enough on its own: nothing else deals the next hand, so the table would
       // sit idle with players in their seats. Give it the same beat a showdown gets, then try.
       this.showdownTimer = setTimeout(() => {
-        void this.enqueue(() => this.maybeStartRound());
+        void this.enqueue(async () => {
+          await this.releaseDeparted();
+          this.maybeStartRound();
+        });
       }, this.config.showdownDelayMs ?? 5_000);
       return;
     }
@@ -199,8 +202,11 @@ export class LotteryRoom extends BaseLiveRoom<LotteryRoomConfig, RoomSeat> {
     this.push();
 
     this.showdownTimer = setTimeout(() => {
-      void this.enqueue(() => {
+      void this.enqueue(async () => {
         this.phase = 'WAITING';
+        // Frees anyone disconnect grace queued but could not release yet (D4, BUG-07 follow-up)
+        // before the next round can claim their seat as still occupied.
+        await this.releaseDeparted();
         this.push();
         this.maybeStartRound();
       });

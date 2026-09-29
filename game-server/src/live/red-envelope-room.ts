@@ -157,6 +157,12 @@ export class RedEnvelopeRoom extends BaseLiveRoom<RedEnvelopeRoomConfig, RoomSea
     this.maybeStartRound();
   }
 
+  /** This game's equivalent of a live bet is a claimed packet — `bet` is unused here (D4, BUG-07
+   *  follow-up). The banker is committed the same as every other room's. */
+  protected override seatCommitted(seat: RoomSeat): boolean {
+    return seat.isBanker || seat.claimed !== undefined;
+  }
+
   private maybeStartRound(): void {
     if (this.phase !== 'WAITING') return;
     const occupied = this.occupiedSeats();
@@ -290,7 +296,7 @@ export class RedEnvelopeRoom extends BaseLiveRoom<RedEnvelopeRoomConfig, RoomSea
    */
   private scheduleNextRound(): void {
     this.showdownTimer = setTimeout(() => {
-      void this.enqueue(() => {
+      void this.enqueue(async () => {
         const applicant = this.occupiedSeats().find((s) => s.wantsBank && !s.isBanker);
         if (applicant) {
           for (const s of this.occupiedSeats()) s.isBanker = false;
@@ -298,6 +304,9 @@ export class RedEnvelopeRoom extends BaseLiveRoom<RedEnvelopeRoomConfig, RoomSea
           delete applicant.wantsBank;
         }
         this.phase = 'WAITING';
+        // Frees anyone disconnect grace queued but could not release yet (D4, BUG-07 follow-up)
+        // before the next round can claim their seat as still occupied.
+        await this.releaseDeparted();
         this.push();
         this.maybeStartRound();
       });

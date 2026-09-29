@@ -170,4 +170,49 @@ describe('TexasCowboyRoom — Live Room Integration', () => {
 
     room.dispose();
   }, 20_000);
+
+  /**
+   * BUG-07 follow-up, D4. This room's open betting window IS phase `WAITING` — real chips ride on
+   * `seat.bet` while it's open — so the base default (table-wide `WAITING` means idle, safe to
+   * release) is exactly wrong here: it would release a disconnected bettor mid-window, the very
+   * bug commit 2 of BUG-07 first added the `seat.bet` check for. `graceReleaseSafe` is overridden
+   * to ignore phase entirely and go by the bet alone.
+   */
+  it('does not release a disconnected bettor mid-window, releases once the round settles', async () => {
+    const players = new DevPlayers({ startingChips: 50_000 });
+    const bank = new ChipBank(players);
+    const alice = players.create('Alice').id;
+    const bob = players.create('Bob').id;
+    const bobBefore = players.find(bob)!.available;
+
+    const room = newRoom('texas-cowboy-grace', { directory: players, fc: bank });
+
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(bob, { kind: 'sit', seat: 1, buyIn: BUY_IN });
+
+    await room.command(bob, {
+      kind: 'act',
+      action: { type: 'bet', amount: 100, selection: 'cowboy_win' },
+    });
+
+    const internals = room as unknown as {
+      seats: Array<{ playerId: string; connected: boolean } | null>;
+      armDisconnectGrace(playerId: string, graceMs?: number): void;
+    };
+    const seat = internals.seats.find((s) => s?.playerId === bob);
+    if (!seat) throw new Error('bob is not seated');
+    seat.connected = false;
+    internals.armDisconnectGrace(bob, 15);
+
+    await wait(200);
+    // Still there — a live bet, window genuinely open (phase happens to read WAITING here).
+    expect(room.snapshotFor(alice).seats.some((s) => s.playerId === bob)).toBe(true);
+
+    // Let the round run its real course: window closes, deals, three reveals, settles — and
+    // `startNextRound` calls `releaseDeparted` before it opens the next window.
+    await until(() => !room.snapshotFor(alice).seats.some((s) => s.playerId === bob), 50_000);
+    expect(players.find(bob)!.available).toBe(bobBefore);
+
+    room.dispose();
+  }, 60_000);
 });

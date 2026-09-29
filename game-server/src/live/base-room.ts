@@ -77,6 +77,9 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
 
   private readonly roomJackpot: RoomJackpot;
   private readonly disconnectTimers = new Map<string, NodeJS.Timeout>();
+  /** playerIds the grace timer found unsafe to release yet — retried by `releaseDeparted` at the
+   *  next round boundary rather than waiting out the timer's own 5s re-arm (BUG-07 follow-up, D4). */
+  protected readonly departing = new Set<string>();
   private queue: Promise<unknown> = Promise.resolve();
   /** Set synchronously by `drain()` (D2, BUG-07 follow-up) — refuses new money (`sit`/`topUp`) and
    *  new bets (`handleAct`) the instant shutdown starts, before the queue even sees it. */
@@ -147,6 +150,7 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
         clearTimeout(timer);
         this.disconnectTimers.delete(playerId);
       }
+      this.departing.delete(playerId);
     }
 
     client.sendSnapshot(this.snapshotFor(playerId));
@@ -171,14 +175,38 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
   }
 
   /**
+   * Whether THIS seat, specifically, has anything live on it right now — not whether the table as a
+   * whole is busy (BUG-07 follow-up, D4). The original grace check gated on `this.phase`, table-wide:
+   * on a busy table a disconnected seat that never bet still saw `phase !== 'WAITING'` on every check,
+   * because the next round always started before the grace task ran (a disconnected seat still counts
+   * as occupied) — 42 hands, still seated, for a player who never had a chip at risk in any of them.
+   *
+   * Default: a live bet, or the banker's chair — the two ways a base-room seat carries risk. Dou Di
+   * Zhu has no bet to check (no per-trick wager) so it overrides to phase-based; red-envelope's
+   * equivalent of a bet is a claimed envelope; slots resolves a spin atomically and is never
+   * "committed" between calls.
+   */
+  protected seatCommitted(seat: TSeat): boolean {
+    return seat.bet > 0 || seat.isBanker === true;
+  }
+
+  /**
+   * Whether the grace timer may actually let go of this disconnected seat's chair.
+   *
+   * Default: the table is fully idle (`WAITING` — nothing anywhere is at risk, so even a seat this
+   * class considers "committed" by a sticky flag like `isBanker` is safe to let go of), OR this seat
+   * specifically is not committed. Texas Cowboy overrides this: its open betting window IS phase
+   * `WAITING` — seats place real bets into it — so `phase === 'WAITING'` cannot mean idle there the
+   * way it does everywhere else, and only `seatCommitted` (which texas-cowboy leaves at the default,
+   * bet-only) decides.
+   */
+  protected graceReleaseSafe(seat: TSeat): boolean {
+    return this.phase === 'WAITING' || !this.seatCommitted(seat);
+  }
+
+  /**
    * The grace timer fires, checks whether it is actually safe to let go of the chair, and either
    * releases the seat or checks again shortly — it does not just give up (BUG-07).
-   *
-   * "Safe" is phase !== 'WAITING' OR a live bet on this seat, not phase alone: a round in progress
-   * covers most games (niu-niu's banker included — the banker never carries `bet`, but the room is
-   * never WAITING while a hand is live), but texas-cowboy calls its open betting window 'WAITING'
-   * while seats ARE placing real bets into it, so a bet on the seat has to gate the release too or
-   * a disconnect during that window would return chips still at risk.
    */
   protected armDisconnectGrace(playerId: string, graceMs = 30_000): void {
     if (this.disconnectTimers.has(playerId)) return;
@@ -186,26 +214,59 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
       this.disconnectTimers.delete(playerId);
       void this.enqueue(async () => {
         const seat = this.seatOf(playerId);
-        if (!seat || seat.connected) return;
-        if (this.phase !== 'WAITING' || seat.bet > 0) {
-          // A round is live, or this seat is in it — check back shortly rather than dropping the
-          // grace entirely; the player is released as soon as it is actually safe.
+        if (!seat || seat.connected) {
+          this.departing.delete(playerId);
+          return;
+        }
+        if (!this.graceReleaseSafe(seat)) {
+          // Not this seat's table-wide idle moment, and it is still carrying something — check back
+          // shortly rather than dropping the grace entirely. Queued in `departing` too, so the next
+          // round boundary's `releaseDeparted` can free it the instant it actually becomes safe,
+          // rather than this seat waiting out its own next 5s tick.
+          this.departing.add(playerId);
           this.armDisconnectGrace(playerId, 5_000);
           return;
         }
         try {
           await this.releaseSeat(seat.index);
         } catch (err) {
-          // BUG-07 commit 1: a refused release now leaves the seat exactly as it was. Log and stop
-          // — the seat stays occupied and connected=false, so the NEXT disconnect (a reconnect then
-          // another drop) tries again rather than this timer spinning on a release FC keeps refusing.
+          // BUG-07 commit 1: a refused release now leaves the seat exactly as it was. Re-armed with a
+          // 30s backoff — not a return — so a release FC keeps refusing is retried rather than given
+          // up on for good.
           console.error(`[room ${this.config.id}] seat ${seat.index} failed to release after disconnect grace:`, err);
+          this.departing.add(playerId);
+          this.armDisconnectGrace(playerId, 30_000);
           return;
         }
+        this.departing.delete(playerId);
         this.push();
       });
     }, graceMs);
     this.disconnectTimers.set(playerId, timer);
+  }
+
+  /**
+   * Free every seat that grace queued as `departing` but could not yet release — called by every
+   * room right after `this.phase = 'WAITING'` and BEFORE it deals the next round (BUG-07 follow-up,
+   * D4). This is the fix for the actual race the auditor found: a disconnected seat still counts as
+   * occupied, so without this, `maybeStartRound()` claims it for the next hand before the grace
+   * timer's own tick ever gets a chance to run.
+   */
+  protected async releaseDeparted(): Promise<void> {
+    for (const playerId of [...this.departing]) {
+      const seat = this.seatOf(playerId);
+      if (!seat || seat.connected) {
+        this.departing.delete(playerId);
+        continue;
+      }
+      try {
+        await this.releaseSeat(seat.index);
+        this.departing.delete(playerId);
+      } catch (err) {
+        // Left in `departing` — the next round boundary or the seat's own grace timer tries again.
+        console.error(`[room ${this.config.id}] seat ${seat.index} still could not be released:`, err);
+      }
+    }
   }
 
   hasSeated(playerId: string): boolean {
@@ -609,5 +670,6 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
       clearTimeout(timer);
     }
     this.disconnectTimers.clear();
+    this.departing.clear();
   }
 }

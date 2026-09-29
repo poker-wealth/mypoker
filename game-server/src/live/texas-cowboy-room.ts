@@ -117,7 +117,18 @@ export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSea
   protected onSeatChanged(): void {
     this.push();
   }
-  
+
+  /**
+   * The base default treats table-wide `phase === 'WAITING'` as "nothing anywhere is at risk" — true
+   * everywhere else, but not here (D4, BUG-07 follow-up): this room's open betting window IS phase
+   * `WAITING`, with real chips riding on `seat.bet` while it's open. Falling through to the default
+   * would release a disconnected bettor mid-window, the exact bug commit 2 of BUG-07 added the
+   * `seat.bet` check for. `seatCommitted` (bet-only here, unchanged) is the only thing that may decide.
+   */
+  protected override graceReleaseSafe(seat: RoomSeat): boolean {
+    return !this.seatCommitted(seat);
+  }
+
   /**
    * Queue the next phase, replacing whatever was pending.
    *
@@ -133,13 +144,17 @@ export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSea
     this.timer = setTimeout(() => void this.enqueue(fn), delayMs);
   }
 
-  private startNextRound(): void {
+  private async startNextRound(): Promise<void> {
+    if (this.disposed) return;
+    // Frees anyone disconnect grace queued but could not release during the last window (D4,
+    // BUG-07 follow-up) BEFORE this room opens the next one on top of their seat.
+    await this.releaseDeparted();
     if (this.disposed) return;
     this.handNumber++;
     this.engine = new TexasCowboyEngine(this.config.id, this.handNumber, {
       rakeBps: rakeOf(this.config),
     });
-    
+
     // Clear seat bets
     for (const s of this.occupiedSeats()) {
       s.bet = 0;

@@ -109,6 +109,12 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
     this.maybeStartRound();
   }
 
+  /** No per-trick wager to check (D4, BUG-07 follow-up) — a round in progress is the only thing a
+   *  Dou Di Zhu seat can be committed to. */
+  protected override seatCommitted(): boolean {
+    return this.phase !== 'WAITING';
+  }
+
   // ── Reading the table ───────────────────────────────────────────────────────
 
   /**
@@ -202,7 +208,10 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
       // WAITING is not enough on its own: nothing else deals the next hand, so the table would
       // sit idle with players in their seats. Give it the same beat a showdown gets, then try.
       this.showdownTimer = setTimeout(() => {
-        void this.enqueue(() => this.maybeStartRound());
+        void this.enqueue(async () => {
+          await this.releaseDeparted();
+          await this.maybeStartRound();
+        });
       }, this.config.showdownDelayMs ?? 5_000);
       return;
     }
@@ -213,6 +222,9 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
     this.showdownTimer = setTimeout(() => {
       void this.enqueue(async () => {
         this.phase = 'WAITING';
+        // Frees anyone disconnect grace queued but could not release yet (D4, BUG-07 follow-up)
+        // before the next round can claim their seat as still occupied.
+        await this.releaseDeparted();
         this.push();
         await this.maybeStartRound();
       });

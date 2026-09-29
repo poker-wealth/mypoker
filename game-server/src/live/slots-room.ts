@@ -18,6 +18,9 @@ export interface SlotsRoomConfig extends LiveTableConfig {
 
 interface RoomSeat extends BaseRoomSeat {
   reels?: string[] | undefined;
+  /** What the last spin wagered, for display — `bet` itself is always 0 once a spin resolves (D5,
+   *  BUG-07 follow-up): a spin is atomic, so nothing is ever "currently" wagered between calls. */
+  lastWager?: number | undefined;
 }
 
 /**
@@ -213,7 +216,7 @@ export class SlotsRoom extends BaseLiveRoom<SlotsRoomConfig, RoomSeat> {
 
     const outcome = receipt.outcome as { reels?: string[] } | undefined;
     seat.reels = outcome?.reels;
-    seat.bet = wager;
+    seat.lastWager = wager;
     seat.net = receipt.net;
     seat.stack += receipt.net;
 
@@ -224,8 +227,20 @@ export class SlotsRoom extends BaseLiveRoom<SlotsRoomConfig, RoomSeat> {
       await this.processJackpot(receipt.net, roundId, this.provider.roundSeed(roundId));
     }
 
-    this.phase = 'SHOWDOWN';
+    // A spin is atomic (D5, BUG-07 follow-up): it is fully decided, paid and pushed in this one
+    // call, so nothing is left "in progress" the way a betting round is at every other table. This
+    // used to stay SHOWDOWN forever — nothing here ever set it back — which made a disconnected
+    // seat look permanently mid-round to the grace timer and `seatCommitted`, and left a stale
+    // `bet` on the seat between spins that this room never actually owed anyone.
+    seat.bet = 0;
+    this.phase = 'WAITING';
     this.push();
+  }
+
+  /** A spin is atomic (D5, BUG-07 follow-up) — there is never a moment between calls where a seat
+   *  is holding something this room still owes settling. Always safe to release. */
+  protected override seatCommitted(): boolean {
+    return false;
   }
 
   snapshotFor(playerId: string): TableSnapshot {
