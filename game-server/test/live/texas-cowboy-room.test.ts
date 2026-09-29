@@ -5,6 +5,30 @@ import { TableHub } from '../../src/live/table-hub';
 import { defaultTables } from '../../src/live/server';
 
 /**
+ * Pin the deal so the settlement test below can't land on a TIE (~4% of live runs) -- a tie voids
+ * both bets by design and skips settleTableHand entirely, which is a real, useful behaviour but not
+ * what that test is checking, and left `sinks.rake` occasionally `undefined` instead of `100`.
+ *
+ * Every other test in this file either never reaches `deal()` (refusal/hold/stand tests, which throw
+ * before betting closes) or explicitly supplies its own `bet`-only outcome (the grace and F7 stand
+ * tests stand or disconnect during the WAITING/betting window, before a deal happens) -- none of them
+ * depend on which cards come out, so pinning the deck for the whole file is safe.
+ */
+jest.mock('../../src/games/texas-cowboy/poker', () => {
+  const actual = jest.requireActual<typeof import('../../src/games/texas-cowboy/poker')>(
+    '../../src/games/texas-cowboy/poker',
+  );
+  // dealRound: cowboy = deck[0..1], cowgirl = deck[2..3], board = deck[4..8]. Cowboy AA vs cowgirl 2-3 on
+  // K 9 7 5 4 rainbow: pair of aces beats king-high, no straight/flush possible — never a TIE (P≈4% live),
+  // which voids both bets before settleTableHand and leaves rake undefined.
+  const PINNED = ['As', 'Ah', '2c', '3d', 'Kd', '9s', '7c', '5h', '4s'];
+  return {
+    ...actual,
+    shuffleDeck: (deck: string[]): string[] => [...PINNED, ...deck.filter((c) => !PINNED.includes(c))],
+  };
+});
+
+/**
  * TEXAS COWBOY — the room-level conservation test the table never had (ESTHER_V2 task 2).
  *
  * This table is the one most worth pinning. Nobody banks it, so the round is player-funded: the
@@ -84,6 +108,12 @@ describe('TexasCowboyRoom — Live Room Integration', () => {
     await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
     await room.command(bob, { kind: 'sit', seat: 1, buyIn: BUY_IN });
 
+    // Snapshot each player's total (available + locked) right after buy-in, before either stakes a
+    // bet, so the net assertions below isolate what the bet itself does and aren't diluted by the
+    // buy-in's own available -> locked shift.
+    const aliceBeforeBet = players.available(alice) + players.locked(alice);
+    const bobBeforeBet = players.available(bob) + players.locked(bob);
+
     // Opposite sides of the same market, so one of them must lose and fund the other. 2,000, not
     // 100: at the default 50bps jackpot rate a 100-chip pot injects floor(100*50/10000) = 0 either
     // way, which would let this test pass whether or not BUG-24's `jackpotBps: 0` is actually wired
@@ -117,6 +147,10 @@ describe('TexasCowboyRoom — Live Room Integration', () => {
     expect(outcomeHits).toHaveLength(1);
     const expectedWinner = { cowboy_win: 'COWBOY', cowgirl_win: 'COWGIRL', tie: 'TIE' }[outcomeHits[0] as 'cowboy_win'];
     expect(gs.result?.winner).toBe(expectedWinner);
+    // The pin above is meant to make this a guaranteed, decisive COWBOY win -- assert that directly
+    // rather than only through the market bookkeeping, so a mock that silently stopped applying would
+    // fail loudly here instead of coincidentally still passing on an unpinned, occasionally-tied deal.
+    expect(gs.result?.winner).toBe('COWBOY');
     for (const m of gs.markets) {
       const hit = gs.marketHistory![m.id]![0];
       expect(gs.vacant?.[m.id]).toEqual(hit ? { rounds: 0, exact: true } : { rounds: 1, exact: false });
@@ -125,6 +159,14 @@ describe('TexasCowboyRoom — Live Room Integration', () => {
     await wait(6_000); // settlement runs a beat after showdown
 
     expect(players.totalChips() + bank.sinkTotal()).toBe(startingTotal);
+
+    // The pinned deal makes COWBOY the decisive winner (Alice bet cowboy_win, Bob cowgirl_win), so the
+    // net movement is exact, not just conserved: Alice's stake comes back plus Bob's stake minus the
+    // rake, Bob's stake is gone entirely.
+    const aliceAfter = players.available(alice) + players.locked(alice);
+    const bobAfter = players.available(bob) + players.locked(bob);
+    expect(aliceAfter - aliceBeforeBet).toBe(1_900);
+    expect(bobAfter - bobBeforeBet).toBe(-2_000);
 
     // BUG-24: this table draws no jackpot (the deal is not provably fair), so settlement must not
     // inject into any jp:<tier>:texas-cowboy-1 pool — money nothing can ever pay out. The whole
