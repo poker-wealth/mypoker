@@ -5,6 +5,16 @@ import { TableHub } from '../../src/live/table-hub';
 import { defaultTables } from '../../src/live/server';
 import type { SettlementFailureReport, TableSettlementRequest } from '../../src/core/financial-core-client';
 
+jest.mock('../../src/fairness/shuffle', () => {
+  const actual = jest.requireActual<typeof import('../../src/fairness/shuffle')>('../../src/fairness/shuffle');
+  return {
+    ...actual,
+    // Cowboy = deck[0], Beauty = deck[1]. A tie (P = 3/51 ≈ 5.9% with the live deck) voids the
+    // round BEFORE settleTableHand is reached, so the injected rejection never fires. Pin Ace vs Two.
+    shuffledDeck: (seed: string): string[] => ['As', '2h', ...actual.shuffledDeck(seed).filter((c) => c !== 'As' && c !== '2h')],
+  };
+});
+
 const BUY_IN = 2_000;
 
 const wait = (ms: number): Promise<unknown> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -70,6 +80,13 @@ describe('CowboyBeautyRoom — Live Room Integration', () => {
 
     const snap = room.snapshotFor(alice);
     expect(snap.phase).toBe('SHOWDOWN');
+
+    // Confirms the game really draws through the mocked `shuffledDeck` (the index.ts re-export is a
+    // getter, not a copied value, so this also proves the getter forwards to the mock) — not just
+    // that the round resolved. Ace vs Two: COWBOY always wins, never a tie.
+    expect((snap.gameState as { cowboyCard: string; beautyCard: string; winner: string }).cowboyCard).toBe('As');
+    expect((snap.gameState as { cowboyCard: string; beautyCard: string; winner: string }).beautyCard).toBe('2h');
+    expect((snap.gameState as { cowboyCard: string; beautyCard: string; winner: string }).winner).toBe('COWBOY');
 
     // Verify ledger-level money conservation including rake sink
     expect(players.totalChips() + bank.sinkTotal()).toBe(startingTotal);
@@ -138,10 +155,7 @@ describe('CowboyBeautyRoom — settlement failure recovery (BUG-11)', () => {
     });
 
     // The table recovers rather than freezing — a second hand deals on its own.
-    await until(
-      () => room.snapshotFor(alice).phase === 'IN_HAND' && room.snapshotFor(alice).handNumber === 2,
-      10_000,
-    );
+    await until(() => room.snapshotFor(alice).handNumber === 2, 10_000);
     room.dispose();
   }, 15_000);
 });
