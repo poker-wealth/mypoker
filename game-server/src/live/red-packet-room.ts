@@ -113,7 +113,10 @@ export class RedPacketRoom extends BaseLiveRoom<RedPacketRoomConfig, RoomSeat> {
       banker = undefined;
     }
     if (!banker) {
-      banker = occupied.find((s) => !s.leaving) ?? occupied[0]!;
+      banker = occupied.find((s) => !s.leaving);
+      // F5 (audit fix): every seat left is leaving — wait rather than force the bank onto one of
+      // them. The round starts on its own once a release clears one, or a fresh player sits down.
+      if (!banker) return;
       banker.isBanker = true;
     }
 

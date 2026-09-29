@@ -212,7 +212,15 @@ export class NiuNiuRoom extends BaseLiveRoom<NiuNiuRoomConfig, RoomSeat> {
     // Highest bid wins; an unbid seat counts as 1x, and the earliest of equal bids takes it. A
     // leaving seat (D6, BUG-07 follow-up) never wins the chair, bid or not.
     const candidates = seated.filter((s) => !s.leaving);
-    let winner = candidates[0] ?? seated[0]!;
+    if (candidates.length === 0) {
+      // F5 extension (audit fix, same bug class): every seated player is leaving — wait rather
+      // than force the bank onto one of them.
+      this.phase = 'WAITING';
+      this.stage = null;
+      this.push();
+      return;
+    }
+    let winner = candidates[0]!;
     for (const s of candidates) {
       if ((s.bankerBid ?? 1) > (winner.bankerBid ?? 1)) winner = s;
     }

@@ -322,6 +322,7 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
       winners: this.occupiedSeats().filter((s) => (s.net ?? 0) > 0).map((s) => s.index),
       ...(this.resultMessage() ? { message: this.resultMessage()! } : {}),
       ...(this.waitingFor(3) ? { message: this.waitingFor(3)! } : {}),
+      ...(this.leavingBlockedMessage() ? { message: this.leavingBlockedMessage()! } : {}),
       serverTime: Date.now(),
     };
   }
@@ -333,6 +334,20 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
     const seat = this.seatOf(winnerId);
     const side = this.game.getLandlord() === winnerId ? 'Landlord' : 'Peasants';
     return `${seat?.name ?? winnerId} wins — ${side}`;
+  }
+
+  /**
+   * Occupied at three but still not dealing (F6, audit fix on BUG-07 follow-up) — `waitingFor(3)`
+   * reads as "the table is short a player," which is false here: all three seats are full, one of
+   * them just cannot be dealt in until its release clears (a `leaving` seat stuck on a refused
+   * release, or one grace is still winding down). Told apart from `waitingFor` so the felt does not
+   * ask a player to invite someone who is, from where they sit, already seated.
+   */
+  private leavingBlockedMessage(): string | undefined {
+    if (this.phase !== 'WAITING') return undefined;
+    const occupied = this.occupiedSeats();
+    if (occupied.length !== 3 || !occupied.some((s) => s.leaving)) return undefined;
+    return 'Waiting for a seat to clear before the next hand can be dealt.';
   }
 
   dispose(): void {

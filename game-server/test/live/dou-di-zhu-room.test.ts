@@ -50,13 +50,60 @@ describe('DouDiZhuRoom — a leaving seat is never dealt in (BUG-07)', () => {
     await room.command(p1, { kind: 'sit', seat: 1, buyIn: BUY_IN });
     // p1 marked leaving directly — the state a stuck failed release would leave it in — while
     // only two are seated, so no deal has been attempted yet.
-    const internals = room as unknown as { seats: Array<{ leaving?: boolean } | null> };
-    internals.seats[1]!.leaving = true;
+    const internals = room as unknown as {
+      seats: Array<{ leaving?: 'stand' | 'disconnect' | 'drain' } | null>;
+    };
+    internals.seats[1]!.leaving = 'stand';
 
     // The third seat brings the table to three occupied, which would normally deal immediately.
     await room.command(p2, { kind: 'sit', seat: 2, buyIn: BUY_IN });
     await wait(100);
     expect(room.snapshotFor(p0).phase).toBe('WAITING');
+    // F6 (audit fix): says WHY, rather than the generic "waiting for players" a table that is
+    // actually full would otherwise show.
+    expect(room.snapshotFor(p0).message).toMatch(/seat to clear/);
+
+    room.dispose();
+  });
+});
+
+/**
+ * F7 / BUG-21 (audit fix on BUG-07 follow-up): base `stand()` only ever refused
+ * `phase === 'IN_HAND' && seat.bet > 0` — baccarat-shaped, and wrong for Dou Di Zhu, which never
+ * carries a bet at all (mid-hand `seat.bet` stays 0), so the old check never fired here and a
+ * player could stand mid-hand, leaving the other two stuck on a turn that will never come and any
+ * later settlement debiting a seat that is already gone.
+ */
+describe('DouDiZhuRoom — cannot stand mid-hand (BUG-21)', () => {
+  it('refuses to stand once the hand is dealt', async () => {
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = new ChipBank(players);
+    const p0 = players.create('P0').id;
+    const p1 = players.create('P1').id;
+    const p2 = players.create('P2').id;
+
+    const room = new DouDiZhuRoom(
+      {
+        id: 'dou-di-zhu-bug21-stand',
+        name: 'Test Dou Di Zhu',
+        game: 'dou-di-zhu',
+        baseStake: 100,
+        minBuyIn: 1_000,
+        maxBuyIn: 50_000,
+        maxSeats: 3,
+        rakeBps: 500,
+        showdownDelayMs: 20,
+      },
+      { directory: players, fc: bank },
+    );
+
+    await room.command(p0, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(p1, { kind: 'sit', seat: 1, buyIn: BUY_IN });
+    await room.command(p2, { kind: 'sit', seat: 2, buyIn: BUY_IN });
+    await until(() => room.snapshotFor(p0).phase === 'IN_HAND');
+
+    await expect(room.command(p1, { kind: 'stand' })).rejects.toThrow(/live bet/);
+    expect(room.snapshotFor(p0).seats.some((s) => s.playerId === p1)).toBe(true);
 
     room.dispose();
   });

@@ -106,6 +106,23 @@ export class BaccaratRoom extends BaseLiveRoom<BaccaratRoomConfig, RoomSeat> {
     const occupied = this.occupiedSeats();
     if (occupied.length < 2) return;
 
+    let banker = occupied.find((s) => s.isBanker);
+    // Demote a sticky banker who is now on the way out (D6, BUG-07 follow-up) — `isBanker` can
+    // predate `leaving` (seated first, or banked a round, before ever asking to leave), so finding
+    // one is not enough; a `leaving` seat is either genuinely departing or stuck on a release FC
+    // keeps refusing, and either way it has no business anchoring the next round.
+    if (banker?.leaving) {
+      banker.isBanker = false;
+      banker = undefined;
+    }
+    if (!banker) {
+      banker = occupied.find((s) => !s.leaving);
+      // F5 (audit fix): every seat left is leaving — wait rather than force the bank onto one of
+      // them. The round starts on its own once a release clears one, or a fresh player sits down.
+      if (!banker) return;
+      banker.isBanker = true;
+    }
+
     // A fresh game per round, not a reused one advanced by `nextRound()`: after an abandoned round
     // (settlement failed, or a later step like the jackpot threw) the old instance is left holding
     // stale bets and a state machine that never left BETTING/RESOLVED — the next round's setBanker
@@ -124,20 +141,6 @@ export class BaccaratRoom extends BaseLiveRoom<BaccaratRoomConfig, RoomSeat> {
         jackpotAccounts: tableJackpotAccounts(this.config.id),
       },
     );
-
-    let banker = occupied.find((s) => s.isBanker);
-    // Demote a sticky banker who is now on the way out (D6, BUG-07 follow-up) — `isBanker` can
-    // predate `leaving` (seated first, or banked a round, before ever asking to leave), so finding
-    // one is not enough; a `leaving` seat is either genuinely departing or stuck on a release FC
-    // keeps refusing, and either way it has no business anchoring the next round.
-    if (banker?.leaving) {
-      banker.isBanker = false;
-      banker = undefined;
-    }
-    if (!banker) {
-      banker = occupied.find((s) => !s.leaving) ?? occupied[0]!;
-      banker.isBanker = true;
-    }
 
     this.phase = 'IN_HAND';
     this.handNumber++;

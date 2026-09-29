@@ -215,4 +215,28 @@ describe('TexasCowboyRoom — Live Room Integration', () => {
 
     room.dispose();
   }, 60_000);
+
+  /**
+   * F7 / BUG-21 (audit fix on BUG-07 follow-up): base `stand()` only ever refused
+   * `phase === 'IN_HAND' && seat.bet > 0` — this room's real money moves during its open betting
+   * window, which is phase `WAITING`, not `IN_HAND`, so the old check never fired here and a
+   * bettor could stand with a live stake mid-window, leaving `settleBets` to debit a released seat.
+   */
+  it('refuses to stand with a live bet during the open betting window', async () => {
+    const players = new DevPlayers({ startingChips: 50_000 });
+    const bank = new ChipBank(players);
+    const alice = players.create('Alice').id;
+
+    const room = newRoom('texas-cowboy-bug21-stand', { directory: players, fc: bank });
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(alice, {
+      kind: 'act',
+      action: { type: 'bet', amount: 100, selection: 'cowboy_win' },
+    });
+
+    await expect(room.command(alice, { kind: 'stand' })).rejects.toThrow(/live bet/);
+    expect(room.snapshotFor(alice).seats.some((s) => s.playerId === alice)).toBe(true);
+
+    room.dispose();
+  }, 20_000);
 });

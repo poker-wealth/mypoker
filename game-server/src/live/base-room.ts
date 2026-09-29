@@ -33,9 +33,12 @@ export interface BaseRoomSeat {
    * this must never be handed the bank, dealt in, or allowed a fresh bet: it is either genuinely
    * leaving or stuck on a release FC keeps refusing, and either way it has no business starting
    * something new. Cleared by `releaseSeat` succeeding (the seat is gone) — there is no other path
-   * that clears it, on purpose: a seat that asked to leave does not change its mind by staying put.
+   * that clears it EXCEPT a reconnect after 'disconnect' (BUG-07 follow-up, audit fix): a grace
+   * timer that fired while this seat was mid-round tagged it 'disconnect' before it ever asked to
+   * leave, so `join()`'s reconnect path un-tags it. 'stand' and 'drain' are the player (or the
+   * room) actually asking — those stay sticky through a reconnect, same as before.
    */
-  leaving?: boolean;
+  leaving?: 'stand' | 'disconnect' | 'drain';
   /**
    * The worst this seat's standing bet can cost the bank, as a multiple of the stake — a tie at
    * baccarat's 8:1, a 5x stake against a 5x Niu Niu bank holding Five Small. Written by the room
@@ -112,9 +115,11 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
     }
     if (config.maxSeats < 1) throw new RoomError(`table ${config.id}: maxSeats must be at least 1`);
 
+    // .unref() (F3, audit fix) — repo convention (see gateway/app.ts's lobby resync): never holds
+    // the process, or a test run, open on its own.
     this.leavingRetryTimer = setInterval(() => {
       void this.enqueue(() => this.retryLeavingSeats());
-    }, 30_000);
+    }, 30_000).unref();
   }
 
   /**
@@ -162,6 +167,13 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
     const seat = this.seatOf(playerId);
     if (seat) {
       seat.connected = true;
+      // F2 (audit fix on BUG-07 follow-up): a 'disconnect' tag is the grace timer's own doing, not
+      // the player's — reconnecting before release actually cleared the seat means they are back,
+      // so nothing here should still be trying to hand their chair away, refusing their bets, or
+      // (via `retryLeavingSeats`/`releaseDeparted`) releasing them out from under a seat they never
+      // asked to leave. 'stand' and 'drain' are the player (or the room) actually asking — those
+      // stay sticky: reconnecting does not undo a stand that is still waiting on a stuck release.
+      if (seat.leaving === 'disconnect') delete seat.leaving;
       const timer = this.disconnectTimers.get(playerId);
       if (timer) {
         clearTimeout(timer);
@@ -240,7 +252,7 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
           this.departing.delete(playerId);
           return;
         }
-        seat.leaving = true;
+        seat.leaving = 'disconnect';
         if (!this.graceReleaseSafe(seat)) {
           // Not this seat's table-wide idle moment, and it is still carrying something — check back
           // shortly rather than dropping the grace entirely. Queued in `departing` too, so the next
@@ -290,6 +302,12 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
     for (const index of indexes) {
       const seat = this.seats[index];
       if (!seat) continue;
+      // Safety net (audit fix on BUG-07 follow-up, F1): every current call site runs this right
+      // after `this.phase = 'WAITING'` (or, for texas-cowboy, after its own bet reset — its
+      // `graceReleaseSafe` override does not depend on phase at all), so this is always true today.
+      // Kept explicit rather than relied on implicitly, so a future caller of `releaseDeparted` from
+      // a different point in a room's cycle cannot silently release a seat still mid-round.
+      if (!this.graceReleaseSafe(seat)) continue;
       const playerId = seat.playerId;
       try {
         await this.releaseSeat(index);
@@ -302,18 +320,31 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
     }
   }
 
-  /** The room's own 30s sweep for every `leaving` seat a release has refused — covers `stand()`
-   *  failures too, which have no disconnect timer of their own to retry them (BUG-07 follow-up, D6). */
+  /**
+   * The room's own 30s sweep for every `leaving` seat a release has refused — covers `stand()`
+   * failures too, which have no disconnect timer of their own to retry them (BUG-07 follow-up, D6).
+   *
+   * Gated on `graceReleaseSafe` (audit fix, F1): unlike `releaseDeparted`, this runs on its own
+   * clock, independent of any round boundary — it used to release a `leaving` seat unconditionally,
+   * which meant a disconnected banker (or a Dou Di Zhu player, or a texas-cowboy bettor) whose grace
+   * had already tagged them `leaving` while mid-round got released by this sweep regardless of
+   * whether the round they were part of had actually finished. `releaseDeparted` already covers the
+   * safe case at the boundary; this must only ever pick up what is ALSO safe right now.
+   */
   protected async retryLeavingSeats(): Promise<void> {
-    for (const seat of this.occupiedSeats()) {
-      if (!seat.leaving) continue;
+    const leaving = this.occupiedSeats().filter((s) => s.leaving);
+    if (leaving.length === 0) return;
+    let released = false;
+    for (const seat of leaving) {
+      if (!this.graceReleaseSafe(seat)) continue;
       try {
         await this.releaseSeat(seat.index);
+        released = true;
       } catch (err) {
         console.error(`[room ${this.config.id}] seat ${seat.index} still leaving — retry failed:`, err);
       }
     }
-    this.push();
+    if (released) this.push();
   }
 
   hasSeated(playerId: string): boolean {
@@ -403,21 +434,28 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
   protected async stand(playerId: string): Promise<void> {
     const seat = this.seatOf(playerId);
     if (!seat) return;
-    if (this.phase === 'IN_HAND' && seat.bet > 0) {
-      throw new RoomError('cannot leave mid-hand with an active bet');
-    }
     // BUG-07 follow-up, D6: the banker is the table's counterparty for every other seat's bet this
     // round — walking away mid-round leaves those bets with nothing backing them. WAITING is fine:
-    // nothing is riding on the bank between rounds.
+    // nothing is riding on the bank between rounds. Checked first, ahead of the general committed
+    // check below, so a leaving banker gets this specific reason rather than the generic one.
     if (this.phase !== 'WAITING' && seat.isBanker) {
       throw new RoomError("the banker can't leave mid-round");
+    }
+    // BUG-21 (audit fix on BUG-07 follow-up): `phase === 'IN_HAND' && seat.bet > 0` used to be the
+    // only guard here, which is baccarat-shaped and wrong for the rest of the rooms — Dou Di Zhu
+    // never carries a bet at all (mid-hand `seat.bet` stays 0, so the old check never fired), and
+    // Texas Cowboy's real money moves during its open betting window, which is phase `WAITING`, not
+    // `IN_HAND`. Reusing `graceReleaseSafe` asks the exact question the grace timer already answers
+    // for a disconnected seat: is this seat actually uncommitted right now, this room's own way.
+    if (!this.graceReleaseSafe(seat)) {
+      throw new RoomError('you have a live bet this round — you can leave when it settles');
     }
 
     // Set BEFORE the release, not after (D6): a refused release leaves the seat occupied, and it
     // must not be eligible for the bank, a fresh deal, or a fresh bet while it sits there waiting
     // for `retryLeavingSeats`/`releaseDeparted` to clear it. Nothing unsets this on failure —
     // `releaseSeat` succeeding is the only thing that ever removes the seat this flag is on.
-    seat.leaving = true;
+    seat.leaving = 'stand';
     await this.releaseSeat(seat.index);
     this.push();
     this.onSeatChanged();
@@ -714,7 +752,7 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
       // Marked `leaving` before the release, same as `stand()` (D6, BUG-07 follow-up): a seat whose
       // release fails here must not be handed the bank or a fresh bet if the room somehow outlives
       // this drain, and it is what makes the 30s retry sweep and `releaseDeparted` keep trying it.
-      for (const seat of occupied) seat.leaving = true;
+      for (const seat of occupied) seat.leaving = 'drain';
       const results = await Promise.allSettled(occupied.map((seat) => this.releaseSeat(seat.index)));
       results.forEach((result, i) => {
         if (result.status === 'rejected') {

@@ -186,7 +186,10 @@ export class RedEnvelopeRoom extends BaseLiveRoom<RedEnvelopeRoomConfig, RoomSea
     if (!banker) {
       // Never hand the bank to a seat on its way out (D6, BUG-07 follow-up) — whether they applied
       // or not, a `leaving` seat has no business anchoring the next round.
-      banker = occupied.find((s) => s.wantsBank && !s.leaving) ?? occupied.find((s) => !s.leaving) ?? occupied[0]!;
+      banker = occupied.find((s) => s.wantsBank && !s.leaving) ?? occupied.find((s) => !s.leaving);
+      // F5 (audit fix): every seat left is leaving — wait rather than force the bank onto one of
+      // them. The round starts on its own once a release clears one, or a fresh player sits down.
+      if (!banker) return;
       banker.isBanker = true;
     }
     delete banker.wantsBank;
