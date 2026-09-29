@@ -177,8 +177,16 @@ export class RedEnvelopeRoom extends BaseLiveRoom<RedEnvelopeRoomConfig, RoomSea
      * survives the round it was made in.
      */
     let banker = occupied.find((s) => s.isBanker);
+    // Demote a sticky banker who is now leaving (D6, BUG-07 follow-up) — `isBanker` can predate
+    // `leaving`, so finding one is not enough.
+    if (banker?.leaving) {
+      banker.isBanker = false;
+      banker = undefined;
+    }
     if (!banker) {
-      banker = occupied.find((s) => s.wantsBank) ?? occupied[0]!;
+      // Never hand the bank to a seat on its way out (D6, BUG-07 follow-up) — whether they applied
+      // or not, a `leaving` seat has no business anchoring the next round.
+      banker = occupied.find((s) => s.wantsBank && !s.leaving) ?? occupied.find((s) => !s.leaving) ?? occupied[0]!;
       banker.isBanker = true;
     }
     delete banker.wantsBank;
@@ -297,7 +305,8 @@ export class RedEnvelopeRoom extends BaseLiveRoom<RedEnvelopeRoomConfig, RoomSea
   private scheduleNextRound(): void {
     this.showdownTimer = setTimeout(() => {
       void this.enqueue(async () => {
-        const applicant = this.occupiedSeats().find((s) => s.wantsBank && !s.isBanker);
+        // Never rotate the bank onto a leaving seat either (D6, BUG-07 follow-up).
+        const applicant = this.occupiedSeats().find((s) => s.wantsBank && !s.isBanker && !s.leaving);
         if (applicant) {
           for (const s of this.occupiedSeats()) s.isBanker = false;
           applicant.isBanker = true;

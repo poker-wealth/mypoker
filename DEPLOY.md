@@ -65,7 +65,8 @@ for three unrelated reasons: (1) Heroku's own `SIGTERM` reaches `npm`, which the
 forwarded `SIGTERM` to `node` — two signals instead of one, milliseconds apart, which is exactly the
 repeat-signal case the handler above now has to tolerate rather than a reason to need it in the
 first place; (2) this process's exit code (0 on a clean drain, 1 on a failed one — see below) reaches
-the platform directly, instead of being re-wrapped by npm's own `ELIFECYCLE` exit-code handling; (3)
+the platform directly, instead of npm prepending an `ELIFECYCLE` error block to the platform's log
+(npm ≥7 propagates the child's exit code); (3)
 one fewer process alive inside the 30s shutdown window. The Procfile itself is unchanged by this
 pass — switch it when convenient, not because the drain depends on it.
 

@@ -138,7 +138,9 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
   private async maybeStartRound(): Promise<void> {
     if (this.phase !== 'WAITING') return;
     const occupied = this.occupiedSeats();
-    if (occupied.length !== 3) return;
+    // A seat on its way out (D6, BUG-07 follow-up) doesn't count toward the three this game needs,
+    // and never gets dealt in — there is no way to sub a fourth player into a hand already running.
+    if (occupied.length !== 3 || occupied.some((s) => s.leaving)) return;
 
     this.game = new DouDiZhuGame(
       this.config.id,

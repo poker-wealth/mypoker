@@ -17,6 +17,51 @@ async function until(condition: () => boolean, timeoutMs = 5_000): Promise<void>
   throw new Error('timed out waiting for state');
 }
 
+/**
+ * BUG-07 follow-up, D6: a leaving seat doesn't count toward Dou Di Zhu's exact-three requirement,
+ * and is never dealt in — there is no way to sub a fourth player into a hand already running, so
+ * a table stuck with one leaving seat simply waits rather than deals two real players plus a
+ * chair that is trying to leave.
+ */
+describe('DouDiZhuRoom — a leaving seat is never dealt in (BUG-07)', () => {
+  it('does not deal while one of the three occupied seats is leaving', async () => {
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = new ChipBank(players);
+    const p0 = players.create('P0').id;
+    const p1 = players.create('P1').id;
+    const p2 = players.create('P2').id;
+
+    const room = new DouDiZhuRoom(
+      {
+        id: 'dou-di-zhu-bug07-leaving',
+        name: 'Test Dou Di Zhu',
+        game: 'dou-di-zhu',
+        baseStake: 100,
+        minBuyIn: 1_000,
+        maxBuyIn: 50_000,
+        maxSeats: 3,
+        rakeBps: 500,
+        showdownDelayMs: 20,
+      },
+      { directory: players, fc: bank },
+    );
+
+    await room.command(p0, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(p1, { kind: 'sit', seat: 1, buyIn: BUY_IN });
+    // p1 marked leaving directly — the state a stuck failed release would leave it in — while
+    // only two are seated, so no deal has been attempted yet.
+    const internals = room as unknown as { seats: Array<{ leaving?: boolean } | null> };
+    internals.seats[1]!.leaving = true;
+
+    // The third seat brings the table to three occupied, which would normally deal immediately.
+    await room.command(p2, { kind: 'sit', seat: 2, buyIn: BUY_IN });
+    await wait(100);
+    expect(room.snapshotFor(p0).phase).toBe('WAITING');
+
+    room.dispose();
+  });
+});
+
 describe('DouDiZhuRoom — Live Room Integration', () => {
   it('registers dou-di-zhu table in defaultTables and TableHub', async () => {
     const players = new DevPlayers({ startingChips: 10_000 });

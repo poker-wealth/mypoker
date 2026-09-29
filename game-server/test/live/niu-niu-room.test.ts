@@ -225,3 +225,74 @@ describe('NiuNiuRoom — settlement failure recovery (BUG-11 follow-up)', () => 
     room.dispose();
   }, 15_000);
 });
+
+/**
+ * BUG-07 follow-up, D6. "Niu-niu can auction a disconnected seat into the bank" — an unbid seat
+ * counts as 1x and, on a tie, the earliest seat wins, so a disconnected non-bidder could still be
+ * handed the bank by the auction's own default. This pins the case where the grace timer HAS
+ * already found Bob (marking him `leaving`) but could not actually release him yet — FC refuses
+ * once — so he is still sitting there, occupied, when the auction closes. It must not be him.
+ */
+describe('NiuNiuRoom — a leaving seat is not auctioned into the bank (BUG-07)', () => {
+  it('a disconnected non-bidder stuck on a refused release is not auctioned into the bank', async () => {
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = new ChipBank(players);
+    const alice = players.create('Alice').id; // bids, should win the auction
+    const bob = players.create('Bob').id; // disconnects before bidding, never bids
+
+    const realRelease = bank.release.bind(bank);
+    let bobReleaseCalls = 0;
+    bank.release = (playerAccountId: string, amount: string): Promise<void> => {
+      if (playerAccountId === bob) {
+        bobReleaseCalls += 1;
+        if (bobReleaseCalls === 1) return Promise.reject(new Error('financial-core unreachable'));
+      }
+      return realRelease(playerAccountId, amount);
+    };
+
+    const room = new NiuNiuRoom(
+      {
+        id: 'niu-niu-bug07-grace',
+        name: 'Test Niu Niu',
+        game: 'niu-niu',
+        minBuyIn: 1_000,
+        maxBuyIn: 50_000,
+        maxSeats: 6,
+        rakeBps: 500,
+        biddingTimeMs: 150, // closes on its own even though Bob never bids
+        bettingTimeMs: 150,
+        showdownDelayMs: 20,
+      },
+      { directory: players, fc: bank },
+    );
+
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(bob, { kind: 'sit', seat: 1, buyIn: BUY_IN });
+    await until(() => room.snapshotFor(alice).stage === 'BIDDING');
+
+    const internals = room as unknown as {
+      seats: Array<{ playerId: string; connected: boolean } | null>;
+      armDisconnectGrace(playerId: string, graceMs?: number): void;
+    };
+    const seat = internals.seats.find((s) => s?.playerId === bob);
+    if (!seat) throw new Error('bob is not seated');
+    seat.connected = false;
+    internals.armDisconnectGrace(bob, 15);
+
+    // Grace fires (15ms): Bob is uncommitted, so release is attempted — and refused. He is marked
+    // `leaving` and stays seated, occupied, well before the 150ms auction close.
+    await until(() => bobReleaseCalls === 1, 3_000);
+
+    await room.command(alice, { kind: 'act', action: { type: 'bid-2' } });
+
+    // The auction closes on its own timer since Bob never bids — an unbid seat would otherwise
+    // win it by default. Bob is still sitting there (his release was refused) but must not be the
+    // one the auction hands the bank to.
+    await until(() => room.snapshotFor(alice).stage === 'BETTING', 3_000);
+    expect(room.snapshotFor(alice).seats.some((s) => s.playerId === bob)).toBe(true);
+    const banker = room.snapshotFor(alice).seats.find((s) => s.isDealer);
+    expect(banker?.playerId).toBe(alice);
+
+    room.dispose();
+  }, 15_000);
+});

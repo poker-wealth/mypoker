@@ -99,8 +99,14 @@ export class SanZhangRoom extends BaseLiveRoom<SanZhangRoomConfig, RoomSeat> {
     if (occupied.length < 2) return;
 
     let banker = occupied.find((s) => s.isBanker);
+    // Demote a sticky banker who is now leaving (D6, BUG-07 follow-up) — `isBanker` can predate
+    // `leaving`, so finding one is not enough.
+    if (banker?.leaving) {
+      banker.isBanker = false;
+      banker = undefined;
+    }
     if (!banker) {
-      banker = occupied[0]!;
+      banker = occupied.find((s) => !s.leaving) ?? occupied[0]!;
       banker.isBanker = true;
     }
 

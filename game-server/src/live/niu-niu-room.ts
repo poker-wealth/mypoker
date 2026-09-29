@@ -209,9 +209,11 @@ export class NiuNiuRoom extends BaseLiveRoom<NiuNiuRoomConfig, RoomSeat> {
       return;
     }
 
-    // Highest bid wins; an unbid seat counts as 1x, and the earliest of equal bids takes it.
-    let winner = seated[0]!;
-    for (const s of seated) {
+    // Highest bid wins; an unbid seat counts as 1x, and the earliest of equal bids takes it. A
+    // leaving seat (D6, BUG-07 follow-up) never wins the chair, bid or not.
+    const candidates = seated.filter((s) => !s.leaving);
+    let winner = candidates[0] ?? seated[0]!;
+    for (const s of candidates) {
       if ((s.bankerBid ?? 1) > (winner.bankerBid ?? 1)) winner = s;
     }
     for (const s of seated) s.isBanker = s === winner;
