@@ -86,6 +86,12 @@ declare global {
   }
 }
 
+/** /auth/login throttle (BUG-15): failures allowed per window before a 429. */
+const LOGIN_FAILURE_LIMIT = 10;
+const LOGIN_FAILURE_WINDOW_MS = 15 * 60_000;
+/** Cap on distinct identifier|IP keys tracked at once — see recordLoginFailure. */
+const LOGIN_THROTTLE_MAX_KEYS = 50_000;
+
 function profileFromTelegram(user: TelegramUser): PlayerProfile {
   return {
     playerId: playerIdForTelegramUser(user.id),
@@ -253,6 +259,47 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
     });
   const now = deps.now ?? ((): number => Date.now());
   const otps = deps.otps ?? otpStore;
+
+  // /auth/login brute-force throttle: a sliding window of recent WRONG-PASSWORD
+  // failures, keyed by `${identifier}|${req.ip}` (same shape as table-access.ts's
+  // pinFailures). Neither half alone is the key, so one guessed password sprayed
+  // across many accounts from one IP, or one account probed from many IPs, both
+  // still trip it.
+  const loginFailures = new Map<string, number[]>();
+
+  /** Drop timestamps older than the window; keep the map from holding dead entries. */
+  const recentLoginFailures = (key: string): number[] => {
+    const recent = (loginFailures.get(key) ?? []).filter((at) => now() - at < LOGIN_FAILURE_WINDOW_MS);
+    if (recent.length > 0) loginFailures.set(key, recent);
+    else loginFailures.delete(key);
+    return recent;
+  };
+
+  /** null when the caller may proceed; otherwise the Retry-After in whole seconds. */
+  const loginThrottled = (key: string): number | null => {
+    const recent = recentLoginFailures(key);
+    if (recent.length < LOGIN_FAILURE_LIMIT) return null;
+    const oldest = recent[0]!;
+    return Math.max(1, Math.ceil((LOGIN_FAILURE_WINDOW_MS - (now() - oldest)) / 1000));
+  };
+
+  const recordLoginFailure = (key: string): void => {
+    const recent = recentLoginFailures(key);
+    recent.push(now());
+    loginFailures.set(key, recent);
+    // An attacker who cycles identifiers (or IPs) rather than repeating one
+    // could otherwise grow this map without bound. Evict the oldest-inserted
+    // entry to cap it — losing a little precision under attack is fine, an
+    // unbounded map is not.
+    if (loginFailures.size > LOGIN_THROTTLE_MAX_KEYS) {
+      const oldestKey = loginFailures.keys().next().value;
+      if (oldestKey !== undefined) loginFailures.delete(oldestKey);
+    }
+  };
+
+  const resetLoginFailures = (key: string): void => {
+    loginFailures.delete(key);
+  };
 
   // Web identity (email/password + Google) — the browser sign-in path. The user
   // store lives HERE in the gateway (financial-core is money-only and just
@@ -613,6 +660,22 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
       // account is perfectly valid. Only new phone sign-UPS are closed.
       const identifier = raw.includes('@') ? normalizeEmail(raw) : raw.trim();
 
+      // Keyed by identifier+IP so neither alone can lock another player out —
+      // an attacker spraying one password across many accounts from one IP
+      // trips the IP half; one account probed from many IPs trips the
+      // identifier half. See loginThrottled/recordLoginFailure above.
+      const throttleKey = `${identifier}|${req.ip}`;
+      const retryAfterSeconds = loginThrottled(throttleKey);
+      if (retryAfterSeconds !== null) {
+        // Same shape as the invalid_credentials answer below — a 429 timing
+        // difference already reveals nothing an attacker didn't know (they
+        // triggered it), so no enumeration risk in going straight to it
+        // without calling verifyPassword.
+        res.set('Retry-After', String(retryAfterSeconds));
+        res.status(429).json({ error: 'too many attempts — try again later', code: 'rate_limited' });
+        return;
+      }
+
       // main's contract (#61): THROWS on refusal, returns the identity on
       // success. The closed set is what keeps `invalid_credentials` from
       // splitting back into "no such account" and "wrong password", which
@@ -626,6 +689,10 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
         if (err.code === 'invalid_credentials' || err.code === 'use_google') {
           // Anything that is not a LoginError (a database outage, say) is
           // rethrown to the 500 handler rather than reported as a bad password.
+          // Only this branch counts against the throttle: it is the one
+          // reachable WITHOUT a correct password (see LoginRefusal), so it is
+          // the only one a brute-force guess can produce.
+          recordLoginFailure(throttleKey);
           res.status(401).json({ error: err.message, code: err.code });
           return;
         }
@@ -648,6 +715,7 @@ export function buildAuthRouter(config: GatewayConfig, deps: AuthDeps = {}): Rou
         return;
       }
 
+      resetLoginFailures(throttleKey);
       res.json(issue(asProfile(identity)));
       return;
     })().catch((err: unknown) => {
