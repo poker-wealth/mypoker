@@ -24,6 +24,9 @@ import { OFFICIAL_USDT_TRC20_CONTRACT } from '../src/deposit/trc20';
 
 const INTERNAL = 'dev-internal-secret';
 const JWT = 'dev-jwt-secret';
+// Same fixture address used across the test suite (e.g. test/http/app.test.ts's VALID_ADDRESS) —
+// a real base58 TRON address, so isValidTronAddress() accepts it. 'TXaddr' does not parse as one.
+const WADDR = 'TYgJ95nhTefUuoTYxEHvVCrfYvroGrSuSU';
 
 let pass = 0;
 let fail = 0;
@@ -40,6 +43,9 @@ function check(label: string, cond: boolean, detail = ''): void {
 async function main(): Promise<void> {
   process.env.INTERNAL_API_SECRET = INTERNAL;
   process.env.JWT_SECRET = JWT;
+  // §3.6's 48h withdrawal-address cooldown is real production behaviour, not something a smoke run
+  // should wait out — zero it so the address registered below is immediately withdrawable.
+  process.env.WITHDRAWAL_ADDRESS_COOLDOWN_MS = '0';
 
   const rs = await MongoMemoryReplSet.create({ replSet: { count: 1, storageEngine: 'wiredTiger' } });
   await connectDb({ uri: rs.getUri('fc_smoke') });
@@ -117,16 +123,26 @@ async function main(): Promise<void> {
 
   console.log('4) Buy in 300 at a table (available → locked)');
   const player = await getOrCreatePlayerAccount('p-demo');
-  await api('POST', '/internal/buy-ins', { internal: true, body: { playerAccountId: player._id, amount: '300' } });
+  // /internal/buy-ins' `playerAccountId` field is actually a playerId (owner_id) — the route
+  // resolves it to the scoped account itself (resolvePlayerAccountId in routes.ts). Passing the
+  // account's own _id here would resolve (and silently create) a DIFFERENT account, owned by that
+  // UUID, instead of crediting p-demo's real account.
+  await api('POST', '/internal/buy-ins', { internal: true, body: { playerAccountId: 'p-demo', amount: '300' } });
   const b4 = await bal();
   check('available 200 / locked 300', b4.available === 200 && b4.locked === 300, JSON.stringify(b4));
 
   console.log('5) Locked funds are NOT withdrawable');
-  const overW = await api('POST', '/me/withdrawals', { player: true, body: { amount: '250', address: 'TXaddr' } });
+  // A withdrawal request checks the address before the balance: isValidTronAddress() first, then
+  // §3.6's registered-address + cooldown check, THEN the balance. 'TXaddr' isn't a valid TRON
+  // address (400) and an unregistered address is refused regardless of balance (403) — either would
+  // mask the 409 this step means to prove. Register the real withdrawal address up front so this
+  // request fails for the one reason it's testing.
+  await api('POST', '/me/withdrawal-address', { player: true, body: { address: WADDR } });
+  const overW = await api('POST', '/me/withdrawals', { player: true, body: { amount: '250', address: WADDR } });
   check('withdraw 250 (> available 200) → 409', overW.status === 409);
 
   console.log('6) Leave table with 100 (locked → available)');
-  await api('POST', '/internal/releases', { internal: true, body: { playerAccountId: player._id, amount: '100' } });
+  await api('POST', '/internal/releases', { internal: true, body: { playerAccountId: 'p-demo', amount: '100' } });
   const b6 = await bal();
   check('available 300 / locked 200', b6.available === 300 && b6.locked === 200, JSON.stringify(b6));
 
@@ -138,7 +154,11 @@ async function main(): Promise<void> {
     body: {
       roundId: 'r-smoke-1',
       tableType: 'PLATFORM',
-      winnerAccountId: player._id,
+      // Same playerId-not-accountId contract as buy-ins/releases above: the route resolves this via
+      // resolvePlayerAccountId (routes.ts) despite the field's name/type — player._id here would
+      // resolve (and create) an unrelated zero-balance account instead of p-demo's real one, and the
+      // jackpot/rake debit against it would fail on insufficient balance.
+      winnerAccountId: 'p-demo',
       winnerProfit: '1000',
       rake: '50',
       jackpotAccounts: {
@@ -154,17 +174,21 @@ async function main(): Promise<void> {
   check('winner paid 55 (jackpot 5 + rake 50): available 245', b7.available === 245, JSON.stringify(b7));
 
   console.log('8) Withdraw 100 — full lifecycle REQUESTED → APPROVED → BROADCASTING → CONFIRMED');
-  // §3.6: withdrawals go to the registered address, 48h after a change. Register it first; the smoke
-  // FC should run with WITHDRAWAL_ADDRESS_COOLDOWN_MS=0 so it's immediately withdrawable.
-  const waddr = 'TYgJ95nhTefUuoTYxEHvVCrfYvroGrSuSU';
-  await api('POST', '/me/withdrawal-address', { player: true, body: { address: waddr } });
-  const wreq = await api('POST', '/me/withdrawals', { player: true, body: { amount: '100', address: waddr } });
+  // The withdrawal address was already registered (and its cooldown zeroed) in step 5 — re-registering
+  // the SAME address is a no-op (setWithdrawalAddress), so nothing further is needed here.
+  const wreq = await api('POST', '/me/withdrawals', { player: true, body: { amount: '100', address: WADDR } });
   const wid = wreq.json.withdrawalId as string;
   check('withdrawal REQUESTED', wreq.status === 201 && wreq.json.state === 'REQUESTED');
   const apv = await api('POST', `/internal/withdrawals/${wid}/approve`, { internal: true, body: { approverId: 'ops-smoke' } });
   check('APPROVED (funds held in clearing)', apv.json.state === 'APPROVED');
   const ba = await bal();
   check('available 145 / clearing 100', ba.available === 145 && ba.clearing === 100, JSON.stringify(ba));
+  // BUG-09: /internal/withdrawals/:id/broadcast takes an optional `requirePending`. The gateway's
+  // admin "mark as sent" action always sets it true, refusing unless txHash matches an already-pending
+  // broadcast (see broadcastWithdrawal's doc comment). This smoke run calls the Financial Core
+  // directly and never sets a pendingTxId first (no sign-broadcast step), so requirePending stays
+  // unset/false — the "no pendingTxId at all" arm applies and this records tx-out-1 as a fresh send,
+  // same as the ordinary auto sign-broadcast path would. No change needed for that path here.
   await api('POST', `/internal/withdrawals/${wid}/broadcast`, { internal: true, body: { txHash: 'tx-out-1' } });
   const cf = await api('POST', `/internal/withdrawals/${wid}/confirm`, { internal: true });
   check('CONFIRMED (funds left platform)', cf.json.state === 'CONFIRMED');
