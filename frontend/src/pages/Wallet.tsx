@@ -132,11 +132,15 @@ export function Wallet() {
           <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-xl bg-black/20 px-3 py-2">
               <div className="text-[0.68rem] text-white/70">{t('wallet.available')}</div>
-              <div className="font-bold tabular-nums">${balance.data?.available ?? '0.000000'}</div>
+              <div className="font-bold tabular-nums">
+                {balance.data ? `$${balance.data.available}` : '—'}
+              </div>
             </div>
             <div className="rounded-xl bg-black/20 px-3 py-2">
               <div className="text-[0.68rem] text-white/70">{t('wallet.inPlay')}</div>
-              <div className="font-bold tabular-nums">${balance.data?.locked ?? '0.000000'}</div>
+              <div className="font-bold tabular-nums">
+                {balance.data ? `$${balance.data.locked}` : '—'}
+              </div>
             </div>
           </div>
         </div>
@@ -229,7 +233,7 @@ export function Wallet() {
       <WithdrawSheet
         open={withdrawOpen}
         onClose={() => setWithdrawOpen(false)}
-        available={balance.data?.available ?? '0'}
+        available={balance.data?.available ?? null}
       />
       <TxnDetailSheet open={detailOpen} txn={detailTxn} onClose={() => setDetailOpen(false)} />
     </div>
@@ -425,7 +429,7 @@ function WithdrawSheet({
 }: {
   open: boolean;
   onClose: () => void;
-  available: string;
+  available: string | null;
 }) {
   const { t } = useTranslation();
   const withdrawals = useWithdrawals();
@@ -435,6 +439,14 @@ function WithdrawSheet({
   const [amount, setAmount] = useState('');
   const [address, setAddress] = useState('');
   const [changing, setChanging] = useState(false);
+
+  // `withdraw.isPending` is React state — it only flips true on the NEXT
+  // render, so two taps landing in the same event-loop turn both read it as
+  // false and both call mutate(). A ref is readable/writable synchronously,
+  // so the second tap sees the flag the first one just set. Each POST mints
+  // a fresh withdrawal id, so the ledger's idempotency key never sees this
+  // race — this guard is the only thing stopping two withdrawals firing.
+  const submitting = useRef(false);
 
   // §3.6: withdrawals go ONLY to the registered address, and only once its 48h
   // cooldown has elapsed. Both facts have to be on screen before the player
@@ -465,13 +477,18 @@ function WithdrawSheet({
   };
 
   const submit = (): void => {
+    if (submitting.current) return;
     if (!amount.trim() || !reg?.address) return;
+    submitting.current = true;
     withdraw.mutate(
       // The address is the REGISTERED one, never a typed one — sending anything
       // else is refused, and offering a free-text field would invite exactly
       // the mistake the rule exists to prevent.
       { amount: amount.trim(), address: reg.address },
       {
+        onSettled: () => {
+          submitting.current = false;
+        },
         onSuccess: () => {
           toast.success(t('wallet.withdrawRequested'));
           setAmount('');
@@ -498,7 +515,7 @@ function WithdrawSheet({
     <Sheet open={open} onClose={onClose} title={t('wallet.withdrawTitle')}>
       <div className="space-y-3 p-4">
         <div className="text-[0.72rem] text-dim">
-          {t('wallet.availableToWithdraw', { amount: `$${available}` })}
+          {t('wallet.availableToWithdraw', { amount: available !== null ? `$${available}` : '—' })}
         </div>
 
         <label className="block">
