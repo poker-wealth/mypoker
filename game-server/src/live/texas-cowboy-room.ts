@@ -30,6 +30,8 @@ interface RoomSeat extends BaseRoomSeat {
  * Nobody banks this game, so the round is player-funded: the losing stakes are the prize pool and
  * the winners divide it. The alternative — paying published odds out of a house account — would
  * make the platform the counterparty to its own players.
+ *
+ * No jackpot: see settleRound (BUG-24).
  */
 /** The table's cut. A table that forgets to configure one still takes the standard 5%. */
 function rakeOf(config: TexasCowboyRoomConfig): number {
@@ -247,7 +249,11 @@ export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSea
     const { netByUser } = this.engine.settleBets();
 
     if (netByUser.size > 0) {
-      const settlement = settleNet(netByUser, { rakeBps: rakeOf(this.config) });
+      // BUG-24: no jackpot on this table. The deal is not provably fair (engine.ts shuffles with
+      // Math.random), and every other room refuses to draw a jackpot on an unverifiable seed — so an
+      // injection here is a 0.5% deduction into pools (jp:<tier>:<table>) that nothing can ever pay
+      // out (clearing-rules: JACKPOT_* → PLAYER only). Re-enable together with a seeded deal.
+      const settlement = settleNet(netByUser, { rakeBps: rakeOf(this.config), jackpotBps: 0 });
       const request = toTableSettlementRequest(settlement, {
         // The suffix is not cosmetic: FC treats a repeated roundId as a settlement replay (idempotency
         // key) and returns applied:false without moving money. handNumber alone repeats across room
@@ -354,7 +360,7 @@ export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSea
         };
       }),
       insurance: null,
-      jackpot: this.lastJackpotWin,
+      jackpot: null, // BUG-24: this table runs no jackpot (see settleRound)
       yourSeat: seat ? seat.index : null,
       you: seat ? { playerId: seat.playerId, name: seat.name, available: seat.stack } : null,
       toActSeat: null,

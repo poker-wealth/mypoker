@@ -84,14 +84,18 @@ describe('TexasCowboyRoom — Live Room Integration', () => {
     await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
     await room.command(bob, { kind: 'sit', seat: 1, buyIn: BUY_IN });
 
-    // Opposite sides of the same market, so one of them must lose and fund the other.
+    // Opposite sides of the same market, so one of them must lose and fund the other. 2,000, not
+    // 100: at the default 50bps jackpot rate a 100-chip pot injects floor(100*50/10000) = 0 either
+    // way, which would let this test pass whether or not BUG-24's `jackpotBps: 0` is actually wired
+    // through — a stake large enough to floor to a nonzero jackpot is what makes the assertions below
+    // load-bearing.
     await room.command(alice, {
       kind: 'act',
-      action: { type: 'bet', amount: 100, selection: 'cowboy_win' },
+      action: { type: 'bet', amount: 2_000, selection: 'cowboy_win' },
     });
     await room.command(bob, {
       kind: 'act',
-      action: { type: 'bet', amount: 100, selection: 'cowgirl_win' },
+      action: { type: 'bet', amount: 2_000, selection: 'cowgirl_win' },
     });
 
     // The round runs on its own clock: betting window, deal, three reveals, then settlement.
@@ -121,6 +125,17 @@ describe('TexasCowboyRoom — Live Room Integration', () => {
     await wait(6_000); // settlement runs a beat after showdown
 
     expect(players.totalChips() + bank.sinkTotal()).toBe(startingTotal);
+
+    // BUG-24: this table draws no jackpot (the deal is not provably fair), so settlement must not
+    // inject into any jp:<tier>:texas-cowboy-1 pool — money nothing can ever pay out. The whole
+    // 2,000-chip losing stake's cut is the rake alone: floor(2000 * 500 / 10000) = 100, winner nets
+    // 1900.
+    const sinks = bank.sinkBalances();
+    for (const [account, balance] of Object.entries(sinks)) {
+      if (account.startsWith('jp:')) expect(balance).toBe(0);
+    }
+    expect(sinks.rake).toBe(100);
+    expect(room.snapshotFor(alice).jackpot).toBeNull();
 
     room.dispose();
   }, 60_000);
