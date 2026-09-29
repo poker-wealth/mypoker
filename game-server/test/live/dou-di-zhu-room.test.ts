@@ -357,14 +357,14 @@ describe('DouDiZhuRoom — a failed settlement on the final play does not crash 
 
       for (let step = 0; step < 5; step++) {
         const snap = room.snapshotFor(p0);
+        // Loop by the engine's actual stage, not by catching whatever 'not bidding' throws once
+        // bidding ends — a catch-and-break there would just as happily swallow a real regression in
+        // the bidding flow as it would the expected end-of-auction state.
+        if (snap.stage !== 'BIDDING') break;
         const toActSeat = snap.toActSeat;
         if (toActSeat === null) break;
         const pid = toActSeat === 0 ? p0 : toActSeat === 1 ? p1 : p2;
-        try {
-          await room.command(pid, { kind: 'act', action: { type: step === 0 ? 'bid-3' : 'bid-0' } });
-        } catch {
-          break;
-        }
+        await room.command(pid, { kind: 'act', action: { type: step === 0 ? 'bid-3' : 'bid-0' } });
       }
 
       // Same terminating line of play as the happy-path test: whoever holds the trick leads their
@@ -397,6 +397,9 @@ describe('DouDiZhuRoom — a failed settlement on the final play does not crash 
       for (const seat of after.seats.filter((s) => s.playerId)) expect(seat.stack).toBe(BUY_IN);
       expect(bank.failureReports.length).toBeGreaterThan(0);
       expect(bank.failureReports[0]!.tableId).toBe('dou-di-zhu-bug25');
+      // BUG-25 follow-up: resultMessage() used to keep reporting the previous (never-paid) winner for
+      // the whole WAITING window, so the felt said "X wins" over a hand that settled nothing.
+      expect(after.message ?? '').not.toMatch(/wins/);
 
       room.dispose();
     } finally {

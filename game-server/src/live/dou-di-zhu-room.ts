@@ -353,8 +353,18 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
     };
   }
 
-  /** "Bruno (Landlord) wins" — a name, not the raw account id the old message printed. */
+  /**
+   * "Bruno (Landlord) wins" — a name, not the raw account id the old message printed.
+   *
+   * Returns undefined once the table is back to `WAITING` (BUG-25 follow-up): `this.game` is not
+   * replaced with a fresh `DouDiZhuGame` until `maybeStartRound` deals the next hand, so
+   * `getWinner()` keeps reporting the PREVIOUS hand's winner for the whole `WAITING` window —
+   * including after `abandonRoundAndRedeal` sends the table back to `WAITING` on a refused
+   * settlement, where nobody actually won anything and stacks never moved. Without this guard the
+   * felt showed "X wins" for a full `showdownDelayMs` after a settlement failure that paid nobody.
+   */
   private resultMessage(): string | undefined {
+    if (this.phase === 'WAITING') return undefined;
     const winnerId = this.game.getWinner();
     if (!winnerId) return undefined;
     const seat = this.seatOf(winnerId);

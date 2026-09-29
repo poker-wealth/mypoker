@@ -540,10 +540,16 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
    * are already correct. Either way, inventing a correction here would be the actual disaster.
    */
   protected abandonRound(err: unknown): void {
-    console.error(
-      `[room ${this.config.id}] round failed to settle — table returned to WAITING, nothing paid or reversed:`,
-      err,
-    );
+    // "nothing paid or reversed" was wrong whenever the throw landed AFTER `fc.settleTableHand`
+    // itself already succeeded (e.g. `processJackpot` throwing post-settlement in dou-di-zhu or
+    // san-zhang): FC had applied the settlement and this room had already mirrored the stacks, so
+    // telling ops nothing was paid was actively misleading during exactly the recovery this message
+    // exists to guide. Nothing here can tell "failed before settling" apart from "failed after" (see
+    // the class comment above), so the honest wording asks ops to check rather than asserting either
+    // way — and it is the SAME wording whether it lands in the console or in FC's security_log, so
+    // ops reading either one see the same instruction.
+    const message = `round ${this.config.id}#${this.handNumber} could not complete — check the ledger for this round before reversing anything`;
+    console.error(`[room ${this.config.id}] ${message}:`, err);
     // Surface it. A settlement failure is a money fault; left as a console line a RECURRING ledger
     // fault stays quiet. Report it so it lands in FC's append-only security_log and pages ops. Fire-
     // and-forget, exactly like the CB3 anomaly report — the recovery below must not wait on the alert.
@@ -551,7 +557,7 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
       void this.fc
         .reportSettlementFailure({
           tableId: this.config.id,
-          reason: err instanceof Error ? err.message : String(err),
+          reason: `${message}: ${err instanceof Error ? err.message : String(err)}`,
         })
         .catch((e) => console.error(`[room ${this.config.id}] settlement-failure report to FC failed:`, e));
     }

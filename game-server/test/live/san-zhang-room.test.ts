@@ -84,63 +84,91 @@ describe('SanZhangRoom — Live Room Integration', () => {
  * wedged the table for good, the same shape as the baccarat/niu-niu fix this mirrors.
  */
 describe('SanZhangRoom — a fresh game per round survives an abandon (BUG-26)', () => {
-  it('deals and settles again after settlement fails once, for two rounds in a row', async () => {
+  /**
+   * BUG-26 follow-up — the stale-bet shape the old "two rounds in a row" test never actually
+   * exercised: `SanZhangGame.start()` calls `fc.settleTableHand` BEFORE transitioning its state
+   * machine to `RESOLVED` (see `san-zhang-game.ts`), so a rejected settlement leaves the state
+   * machine in `BETTING` — pre-fix, round 2's `setBanker`/`placeBet` never actually throw for this
+   * failure mode (that only happens for the OTHER shape, test 2 below, where settlement itself
+   * succeeds and a later step throws). The old test's docstring claimed otherwise; it wasn't testing
+   * what it said it was.
+   *
+   * What pre-fix reuse actually does here: `setBanker` only deletes the INCOMING banker's own entry
+   * from `this.bets` (`this.bets.delete(playerId)`), so a bettor who does not rebet in round 2 is
+   * simply never removed from the reused game's internal `bets` Map. Round 2's `start()` then reads
+   * `participants = [this.banker, ...this.bets.keys()]` and silently deals carol back in — and
+   * settles her — on her ROUND 1 stake, even though her room-level seat.bet is 0 and she took no
+   * action in round 2. The fresh `SanZhangGame` per round (`maybeStartRound`) starts that Map empty,
+   * so carol simply never enters it unless she bets.
+   */
+  it('a bettor who sits out round 2 is not silently resettled on her round-1 bet (stale bet)', async () => {
     const players = new DevPlayers({ startingChips: 10_000 });
     const bank = new ChipBank(players);
     const alice = players.create('Alice').id;
     const bob = players.create('Bob').id;
+    const carol = players.create('Carol').id;
+    const startingTotal = players.totalChips();
 
     const realSettle = bank.settleTableHand.bind(bank);
     let calls = 0;
+    const recorded: TableSettlementRequest[] = [];
     bank.settleTableHand = (req: TableSettlementRequest): Promise<{ roundId: string; applied: boolean }> => {
       calls += 1;
       if (calls === 1) return Promise.reject(new Error('financial-core unreachable'));
+      recorded.push(req);
       return realSettle(req);
     };
 
     const room = new SanZhangRoom(
       {
-        id: 'san-zhang-bug26-settle-fails',
+        id: 'san-zhang-bug26-stale-bet',
         name: 'Test San Zhang',
         game: 'san-zhang',
         minBuyIn: 1_000,
         maxBuyIn: 50_000,
         maxSeats: 6,
         rakeBps: 500,
-        bettingTimeMs: 5_000,
+        bettingTimeMs: 200,
         showdownDelayMs: 20,
       },
       { directory: players, fc: bank },
     );
 
+    // Alice sits first, so she is the banker (base-room's `isFirst` -> `createSeatRecord`).
     await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
     await room.command(bob, { kind: 'sit', seat: 1, buyIn: BUY_IN });
+    await room.command(carol, { kind: 'sit', seat: 2, buyIn: BUY_IN });
     await until(() => room.snapshotFor(alice).phase === 'IN_HAND');
 
-    // Round 1: the bettor's action triggers `resolveRound`, whose settlement fails (calls === 1).
-    // Before the fix, the reused game was left mid-state and round 2's `setBanker` threw forever —
-    // the table never left WAITING.
+    // Round 1: both non-bankers bet, which fires `resolveRound` immediately; its settlement is
+    // refused (calls === 1) and the round is abandoned.
     await room.command(bob, { kind: 'act', action: { type: 'bet', amount: 100 } });
+    await room.command(carol, { kind: 'act', action: { type: 'bet', amount: 100 } });
 
     await until(
       () => room.snapshotFor(alice).phase === 'IN_HAND' && room.snapshotFor(alice).handNumber === 2,
       10_000,
     );
 
-    // Round 2 deals and settles normally.
+    // Round 2: only bob rebets — carol sits it out entirely. Nothing auto-triggers `resolveRound`
+    // (carol's seat.bet is still 0), so this waits out the real betting timer instead.
     await room.command(bob, { kind: 'act', action: { type: 'bet', amount: 100 } });
     await until(() => room.snapshotFor(alice).phase === 'SHOWDOWN', 10_000);
     expect(calls).toBe(2);
+    expect(recorded).toHaveLength(1);
 
-    // A second round in a row after the recovered one — the fresh-game rebuild in `maybeStartRound`
-    // is not a one-shot patch that only covers the round immediately after an abandon.
-    await until(
-      () => room.snapshotFor(alice).phase === 'IN_HAND' && room.snapshotFor(alice).handNumber === 3,
-      10_000,
-    );
-    await room.command(bob, { kind: 'act', action: { type: 'bet', amount: 100 } });
-    await until(() => room.snapshotFor(alice).phase === 'SHOWDOWN', 10_000);
-    expect(calls).toBe(3);
+    // The round-2 settlement request must involve only alice (banker) and bob (the only bettor) —
+    // carol, who never acted in round 2, must not appear as either a loser or a winner.
+    const round2Ids = new Set([...recorded[0]!.losers, ...recorded[0]!.winners].map((p) => p.playerAccountId));
+    expect(round2Ids).not.toContain(carol);
+    for (const id of round2Ids) expect([alice, bob]).toContain(id);
+
+    const carolSeat = room.snapshotFor(alice).seats.find((s) => s.playerId === carol)!;
+    expect(carolSeat.stack).toBe(BUY_IN);
+    expect(room.snapshotFor(alice).winners).not.toContain(carolSeat.index);
+
+    // Ledger-level conservation across both the refused round and the settled one.
+    expect(players.totalChips() + bank.sinkTotal()).toBe(startingTotal);
 
     room.dispose();
   }, 20_000);
