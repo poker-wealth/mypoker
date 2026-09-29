@@ -118,3 +118,107 @@ describe('PokerRoom.drain — voids a live hand rather than waiting it out (BUG-
     room.dispose();
   });
 });
+
+/**
+ * BUG-07 follow-up (DEFECT 2): the auditor rejected the fix for this too. `beginClosing`/
+ * `maybeStartHand` fired `finishClose` UN-queued (`void this.finishClose()`), and the old `closed`
+ * guard flipped true synchronously, before a single seat had actually been released. So `drain()`'s
+ * own queued task, racing an owner's `close_table` already in flight, saw `closed === true` and
+ * returned 0 failures immediately — the process could exit while releases were still in flight.
+ * `finishClose` is now queued (so `drain()`'s task is naturally ordered behind it, not racing it)
+ * and memoized on the RUN itself (`closeRun`), so a second caller joins the SAME release run instead
+ * of seeing "already closed" before it has actually finished.
+ */
+describe('PokerRoom.drain — joins an owner close already in flight (BUG-07 follow-up — DEFECT 2)', () => {
+  it('does not resolve before a close_table already in flight finishes releasing, and releases each seat exactly once', async () => {
+    const players = new DevPlayers({ startingChips: STARTING });
+    const bank = new ChipBank(players);
+    const alice = players.create('Alice').id; // owner
+    const bob = players.create('Bob').id;
+
+    const realRelease = bank.release.bind(bank);
+    let releaseCalls = 0;
+    bank.release = async (playerAccountId: string, amount: string): Promise<void> => {
+      releaseCalls += 1;
+      await wait(200);
+      return realRelease(playerAccountId, amount);
+    };
+
+    const room = new PokerRoom(
+      {
+        ...FAST,
+        id: 't-drain-close-race',
+        name: 'Drain close race',
+        ownerId: alice,
+        autoStartPlayers: 0, // stay WAITING — this test is about the close/drain race, not a hand
+      } as PokerRoomConfig,
+      { directory: players, fc: bank },
+    );
+
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(bob, { kind: 'sit', seat: 1, buyIn: BUY_IN });
+
+    // Owner closes — queues finishClose, whose releases are now delayed 200ms each.
+    await room.command(alice, { kind: 'close_table' });
+
+    // drain() called immediately after: it must JOIN the close already queued, not see `closed`
+    // early and resolve as if every seat were already gone.
+    let drained = false;
+    const drainPromise = room.drain().then(() => {
+      drained = true;
+    });
+
+    await wait(50); // comfortably inside the 200ms release delay
+    expect(drained).toBe(false);
+
+    await drainPromise;
+    expect(drained).toBe(true);
+
+    // Exactly one release per seat — the two callers joined the SAME run rather than each releasing
+    // independently.
+    expect(releaseCalls).toBe(2);
+    expect(players.find(alice)!.available).toBe(STARTING);
+    expect(players.find(bob)!.available).toBe(STARTING);
+
+    room.dispose();
+  }, 10_000);
+
+  it('rejects with the failure count when the in-flight close has a refused release', async () => {
+    const players = new DevPlayers({ startingChips: STARTING });
+    const bank = new ChipBank(players);
+    const alice = players.create('Alice').id; // owner — release refused
+    const bob = players.create('Bob').id;
+
+    const realRelease = bank.release.bind(bank);
+    bank.release = async (playerAccountId: string, amount: string): Promise<void> => {
+      await wait(50);
+      if (playerAccountId === alice) throw new Error('financial-core unreachable');
+      return realRelease(playerAccountId, amount);
+    };
+
+    const room = new PokerRoom(
+      {
+        ...FAST,
+        id: 't-drain-close-race-fail',
+        name: 'Drain close race fail',
+        ownerId: alice,
+        autoStartPlayers: 0,
+      } as PokerRoomConfig,
+      { directory: players, fc: bank },
+    );
+
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(bob, { kind: 'sit', seat: 1, buyIn: BUY_IN });
+
+    await room.command(alice, { kind: 'close_table' });
+
+    await expect(room.drain()).rejects.toThrow(/1 seat\(s\) unreleased/);
+
+    // Bob's release still succeeded — one seat's failure doesn't strand the other.
+    expect(players.find(bob)!.available).toBe(STARTING);
+    // Alice's money is still locked, not lost.
+    expect(players.find(alice)!.available).toBe(STARTING - BUY_IN);
+
+    room.dispose();
+  }, 10_000);
+});

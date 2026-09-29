@@ -55,8 +55,9 @@ export interface LiveRoom {
    * process restart or redeploy left every seated stack locked in FC with nobody at the table
    * anymore, stranded until the next restart happened to reuse the same table id and someone stood
    * up. Called before `dispose()` during an orderly shutdown; resolves once the room has released
-   * everyone it safely can (a release FC refuses is logged and left for the next start to sort out,
-   * same as any other refused release).
+   * everyone it safely can — a release FC refuses is logged AND rejects this promise (BUG-07
+   * follow-up — D7), so `TableHub.drain`'s `Promise.allSettled` can count it and the process exits 1
+   * instead of a silent 0, rather than the refusal only being logged and left for the next start.
    */
   drain(): Promise<void>;
   /** Stop timers and release resources. */

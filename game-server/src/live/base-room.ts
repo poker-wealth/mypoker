@@ -565,25 +565,36 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
    * touched, so `sit`/`topUp`/`act` are refused the instant shutdown starts; the release loop itself
    * runs as a queued task, so it only starts after whatever command or settlement was already in
    * flight has fully finished.
+   *
+   * Releases every seat CONCURRENTLY (BUG-07 follow-up), not one at a time: a 6-seat table's
+   * shutdown used to be bounded by the SUM of six FC timeouts, not one. `Promise.allSettled` keeps
+   * each seat's own try/catch — one seat's failure still cannot strand another's release.
    */
   async drain(): Promise<void> {
     this.draining = true;
     let failures = 0;
     await this.enqueue(async () => {
-      const voided = this.occupiedSeats().filter((s) => s.bet > 0);
+      // Gated on IN_HAND (BUG-07 follow-up): a room can be draining during SHOWDOWN too, where every
+      // bet has already been walked into `seat.stack` by the settlement that just ran — logging
+      // "voids N unsettled bets" there would describe money that already settled, not money about
+      // to be voided.
+      const voided = this.phase === 'IN_HAND' ? this.occupiedSeats().filter((s) => s.bet > 0) : [];
       if (voided.length > 0) {
         console.error(
           `[room ${this.config.id}] drain voids ${voided.length} unsettled bet(s) — never left seat.stack`,
         );
       }
-      for (const seat of this.occupiedSeats()) {
-        try {
-          await this.releaseSeat(seat.index);
-        } catch (err) {
+      const occupied = this.occupiedSeats();
+      const results = await Promise.allSettled(occupied.map((seat) => this.releaseSeat(seat.index)));
+      results.forEach((result, i) => {
+        if (result.status === 'rejected') {
           failures += 1;
-          console.error(`[room ${this.config.id}] seat ${seat.index} failed to release during drain:`, err);
+          console.error(
+            `[room ${this.config.id}] seat ${occupied[i]!.index} failed to release during drain:`,
+            result.reason,
+          );
         }
-      }
+      });
       this.push();
     });
     if (failures > 0) {

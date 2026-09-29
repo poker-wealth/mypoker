@@ -363,11 +363,21 @@ export class PokerRoom implements LiveRoom {
   private paused = false;
   /** Close requested; the table deals no more and settles when the hand ends. */
   private closing = false;
-  /** finishClose has run. Guards against a double release of the same seat. */
+  /** Set by `runFinishClose` before it starts releasing seats — NOT the re-entry guard for
+   *  `finishClose` itself (that's `closeRun` below); this only tells `drain()`'s own task whether a
+   *  close is already under way, so it does not re-void a hand that closing has already claimed. */
   private closed = false;
-  /** Memoized by `beginClosing` — the promise `drain()` awaits, resolved by `finishClose` (BUG-07). */
-  private closePromise: Promise<void> | null = null;
-  private closeResolve: (() => void) | null = null;
+  /**
+   * Memoizes the CLOSE RUN itself (BUG-07 follow-up), not a flag set before it starts (DEFECT 2 —
+   * the previous `closed` guard flipped true synchronously, before a single seat had actually been
+   * released, so a second caller — `drain()` racing an owner's `close_table` already in flight — saw
+   * `closed` and returned immediately, as if every seat were already gone while the releases were
+   * still in flight; the process could then exit mid-release). `??=` in `finishClose` means every
+   * caller — the owner path (`beginClosing`/`maybeStartHand`, queued) and `drain()` (which calls it
+   * directly, never queued a second time) — gets the SAME promise and therefore the SAME eventual
+   * failure count, whichever of them got there first.
+   */
+  private closeRun: Promise<number> | null = null;
   private manualStarted = false;
 
   // The last reserve read that succeeded, and when. Null until the first one
@@ -852,7 +862,7 @@ export class PokerRoom implements LiveRoom {
    */
   private close(actorId: string): void {
     this.requireOwner(actorId, 'close the table');
-    void this.beginClosing();
+    this.beginClosing();
   }
 
   /**
@@ -887,13 +897,17 @@ export class PokerRoom implements LiveRoom {
     }
     let failures = 0;
     await this.enqueue(async () => {
-      if (this.closed) return;
       if (this.showdownTimer) {
         clearTimeout(this.showdownTimer);
         this.showdownTimer = undefined;
       }
       const game = this.game;
-      if (this.phase === 'IN_HAND' && game) {
+      // `!this.closed` (BUG-07 follow-up — DEFECT 2): a close already under way (the owner's
+      // `close_table`, queued ahead of this task) has already claimed the hand, if there was one, by
+      // the time its own queued `finishClose` ran — this task must not re-void anything. `finishClose`
+      // below is what actually decides whether there is still work to do; this is just the guard on
+      // OUR OWN void-hand block, not the re-entry guard for the release loop.
+      if (!this.closed && this.phase === 'IN_HAND' && game) {
         const roundId = game.roundInfo()?.roundId;
         console.error(
           `[room ${this.config.id}] hand ${roundId ?? '?'} voided by shutdown — no settlement issued, pre-hand stacks returned`,
@@ -919,65 +933,60 @@ export class PokerRoom implements LiveRoom {
   }
 
   /**
-   * Start closing (idempotent) and return the promise that resolves once every seat is actually
-   * released.
+   * Start closing (idempotent).
    *
-   * `close()` used to fire `finishClose` and walk away — nobody needed to know when it finished,
-   * because the room's own `push()` calls told any client that was still watching. `drain()` does
-   * need to know: it is what tells the process it is safe to exit. Memoized on `closePromise` so a
-   * second caller (drain() after the owner already closed the table, or drain() called twice) waits
-   * on the SAME run rather than racing a fresh `finishClose` against one already releasing seats.
+   * `closing` guards re-entry: a second `close_table`, or a `close()` racing `drain()`, is a no-op
+   * here. The actual release run is `finishClose` — queued, never called directly (BUG-07 follow-up
+   * — DEFECT 2), so it runs strictly after whatever command was already ahead of it, same as every
+   * other money-touching path in this room.
    */
-  private beginClosing(): Promise<void> {
-    if (this.closePromise) return this.closePromise;
+  private beginClosing(): void {
+    if (this.closing) return;
     this.closing = true;
     this.push();
-    this.closePromise = new Promise<void>((resolve) => {
-      this.closeResolve = resolve;
-    });
-    // Nothing in flight → close now. Otherwise the hand's end reaches
-    // maybeStartHand, which picks this up.
-    if (this.phase === 'WAITING') void this.finishClose();
-    return this.closePromise;
+    // Nothing in flight → close now. Otherwise the hand's end reaches maybeStartHand, which picks
+    // this up. Queued rather than called directly: this runs inside the ALREADY-executing queued
+    // task that dispatched `close()`, so `void this.enqueue(...)` schedules it to run next, after
+    // that task returns — never awaited here, so `close()` itself stays synchronous.
+    if (this.phase === 'WAITING') void this.enqueue(async () => { await this.finishClose(); });
   }
 
   /**
-   * Give every remaining stack back, then stop.
+   * Give every remaining stack back, then stop. Returns how many seats failed to release (D7).
    *
-   * Seats are released through the SAME path a voluntary departure uses, one at
-   * a time through the room's queue. Reusing `releaseSeat` rather than writing
-   * a bulk refund keeps this off its own money path — there is one way chips
-   * leave a table and this is not a second one.
+   * Seats are released through the SAME path a voluntary departure uses — releasing every seat
+   * CONCURRENTLY (BUG-07 follow-up) rather than one at a time, so a 6-seat table's shutdown is
+   * bounded by ONE seat's FC timeout, not the sum of all six; each seat still gets its own
+   * try/catch, so one seat's failure cannot strand another's release.
    *
-   * Guarded against re-entry: `maybeStartHand` runs on several edges and this
-   * must not start twice and double-release a seat.
-   *
-   * Resolves to how many seats failed to release (D7) — `close()`'s own `void this.finishClose()`
-   * callers ignore it, same as they always ignored the old `Promise<void>`, while `drain()` reads it
-   * to report a failed shutdown upward instead of exiting 0 with chips left stranded.
+   * Memoized on the RUN itself via `closeRun`, not a flag set before it starts (DEFECT 2 — see the
+   * field comment on `closeRun`): every caller of `finishClose` — the owner path (`beginClosing`,
+   * queued) and `drain()` (called directly, never queued a second time) — gets the SAME promise,
+   * so a second caller joins the release run already in flight instead of seeing "already closed"
+   * before a single seat has actually come back.
    */
-  private async finishClose(): Promise<number> {
-    if (this.closed) return 0;
+  private finishClose(): Promise<number> {
+    this.closeRun ??= this.runFinishClose();
+    return this.closeRun;
+  }
+
+  private async runFinishClose(): Promise<number> {
     this.closed = true;
 
     // A copy: releaseSeat mutates the seat list as it goes. Empty chairs are
     // `null` here, not seats with no player, so they are filtered by identity.
     const occupied = [...this.seats].filter((s): s is NonNullable<typeof s> => s !== null);
+    const results = await Promise.allSettled(occupied.map((seat) => this.releaseSeat(seat.index)));
     let failures = 0;
-    for (const seat of occupied) {
-      try {
-        await this.releaseSeat(seat.index);
-      } catch (err) {
+    results.forEach((result, i) => {
+      if (result.status === 'rejected') {
         failures += 1;
         // One seat failing must not strand the rest — every other player still
         // gets their chips, and the failure is loud rather than silent.
-        console.error(`[poker-room] close: seat ${seat.index} failed to release:`, err);
+        console.error(`[poker-room] close: seat ${occupied[i]!.index} failed to release:`, result.reason);
       }
-    }
+    });
     this.push();
-    // Whoever is waiting on beginClosing()'s promise — drain(), if anyone — hears about it now
-    // that every seat is actually gone, not before.
-    this.closeResolve?.();
     return failures;
   }
 
@@ -1316,7 +1325,13 @@ export class PokerRoom implements LiveRoom {
      * once the last hand is done every remaining stack goes home.
      */
     if (this.closing) {
-      void this.finishClose();
+      // Queued, not called directly (BUG-07 follow-up — DEFECT 2): `maybeStartHand` runs inside an
+      // already-executing queued task (every caller reaches it through `enqueue`'d command handling),
+      // so `void this.enqueue(...)` schedules the release run to start right after that task
+      // returns, rather than firing it unqueued and racing whatever runs next.
+      void this.enqueue(async () => {
+        await this.finishClose();
+      });
       return;
     }
     if (this.paused) return;

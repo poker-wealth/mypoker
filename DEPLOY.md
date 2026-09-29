@@ -53,14 +53,26 @@ Public API URL → `https://mypoker-gateway.herokuapp.com`.
 **Shutdown grace period (BUG-07).** The gateway now drains every live table — releasing every
 seated stack back to its wallet — on `SIGTERM`/`SIGINT` before it exits (`gateway/server.ts`), with
 a 25s internal hard-exit safety timer so a stuck drain still lets the process die rather than hang.
-That only works if the platform actually gives the process 25s+ to finish before killing it — which
-in turn only works if the process actually RECEIVES the signal: the `Procfile` above runs
-`web: npm start`, and `npm` does not reliably forward `SIGTERM` to the child process it spawns (a
-well-known npm gotcha — the signal can be swallowed by the `npm` wrapper itself, never reaching
-`node dist/gateway/server.js` at all). `web: node dist/gateway/server.js` — skipping `npm start` —
-avoids that entirely, since Heroku's dyno then sends `SIGTERM` straight to the process holding the
-`SIGTERM`/`SIGINT` handlers below. Left as `npm start` for now (not changed by this pass); switch it
-before relying on the drain in production.
+The handler tolerates a repeated signal (Heroku signals every process in the dyno and may send
+`SIGTERM` more than once) by ignoring it and logging, rather than treating a second one as a reason
+to abort the drain early.
+
+The `Procfile` above still runs `web: npm start`, which DOES forward `SIGTERM` to the `node`
+process it spawns (npm ≥7, including the 11.x in this repo's toolchain — this is not the "npm
+swallows the signal" gotcha some older npm versions had). Even so, prefer
+`web: node dist/gateway/server.js` over `web: npm start` before relying on this drain in production,
+for three unrelated reasons: (1) Heroku's own `SIGTERM` reaches `npm`, which then sends its OWN
+forwarded `SIGTERM` to `node` — two signals instead of one, milliseconds apart, which is exactly the
+repeat-signal case the handler above now has to tolerate rather than a reason to need it in the
+first place; (2) this process's exit code (0 on a clean drain, 1 on a failed one — see below) reaches
+the platform directly, instead of being re-wrapped by npm's own `ELIFECYCLE` exit-code handling; (3)
+one fewer process alive inside the 30s shutdown window. The Procfile itself is unchanged by this
+pass — switch it when convenient, not because the drain depends on it.
+
+**Exit code on a failed drain (BUG-07 follow-up).** `hub.drain()` returns how many seats, across
+every table, failed to release; `gateway/server.ts` exits 1 instead of 0 when that count is nonzero
+(or if `hub.drain()`/`hub.close()` itself throws), so a shutdown that left chips locked in FC does
+not look the same to the platform/ops as a clean one.
 
 Heroku's dyno shutdown window is **fixed at 30 seconds** (SIGTERM → SIGKILL) — this is not a config
 value; there is no Heroku setting that lengthens it (an add-on-less standard/eco/basic dyno cannot

@@ -67,12 +67,14 @@ connectDb(config.mongoUri, config.mongoTls)
     let shuttingDown = false;
     const shutdown = (signal: NodeJS.Signals): void => {
       if (shuttingDown) {
-        // A second stop signal mid-drain (D7, BUG-07 follow-up): the platform is done waiting —
-        // exit now rather than risk racing whatever drain()/close() is still in flight. This used to
-        // silently no-op a repeat signal, which meant an operator's second Ctrl-C (or the platform's
-        // own SIGTERM-then-SIGKILL-but-something-forwarded-SIGTERM-twice) just sat there.
-        console.error(`\n  [shutdown] ${signal} received again while draining — exiting immediately\n`);
-        process.exit(1);
+        // IGNORE a repeat signal (BUG-07 follow-up — DEFECT 1, reverted from exit(1)): Heroku sends
+        // SIGTERM to every process in the dyno and may repeat it, and with `web: npm start` (still
+        // the Procfile today), npm >=7 forwards the signal straight to this process — so a single
+        // Heroku stop can knock on this door twice, milliseconds apart, before drain() has even
+        // started. Exiting immediately on the second knock aborted the drain on every deploy. The
+        // 25s hard-exit timer below is the only escalation; a repeat signal just gets logged.
+        console.log(`\n  [shutdown] ${signal} received again — already draining, ignoring\n`);
+        return;
       }
       shuttingDown = true;
       console.log(`\n  [shutdown] ${signal} received — draining live tables before exit\n`);
