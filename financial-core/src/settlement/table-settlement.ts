@@ -35,6 +35,17 @@ export interface JackpotShares {
   grand: Money;
 }
 
+/** The stored receipt shape for a table settlement (BUG-20: also what GET /internal/table-settlements/:roundId reads back). */
+export interface TableReceipt {
+  type: 'table';
+  roundId: string;
+  rake: string;
+  jackpotTotal: string;
+  losers: { accountId: string; amount: string }[];
+  winners: { accountId: string; amount: string }[];
+  hash: string;
+}
+
 export interface TableSettlementInput {
   roundId: string;
   tableType: TableType;
@@ -79,7 +90,7 @@ export async function settleTableHand(
     throw new AccountNotFoundError(`${dest.accountType}/${dest.ownerId}`);
   }
 
-  const receipt = {
+  const receipt: TableReceipt = {
     type: 'table',
     roundId: input.roundId,
     rake: input.rake.toString(),

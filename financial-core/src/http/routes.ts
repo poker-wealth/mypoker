@@ -7,7 +7,8 @@ import { LedgerModel } from '../wallet/ledger.model';
 import { transfer } from '../wallet/transfer';
 import { TableType, getRakeDestination } from '../settlement/settlement-domain';
 import { settleRound } from '../settlement/settle-round';
-import { settleTableHand } from '../settlement/table-settlement';
+import { settleTableHand, type TableReceipt } from '../settlement/table-settlement';
+import { SettlementModel } from '../settlement/settlement.model';
 import { processConfirmedDeposit } from '../deposit/deposit-credit';
 import { lockForBuyIn, releaseToAvailable } from '../wallet/seat-funds';
 import {
@@ -1240,6 +1241,49 @@ export function buildRouter(): Router {
         jackpotAccounts: b.jackpotAccounts,
       });
       res.json(result);
+    }),
+  );
+
+  // BUG-20: lets a room that lost the settlement response ask FC whether the round it thinks
+  // failed actually committed, before it abandons a hand FC already paid. Parties come back keyed
+  // by playerAccountId (owner_id), the same identifier the room's request used — not the internal
+  // accountId the receipt stores — so the caller can compare its own request against this reply.
+  r.get(
+    '/internal/table-settlements/:roundId',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const roundId = z.string().min(1).parse(req.params.roundId);
+      const doc = await SettlementModel.findOne({ roundId }).lean();
+      if (!doc) {
+        res.json({ settled: false });
+        return;
+      }
+      const r2 = doc.receipt as unknown as Partial<TableReceipt>;
+      if (r2.type !== 'table') {
+        res.json({ settled: true });
+        return;
+      }
+      const ids = [...r2.losers!, ...r2.winners!].map((p) => p.accountId);
+      const owners = new Map(
+        (await AccountModel.find({ _id: { $in: ids } }).lean()).map((a) => [a._id, a.ownerId]),
+      );
+      const party = (p: { accountId: string; amount: string }): { playerAccountId: string; amount: string } => ({
+        playerAccountId: owners.get(p.accountId) ?? p.accountId,
+        amount: p.amount,
+      });
+      res.json({
+        settled: true,
+        receipt: {
+          type: 'table',
+          roundId: r2.roundId,
+          rake: r2.rake,
+          jackpotTotal: r2.jackpotTotal,
+          losers: r2.losers!.map(party),
+          winners: r2.winners!.map(party),
+          hash: r2.hash,
+          settledAt: doc.createdAt,
+        },
+      });
     }),
   );
 
