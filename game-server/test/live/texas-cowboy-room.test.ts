@@ -11,8 +11,10 @@ import type { TableSettlementRequest } from '../../src/core/financial-core-clien
  * what that test is checking, and left `sinks.rake` occasionally `undefined` instead of `100`.
  *
  * Every other test in this file either never reaches `deal()` (refusal/hold/stand tests, which throw
- * before betting closes) or explicitly supplies its own `bet`-only outcome (the grace and F7 stand
- * tests stand or disconnect during the WAITING/betting window, before a deal happens) -- none of them
+ * before betting closes) or explicitly supplies its own `bet`-only outcome (the grace test lets the
+ * round deal and settle, but Bob is the lone bettor and a lone bettor nets 0 either way (engine
+ * settleBets: no opposing stake, so no losing pool), so it does not depend on which cards come out;
+ * the F7 stand and refusal tests act during the betting window before any deal) -- none of them
  * depend on which cards come out, so pinning the deck for the whole file is safe.
  */
 jest.mock('../../src/games/texas-cowboy/poker', () => {

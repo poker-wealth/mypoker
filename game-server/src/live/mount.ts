@@ -51,7 +51,9 @@ export interface MountLiveOptions {
    * IP — see `GameSocketServerConfig.trustProxyHops` (BUG-27). The folded
    * gateway passes its own `GatewayConfig.trustProxyHops` through here so the
    * socket and the HTTP API agree about the same proxy in front of them; the
-   * standalone table server has no such config and leaves it out (0).
+   * standalone table server (live/server.ts startFromEnv) reads its own
+   * TRUST_PROXY_HOPS with the same nonNegativeInt validation and production
+   * default and passes it through here.
    */
   trustProxyHops?: number;
 }
