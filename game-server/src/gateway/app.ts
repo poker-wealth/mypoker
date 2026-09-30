@@ -11,7 +11,6 @@ import { buildAgentRouter } from './agent-routes';
 import { buildAdminRouter } from './admin-routes';
 import { buildMeRouter } from './me-routes';
 import { buildAvatarRouter } from './avatar-routes';
-import { createRedEnvelopeRouter } from './red-envelope-routes';
 import { buildInternalRouter } from './internal-routes';
 import { currentRuleManifest, ruleVersionFor } from '../fairness/rule-version';
 import { ruleCommitment } from '../fairness/rule-commitment';
@@ -154,7 +153,6 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
   // Jackpot pools are derived from the same tables, so it shares the gate.
   if (lobby) app.use('/jackpot', buildJackpotRouter(lobby, config));
 
-  app.use('/red-envelope', createRedEnvelopeRouter());
   // Live tables, folded into the gateway so ONE origin serves the API and the game socket (`/ws`).
   // Mounted only when the Financial Core secret is configured — i.e. a real deploy; an auth-only
   // gateway (and the auth/lobby tests) skip it. The WebSocket itself is attached to the http server

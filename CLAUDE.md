@@ -72,7 +72,7 @@ Both are recorded in `docs/TRAPS.md` §25. Before writing anything in the lobby
 or the parity checker, run `git log origin/main --oneline -- <file>` and check
 the branch list — a fix sitting unmerged looks exactly like a bug nobody found.
 
-Also known: **16 pre-existing eslint `any` errors** in
+Also known: **13 pre-existing eslint `any` errors** in
 `frontend/src/components/games/`. Not yours.
 
 ## Local traps
