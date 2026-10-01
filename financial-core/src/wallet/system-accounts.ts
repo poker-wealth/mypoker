@@ -74,18 +74,85 @@ const JACKPOT_TYPE: Record<string, AccountType> = {
   grand: AccountType.JACKPOT_GRAND,
 };
 
+const reportedLegacyPools = new Set<string>();
+
 export async function ensureJackpotAccounts(
   tableId: string,
   ids: { mini: string; minor: string; major: string; grand: string },
 ): Promise<void> {
+  // Match on (accountType, ownerId, scope) — the unique index — not on the caller's `_id`. Two
+  // callers have disagreed about a pool's id shape (the game server's room classes name pools
+  // `jp:<tier>:<table>` in one place and `jp:<table>:<tier>` in another; the jackpot-payout route
+  // also guesses a shape for tiers it isn't paying this round). Matching by `_id` meant a second
+  // caller using the OTHER shape for the same real account tried to INSERT a second document under
+  // the same (type, owner, scope) — which the unique index rejects with E11000, taking the whole
+  // request (and every tier in the same Promise.all) down with it. A table's four pools are keyed by
+  // (accountType, ownerId, scope) here for exactly the same reason ensureRakeAccount below is.
   await Promise.all(
-    (Object.keys(JACKPOT_TYPE) as (keyof typeof ids)[]).map((tier) =>
-      AccountModel.updateOne(
-        { _id: ids[tier] },
-        { $setOnInsert: { _id: ids[tier], accountType: JACKPOT_TYPE[tier], ownerId: tableId } },
-        { upsert: true },
-      ),
-    ),
+    (Object.keys(JACKPOT_TYPE) as (keyof typeof ids)[]).map(async (tier) => {
+      try {
+        await AccountModel.updateOne(
+          { accountType: JACKPOT_TYPE[tier], ownerId: tableId, scope: PLATFORM_SCOPE },
+          {
+            $setOnInsert: {
+              _id: ids[tier],
+              accountType: JACKPOT_TYPE[tier],
+              ownerId: tableId,
+              scope: PLATFORM_SCOPE,
+            },
+          },
+          { upsert: true },
+        );
+      } catch (err) {
+        // Two first-settlements for the same brand-new table can race: both miss the match, both
+        // try to insert, the unique index accepts one and rejects the other with a duplicate-key
+        // error. The account exists either way, which is all this function promises — so a
+        // duplicate key here is success, not failure (same treatment as getOrCreatePlayerAccount /
+        // getOrCreateExternalAccount above).
+        //
+        // But E11000 does not by itself prove it was THIS race: `ids[tier]` collides with the
+        // default `_id` unique index too, and a genuine conflict there — the id already belongs to
+        // some other account entirely, e.g. a different type/owner sharing the string by accident —
+        // must not be swallowed. Confirm the benign case actually holds: a jackpot account for this
+        // exact (type, owner, scope) exists. Only then is this a race we lost harmlessly; otherwise
+        // rethrow so a real conflict stays loud instead of masquerading as success.
+        if (!isDuplicateKeyError(err)) throw err;
+        const matching = await AccountModel.findOne({
+          accountType: JACKPOT_TYPE[tier],
+          ownerId: tableId,
+          scope: PLATFORM_SCOPE,
+        });
+        if (matching) return; // the benign race: someone else's insert won, the account is there
+        const conflicting = await AccountModel.findOne({ _id: ids[tier] });
+        if (conflicting) {
+          if (conflicting.accountType === JACKPOT_TYPE[tier]) {
+            // A stranded legacy pool: this IS the tier's pool for this table, just under an
+            // owner/id convention the (accountType, ownerId, scope) match above does not reach.
+            // Two live shapes do this — pools created before b1bd93c sit under their TIER as owner
+            // (`jp:mini:<table>`, ownerId "mini"; see jackpot-pool-audit.ts), and pools created at
+            // table creation (settle-round.ts's JackpotAccounts, scripts/smoke.ts) can carry a
+            // random default _id under an arbitrary owner. Either way, transfer() addresses the pool
+            // by `_id`, so reusing it by _id hits the right account exactly as it always has — no
+            // migration needed, just don't throw on a pool this tier already owns.
+            if (!reportedLegacyPools.has(ids[tier])) {
+              reportedLegacyPools.add(ids[tier]);
+              console.warn(
+                `[jackpot] reusing legacy ${tier} pool ${ids[tier]} for table ${tableId} under stranded owner ` +
+                  `"${conflicting.ownerId}" — run scripts/jackpot-pool-audit.ts and migrate; logged once per process`,
+              );
+            }
+            return;
+          }
+          throw new Error(
+            `ensureJackpotAccounts: _id ${ids[tier]} for ${tier} tier of table ${tableId} already ` +
+              `belongs to a different account (type=${conflicting.accountType}, ` +
+              `owner=${conflicting.ownerId}, scope=${conflicting.scope}) — refusing to treat a ` +
+              'genuine id conflict as the benign upsert race',
+          );
+        }
+        throw err;
+      }
+    }),
   );
 }
 

@@ -1,5 +1,7 @@
+import { randomUUID } from 'node:crypto';
 import { settleNet, toTableSettlementRequest } from '../games/texas/settlement';
 import { BaseLiveRoom, RoomError, tableJackpotAccounts, type BaseRoomSeat } from './base-room';
+import { confirmSettled } from './settlement-recovery';
 import type { LiveTableConfig, RoomDeps } from './live-room';
 import type { TableSnapshot } from './room-state';
 import { TexasCowboyEngine } from '../games/texas-cowboy/engine';
@@ -29,6 +31,8 @@ interface RoomSeat extends BaseRoomSeat {
  * Nobody banks this game, so the round is player-funded: the losing stakes are the prize pool and
  * the winners divide it. The alternative — paying published odds out of a house account — would
  * make the platform the counterparty to its own players.
+ *
+ * No jackpot: see settleRound (BUG-24).
  */
 /** The table's cut. A table that forgets to configure one still takes the standard 5%. */
 function rakeOf(config: TexasCowboyRoomConfig): number {
@@ -116,7 +120,18 @@ export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSea
   protected onSeatChanged(): void {
     this.push();
   }
-  
+
+  /**
+   * The base default treats table-wide `phase === 'WAITING'` as "nothing anywhere is at risk" — true
+   * everywhere else, but not here (D4, BUG-07 follow-up): this room's open betting window IS phase
+   * `WAITING`, with real chips riding on `seat.bet` while it's open. Falling through to the default
+   * would release a disconnected bettor mid-window, the exact bug commit 2 of BUG-07 added the
+   * `seat.bet` check for. `seatCommitted` (bet-only here, unchanged) is the only thing that may decide.
+   */
+  protected override graceReleaseSafe(seat: RoomSeat): boolean {
+    return !this.seatCommitted(seat);
+  }
+
   /**
    * Queue the next phase, replacing whatever was pending.
    *
@@ -132,13 +147,17 @@ export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSea
     this.timer = setTimeout(() => void this.enqueue(fn), delayMs);
   }
 
-  private startNextRound(): void {
+  private async startNextRound(): Promise<void> {
+    if (this.disposed) return;
+    // Frees anyone disconnect grace queued but could not release during the last window (D4,
+    // BUG-07 follow-up) BEFORE this room opens the next one on top of their seat.
+    await this.releaseDeparted();
     if (this.disposed) return;
     this.handNumber++;
     this.engine = new TexasCowboyEngine(this.config.id, this.handNumber, {
       rakeBps: rakeOf(this.config),
     });
-    
+
     // Clear seat bets
     for (const s of this.occupiedSeats()) {
       s.bet = 0;
@@ -231,32 +250,52 @@ export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSea
     const { netByUser } = this.engine.settleBets();
 
     if (netByUser.size > 0) {
-      const settlement = settleNet(netByUser, { rakeBps: rakeOf(this.config) });
+      // BUG-24: no jackpot on this table. The deal is not provably fair (engine.ts shuffles with
+      // Math.random), and every other room refuses to draw a jackpot on an unverifiable seed — so an
+      // injection here is a 0.5% deduction into pools (jp:<tier>:<table>) that nothing can ever pay
+      // out (clearing-rules: JACKPOT_* → PLAYER only). Re-enable together with a seeded deal.
+      const settlement = settleNet(netByUser, { rakeBps: rakeOf(this.config), jackpotBps: 0 });
       const request = toTableSettlementRequest(settlement, {
-        roundId: `${this.config.id}-tc-${this.handNumber}`,
+        // The suffix is not cosmetic: FC treats a repeated roundId as a settlement replay (idempotency
+        // key) and returns applied:false without moving money. handNumber alone repeats across room
+        // instances sharing a config.id, so a random component is load-bearing here.
+        roundId: `${this.config.id}-tc-${this.handNumber}-${randomUUID().slice(0, 8)}`,
         gameId: 'texas-cowboy',
         tableType: 'PLATFORM',
         accountOf: (playerId) => playerId,
         jackpotAccounts: tableJackpotAccounts(this.config.id),
       });
 
+      // Mirror what the ledger did: winners up by their net, losers down by theirs. Hoisted so both
+      // the normal success path and BUG-20 recovery (below) call the exact same mirror, once.
+      const mirror = (): void => {
+        for (const loser of settlement.losers) {
+          const seat = this.seatOf(loser.playerId);
+          if (seat) seat.stack -= loser.amount;
+        }
+        for (const winner of settlement.winners) {
+          const seat = this.seatOf(winner.playerId);
+          if (seat) seat.stack += winner.amount;
+        }
+      };
+
       try {
         const receipt = await this.fc.settleTableHand(request);
-        if (receipt.applied) {
-          // Mirror what the ledger just did: winners up by their net, losers down by theirs.
-          for (const loser of settlement.losers) {
-            const seat = this.seatOf(loser.playerId);
-            if (seat) seat.stack -= loser.amount;
-          }
-          for (const winner of settlement.winners) {
-            const seat = this.seatOf(winner.playerId);
-            if (seat) seat.stack += winner.amount;
-          }
-        }
+        if (receipt.applied) mirror();
       } catch (err) {
-        // A refused settlement is not a paid one. Say so, change nothing, and let the next round
-        // start — the stakes are still on the seats because they were never taken off them.
-        console.error(`[room ${this.config.id}] settlement refused, nothing paid:`, err);
+        // BUG-20: the settlement may have committed in FC even though this call threw (a lost
+        // response, not a refusal). `request` is the exact object just sent — ask FC whether it
+        // matches what it has on file before treating the round as unpaid.
+        if (await confirmSettled(this.fc, request, `[room ${this.config.id}]`)) {
+          console.error(
+            `[room ${this.config.id}] settlement response lost for round ${request.roundId} but FC confirms it committed — mirroring`,
+          );
+          mirror();
+        } else {
+          // A refused settlement is not a paid one. Say so, change nothing, and let the next round
+          // start — the stakes are still on the seats because they were never taken off them.
+          console.error(`[room ${this.config.id}] settlement refused, nothing paid:`, err);
+        }
       }
     }
 
@@ -335,7 +374,7 @@ export class TexasCowboyRoom extends BaseLiveRoom<TexasCowboyRoomConfig, RoomSea
         };
       }),
       insurance: null,
-      jackpot: this.lastJackpotWin,
+      jackpot: null, // BUG-24: this table runs no jackpot (see settleRound)
       yourSeat: seat ? seat.index : null,
       you: seat ? { playerId: seat.playerId, name: seat.name, available: seat.stack } : null,
       toActSeat: null,

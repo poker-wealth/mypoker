@@ -24,7 +24,7 @@ interface RoomSeat extends BaseRoomSeat {
 }
 
 export class BaccaratRoom extends BaseLiveRoom<BaccaratRoomConfig, RoomSeat> {
-  private readonly game: BaccaratGame;
+  private game: BaccaratGame;
   private bettingTimer: NodeJS.Timeout | null = null;
   private showdownTimer: NodeJS.Timeout | null = null;
 
@@ -107,10 +107,40 @@ export class BaccaratRoom extends BaseLiveRoom<BaccaratRoomConfig, RoomSeat> {
     if (occupied.length < 2) return;
 
     let banker = occupied.find((s) => s.isBanker);
+    // Demote a sticky banker who is now on the way out (D6, BUG-07 follow-up) — `isBanker` can
+    // predate `leaving` (seated first, or banked a round, before ever asking to leave), so finding
+    // one is not enough; a `leaving` seat is either genuinely departing or stuck on a release FC
+    // keeps refusing, and either way it has no business anchoring the next round.
+    if (banker?.leaving) {
+      banker.isBanker = false;
+      banker = undefined;
+    }
     if (!banker) {
-      banker = occupied[0]!;
+      banker = occupied.find((s) => !s.leaving);
+      // F5 (audit fix): every seat left is leaving — wait rather than force the bank onto one of
+      // them. The round starts on its own once a release clears one, or a fresh player sits down.
+      if (!banker) return;
       banker.isBanker = true;
     }
+
+    // A fresh game per round, not a reused one advanced by `nextRound()`: after an abandoned round
+    // (settlement failed, or a later step like the jackpot threw) the old instance is left holding
+    // stale bets and a state machine that never left BETTING/RESOLVED — the next round's setBanker
+    // or placeBet would throw forever. Rebuilding here, exactly like lottery-room.ts, means the
+    // round that follows an abandon starts clean regardless of how the previous one died.
+    this.game = new BaccaratGame(
+      this.config.id,
+      this.fc,
+      new EventBus(),
+      this.chain,
+      {
+        rakeBps: this.config.rakeBps,
+        tiePayout: this.config.tiePayout,
+        tableType: 'PLATFORM',
+        accountOf: (p) => p,
+        jackpotAccounts: tableJackpotAccounts(this.config.id),
+      },
+    );
 
     this.phase = 'IN_HAND';
     this.handNumber++;
@@ -145,50 +175,84 @@ export class BaccaratRoom extends BaseLiveRoom<BaccaratRoomConfig, RoomSeat> {
       return;
     }
 
-    this.game.setBanker(banker.playerId);
-    for (const b of bettors) {
-      this.game.placeBet(b.playerId, b.betType!, b.bet);
-    }
+    // Anything from here on can throw — the ledger refusing, a jackpot pool failing to open. If it
+    // does, the table goes back to WAITING instead of sitting in IN_HAND forever. See
+    // `abandonRound`: nothing is paid or reversed here, only the room is made playable again.
+    try {
+      this.game.setBanker(banker.playerId);
+      for (const b of bettors) {
+        this.game.placeBet(b.playerId, b.betType!, b.bet);
+      }
 
-    await this.game.start();
+      try {
+        await this.game.start();
+      } catch (err) {
+        // BUG-20: the settlement may have committed in FC even though this call threw (a lost
+        // response, not a refusal). Ask before abandoning a hand the ledger already paid.
+        const nets = this.game.getNet();
+        const attempted = nets.size > 0 ? settleNet(nets, { rakeBps: this.config.rakeBps }) : undefined;
+        if (!attempted || !(await this.settledDespite(err, this.game.getRoundId(), attempted))) throw err;
+        // Recovered: FC already committed this settlement, but `start()` threw before reaching its
+        // own post-settle lines — without this the round stays stuck in BETTING forever, which
+        // `getPublicState`'s reveal (and any future `nextRound()`) would see as unresolved even
+        // though the ledger already paid it (BUG-20 follow-up).
+        this.game.resolveSettled();
+      }
 
-    const grossNets = this.game.getNet();
-    const settlement = settleNet(grossNets, { rakeBps: this.config.rakeBps });
-    const netDeltas = new Map<string, number>();
-    for (const l of settlement.losers) netDeltas.set(l.playerId, -l.amount);
-    for (const w of settlement.winners) netDeltas.set(w.playerId, w.amount);
+      const grossNets = this.game.getNet();
+      const settlement = settleNet(grossNets, { rakeBps: this.config.rakeBps });
+      const netDeltas = new Map<string, number>();
+      for (const l of settlement.losers) netDeltas.set(l.playerId, -l.amount);
+      for (const w of settlement.winners) netDeltas.set(w.playerId, w.amount);
 
-    let winnerProfit = 0;
-    for (const s of this.occupiedSeats()) {
-      const net = netDeltas.get(s.playerId) ?? 0;
-      s.net = net;
-      s.stack += net;
-      if (net > 0) winnerProfit += net;
-    }
+      let winnerProfit = 0;
+      for (const s of this.occupiedSeats()) {
+        const net = netDeltas.get(s.playerId) ?? 0;
+        s.net = net;
+        s.stack += net;
+        if (net > 0) winnerProfit += net;
+      }
 
-    const roundId = `${this.config.id}-bac-${this.handNumber}`;
-    // The jackpot draws on the seed the round was actually generated from, so a player can
-    // verify the draw the same way they verify the game. It used to draw on `${roundId}:seed`,
-    // which anyone holding a round id can reproduce — a predictable jackpot.
-    //
-    // No fallback on purpose: without a real seed the draw is SKIPPED, because running it on a
-    // guessable one is the bug rather than the backstop.
-    const jackpotSeed = this.game.roundSeed();
-    if (jackpotSeed) {
-      await this.processJackpot(winnerProfit, roundId, jackpotSeed);
-    } else {
-      console.error(
-        `[room ${this.config.id}] round ${roundId} has no verifiable seed — jackpot skipped rather than drawn on a predictable one`,
-      );
+      // Share the settlement's own round id rather than minting a second one from handNumber: two
+      // rooms with the same config.id (or a restart resetting handNumber) used to collide, and FC's
+      // idempotency key is `${roundId}:jackpot:${tier}` — a collision silently skips the payout.
+      const roundId = this.game.getRoundId();
+      // The jackpot draws on the seed the round was actually generated from, so a player can
+      // verify the draw the same way they verify the game. It used to draw on `${roundId}:seed`,
+      // which anyone holding a round id can reproduce — a predictable jackpot.
+      //
+      // No fallback on purpose: without a real seed the draw is SKIPPED, because running it on a
+      // guessable one is the bug rather than the backstop.
+      const jackpotSeed = this.game.roundSeed();
+      if (jackpotSeed) {
+        await this.processJackpot(winnerProfit, roundId, jackpotSeed);
+      } else {
+        console.error(
+          `[room ${this.config.id}] round ${roundId} has no verifiable seed — jackpot skipped rather than drawn on a predictable one`,
+        );
+      }
+    } catch (err) {
+      this.abandonRound(err);
+      // WAITING is not enough on its own: nothing else deals the next hand, so the table would
+      // sit idle with players in their seats. Give it the same beat a showdown gets, then try.
+      this.showdownTimer = setTimeout(() => {
+        void this.enqueue(async () => {
+          await this.releaseDeparted();
+          this.maybeStartRound();
+        });
+      }, this.config.showdownDelayMs ?? 5_000);
+      return;
     }
 
     this.phase = 'SHOWDOWN';
     this.push();
 
     this.showdownTimer = setTimeout(() => {
-      void this.enqueue(() => {
-        this.game.nextRound();
+      void this.enqueue(async () => {
         this.phase = 'WAITING';
+        // Frees anyone the disconnect grace queued but could not release earlier (D4, BUG-07
+        // follow-up) BEFORE the next round can claim their seat as still occupied.
+        await this.releaseDeparted();
         this.push();
         this.maybeStartRound();
       });

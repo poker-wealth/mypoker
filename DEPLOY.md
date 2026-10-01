@@ -45,10 +45,70 @@ heroku config:set -a mypoker-gateway \
   FINANCIAL_CORE_URL='https://mypoker-fc.herokuapp.com' \
   GOOGLE_CLIENT_ID='<id>' GOOGLE_CLIENT_SECRET='<secret>' \
   TELEGRAM_BOT_TOKEN='<token>' \
+  TRUST_PROXY_HOPS=1 \
   CORS_ORIGINS='https://mypoker777.com,https://www.mypoker777.com,https://app.mypoker777.com'
 git subtree push --prefix game-server heroku-gw main
 ```
 Public API URL → `https://mypoker-gateway.herokuapp.com`.
+
+**`TRUST_PROXY_HOPS=1` (BUG-15).** Heroku's router is a reverse proxy, and without
+`app.set('trust proxy', ...)` Express reads `req.ip` off the raw socket — the
+router's own address for every request, not the visitor's. The `/auth/login`
+failure throttle keys partly on `req.ip` (`game-server/src/gateway/auth.ts`), so
+behind an untrusted proxy that IP half was constant across every real user and
+added no protection. `1` is correct because the Heroku router is exactly one hop
+and always APPENDS the true client address as the rightmost `X-Forwarded-For`
+entry — trusting exactly that many hops reads the real client and nothing a
+client could spoof by sending its own header. Only raise it to `2` if Cloudflare
+is ever put in front of the Heroku router (one more real hop); trusting hops that
+aren't actually there makes `X-Forwarded-For` attacker-spoofable, which is worse
+than not trusting the proxy at all. Never deploy with it unset in production —
+config.ts defaults to `1` there, but an explicit value here is the deploy's own
+record of the topology, not something to lean on the code default for.
+
+**The login throttle is in-memory, per process.** `loginFailures` in
+`gateway/auth.ts` lives in the Node process's own memory, not in Mongo or Redis.
+Scale the gateway to N dynos and each one tracks its own 10-failures-per-window
+independently — an attacker spread across dynos effectively gets N×10 attempts
+per window, not 10. A dyno restart (a deploy, a crash, Heroku's own periodic
+cycling) also clears whatever that process had counted, for every key it held.
+Fine at one dyno; if the gateway is ever scaled beyond one, this needs a shared
+store (Redis is already a dependency on the FC side) before the throttle's
+numbers mean what they say.
+
+**Shutdown grace period (BUG-07).** The gateway now drains every live table — releasing every
+seated stack back to its wallet — on `SIGTERM`/`SIGINT` before it exits (`gateway/server.ts`), with
+a 25s internal hard-exit safety timer so a stuck drain still lets the process die rather than hang.
+The handler tolerates a repeated signal (Heroku signals every process in the dyno and may send
+`SIGTERM` more than once) by ignoring it and logging, rather than treating a second one as a reason
+to abort the drain early.
+
+The `Procfile` above still runs `web: npm start`, which DOES forward `SIGTERM` to the `node`
+process it spawns (npm ≥7, including the 11.x in this repo's toolchain — this is not the "npm
+swallows the signal" gotcha some older npm versions had). Even so, prefer
+`web: node dist/gateway/server.js` over `web: npm start` before relying on this drain in production,
+for three unrelated reasons: (1) Heroku's own `SIGTERM` reaches `npm`, which then sends its OWN
+forwarded `SIGTERM` to `node` — two signals instead of one, milliseconds apart, which is exactly the
+repeat-signal case the handler above now has to tolerate rather than a reason to need it in the
+first place; (2) this process's exit code (0 on a clean drain, 1 on a failed one — see below) reaches
+the platform directly, instead of npm prepending an `ELIFECYCLE` error block to the platform's log
+(npm ≥7 propagates the child's exit code); (3)
+one fewer process alive inside the 30s shutdown window. The Procfile itself is unchanged by this
+pass — switch it when convenient, not because the drain depends on it.
+
+**Exit code on a failed drain (BUG-07 follow-up).** `hub.drain()` returns how many seats, across
+every table, failed to release; `gateway/server.ts` exits 1 instead of 0 when that count is nonzero
+(or if `hub.drain()`/`hub.close()` itself throws), so a shutdown that left chips locked in FC does
+not look the same to the platform/ops as a clean one.
+
+Heroku's dyno shutdown window is **fixed at 30 seconds** (SIGTERM → SIGKILL) — this is not a config
+value; there is no Heroku setting that lengthens it (an add-on-less standard/eco/basic dyno cannot
+be given more). The 25s hard-exit timer above is already tuned to that ceiling with a 5s margin;
+raising it closer to 30s narrows that margin against the platform's own clock rather than widening
+it. If gameplay ever moves off Heroku (Render's "Shutdown Grace Period", Fly's `kill_timeout`, or a
+plain Docker host's `docker stop -t <seconds>` / Kubernetes `terminationGracePeriodSeconds`) that
+setting must be **≥ 30s** so the platform doesn't SIGKILL before this process's own 25s timer would
+have exited cleanly anyway.
 
 **All three hosts, each with the scheme.** `CORS_ORIGINS` is an exact-match
 allowlist with no wildcard (`game-server/src/gateway/app.ts`), compared against
@@ -100,5 +160,55 @@ Also update, or they will still point at the old host:
 - **IP to whitelist** = the outbound IP of the dyno calling them. Heroku dynos have dynamic IPs, so for a stable IP to give the provider you'll need an outbound-IP addon (e.g. QuotaGuard/Fixie) or a small proxy — flagged as a decision, because most providers require a *fixed* egress IP.
 
 ## Not in this pass (follow-ons)
-- Table server (live gameplay) — its own Heroku app, or fold the hub into the gateway (one origin for HTTP + WS). Recommended before players play.
+- Table server (live gameplay) — its own Heroku app, or fold the hub into the gateway (one origin for HTTP + WS). Recommended before players play. If it ever deploys standalone (not folded into the gateway) behind a proxy, it needs its own `TRUST_PROXY_HOPS` set the same way as the gateway's (see above) — left unset behind a real proxy, every connection's derived IP is the proxy's own address, and a per-IP guard like `banSameIp` then refuses the second seat at every table.
 - Mainnet chain + real keys, 3-node — the W11 items.
+- **Slots vendor float.** Slots is player-vs-vendor, not player-vs-house: every payout is paid out
+  of the vendor account's own balance (`acc-slots-vendor:<tableId>` — `acc-slots-vendor:slots` for
+  the default `slots` table), and that account starts at $0 like any other player account. The room
+  locks up to a 10,000-chip ($100.00) float into it on its own, retrying if FC isn't reachable yet
+  and topping the float back up out of what it locks as spins settle — but it can only lock chips
+  that are actually sitting in the account's AVAILABLE balance. Until it has at least $100.00
+  available, spins stay refused (`RoomError: slots are unavailable — vendor float not funded`).
+
+  Fund it by having ops POST directly to FC's internal deposit route — there is no player-facing
+  deposit UI for a vendor account:
+
+  ```
+  POST /internal/deposits
+  headers: x-internal-secret: <the FC internal service secret>
+  body: {
+    "playerId": "acc-slots-vendor:slots",
+    "amount": "100.00",
+    "txHash": "<the on-chain tx hash>",
+    "contractAddress": "<the official USDT-TRC20 contract address>",
+    "confirmations": <int, >= the confirmation threshold>
+  }
+  ```
+
+  Field names are `routes.ts`'s `depositBody` schema (`playerId`, `amount`, `txHash`,
+  `contractAddress`, `confirmations`). FC does not verify `/internal/deposits` against the chain —
+  it trusts the caller. The `txHash` MUST be a real USDT-TRC20 transfer into a platform-controlled
+  wallet (treasury / sweep address) so the ledger stays backed; a made-up `txHash` creates an
+  unbacked liability. It only clears `processConfirmedDeposit`'s checks (`deposit-credit.ts`) when
+  `contractAddress` is the official USDT-TRC20 contract (`usdtContract()` in `config/chain.ts`,
+  default `TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t`, overridable via `USDT_TRC20_CONTRACT`) and
+  `confirmations` is at least the required threshold (`requiredConfirmations()`, default 20,
+  overridable via `DEPOSIT_CONFIRMATIONS`). It credits the account's PLATFORM-scope AVAILABLE
+  balance (`getOrCreatePlayerAccount(playerId)` with no scope defaults to `PLATFORM_SCOPE`) — the
+  room then locks it from there into the float itself.
+
+  Never cite a transaction that landed at a player's derived deposit address — deposit-watcher
+  credits those by the same `deposit:<txHash>` idempotency key (`deposit-credit.ts`), so whichever
+  runs first wins (the vendor gets nothing, or a player loses a real deposit).
+
+  The route answers HTTP 200 even when it refuses — check the body for `credited: true`; refusals
+  come back as `{credited: false, reason: 'wrong_contract' | 'unconfirmed' | 'already_credited'}`
+  (`DepositOutcome` in `deposit-credit.ts`). Also: `amount` is a plain decimal string with at most 6
+  decimal places (e.g. `"100.00"`, no currency symbol) and `confirmations` is a JSON number, not a
+  string.
+
+  $100.00 only OPENS the table, it does not size it: one spin's max win (wager ×
+  `maxPayoutMultiple`, 100×) can drain the whole float in a single payout, and the very next
+  top-up then needs that much sitting in AVAILABLE again or spins refuse once more. Size the
+  vendor's actual working balance to expected payout volume, not to the $100.00 minimum that merely
+  unblocks the first spin.

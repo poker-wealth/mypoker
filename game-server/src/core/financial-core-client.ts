@@ -37,6 +37,31 @@ export interface TableSettlementParty {
 }
 
 /**
+ * The receipt FC hands back for a table settlement it already committed — from
+ * `settleTableHand`'s own response shape, or from `settlementStatus` below (BUG-20). Amounts are in
+ * the client's own units: the HTTP client returns FC's decimal strings unchanged; `ChipDenominatedFc`
+ * converts them to chip-integer strings, same as every other amount it wraps.
+ */
+export interface TableSettlementReceipt {
+  type: 'table';
+  roundId: string;
+  rake: string;
+  jackpotTotal: string;
+  losers: TableSettlementParty[];
+  winners: TableSettlementParty[];
+  hash: string;
+}
+
+/**
+ * Whether a round settled, as FC's own record says — not as this process remembers trying. `settled:
+ * true` with no `receipt` means FC has a record but it is not a table settlement (or not one this
+ * client can parse); the caller treats that the same as "can't confirm" (BUG-20).
+ */
+export type SettlementStatus =
+  | { settled: false }
+  | { settled: true; receipt?: TableSettlementReceipt };
+
+/**
  * Multi-party table-hand settlement: each loser's locked balance drops, each winner's rises, the
  * rake goes to the house, and the jackpot is injected. Σ(losers) = Σ(winners) + rake + Σ(jackpot).
  */
@@ -61,17 +86,40 @@ export interface TableSettlementRequest {
   jackpotAccounts: JackpotAccounts;
 }
 
+/**
+ * Which wallet a buy-in/release should lock or unlock. Mirrors the (tableType, leagueId) scope
+ * settlement already resolves server-side (FC routes.ts `playerScope`) — a league table's chips must
+ * lock and release the SAME account settlement pays from, or a league hand settles an account that
+ * was never actually locked. Absent/`'PLATFORM'` is the platform wallet, unchanged from today.
+ */
+export interface WalletScope {
+  tableType: 'PLATFORM' | 'LEAGUE';
+  leagueId?: string;
+}
+
 export interface FinancialCoreClient {
   /** Lock a player's buy-in at a table (available → locked). */
-  buyIn(playerAccountId: string, amount: string): Promise<void>;
+  buyIn(playerAccountId: string, amount: string, scope?: WalletScope): Promise<void>;
   /** Release a player's stack on leaving (locked → available). */
-  release(playerAccountId: string, amount: string): Promise<void>;
+  release(playerAccountId: string, amount: string, scope?: WalletScope): Promise<void>;
+  /**
+   * An account's currently locked balance — what it already has buy-in'd/reserved. A provider-vendor
+   * float (slots-room, BUG-10 follow-up) reads this to top itself up to a target rather than locking
+   * a fresh float on every boot, which otherwise only grows and eventually 409s. Optional so demo/test
+   * fakes need not implement it — a caller without it treats "locked" as unknown, never as zero.
+   */
+  lockedBalance?(playerAccountId: string, scope?: WalletScope): Promise<string>;
   /** Settle a finished hand (jackpot inject → rake). Idempotent on roundId. */
   settleRound(req: SettleRoundRequest): Promise<SettlementReceipt>;
   /** Settle a full multi-party table hand (losers/winners/rake/jackpot). Idempotent on roundId. */
   settleTableHand(req: TableSettlementRequest): Promise<{ roundId: string; applied: boolean }>;
-  /** Pay a jackpot hit from a pool account to a player. Idempotent per round+tier.
-   *  Optional so demo/test fakes need not implement it. */
+  /** Whether a round already settled, per FC's own record (BUG-20) — a room calls this after
+   *  `settleTableHand` throws, to tell a lost response apart from a genuine refusal before
+   *  abandoning a hand FC may have already paid. Optional: absent means a lost response is treated
+   *  as a failure, same as before this existed. */
+  settlementStatus?(roundId: string): Promise<SettlementStatus>;
+  /** Pay a jackpot hit from a pool account into the player's WALLET (available) — not their table
+   *  stack. Idempotent per round+tier. Optional so demo/test fakes need not implement it. */
   jackpotPayout?(req: JackpotPayoutRequest): Promise<{ applied: boolean }>;
   /** Insurance reserve facts for one system (PLATFORM or a leagueId).
    *  Optional for the same reason; a room without it offers no insurance. */
@@ -108,7 +156,13 @@ export interface InsuranceReserveFacts {
   todayPaidOut: string;
 }
 
-export interface JackpotPayoutRequest {
+/**
+ * `Partial<WalletScope>` — a jackpot payout is scoped like a buy-in/release (same (tableType,
+ * leagueId) FC's `playerScope` resolves), but unlike those, callers that predate leagues (and the
+ * dev `ChipBank` fake) still send neither field and default to PLATFORM. Absent tableType/leagueId
+ * credits the player's platform wallet, exactly as before.
+ */
+export interface JackpotPayoutRequest extends Partial<WalletScope> {
   tableId: string;
   tier: 'mini' | 'minor' | 'major' | 'grand';
   jackpotAccountId: string;
@@ -117,6 +171,11 @@ export interface JackpotPayoutRequest {
   amount: string;
   roundId: string;
 }
+
+/** Build the wire fields for a wallet scope — `{}` when absent, so an unscoped call is byte-identical
+ *  to today's request and defaults to PLATFORM exactly as FC's routes already do. */
+const scopeFields = (s?: WalletScope): { tableType?: 'PLATFORM' | 'LEAGUE'; leagueId?: string } =>
+  s ? { tableType: s.tableType, ...(s.leagueId ? { leagueId: s.leagueId } : {}) } : {};
 
 export class FinancialCoreError extends Error {
   constructor(
@@ -133,24 +192,40 @@ export interface HttpClientOptions {
   baseUrl: string;
   internalSecret: string;
   fetchImpl?: typeof fetch;
+  /**
+   * Abort a hung call after this long (D7, BUG-07 follow-up), so a stuck FC request can't block a
+   * room's queue — and, downstream, `drain()` — for the whole shutdown window. Default 5s. Applies
+   * to every `post()` call EXCEPT settlement, which does real work (rake, jackpot pools, volume,
+   * notifications) and gets `settlementTimeoutMs` instead — a settlement aborted client-side while
+   * FC actually commits it server-side would fail a hand that in fact settled correctly, which is a
+   * worse outcome than a slow shutdown.
+   */
+  timeoutMs?: number;
+  /** Timeout for `settleTableHand`'s own request — see `timeoutMs`. Default 20s. */
+  settlementTimeoutMs?: number;
 }
 
 export class HttpFinancialCoreClient implements FinancialCoreClient {
   private readonly baseUrl: string;
   private readonly secret: string;
   private readonly doFetch: typeof fetch;
+  private readonly timeoutMs: number;
+  private readonly settlementTimeoutMs: number;
 
   constructor(opts: HttpClientOptions) {
     this.baseUrl = opts.baseUrl.replace(/\/$/, '');
     this.secret = opts.internalSecret;
     this.doFetch = opts.fetchImpl ?? fetch;
+    this.timeoutMs = opts.timeoutMs ?? 5_000;
+    this.settlementTimeoutMs = opts.settlementTimeoutMs ?? 20_000;
   }
 
-  private async post<T>(path: string, body: unknown): Promise<T> {
+  private async post<T>(path: string, body: unknown, timeoutMs = this.timeoutMs): Promise<T> {
     const res = await this.doFetch(`${this.baseUrl}${path}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-internal-secret': this.secret },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => '');
@@ -159,16 +234,32 @@ export class HttpFinancialCoreClient implements FinancialCoreClient {
     return (await res.json()) as T;
   }
 
-  async buyIn(playerAccountId: string, amount: string): Promise<void> {
-    await this.post('/internal/buy-ins', { playerAccountId, amount });
+  async buyIn(playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> {
+    await this.post('/internal/buy-ins', { playerAccountId, amount, ...scopeFields(scope) });
   }
 
-  async release(playerAccountId: string, amount: string): Promise<void> {
-    await this.post('/internal/releases', { playerAccountId, amount });
+  async release(playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> {
+    await this.post('/internal/releases', { playerAccountId, amount, ...scopeFields(scope) });
+  }
+
+  async lockedBalance(playerAccountId: string, scope?: WalletScope): Promise<string> {
+    const params = new URLSearchParams(scopeFields(scope) as Record<string, string>);
+    const qs = params.toString();
+    const res = await this.doFetch(
+      `${this.baseUrl}/internal/accounts/${encodeURIComponent(playerAccountId)}/balance${qs ? `?${qs}` : ''}`,
+      { headers: { 'x-internal-secret': this.secret } },
+    );
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new FinancialCoreError(res.status, detail);
+    }
+    const body = (await res.json()) as { locked: string };
+    return body.locked;
   }
 
   async settleRound(req: SettleRoundRequest): Promise<SettlementReceipt> {
-    return this.post<SettlementReceipt>('/internal/settlements', req);
+    // Same longer timeout as settleTableHand (D7) — a round settlement, not a plain balance write.
+    return this.post<SettlementReceipt>('/internal/settlements', req, this.settlementTimeoutMs);
   }
 
   async insuranceReserve(ownerId: string): Promise<InsuranceReserveFacts> {
@@ -215,10 +306,20 @@ export class HttpFinancialCoreClient implements FinancialCoreClient {
   async settleTableHand(
     req: TableSettlementRequest,
   ): Promise<{ roundId: string; applied: boolean }> {
+    // Longer timeout than the default (D7) — this does real work server-side (rake, jackpot pools,
+    // volume, notifications), unlike a plain buy-in/release write.
     const result = await this.post<{ roundId: string; applied: boolean }>(
       '/internal/table-settlements',
       req,
+      this.settlementTimeoutMs,
     );
+
+    if (!result.applied) {
+      // game-server never retries a settlement, so a replay can only mean a reused round id. The
+      // room checks FC's stored receipt before deciding whether this was our own settlement
+      // (BUG-20) or a reused id.
+      throw new FinancialCoreError(409, `settlement for ${req.roundId} was already applied — round id reused`);
+    }
 
     // Both AFTER the money has settled and only if it did. Recording volume or
     // announcing a win for a hand that failed to settle would report something
@@ -228,6 +329,22 @@ export class HttpFinancialCoreClient implements FinancialCoreClient {
       await this.announceHand(req);
     }
     return result;
+  }
+
+  /** Whether a round already settled, per FC's own record (BUG-20). See the interface doc. */
+  async settlementStatus(roundId: string): Promise<SettlementStatus> {
+    const res = await this.doFetch(
+      `${this.baseUrl}/internal/table-settlements/${encodeURIComponent(roundId)}`,
+      {
+        headers: { 'x-internal-secret': this.secret },
+        signal: AbortSignal.timeout(this.timeoutMs),
+      },
+    );
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new FinancialCoreError(res.status, detail);
+    }
+    return (await res.json()) as SettlementStatus;
   }
 
   /**

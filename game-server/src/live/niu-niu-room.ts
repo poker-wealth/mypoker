@@ -89,7 +89,7 @@ export function bankerMinimumFor(seats: number, minStake: number): number {
  * played by two sets of rules in two places, and this is the one that settles through `deps.fc`.
  */
 export class NiuNiuRoom extends BaseLiveRoom<NiuNiuRoomConfig, RoomSeat> {
-  private readonly game: NiuNiuGame;
+  private game: NiuNiuGame;
   private bettingTimer: NodeJS.Timeout | null = null;
   private showdownTimer: NodeJS.Timeout | null = null;
   /** Which half of the round we are in: the bank auction, or betting against the winner of it. */
@@ -165,6 +165,18 @@ export class NiuNiuRoom extends BaseLiveRoom<NiuNiuRoomConfig, RoomSeat> {
     if (!BET_MULTIPLIERS.includes(multiplier)) throw new RoomError('bet multiplier must be 1x, 2x or 5x');
     if (amount <= 0 || amount > seat.stack) throw new RoomError('invalid bet amount');
 
+    // The stake alone is not what a bettor can lose: settlement multiplies it by their own
+    // multiplier, the bank's winning bid, and — if the banker's hand is the winner — that hand's
+    // multiplier (up to Five Small, MAX_HAND_MULTIPLIER). FC refuses a loser debit above
+    // lockedBalance, which used to void the whole round for every player at the table rather than
+    // just refusing the one bet that could not be covered.
+    const worstLoss = amount * multiplier * this.bankerMultiplier * MAX_HAND_MULTIPLIER;
+    if (worstLoss > seat.stack) {
+      throw new RoomError(
+        `a ${multiplier}x bet against a ${this.bankerMultiplier}x bank can lose ${worstLoss} chips — your stack is ${seat.stack}`,
+      );
+    }
+
     const banker = this.occupiedSeats().find((s) => s.isBanker);
     if (banker) {
       // What this bet can actually cost the bank: the stake, the bettor's multiplier, the bank's
@@ -197,9 +209,19 @@ export class NiuNiuRoom extends BaseLiveRoom<NiuNiuRoomConfig, RoomSeat> {
       return;
     }
 
-    // Highest bid wins; an unbid seat counts as 1x, and the earliest of equal bids takes it.
-    let winner = seated[0]!;
-    for (const s of seated) {
+    // Highest bid wins; an unbid seat counts as 1x, and the earliest of equal bids takes it. A
+    // leaving seat (D6, BUG-07 follow-up) never wins the chair, bid or not.
+    const candidates = seated.filter((s) => !s.leaving);
+    if (candidates.length === 0) {
+      // F5 extension (audit fix, same bug class): every seated player is leaving — wait rather
+      // than force the bank onto one of them.
+      this.phase = 'WAITING';
+      this.stage = null;
+      this.push();
+      return;
+    }
+    let winner = candidates[0]!;
+    for (const s of candidates) {
       if ((s.bankerBid ?? 1) > (winner.bankerBid ?? 1)) winner = s;
     }
     for (const s of seated) s.isBanker = s === winner;
@@ -224,6 +246,26 @@ export class NiuNiuRoom extends BaseLiveRoom<NiuNiuRoomConfig, RoomSeat> {
     if (this.phase !== 'WAITING') return;
     const occupied = this.occupiedSeats();
     if (occupied.length < 2) return;
+
+    // A fresh game per round, not a reused one advanced by `nextRound()`: after an abandoned round
+    // (settlement failed, or a later step like the jackpot threw) the old instance is left holding
+    // a banker claim and stale bets, with a state machine that never left BETTING/RESOLVED — the
+    // next round's claimBanker would throw BankerTakenError, or placeBet 'betting is closed'.
+    // Rebuilding here, exactly like lottery-room.ts, means the round that follows an abandon
+    // starts clean regardless of how the previous one died. Room-level round state (isBanker,
+    // bids, multipliers, net) is reset below regardless — that part was already correct.
+    this.game = new NiuNiuGame(
+      this.config.id,
+      this.fc,
+      new EventBus(),
+      this.chain,
+      {
+        rakeBps: this.config.rakeBps,
+        tableType: 'PLATFORM',
+        accountOf: (p) => p,
+        jackpotAccounts: tableJackpotAccounts(this.config.id),
+      },
+    );
 
     this.phase = 'IN_HAND';
     this.stage = 'BIDDING';
@@ -276,7 +318,20 @@ export class NiuNiuRoom extends BaseLiveRoom<NiuNiuRoomConfig, RoomSeat> {
         this.game.placeBet(b.playerId, b.bet, b.betMultiplier ?? 1);
       }
 
-      await this.game.start();
+      try {
+        await this.game.start();
+      } catch (err) {
+        // BUG-20: the settlement may have committed in FC even though this call threw (a lost
+        // response, not a refusal). Ask before abandoning a hand the ledger already paid.
+        const nets = this.game.getNet();
+        const attempted = nets.size > 0 ? settleNet(nets, { rakeBps: this.config.rakeBps }) : undefined;
+        if (!attempted || !(await this.settledDespite(err, this.game.getRoundId(), attempted))) throw err;
+        // Recovered: FC already committed this settlement, but `start()` threw before reaching its
+        // own post-settle lines — without this the round stays stuck in BETTING forever, which
+        // `getPublicState`'s reveal (and any future `nextRound()`) would see as unresolved even
+        // though the ledger already paid it (BUG-20 follow-up).
+        this.game.resolveSettled();
+      }
 
       const grossNets = this.game.getNet();
       const settlement = settleNet(grossNets, { rakeBps: this.config.rakeBps });
@@ -292,7 +347,10 @@ export class NiuNiuRoom extends BaseLiveRoom<NiuNiuRoomConfig, RoomSeat> {
         if (net > 0) winnerProfit += net;
       }
 
-      const roundId = `${this.config.id}-nn-${this.handNumber}`;
+      // Share the settlement's own round id rather than minting a second one from handNumber: two
+      // rooms with the same config.id (or a restart resetting handNumber) used to collide, and FC's
+      // idempotency key is `${roundId}:jackpot:${tier}` — a collision silently skips the payout.
+      const roundId = this.game.getRoundId();
       // The jackpot draws on the seed the round was actually generated from, so a player can
       // verify the draw the same way they verify the game. It used to draw on `${roundId}:seed`,
       // which anyone holding a round id can reproduce — a predictable jackpot.
@@ -313,7 +371,10 @@ export class NiuNiuRoom extends BaseLiveRoom<NiuNiuRoomConfig, RoomSeat> {
       // WAITING is not enough on its own: nothing else deals the next hand, so the table would
       // sit idle with players in their seats. Give it the same beat a showdown gets, then try.
       this.showdownTimer = setTimeout(() => {
-        void this.enqueue(() => this.maybeStartRound());
+        void this.enqueue(async () => {
+          await this.releaseDeparted();
+          this.maybeStartRound();
+        });
       }, this.config.showdownDelayMs ?? 5_000);
       return;
     }
@@ -322,10 +383,12 @@ export class NiuNiuRoom extends BaseLiveRoom<NiuNiuRoomConfig, RoomSeat> {
     this.push();
 
     this.showdownTimer = setTimeout(() => {
-      void this.enqueue(() => {
-        this.game.nextRound();
+      void this.enqueue(async () => {
         this.phase = 'WAITING';
         this.stage = null;
+        // Frees anyone disconnect grace queued but could not release yet (D4, BUG-07 follow-up)
+        // before the next round — or the auction (D6) — can claim their seat.
+        await this.releaseDeparted();
         this.push();
         this.maybeStartRound();
       });

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { BaseGame, InvalidActionError } from '../../core/base-game';
 import { EventBus } from '../../core/event-bus';
 import type { FinancialCoreClient, JackpotAccounts } from '../../core/financial-core-client';
@@ -123,7 +124,10 @@ export class BaccaratGame extends BaseGame<BaccaratPhase, BaccaratAction, Baccar
     if (!this.banker) throw new InvalidActionError('no banker designated');
     if (this.bets.size === 0) throw new InvalidActionError('no bets placed');
 
-    this.roundId = `${this.roomId}-b${++this.handCounter}`;
+    // The suffix is not cosmetic: FC treats a repeated roundId as a settlement replay (idempotency
+    // key) and returns applied:false without moving money. The in-memory counter alone repeats
+    // across instances sharing a roomId, so a random component is load-bearing here.
+    this.roundId = `${this.roomId}-b${++this.handCounter}-${randomUUID().slice(0, 8)}`;
     const { serverSeed } = generateServerCommitment();
     const seats: SeatedClientSeed[] = [...this.bets.keys()].map((_, i) => ({
       seatOrder: i,
@@ -159,10 +163,22 @@ export class BaccaratGame extends BaseGame<BaccaratPhase, BaccaratAction, Baccar
     });
     await this.fc.settleTableHand(request);
 
+    this.resolveSettled();
+  }
+
+  /**
+   * The state transition and the public reveal, split out from `start()` so a caller who confirmed
+   * via FC that a lost-response settlement actually committed (BUG-20's `settledDespite`) can drive
+   * the round to RESOLVED and publish the reveal without re-running `fc.settleTableHand` — that call
+   * already happened; this only finishes what it was interrupted before reaching. Idempotent: called
+   * again on an already-RESOLVED round (the ordinary success path already got here), it does nothing.
+   */
+  resolveSettled(): void {
+    if (this.sm.is('RESOLVED')) return;
     this.sm.transition('RESOLVED');
     this.events.emit('handResolved', {
       roundId: this.roundId,
-      outcome: this.result.outcome,
+      outcome: this.result!.outcome,
       net: Object.fromEntries(this.net),
     });
   }
@@ -197,5 +213,12 @@ export class BaccaratGame extends BaseGame<BaccaratPhase, BaccaratAction, Baccar
   /** The round's provably-fair seed, or undefined before the first round. */
   roundSeed(): string | undefined {
     return this.lastFinalSeed;
+  }
+  /**
+   * The FC settlement round id this round was minted with — so a caller (the jackpot payout)
+   * can share the exact id `settleTableHand` used instead of minting a second, divergent one.
+   */
+  getRoundId(): string {
+    return this.roundId;
   }
 }

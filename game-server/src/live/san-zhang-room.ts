@@ -22,7 +22,7 @@ interface RoomSeat extends BaseRoomSeat {
 }
 
 export class SanZhangRoom extends BaseLiveRoom<SanZhangRoomConfig, RoomSeat> {
-  private readonly game: SanZhangGame;
+  private game: SanZhangGame;
   private bettingTimer: NodeJS.Timeout | null = null;
   private showdownTimer: NodeJS.Timeout | null = null;
 
@@ -99,10 +99,38 @@ export class SanZhangRoom extends BaseLiveRoom<SanZhangRoomConfig, RoomSeat> {
     if (occupied.length < 2) return;
 
     let banker = occupied.find((s) => s.isBanker);
+    // Demote a sticky banker who is now leaving (D6, BUG-07 follow-up) — `isBanker` can predate
+    // `leaving`, so finding one is not enough.
+    if (banker?.leaving) {
+      banker.isBanker = false;
+      banker = undefined;
+    }
     if (!banker) {
-      banker = occupied[0]!;
+      banker = occupied.find((s) => !s.leaving);
+      // F5 (audit fix): every seat left is leaving — wait rather than force the bank onto one of
+      // them. The round starts on its own once a release clears one, or a fresh player sits down.
+      if (!banker) return;
       banker.isBanker = true;
     }
+
+    // A fresh game per round, not a reused one advanced by `nextRound()`: after an abandoned round
+    // (settlement failed, or a later step like the jackpot threw) the old instance is left holding
+    // stale bets and a state machine that never left BETTING/RESOLVED — the next round's setBanker
+    // or placeBet would throw forever. Rebuilding here, exactly like baccarat-room.ts and
+    // niu-niu-room.ts, means the round that follows an abandon starts clean regardless of how the
+    // previous one died.
+    this.game = new SanZhangGame(
+      this.config.id,
+      this.fc,
+      new EventBus(),
+      this.chain,
+      {
+        rakeBps: this.config.rakeBps,
+        tableType: 'PLATFORM',
+        accountOf: (p) => p,
+        jackpotAccounts: tableJackpotAccounts(this.config.id),
+      },
+    );
 
     this.phase = 'IN_HAND';
     this.handNumber++;
@@ -145,7 +173,20 @@ export class SanZhangRoom extends BaseLiveRoom<SanZhangRoomConfig, RoomSeat> {
         this.game.placeBet(b.playerId, b.bet);
       }
 
-      await this.game.start();
+      try {
+        await this.game.start();
+      } catch (err) {
+        // BUG-20: the settlement may have committed in FC even though this call threw (a lost
+        // response, not a refusal). Ask before abandoning a hand the ledger already paid.
+        const nets = this.game.getNet();
+        const attempted = nets.size > 0 ? settleNet(nets, { rakeBps: this.config.rakeBps }) : undefined;
+        if (!attempted || !(await this.settledDespite(err, this.game.getRoundId(), attempted))) throw err;
+        // Recovered: FC already committed this settlement, but `start()` threw before reaching its
+        // own post-settle lines — without this the round stays stuck in BETTING forever, which
+        // `getPublicState`'s reveal (and any future `nextRound()`) would see as unresolved even
+        // though the ledger already paid it (BUG-20 follow-up).
+        this.game.resolveSettled();
+      }
 
       const grossNets = this.game.getNet();
       const settlement = settleNet(grossNets, { rakeBps: this.config.rakeBps });
@@ -161,7 +202,10 @@ export class SanZhangRoom extends BaseLiveRoom<SanZhangRoomConfig, RoomSeat> {
         if (net > 0) winnerProfit += net;
       }
 
-      const roundId = `${this.config.id}-sz-${this.handNumber}`;
+      // Share the settlement's own round id rather than minting a second one from handNumber: two
+      // rooms with the same config.id (or a restart resetting handNumber) used to collide, and FC's
+      // idempotency key is `${roundId}:jackpot:${tier}` — a collision silently skips the payout.
+      const roundId = this.game.getRoundId();
       // The jackpot draws on the seed the round was actually generated from, so a player can
       // verify the draw the same way they verify the game. It used to draw on `${roundId}:seed`,
       // which anyone holding a round id can reproduce — a predictable jackpot.
@@ -182,7 +226,10 @@ export class SanZhangRoom extends BaseLiveRoom<SanZhangRoomConfig, RoomSeat> {
       // WAITING is not enough on its own: nothing else deals the next hand, so the table would
       // sit idle with players in their seats. Give it the same beat a showdown gets, then try.
       this.showdownTimer = setTimeout(() => {
-        void this.enqueue(() => this.maybeStartRound());
+        void this.enqueue(async () => {
+          await this.releaseDeparted();
+          this.maybeStartRound();
+        });
       }, this.config.showdownDelayMs ?? 5_000);
       return;
     }
@@ -191,9 +238,11 @@ export class SanZhangRoom extends BaseLiveRoom<SanZhangRoomConfig, RoomSeat> {
     this.push();
 
     this.showdownTimer = setTimeout(() => {
-      void this.enqueue(() => {
-        this.game.nextRound();
+      void this.enqueue(async () => {
         this.phase = 'WAITING';
+        // Frees anyone disconnect grace queued but could not release yet (D4, BUG-07 follow-up)
+        // before the next round can claim their seat as still occupied.
+        await this.releaseDeparted();
         this.push();
         this.maybeStartRound();
       });

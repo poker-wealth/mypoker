@@ -56,6 +56,70 @@ connectDb(config.mongoUri, config.mongoTls)
       console.log(`  live tables      ${hub ? `on — ws /ws (${hub.tables().length} open)` : 'off (no FC secret)'}`);
       console.log(`  cors origins     ${config.corsOrigins.join(', ') || '(none — same-origin only)'}\n`);
     });
+
+    // Graceful shutdown (BUG-07). This is the production entry point — `Procfile` runs
+    // `npm start` → `node dist/gateway/server.js` — and it had no SIGTERM/SIGINT hook at all before
+    // this: a platform stop (deploy, dyno restart, scale-down) killed the process outright, and
+    // `TableHub.close()` was never even reached. `dispose()` alone was never enough anyway — it
+    // stops timers, it does not release a seat — so every seated stack, at every table, stayed
+    // locked in FC until something else happened to stand that player up. `hub.drain()` (added this
+    // change) releases every one of them first.
+    let shuttingDown = false;
+    const shutdown = (signal: NodeJS.Signals): void => {
+      if (shuttingDown) {
+        // IGNORE a repeat signal (BUG-07 follow-up — DEFECT 1, reverted from exit(1)): Heroku sends
+        // SIGTERM to every process in the dyno and may repeat it, and with `web: npm start` (still
+        // the Procfile today), npm >=7 forwards the signal straight to this process — so a single
+        // Heroku stop can knock on this door twice, milliseconds apart, before drain() has even
+        // started. Exiting immediately on the second knock aborted the drain on every deploy. The
+        // 25s hard-exit timer below is the only escalation; a repeat signal just gets logged.
+        console.log(`\n  [shutdown] ${signal} received again — already draining, ignoring\n`);
+        return;
+      }
+      shuttingDown = true;
+      console.log(`\n  [shutdown] ${signal} received — draining live tables before exit\n`);
+
+      // Heroku's dyno shutdown window (Procfile: `web: npm start`) is a fixed 30s from SIGTERM to
+      // SIGKILL and is not configurable — see the DEPLOY.md note added alongside this. 25s leaves 5s
+      // of margin for this timer to fire, log, and hand off to process.exit before that happens.
+      const hardExit = setTimeout(() => {
+        console.error('[shutdown] drain/close did not finish within 25s — exiting anyway');
+        process.exit(1);
+      }, 25_000);
+      hardExit.unref();
+
+      // Stop accepting new HTTP/WS connections (a new WS upgrade is an HTTP request on this same
+      // server) before draining — nobody new should be able to sit down while the tables are being
+      // told to empty out. Already-open sockets are unaffected until the hub itself closes them.
+      server.close((err) => {
+        if (err) console.error('[shutdown] http server close error:', err);
+      });
+
+      // Exit 1 rather than 0 (D7, BUG-07 follow-up) if any seat, at any table, failed to release —
+      // a "successful" shutdown that actually left chips locked in FC must not look the same to the
+      // platform/ops as a clean one.
+      let hadFailures = false;
+      void (hub ? hub.drain() : Promise.resolve(0))
+        .catch((err: unknown) => {
+          console.error('[shutdown] hub.drain() failed:', err);
+          hadFailures = true;
+          return 0; // still fall through to hub.close() below
+        })
+        .then((failures) => {
+          if (failures > 0) hadFailures = true;
+          return hub?.close();
+        })
+        .catch((err: unknown) => {
+          console.error('[shutdown] hub.close() failed:', err);
+          hadFailures = true;
+        })
+        .then(() => {
+          clearTimeout(hardExit);
+          process.exit(hadFailures ? 1 : 0);
+        });
+    };
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
   })
   .catch((err: unknown) => {
     console.error('gateway failed to start — database:', err instanceof Error ? err.message : err);

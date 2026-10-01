@@ -344,7 +344,7 @@ before the flow under test ran.
 
 Two things a runner should still expect, so neither is mistaken for a regression:
 
-- **16 eslint `any` errors** in `frontend/src/components/games/` — pre-existing,
+- **13 eslint `any` errors** in `frontend/src/components/games/` — pre-existing,
   not introduced by any checklist work.
 - Run financial-core with **`-w 1`** if suites fail in bulk. The in-memory Mongo
   instances contend on a loaded machine, and a contended run fails whole suites

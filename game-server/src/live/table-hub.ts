@@ -61,6 +61,13 @@ export class TableHub {
     authorizeSession?: GameSocketServerConfig['authorizeSession'],
     /** Optional private-table guard — see `TableGuard`. */
     private readonly mayJoin?: TableGuard,
+    /**
+     * How many reverse-proxy hops to trust when deriving a connection's IP —
+     * see `GameSocketServerConfig.trustProxyHops` (BUG-27). Should match the
+     * gateway's own `GatewayConfig.trustProxyHops`, since the socket is folded
+     * behind the same proxy as the HTTP API. Defaults to 0.
+     */
+    trustProxyHops?: number,
   ) {
     this.socket = new GameSocketServer({
       verifyToken,
@@ -68,6 +75,7 @@ export class TableHub {
       onClose: (ctx): void => this.onClose(ctx),
       ...(onEvent ? { onEvent } : {}),
       ...(authorizeSession ? { authorizeSession } : {}),
+      ...(trustProxyHops !== undefined ? { trustProxyHops } : {}),
     });
   }
 
@@ -156,6 +164,31 @@ export class TableHub {
   /** Share an HTTP server's port with the REST API (what the app server does). */
   attachTo(server: Parameters<GameSocketServer['attachTo']>[0], path?: string): void {
     this.socket.attachTo(server, path);
+  }
+
+  /**
+   * Graceful shutdown (BUG-07): return every seated stack, at every table, to its wallet before the
+   * process goes away. Every table drains in parallel — one table's FC call hanging (or one seat's
+   * release being refused) must not hold up every other table's players getting their money back
+   * before the platform's shutdown grace period runs out. Call before `close()`, which only ever
+   * disposed timers and never released a seat.
+   *
+   * Returns how many tables failed to fully drain (D7, BUG-07 follow-up): a room's own `drain()`
+   * rejects when one or more of its seats couldn't be released (`BaseLiveRoom`/`PokerRoom`, both
+   * updated for this), so `Promise.allSettled` is what turns "some seat somewhere is still stuck"
+   * into a number `gateway/server.ts` can act on — exit 1 instead of a silent 0 when a deploy left
+   * chips locked in FC with nobody seated anymore.
+   */
+  async drain(): Promise<number> {
+    const results = await Promise.allSettled([...this.rooms.values()].map((room) => room.drain()));
+    let failures = 0;
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        failures += 1;
+        console.error('[hub] a table failed to drain during shutdown:', result.reason);
+      }
+    }
+    return failures;
   }
 
   async close(): Promise<void> {

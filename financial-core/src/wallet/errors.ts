@@ -61,3 +61,18 @@ export class InvalidWithdrawalTransitionError extends FinancialCoreError {
     super(`Invalid withdrawal transition: ${from} -> ${to}`);
   }
 }
+
+/**
+ * BUG-09 follow-up: a withdrawal already has an unresolved broadcast (`pendingTxId` set) — the
+ * transaction may be live on-chain, so a second send, or a broadcast with a different txHash, is
+ * refused. A human resolves it via `/internal/withdrawals/:id/broadcast` (it landed) or `/reject`
+ * with `chainChecked:true` (it didn't), never by retrying the send.
+ */
+export class WithdrawalBroadcastPendingError extends FinancialCoreError {
+  constructor(
+    public readonly withdrawalId: string,
+    message: string,
+  ) {
+    super(message);
+  }
+}

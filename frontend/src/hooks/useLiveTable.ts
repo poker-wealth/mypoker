@@ -116,7 +116,9 @@ export function useLiveTable(tableId: string): LiveTable {
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
-    void fetch(`${TABLES_URL}/api/live/chips`, { headers: { authorization: `Bearer ${token}` } })
+    void fetch(`${TABLES_URL}/api/live/chips?tableId=${encodeURIComponent(tableId)}`, {
+      headers: { authorization: `Bearer ${token}` },
+    })
       .then((res) => (res.ok ? (res.json() as Promise<{ available: number }>) : null))
       .then((body) => {
         if (!cancelled && body) setAvailable(body.available);
@@ -127,7 +129,7 @@ export function useLiveTable(tableId: string): LiveTable {
     return () => {
       cancelled = true;
     };
-  }, [token, seated]);
+  }, [token, seated, tableId]);
 
   const send = useCallback((command: TableCommand): void => {
     socketRef.current?.send(command);

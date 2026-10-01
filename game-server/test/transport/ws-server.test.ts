@@ -1,5 +1,6 @@
+import type { IncomingMessage } from 'node:http';
 import { WebSocket } from 'ws';
-import { GameSocketServer, type ClientContext } from '../../src/transport/ws-server';
+import { GameSocketServer, connectionIp, type ClientContext } from '../../src/transport/ws-server';
 import {
   generateEphemeralKeyPair,
   deriveSessionKey,
@@ -70,6 +71,37 @@ class TestClient {
 }
 
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * BUG-27: `connectionIp` used to take the FIRST X-Forwarded-For hop, which a
+ * client can put in its own request header — trivially spoofable. Consistent
+ * with the HTTP side's `trust proxy` (BUG-15): with `trustProxyHops` hops
+ * trusted, the real client is the Nth entry from the RIGHT, since a real
+ * proxy only ever appends its own hop rather than forwarding whatever a
+ * client already sent.
+ */
+describe('connectionIp (BUG-27)', () => {
+  const reqWith = (xff: string | undefined, remoteAddress = '10.0.0.1'): IncomingMessage =>
+    ({
+      headers: xff === undefined ? {} : { 'x-forwarded-for': xff },
+      socket: { remoteAddress },
+    }) as unknown as IncomingMessage;
+
+  it('with one trusted hop, reads the rightmost entry -- a spoofed leftmost hop changes nothing', () => {
+    expect(connectionIp(reqWith('1.2.3.4, 203.0.113.10'), 1)).toBe('203.0.113.10');
+    expect(connectionIp(reqWith('203.0.113.10'), 1)).toBe('203.0.113.10');
+  });
+
+  it('with no trusted hops (the default), X-Forwarded-For is ignored entirely', () => {
+    expect(connectionIp(reqWith('9.9.9.9'))).toBe('10.0.0.1');
+    expect(connectionIp(reqWith('9.9.9.9'), 0)).toBe('10.0.0.1');
+  });
+
+  it('falls back to the socket address when the header holds fewer entries than trusted hops', () => {
+    expect(connectionIp(reqWith('203.0.113.10'), 2)).toBe('10.0.0.1');
+    expect(connectionIp(reqWith(undefined), 1)).toBe('10.0.0.1');
+  });
+});
 
 describe('GameSocketServer (secure transport, end-to-end)', () => {
   let server: GameSocketServer;

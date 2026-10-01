@@ -4,6 +4,7 @@ import { Decimal128 } from 'bson';
 import { createApp } from '../../src/http/app';
 import { signToken } from '../../src/http/jwt';
 import { AccountModel } from '../../src/wallet/account.model';
+import { PLATFORM_SCOPE } from '../../src/domain/account-types';
 import { LedgerModel } from '../../src/wallet/ledger.model';
 import { SecurityLogModel } from '../../src/security/security-log.model';
 import { SettlementModel } from '../../src/settlement/settlement.model';
@@ -152,6 +153,36 @@ describe('Financial Core HTTP API (/api/v1)', () => {
     expect(res.status).toBe(409);
   });
 
+  /**
+   * `GET /internal/accounts/:id/balance` already reports `locked` alongside `available` — game-server
+   * callers (slots-room's vendor float top-up, BUG-10 follow-up) read it via
+   * `FinancialCoreClient.lockedBalance`. This pins the field in place so a future change to the route
+   * cannot silently drop it out from under that caller.
+   */
+  it('GET /internal/accounts/:id/balance reports available, locked and clearing', async () => {
+    await post(
+      '/internal/deposits',
+      {
+        playerId: 'p-balance',
+        amount: '500',
+        txHash: 'tx-balance-1',
+        contractAddress: OFFICIAL_USDT_TRC20_CONTRACT,
+        confirmations: 20,
+      },
+      internal,
+    );
+    await post('/internal/buy-ins', { playerAccountId: 'p-balance', amount: '200' }, internal);
+
+    const res = await fetch(url('/internal/accounts/p-balance/balance'), { headers: internal });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      accountId: 'p-balance',
+      available: '300.000000',
+      locked: '200.000000',
+      clearing: '0.000000',
+    });
+  });
+
   it('runs the internal settlement endpoint', async () => {
     // Fund a winner account directly, create treasury + jackpot pools, then settle. The settlement
     // route resolves the winner by playerId (owner_id) → account, so the body passes 'w', not the _id.
@@ -183,6 +214,45 @@ describe('Financial Core HTTP API (/api/v1)', () => {
     const receipt = (await res.json()) as { sequence: string[]; hash: string };
     expect(receipt.sequence).toEqual(['jackpot_inject', 'rake', 'payout']);
     expect(receipt.hash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  // BUG-05 follow-up: /internal/table-settlements provisions a fresh table's jackpot pool accounts
+  // before crediting them (ensureJackpotAccounts); /internal/settlements (singular, round-settlement)
+  // skipped that step, so a brand-new table's FIRST single-leg settlement crashed with
+  // AccountNotFoundError instead of provisioning the pools the way table-settlements already does.
+  // Unlike the test above, this one does NOT pre-create the pool accounts — that is what a real
+  // fresh table's first hand looks like.
+  it('provisions jackpot pool accounts on a fresh table before /internal/settlements settles it', async () => {
+    const TABLE = 'r-api-fresh-table';
+    await AccountModel.create({
+      accountType: 'PLAYER',
+      ownerId: 'w-fresh',
+      availableBalance: Decimal128.fromString('1000'),
+    });
+    const pools = {
+      mini: `jp:${TABLE}:mini`,
+      minor: `jp:${TABLE}:minor`,
+      major: `jp:${TABLE}:major`,
+      grand: `jp:${TABLE}:grand`,
+    };
+    const res = await post(
+      '/internal/settlements',
+      {
+        roundId: 'r-api-fresh-1',
+        tableType: 'PLATFORM',
+        winnerAccountId: 'w-fresh',
+        winnerProfit: '1000',
+        rake: '50',
+        jackpotAccounts: pools,
+      },
+      internal,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ hash: expect.any(String) });
+
+    expect(await AccountModel.countDocuments({ ownerId: TABLE })).toBe(4);
+    const mini = await AccountModel.findById(pools.mini).lean();
+    expect(mini?.accountType).toBe('JACKPOT_MINI');
   });
 
   it('settles a full table hand via /internal/table-settlements', async () => {
@@ -222,6 +292,82 @@ describe('Financial Core HTTP API (/api/v1)', () => {
     );
     expect(res.status).toBe(200);
     expect(await res.json()).toMatchObject({ roundId: 'rt-1', applied: true });
+  });
+
+  // BUG-02: a league table's buy-in/release used to lock and unlock the PLATFORM wallet while
+  // settlement resolved the LEAGUE wallet — the account settlement debited was never the one the
+  // buy-in locked. tableType/leagueId on buy-ins must route to the SAME account settlement uses.
+  it('a LEAGUE buy-in locks the league wallet, and settlement debits that same account — the platform wallet is never touched', async () => {
+    const player = 'league-player-1';
+    const winner = 'league-player-2';
+    const leagueId = 'lg-scope-test';
+
+    // Seed each player's LEAGUE-scoped wallet directly (there is no league deposit path) and a
+    // PLATFORM-scoped wallet for the same playerId, so a mistaken PLATFORM lock/debit is visible.
+    await AccountModel.create({
+      accountType: 'PLAYER', ownerId: player, scope: leagueId,
+      availableBalance: Decimal128.fromString('1000'),
+    });
+    await AccountModel.create({
+      accountType: 'PLAYER', ownerId: player, scope: PLATFORM_SCOPE,
+      availableBalance: Decimal128.fromString('1000'),
+    });
+    await AccountModel.create({
+      accountType: 'PLAYER', ownerId: winner, scope: leagueId,
+      availableBalance: Decimal128.fromString('1000'),
+    });
+
+    const buyIn = await post(
+      '/internal/buy-ins',
+      { playerAccountId: player, amount: '200', tableType: 'LEAGUE', leagueId },
+      internal,
+    );
+    expect(buyIn.status).toBe(200);
+    const winnerBuyIn = await post(
+      '/internal/buy-ins',
+      { playerAccountId: winner, amount: '200', tableType: 'LEAGUE', leagueId },
+      internal,
+    );
+    expect(winnerBuyIn.status).toBe(200);
+
+    const leagueAcctAfterBuyIn = await AccountModel.findOne({ accountType: 'PLAYER', ownerId: player, scope: leagueId }).lean();
+    expect(parseFloat(leagueAcctAfterBuyIn!.lockedBalance.toString())).toBe(200);
+    expect(parseFloat(leagueAcctAfterBuyIn!.availableBalance.toString())).toBe(800);
+    const platformAcctAfterBuyIn = await AccountModel.findOne({ accountType: 'PLAYER', ownerId: player, scope: PLATFORM_SCOPE }).lean();
+    expect(parseFloat(platformAcctAfterBuyIn!.lockedBalance.toString())).toBe(0); // untouched by the LEAGUE buy-in
+    expect(parseFloat(platformAcctAfterBuyIn!.availableBalance.toString())).toBe(1000);
+
+    const pool = async (t: string): Promise<string> =>
+      (await AccountModel.create({ accountType: t, ownerId: 'lg-scope-test-table' }))._id;
+    const settle = await post(
+      '/internal/table-settlements',
+      {
+        roundId: 'rt-league-scope-1',
+        tableType: 'LEAGUE',
+        leagueId,
+        losers: [{ playerAccountId: player, amount: '200' }],
+        winners: [{ playerAccountId: winner, amount: '190' }],
+        rake: '10',
+        jackpot: { mini: '0', minor: '0', major: '0', grand: '0' },
+        jackpotAccounts: {
+          mini: await pool('JACKPOT_MINI'),
+          minor: await pool('JACKPOT_MINOR'),
+          major: await pool('JACKPOT_MAJOR'),
+          grand: await pool('JACKPOT_GRAND'),
+        },
+      },
+      internal,
+    );
+    expect(settle.status).toBe(200);
+    expect(await settle.json()).toMatchObject({ roundId: 'rt-league-scope-1', applied: true });
+
+    // The LOCKED league balance is what settlement debited: the loser's stake left the league wallet.
+    const leagueAcctAfterSettle = await AccountModel.findOne({ accountType: 'PLAYER', ownerId: player, scope: leagueId }).lean();
+    expect(parseFloat(leagueAcctAfterSettle!.lockedBalance.toString())).toBe(0);
+    // The platform wallet for the same playerId never moved, before or after settlement.
+    const platformAcctAfterSettle = await AccountModel.findOne({ accountType: 'PLAYER', ownerId: player, scope: PLATFORM_SCOPE }).lean();
+    expect(parseFloat(platformAcctAfterSettle!.availableBalance.toString())).toBe(1000);
+    expect(parseFloat(platformAcctAfterSettle!.lockedBalance.toString())).toBe(0);
   });
 
   /**

@@ -130,15 +130,35 @@ export function usdtToUnits(decimal: string): bigint {
   return BigInt(whole) * 10n ** BigInt(USDT_DECIMALS) + BigInt(fracPadded);
 }
 
+/** The output of {@link buildAndSignTransfer}: a signed-but-not-yet-broadcast transaction. */
+export interface SignedTransfer {
+  tx: TronTx;
+  signatureHex: string;
+}
+
 /**
- * Build → sign → broadcast a USDT transfer from the hot wallet. Returns the on-chain txID.
- * Throws if TronGrid rejects the build or the broadcast (caller rolls the withdrawal back).
+ * `raw_data.expiration` off a built transaction — TronGrid sets it in MILLISECOND epoch (not seconds,
+ * despite most other TRON timestamps), default ~60s out from build time. Used to know when a
+ * `pendingTxId` (BUG-09) is safe to treat as expired rather than still possibly in flight. `undefined`
+ * if the shape is ever not what TronGrid documents, so a caller can alert instead of misreading it.
  */
-export async function signAndBroadcastTransfer(
+export function txExpirationMs(tx: { raw_data: unknown }): number | undefined {
+  const raw = tx.raw_data as { expiration?: unknown } | null | undefined;
+  return typeof raw?.expiration === 'number' ? raw.expiration : undefined;
+}
+
+/**
+ * Build (TronGrid) → sign (local key / KMS, behind the {@link TronSigner} port) a USDT transfer.
+ * Nothing leaves the wallet here — no network write touches the chain, so a failure here is always
+ * safe to roll back. Split out from the broadcast step (BUG-09) so a caller can persist `tx.txID` as
+ * a `pendingTxId` BEFORE broadcasting: if the broadcast response is then lost (timeout / crash), the
+ * caller has the txID to check on-chain instead of guessing whether a retry would double-send.
+ */
+export async function buildAndSignTransfer(
   cfg: SignerConfig,
   toBase58: string,
   amountUnits: bigint,
-): Promise<string> {
+): Promise<SignedTransfer> {
   const doFetch = cfg.fetchImpl ?? fetch;
   const base = cfg.apiUrl.replace(/\/+$/, '');
   const owner = await cfg.signer.address();
@@ -146,6 +166,9 @@ export async function signAndBroadcastTransfer(
   if (cfg.apiKey) headers['TRON-PRO-API-KEY'] = cfg.apiKey;
 
   // 1. TronGrid builds the unsigned transaction (raw_data + txID). visible:false → hex addresses.
+  //    NOTE: raw_data.expiration is set by TronGrid here (default ~60s from build time). A signed tx
+  //    that is never broadcast, or whose broadcast is lost, stops being sendable once that passes —
+  //    see broadcastSigned's doc comment for what that means for reconciling an ambiguous send.
   const buildRes = await doFetch(`${base}/wallet/triggersmartcontract`, {
     method: 'POST',
     headers,
@@ -168,8 +191,28 @@ export async function signAndBroadcastTransfer(
   // 2. Sign the txID (sha256 of raw_data) — the only step that needs the secret, and it happens
   //    behind the TronSigner port so the key backend (local / KMS / HSM) is invisible here.
   const signatureHex = await cfg.signer.signTxId(tx.txID);
+  return { tx, signatureHex };
+}
 
-  // 3. Broadcast the signed transaction.
+/**
+ * Broadcast an already-signed transaction. Returns the on-chain txID on success.
+ *
+ * AMBIGUOUS ON FAILURE: unlike build/sign, this step is not safe to assume-failed. TronGrid may have
+ * accepted the transaction into its mempool and then lost the response to us (timeout, connection
+ * reset) — the tx is then live on-chain even though this call throws. A caller MUST NOT reinterpret a
+ * throw here as "nothing happened" and must not silently retry with a fresh build (that double-sends);
+ * it should keep the funds held and let a human reconcile `tx.txID` against the chain.
+ */
+export async function broadcastSigned(
+  cfg: SignerConfig,
+  tx: TronTx,
+  signatureHex: string,
+): Promise<string> {
+  const doFetch = cfg.fetchImpl ?? fetch;
+  const base = cfg.apiUrl.replace(/\/+$/, '');
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  if (cfg.apiKey) headers['TRON-PRO-API-KEY'] = cfg.apiKey;
+
   const bcRes = await doFetch(`${base}/wallet/broadcasttransaction`, {
     method: 'POST',
     headers,
@@ -180,6 +223,25 @@ export async function signAndBroadcastTransfer(
     throw new Error(`tron broadcast rejected: ${bc.code ?? ''} ${decodeHexMessage(bc.message)}`.trim());
   }
   return tx.txID;
+}
+
+/**
+ * Build → sign → broadcast a USDT transfer from the hot wallet. Returns the on-chain txID.
+ * Throws if TronGrid rejects the build or the broadcast.
+ *
+ * Thin wrapper kept for callers (deposit sweeping) that have no withdrawal-style ambiguity handling
+ * to do — a lost broadcast response there just means the sweep is re-checked on the next pass, since
+ * sweeping never releases a hold that would double-pay a player. The withdrawal path (BUG-09) does NOT
+ * use this: it calls {@link buildAndSignTransfer} and {@link broadcastSigned} separately so it can
+ * persist the txID between the two and treat a broadcast failure as ambiguous, not failed.
+ */
+export async function signAndBroadcastTransfer(
+  cfg: SignerConfig,
+  toBase58: string,
+  amountUnits: bigint,
+): Promise<string> {
+  const { tx, signatureHex } = await buildAndSignTransfer(cfg, toBase58, amountUnits);
+  return broadcastSigned(cfg, tx, signatureHex);
 }
 
 /** TronGrid error messages come back hex-encoded; decode for a readable failure reason. */

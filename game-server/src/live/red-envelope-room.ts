@@ -157,6 +157,12 @@ export class RedEnvelopeRoom extends BaseLiveRoom<RedEnvelopeRoomConfig, RoomSea
     this.maybeStartRound();
   }
 
+  /** This game's equivalent of a live bet is a claimed packet — `bet` is unused here (D4, BUG-07
+   *  follow-up). The banker is committed the same as every other room's. */
+  protected override seatCommitted(seat: RoomSeat): boolean {
+    return seat.isBanker || seat.claimed !== undefined;
+  }
+
   private maybeStartRound(): void {
     if (this.phase !== 'WAITING') return;
     const occupied = this.occupiedSeats();
@@ -171,8 +177,19 @@ export class RedEnvelopeRoom extends BaseLiveRoom<RedEnvelopeRoomConfig, RoomSea
      * survives the round it was made in.
      */
     let banker = occupied.find((s) => s.isBanker);
+    // Demote a sticky banker who is now leaving (D6, BUG-07 follow-up) — `isBanker` can predate
+    // `leaving`, so finding one is not enough.
+    if (banker?.leaving) {
+      banker.isBanker = false;
+      banker = undefined;
+    }
     if (!banker) {
-      banker = occupied.find((s) => s.wantsBank) ?? occupied[0]!;
+      // Never hand the bank to a seat on its way out (D6, BUG-07 follow-up) — whether they applied
+      // or not, a `leaving` seat has no business anchoring the next round.
+      banker = occupied.find((s) => s.wantsBank && !s.leaving) ?? occupied.find((s) => !s.leaving);
+      // F5 (audit fix): every seat left is leaving — wait rather than force the bank onto one of
+      // them. The round starts on its own once a release clears one, or a fresh player sits down.
+      if (!banker) return;
       banker.isBanker = true;
     }
     delete banker.wantsBank;
@@ -239,7 +256,20 @@ export class RedEnvelopeRoom extends BaseLiveRoom<RedEnvelopeRoomConfig, RoomSea
     // Anything from here can throw — the ledger refusing, a jackpot pool failing to open. If it
     // does the table returns to WAITING rather than sitting in IN_HAND forever; see `abandonRound`.
     try {
-      await this.game.start();
+      try {
+        await this.game.start();
+      } catch (err) {
+        // BUG-20: the settlement may have committed in FC even though this call threw (a lost
+        // response, not a refusal). Ask before abandoning a hand the ledger already paid.
+        const nets = this.game.getNet();
+        const attempted = nets.size > 0 ? settleNet(nets, { rakeBps: this.config.rakeBps }) : undefined;
+        if (!attempted || !(await this.settledDespite(err, this.game.getRoundId(), attempted))) throw err;
+        // Recovered: FC already committed this settlement, but `start()` threw before reaching its
+        // own post-settle lines — without this `this.game.reveal()` below stays null (it is gated on
+        // RESOLVED), so the jackpot draw is skipped for lack of a seed and the provably-fair split
+        // stays withheld from a round the ledger already paid out (BUG-20 follow-up).
+        this.game.resolveSettled();
+      }
 
       const grossNets = this.game.getNet();
       const settlement = settleNet(grossNets, { rakeBps: this.config.rakeBps });
@@ -255,7 +285,10 @@ export class RedEnvelopeRoom extends BaseLiveRoom<RedEnvelopeRoomConfig, RoomSea
         if (net > 0) winnerProfit += net;
       }
 
-      const roundId = `${this.config.id}-re-${this.handNumber}`;
+      // Share the settlement's own round id rather than minting a second one from handNumber: two
+      // rooms with the same config.id (or a restart resetting handNumber) used to collide, and FC's
+      // idempotency key is `${roundId}:jackpot:${tier}` — a collision silently skips the payout.
+      const roundId = this.game.getRoundId();
       // Drawn on the seed the split was generated from, so the jackpot is as verifiable as the
       // game. No fallback: without a real seed the draw is SKIPPED rather than run on a
       // guessable one, which is the bug rather than the backstop.
@@ -287,14 +320,18 @@ export class RedEnvelopeRoom extends BaseLiveRoom<RedEnvelopeRoomConfig, RoomSea
    */
   private scheduleNextRound(): void {
     this.showdownTimer = setTimeout(() => {
-      void this.enqueue(() => {
-        const applicant = this.occupiedSeats().find((s) => s.wantsBank && !s.isBanker);
+      void this.enqueue(async () => {
+        // Never rotate the bank onto a leaving seat either (D6, BUG-07 follow-up).
+        const applicant = this.occupiedSeats().find((s) => s.wantsBank && !s.isBanker && !s.leaving);
         if (applicant) {
           for (const s of this.occupiedSeats()) s.isBanker = false;
           applicant.isBanker = true;
           delete applicant.wantsBank;
         }
         this.phase = 'WAITING';
+        // Frees anyone disconnect grace queued but could not release yet (D4, BUG-07 follow-up)
+        // before the next round can claim their seat as still occupied.
+        await this.releaseDeparted();
         this.push();
         this.maybeStartRound();
       });

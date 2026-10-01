@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { BaseGame, InvalidActionError } from '../../core/base-game';
 import { EventBus } from '../../core/event-bus';
 import type { FinancialCoreClient, JackpotAccounts } from '../../core/financial-core-client';
@@ -63,7 +64,9 @@ export class RedPacketGame extends BaseGame<RedPacketPhase, RedPacketAction, Red
       transitions: { BETTING: ['RESOLVED'], RESOLVED: [] },
     });
     this.cfg = cfg;
-    this.roundId = `${roomId}-rp`;
+    // Many rooms build a new RedPacketGame per round with the same roomId, so the roomId alone is not
+    // enough to keep FC's settlement idempotency key (roundId) unique — a random suffix is.
+    this.roundId = `${roomId}-rp-${randomUUID()}`;
     // Grid fixed and committed at construction — BEFORE any bet.
     this.serverSeed = cfg.serverSeed ?? generateServerCommitment().serverSeed;
     this.commit = gridCommit(this.serverSeed);
@@ -124,6 +127,18 @@ export class RedPacketGame extends BaseGame<RedPacketPhase, RedPacketAction, Red
     });
     await this.fc.settleTableHand(request);
 
+    this.resolveSettled();
+  }
+
+  /**
+   * The state transition and the public reveal, split out from `start()` so a caller who confirmed
+   * via FC that a lost-response settlement actually committed (BUG-20's `settledDespite`) can drive
+   * the round to RESOLVED and publish the reveal without re-running `fc.settleTableHand` — that call
+   * already happened; this only finishes what it was interrupted before reaching. Idempotent: called
+   * again on an already-RESOLVED round (the ordinary success path already got here), it does nothing.
+   */
+  resolveSettled(): void {
+    if (this.sm.is('RESOLVED')) return;
     this.sm.transition('RESOLVED');
     this.events.emit('resolved', {
       roundId: this.roundId,
@@ -135,6 +150,13 @@ export class RedPacketGame extends BaseGame<RedPacketPhase, RedPacketAction, Red
 
   getNet(): Map<string, number> {
     return new Map(this.net);
+  }
+  /**
+   * The FC settlement round id this instance was minted with — so a caller (the jackpot payout)
+   * can share the exact id `settleTableHand` used instead of minting a second, divergent one.
+   */
+  getRoundId(): string {
+    return this.roundId;
   }
   /** Revealed only after the round resolves. */
   reveal(): { serverSeed: string; mines: number[] } | null {

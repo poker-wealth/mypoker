@@ -3,7 +3,9 @@ import type {
   JackpotPayoutRequest,
   SettleRoundRequest,
   SettlementReceipt,
+  SettlementStatus,
   TableSettlementRequest,
+  WalletScope,
 } from '../core/financial-core-client';
 import type { ChipLedger } from './players';
 
@@ -25,15 +27,26 @@ export class ChipBank implements FinancialCoreClient {
   private readonly sinks = new Map<string, number>();
   /** Round ids already applied — settlement is idempotent on retry. */
   private readonly settled = new Set<string>();
+  /** The exact request each applied round settled with — `settlementStatus` (BUG-20) reads this back
+   *  the way the real FC reads back its stored receipt, so recovery tests can drive both clients the
+   *  same way. */
+  private readonly receipts = new Map<string, TableSettlementRequest>();
 
   constructor(private readonly ledger: ChipLedger) {}
 
-  async buyIn(playerAccountId: string, amount: string): Promise<void> {
+  // Scope is accepted for interface compatibility and ignored: this is the play-chip ledger, which
+  // has no PLATFORM/LEAGUE wallet split to route between.
+  async buyIn(playerAccountId: string, amount: string, _scope?: WalletScope): Promise<void> {
     this.ledger.lock(playerAccountId, toChips(amount));
   }
 
-  async release(playerAccountId: string, amount: string): Promise<void> {
+  async release(playerAccountId: string, amount: string, _scope?: WalletScope): Promise<void> {
     this.ledger.unlock(playerAccountId, toChips(amount));
+  }
+
+  // Play-chip ledger, so no USDT conversion — same chip units in and out, mirroring buyIn/release.
+  async lockedBalance(playerAccountId: string, _scope?: WalletScope): Promise<string> {
+    return String(this.ledger.locked(playerAccountId));
   }
 
   async settleTableHand(req: TableSettlementRequest): Promise<{ roundId: string; applied: boolean }> {
@@ -59,7 +72,30 @@ export class ChipBank implements FinancialCoreClient {
     this.toSink(req.jackpotAccounts.grand, toChips(req.jackpot.grand));
 
     this.settled.add(req.roundId);
+    this.receipts.set(req.roundId, req);
     return { roundId: req.roundId, applied: true };
+  }
+
+  /** Whether a round already settled, per this bank's own record (BUG-20) — mirrors the real FC's
+   *  GET /internal/table-settlements/:roundId for tests exercising the recovery path against the
+   *  play-chip ledger. */
+  async settlementStatus(roundId: string): Promise<SettlementStatus> {
+    const req = this.receipts.get(roundId);
+    if (!req) return { settled: false };
+    const jackpotTotal =
+      toChips(req.jackpot.mini) + toChips(req.jackpot.minor) + toChips(req.jackpot.major) + toChips(req.jackpot.grand);
+    return {
+      settled: true,
+      receipt: {
+        type: 'table',
+        roundId,
+        rake: req.rake,
+        jackpotTotal: String(jackpotTotal),
+        losers: req.losers,
+        winners: req.winners,
+        hash: '',
+      },
+    };
   }
 
   async settleRound(req: SettleRoundRequest): Promise<SettlementReceipt> {
@@ -75,7 +111,9 @@ export class ChipBank implements FinancialCoreClient {
   }
 
   /**
-   * Pay a jackpot hit from its pool sink to the winner's stack.
+   * Pay a jackpot hit from its pool sink to the winner's WALLET (available), never locked — the
+   * same destination FC's transfer() uses. The table stack is unchanged, so the release on stand
+   * still unlocks exactly seat.stack (BUG-23).
    *
    * The same conservation as settlement: chips leave the sink and land on a
    * player, so ledger.totalChips() + sinkTotal() is unchanged. A pool that
@@ -92,7 +130,7 @@ export class ChipBank implements FinancialCoreClient {
       throw new Error(`jackpot pool ${req.jackpotAccountId} holds ${pool}, cannot pay ${amount}`);
     }
     this.sinks.set(req.jackpotAccountId, pool - amount);
-    this.ledger.adjustLocked(req.playerId, amount);
+    this.ledger.credit(req.playerId, amount);
     this.settled.add(key);
     return { applied: true };
   }

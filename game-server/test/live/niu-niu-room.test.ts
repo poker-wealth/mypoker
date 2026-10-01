@@ -3,6 +3,7 @@ import { DevPlayers } from '../../src/live/players';
 import { NiuNiuRoom } from '../../src/live/niu-niu-room';
 import { TableHub } from '../../src/live/table-hub';
 import { defaultTables } from '../../src/live/server';
+import type { SettlementFailureReport, TableSettlementRequest } from '../../src/core/financial-core-client';
 
 const BUY_IN = 2_000;
 
@@ -75,6 +76,295 @@ describe('NiuNiuRoom — Live Room Integration', () => {
 
     // Verify ledger-level money conservation including rake sink
     expect(players.totalChips() + bank.sinkTotal()).toBe(startingTotal);
+
+    room.dispose();
+  }, 15_000);
+});
+
+/**
+ * BUG-11 follow-up: niu-niu-room had the identical latent defect the auditor caught in
+ * baccarat-room — one `NiuNiuGame` built in the constructor and only advanced with
+ * `nextRound()` on the success path. After an abandoned round the instance was left with a
+ * banker still claimed and a state machine stuck in BETTING/RESOLVED, so the next round's
+ * `claimBanker` threw `BankerTakenError`, or `placeBet`/`start` threw 'betting is closed',
+ * forever. Fixed the same way as baccarat-room and lottery-room: a fresh `NiuNiuGame` per round.
+ */
+describe('NiuNiuRoom — settlement failure recovery (BUG-11 follow-up)', () => {
+  it('a round that fails settlement is followed by a round that claims banker, bids, bets and settles normally', async () => {
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = new ChipBank(players);
+    const alice = players.create('Alice').id;
+    const bob = players.create('Bob').id;
+    const carol = players.create('Carol').id;
+
+    const realSettle = bank.settleTableHand.bind(bank);
+    let calls = 0;
+    bank.settleTableHand = (req: TableSettlementRequest): Promise<{ roundId: string; applied: boolean }> => {
+      calls += 1;
+      if (calls === 1) return Promise.reject(new Error('financial-core unreachable'));
+      return realSettle(req);
+    };
+    const reportSpy = jest.fn<Promise<void>, [SettlementFailureReport]>().mockResolvedValue(undefined);
+    (bank as unknown as { reportSettlementFailure: typeof reportSpy }).reportSettlementFailure = reportSpy;
+
+    const room = new NiuNiuRoom(
+      {
+        id: 'niu-niu-bug11',
+        name: 'Test Niu Niu',
+        game: 'niu-niu',
+        minBuyIn: 1_000,
+        maxBuyIn: 50_000,
+        maxSeats: 6,
+        rakeBps: 500,
+        bettingTimeMs: 5_000,
+        showdownDelayMs: 20,
+      },
+      { directory: players, fc: bank },
+    );
+
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(bob, { kind: 'sit', seat: 1, buyIn: BUY_IN });
+    await room.command(carol, { kind: 'sit', seat: 2, buyIn: BUY_IN });
+    await until(() => room.snapshotFor(alice).phase === 'IN_HAND');
+
+    // Round 1: the auction and betting both close normally, but the settle for this round fails.
+    await room.command(alice, { kind: 'act', action: { type: 'bid-2' } });
+    await room.command(bob, { kind: 'act', action: { type: 'bid-1' } });
+    await room.command(carol, { kind: 'act', action: { type: 'bid-1' } });
+    await until(() => room.snapshotFor(alice).stage === 'BETTING');
+    // A 2x bank's worst-case exposure per bet is stake x multiplier x 2 x MAX_HAND_MULTIPLIER(6);
+    // two bettors at $50 keeps their combined exposure ($1,200) under Alice's $2,000 stack.
+    await room.command(bob, { kind: 'act', action: { type: 'bet', amount: 50 } });
+    await room.command(carol, { kind: 'act', action: { type: 'bet', amount: 50 } });
+
+    await until(() => room.snapshotFor(alice).phase === 'WAITING');
+    expect(reportSpy).toHaveBeenCalledTimes(1);
+
+    // Round 2: banker claim, auction and betting all work — none of them throw from round 1's
+    // leftover banker claim or stale bets, which a reused game instance would still be holding.
+    await until(
+      () => room.snapshotFor(alice).phase === 'IN_HAND' && room.snapshotFor(alice).handNumber === 2,
+      10_000,
+    );
+    await room.command(alice, { kind: 'act', action: { type: 'bid-2' } });
+    await room.command(bob, { kind: 'act', action: { type: 'bid-1' } });
+    await room.command(carol, { kind: 'act', action: { type: 'bid-1' } });
+    await until(() => room.snapshotFor(alice).stage === 'BETTING');
+    await room.command(bob, { kind: 'act', action: { type: 'bet', amount: 50 } });
+    await room.command(carol, { kind: 'act', action: { type: 'bet', amount: 50 } });
+
+    await until(() => room.snapshotFor(alice).phase === 'SHOWDOWN', 10_000);
+    expect(calls).toBe(2);
+
+    room.dispose();
+  }, 15_000);
+
+  it('deals and settles round 2 after round 1 settles but a later step throws', async () => {
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = new ChipBank(players);
+    const alice = players.create('Alice').id;
+    const bob = players.create('Bob').id;
+
+    let settleCalls = 0;
+    const realSettle = bank.settleTableHand.bind(bank);
+    bank.settleTableHand = (req: TableSettlementRequest): Promise<{ roundId: string; applied: boolean }> => {
+      settleCalls += 1;
+      return realSettle(req);
+    };
+
+    const room = new NiuNiuRoom(
+      {
+        id: 'niu-niu-bug11-post-settle-throw',
+        name: 'Test Niu Niu',
+        game: 'niu-niu',
+        minBuyIn: 1_000,
+        maxBuyIn: 50_000,
+        maxSeats: 6,
+        rakeBps: 500,
+        bettingTimeMs: 5_000,
+        showdownDelayMs: 20,
+      },
+      { directory: players, fc: bank },
+    );
+
+    let jackpotCalls = 0;
+    const realProcessJackpot = (room as unknown as { processJackpot: (...a: unknown[]) => Promise<void> })
+      .processJackpot.bind(room);
+    (room as unknown as { processJackpot: (...a: unknown[]) => Promise<void> }).processJackpot = async (
+      ...args: unknown[]
+    ): Promise<void> => {
+      jackpotCalls += 1;
+      if (jackpotCalls === 1) throw new Error('jackpot pool unavailable');
+      return realProcessJackpot(...args);
+    };
+
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(bob, { kind: 'sit', seat: 1, buyIn: BUY_IN });
+    await until(() => room.snapshotFor(alice).phase === 'IN_HAND');
+
+    await room.command(alice, { kind: 'act', action: { type: 'bid-2' } });
+    await room.command(bob, { kind: 'act', action: { type: 'bid-1' } });
+    await until(() => room.snapshotFor(alice).stage === 'BETTING');
+    await room.command(bob, { kind: 'act', action: { type: 'bet', amount: 100 } });
+
+    // Round 1's settlement went through (money moved) but the jackpot step threw, so the room
+    // abandons — WAITING, then it deals round 2 on its own.
+    await until(
+      () => room.snapshotFor(alice).phase === 'IN_HAND' && room.snapshotFor(alice).handNumber === 2,
+      10_000,
+    );
+
+    await room.command(alice, { kind: 'act', action: { type: 'bid-2' } });
+    await room.command(bob, { kind: 'act', action: { type: 'bid-1' } });
+    await until(() => room.snapshotFor(alice).stage === 'BETTING');
+    await room.command(bob, { kind: 'act', action: { type: 'bet', amount: 100 } });
+
+    await until(() => room.snapshotFor(alice).phase === 'SHOWDOWN', 10_000);
+    expect(settleCalls).toBe(2);
+
+    room.dispose();
+  }, 15_000);
+});
+
+/**
+ * BUG-07 follow-up, D6. "Niu-niu can auction a disconnected seat into the bank" — an unbid seat
+ * counts as 1x and, on a tie, the earliest seat wins, so a disconnected non-bidder could still be
+ * handed the bank by the auction's own default. This pins the case where the grace timer HAS
+ * already found Bob (marking him `leaving`) but could not actually release him yet — FC refuses
+ * once — so he is still sitting there, occupied, when the auction closes. It must not be him.
+ */
+describe('NiuNiuRoom — a leaving seat is not auctioned into the bank (BUG-07)', () => {
+  it('a disconnected non-bidder stuck on a refused release is not auctioned into the bank', async () => {
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = new ChipBank(players);
+    const alice = players.create('Alice').id; // bids, should win the auction
+    const bob = players.create('Bob').id; // disconnects before bidding, never bids
+
+    const realRelease = bank.release.bind(bank);
+    let bobReleaseCalls = 0;
+    bank.release = (playerAccountId: string, amount: string): Promise<void> => {
+      if (playerAccountId === bob) {
+        bobReleaseCalls += 1;
+        if (bobReleaseCalls === 1) return Promise.reject(new Error('financial-core unreachable'));
+      }
+      return realRelease(playerAccountId, amount);
+    };
+
+    const room = new NiuNiuRoom(
+      {
+        id: 'niu-niu-bug07-grace',
+        name: 'Test Niu Niu',
+        game: 'niu-niu',
+        minBuyIn: 1_000,
+        maxBuyIn: 50_000,
+        maxSeats: 6,
+        rakeBps: 500,
+        biddingTimeMs: 150, // closes on its own even though Bob never bids
+        bettingTimeMs: 150,
+        showdownDelayMs: 20,
+      },
+      { directory: players, fc: bank },
+    );
+
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(bob, { kind: 'sit', seat: 1, buyIn: BUY_IN });
+    await until(() => room.snapshotFor(alice).stage === 'BIDDING');
+
+    const internals = room as unknown as {
+      seats: Array<{ playerId: string; connected: boolean } | null>;
+      armDisconnectGrace(playerId: string, graceMs?: number): void;
+    };
+    const seat = internals.seats.find((s) => s?.playerId === bob);
+    if (!seat) throw new Error('bob is not seated');
+    seat.connected = false;
+    internals.armDisconnectGrace(bob, 15);
+
+    // Grace fires (15ms): Bob is uncommitted, so release is attempted — and refused. He is marked
+    // `leaving` and stays seated, occupied, well before the 150ms auction close.
+    await until(() => bobReleaseCalls === 1, 3_000);
+
+    await room.command(alice, { kind: 'act', action: { type: 'bid-2' } });
+
+    // The auction closes on its own timer since Bob never bids — an unbid seat would otherwise
+    // win it by default. Bob is still sitting there (his release was refused) but must not be the
+    // one the auction hands the bank to.
+    await until(() => room.snapshotFor(alice).stage === 'BETTING', 3_000);
+    expect(room.snapshotFor(alice).seats.some((s) => s.playerId === bob)).toBe(true);
+    const banker = room.snapshotFor(alice).seats.find((s) => s.isDealer);
+    expect(banker?.playerId).toBe(alice);
+
+    room.dispose();
+  }, 15_000);
+});
+
+/**
+ * BUG-20: `fc.settleTableHand` can throw even after FC already committed it — a lost response, not
+ * a refusal. `seat.stack` (the room's own mirror) must equal `players.locked` (the ledger's real
+ * record) after settlement either way: pre-fix, the room's catch never mirrored on any throw, so the
+ * two disagree — the ledger moved, the seat did not.
+ */
+describe('NiuNiuRoom — settlement recovery from a lost response (BUG-20)', () => {
+  it('mirrors the stacks once FC confirms the lost settlement actually committed', async () => {
+    class LostResponseBank extends ChipBank {
+      private failedOnce = false;
+      override async settleTableHand(
+        req: TableSettlementRequest,
+      ): Promise<{ roundId: string; applied: boolean }> {
+        const result = await super.settleTableHand(req);
+        if (!this.failedOnce) {
+          this.failedOnce = true;
+          throw new Error('socket hang up');
+        }
+        return result;
+      }
+    }
+
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = new LostResponseBank(players);
+    const alice = players.create('Alice').id;
+    const bob = players.create('Bob').id;
+    const startingTotal = players.totalChips();
+
+    const room = new NiuNiuRoom(
+      {
+        id: 'niu-niu-bug20',
+        name: 'Test Niu Niu',
+        game: 'niu-niu',
+        minBuyIn: 1_000,
+        maxBuyIn: 50_000,
+        maxSeats: 6,
+        rakeBps: 500,
+        bettingTimeMs: 5_000,
+        showdownDelayMs: 20,
+      },
+      { directory: players, fc: bank },
+    );
+
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: BUY_IN });
+    await room.command(bob, { kind: 'sit', seat: 1, buyIn: BUY_IN });
+    await until(() => room.snapshotFor(alice).phase === 'IN_HAND');
+
+    await room.command(alice, { kind: 'act', action: { type: 'bid-2' } });
+    await room.command(bob, { kind: 'act', action: { type: 'bid-1' } });
+    await until(() => room.snapshotFor(alice).stage === 'BETTING');
+    await room.command(bob, { kind: 'act', action: { type: 'bet', amount: 100 } });
+
+    await until(() => room.snapshotFor(alice).phase === 'SHOWDOWN');
+
+    // Conserved (the ledger always reflects the real settlement here, since `LostResponseBank` calls
+    // `super` before throwing) AND correctly mirrored: every seat's room-side stack equals what the
+    // ledger actually has locked for that player — the assertion that is false pre-fix, when the
+    // mirror never ran.
+    expect(players.totalChips() + bank.sinkTotal()).toBe(startingTotal);
+    for (const seat of room.snapshotFor(alice).seats) {
+      if (!seat.playerId) continue;
+      expect(seat.stack).toBe(players.locked(seat.playerId));
+    }
+
+    // Recovered all the way through, not just the stacks: the game's own state machine reached
+    // RESOLVED too (BUG-20 follow-up) — pre-fix, `start()` threw before `sm.transition('RESOLVED')`
+    // ever ran, leaving a recovered round's game instance stuck in BETTING forever.
+    expect((room as unknown as { game: { state: string } }).game.state).toBe('RESOLVED');
 
     room.dispose();
   }, 15_000);

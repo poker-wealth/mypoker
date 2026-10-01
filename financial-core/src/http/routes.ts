@@ -2,11 +2,13 @@ import express, { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { Money } from '../domain/money';
 import { LedgerType, LedgerDirection, PLATFORM_SCOPE } from '../domain/account-types';
+import { WithdrawalState, canTransition } from '../domain/withdrawal-types';
 import { LedgerModel } from '../wallet/ledger.model';
 import { transfer } from '../wallet/transfer';
 import { TableType, getRakeDestination } from '../settlement/settlement-domain';
 import { settleRound } from '../settlement/settle-round';
-import { settleTableHand } from '../settlement/table-settlement';
+import { settleTableHand, type TableReceipt } from '../settlement/table-settlement';
+import { SettlementModel } from '../settlement/settlement.model';
 import { processConfirmedDeposit } from '../deposit/deposit-credit';
 import { lockForBuyIn, releaseToAvailable } from '../wallet/seat-funds';
 import {
@@ -17,6 +19,8 @@ import {
   rollbackWithdrawal,
 } from '../withdrawal/withdrawal-state-machine';
 import { signAndBroadcastWithdrawal } from '../withdrawal/withdrawal-broadcast';
+import { PENDING_TX_GRACE_MS } from '../withdrawal/withdrawal-watcher';
+import { alertOps } from '../lib/alert';
 import { evaluateCB3, evaluateCB4, evaluateCB5 } from '../circuit-breakers/breakers';
 import {
   setWithdrawalAddress,
@@ -25,6 +29,7 @@ import {
   withdrawableAt,
   WithdrawalAddressError,
 } from '../withdrawal/withdrawal-address';
+import { InvalidWithdrawalTransitionError } from '../wallet/errors';
 import {
   getOrCreatePlayerAccount,
   ensureJackpotAccounts,
@@ -561,7 +566,9 @@ export function buildRouter(): Router {
   // The clearing rules have whitelisted JACKPOT_* -> PLAYER from the start;
   // this is the first caller. transfer() runs the full guard set — whitelist,
   // idempotency, overdraft — so a pool can never pay more than it holds, and a
-  // replayed trigger cannot pay twice.
+  // replayed trigger cannot pay twice. transfer() credits the winner's AVAILABLE
+  // balance: a jackpot goes to the wallet, not the table stack, and the room
+  // must never mirror it into seat.stack (BUG-23).
   const jackpotPayoutBody = z.object({
     tableId: z.string().min(1),
     tier: z.enum(['mini', 'minor', 'major', 'grand']),
@@ -570,6 +577,8 @@ export function buildRouter(): Router {
     /** Decimal string, table currency. */
     amount: z.string().min(1),
     roundId: z.string().min(1),
+    tableType: z.nativeEnum(TableType).optional(),
+    leagueId: z.string().min(1).optional(),
   });
   r.post(
     '/internal/jackpot-payouts',
@@ -582,7 +591,11 @@ export function buildRouter(): Router {
         major: b.tier === 'major' ? b.jackpotAccountId : `jp:${b.tableId}:major`,
         grand: b.tier === 'grand' ? b.jackpotAccountId : `jp:${b.tableId}:grand`,
       });
-      const player = await getOrCreatePlayerAccount(b.playerId);
+      // A league jackpot pays into the WINNER'S league wallet, the same scope
+      // table-settlements resolves winners into (below) — an unscoped lookup here
+      // always lands the win in the player's platform wallet, so a league jackpot
+      // hit would silently leak funds out of the league (BUG-16).
+      const player = await getOrCreatePlayerAccount(b.playerId, playerScope(b.tableType, b.leagueId));
       const result = await transfer({
         fromAccountId: b.jackpotAccountId,
         toAccountId: player._id,
@@ -1146,6 +1159,14 @@ export function buildRouter(): Router {
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
       const b = settleBody.parse(req.body);
+      // The pools must exist before settleRound injects the jackpot — transfer() throws
+      // AccountNotFoundError otherwise, failing the whole settlement. table-settlements (below)
+      // already does this; /internal/settlements skipped it, so the first single-leg settlement
+      // for a fresh table's jackpot pools crashed instead of provisioning them.
+      if (b.jackpotAccounts) {
+        const tableOwner = jackpotPoolOwner(b.jackpotAccounts.mini, b.roundId);
+        await ensureJackpotAccounts(tableOwner, b.jackpotAccounts);
+      }
       const winnerAccountId = await resolvePlayerAccountId(
         b.winnerAccountId,
         playerScope(b.tableType, b.leagueId),
@@ -1223,6 +1244,49 @@ export function buildRouter(): Router {
     }),
   );
 
+  // BUG-20: lets a room that lost the settlement response ask FC whether the round it thinks
+  // failed actually committed, before it abandons a hand FC already paid. Parties come back keyed
+  // by playerAccountId (owner_id), the same identifier the room's request used — not the internal
+  // accountId the receipt stores — so the caller can compare its own request against this reply.
+  r.get(
+    '/internal/table-settlements/:roundId',
+    internalAuth,
+    asyncHandler(async (req: Request, res: Response) => {
+      const roundId = z.string().min(1).parse(req.params.roundId);
+      const doc = await SettlementModel.findOne({ roundId }).lean();
+      if (!doc) {
+        res.json({ settled: false });
+        return;
+      }
+      const r2 = doc.receipt as unknown as Partial<TableReceipt>;
+      if (r2.type !== 'table') {
+        res.json({ settled: true });
+        return;
+      }
+      const ids = [...r2.losers!, ...r2.winners!].map((p) => p.accountId);
+      const owners = new Map(
+        (await AccountModel.find({ _id: { $in: ids } }).lean()).map((a) => [a._id, a.ownerId]),
+      );
+      const party = (p: { accountId: string; amount: string }): { playerAccountId: string; amount: string } => ({
+        playerAccountId: owners.get(p.accountId) ?? p.accountId,
+        amount: p.amount,
+      });
+      res.json({
+        settled: true,
+        receipt: {
+          type: 'table',
+          roundId: r2.roundId,
+          rake: r2.rake,
+          jackpotTotal: r2.jackpotTotal,
+          losers: r2.losers!.map(party),
+          winners: r2.winners!.map(party),
+          hash: r2.hash,
+          settledAt: doc.createdAt,
+        },
+      });
+    }),
+  );
+
   // playerAccountId is a playerId (owner_id); tableType/leagueId select the scope so the buy-in
   // locks the SAME account settlement will pay from. Absent → PLATFORM, matching a platform table.
   const seatBody = z.object({
@@ -1256,12 +1320,20 @@ export function buildRouter(): Router {
   // (service-secret) — unlike /me/balance it is not JWT-scoped, because the caller is the table
   // service acting on a token it already verified. Creates a zero account on first sight, so a
   // brand-new player reads ₮0 rather than 404.
+  //
+  // tableType/leagueId select the scope, same as /internal/buy-ins — a LEAGUE caller reads that
+  // league's wallet, not the platform one, or the balance shown means nothing to the table using it.
+  const balanceQuery = z.object({
+    tableType: z.nativeEnum(TableType).optional(),
+    leagueId: z.string().min(1).optional(),
+  });
   r.get(
     '/internal/accounts/:id/balance',
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
       const id = accountId.parse(req.params.id);
-      const acc = await getOrCreatePlayerAccount(id);
+      const { tableType, leagueId } = balanceQuery.parse(req.query);
+      const acc = await getOrCreatePlayerAccount(id, playerScope(tableType, leagueId));
       res.json({
         accountId: id,
         available: Money.fromDecimal128(acc.availableBalance).toString(),
@@ -1779,20 +1851,143 @@ export function buildRouter(): Router {
    * refuse one, nothing could ask it to. From REQUESTED there is nothing held
    * to release; from APPROVED the clearing hold returns to spendable, which is
    * the part a player notices.
+   *
+   * BUG-09 guard: if `pendingTxId` is set, a broadcast was sent and its result is unknown — it may
+   * already be live on-chain. Refunding here without checking the chain risks a double-pay (refund +
+   * the on-chain transfer landing anyway), so this refuses unless the caller explicitly confirms they
+   * checked, the same way other admin routes require an explicit flag rather than assuming intent.
+   *
+   * BUG-09 follow-up (D7): BROADCASTING is refused outright, chainChecked or not. A row can reach
+   * BROADCASTING while an admin has the review sheet open — the watcher's own reconcile pass resolving
+   * the same `pendingTxId` this admin is looking at — and a chainChecked reject issued a moment later
+   * would then refund a transfer that is, right now, live on-chain. Only the watcher (which actually
+   * checks the chain before it acts) ever rolls a BROADCASTING withdrawal back, on genuine on-chain
+   * failure.
+   *
+   * BUG-09 follow-up (D8): a chainChecked reject of a `pendingTxId` is only trustworthy once the signed
+   * tx could actually be dead — before its own expiration (+ the watcher's grace period) TronGrid could
+   * still mine it at any moment, and an admin ticking the box seconds after the send (before there was
+   * anything real to check) would refund funds that then land anyway.
+   *
+   * BUG-09 follow-up (D13): `pendingAtRead` below snapshots `pendingTxId` at the SAME read the checks
+   * above reason about — the tx an admin actually chain-checked — and is passed to `rollbackWithdrawal`
+   * as `expectedPendingTxId`, pinning the refund to that exact tx. Without it, `allowPendingTx` alone
+   * used to drop the pendingTxId guard entirely: state stays APPROVED across a watcher release (an
+   * expired `pendingTxId` reconciled away) and a re-send CAS (withdrawal-broadcast.ts) landing a fresh,
+   * LIVE `pendingTxId` in the gap before BROADCASTING — a chain-checked refund could then match that row
+   * and pay out both the refund and the live send. A mismatch (the filter inside `rollbackWithdrawal`
+   * misses) is a lost race, not a server fault — mapped below to a 409 naming the reload, not left to
+   * surface as the generic `InvalidWithdrawalTransitionError` message.
    */
   const rejectWithdrawalBody = z.object({
     rejectedBy: z.string().min(1),
     reason: z.string().min(1).max(200),
+    chainChecked: z.boolean().optional(),
   });
   r.post(
     '/internal/withdrawals/:id/reject',
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
       const b = rejectWithdrawalBody.parse(req.body);
-      // The refusing administrator is recorded in the reason, since the
-      // withdrawal document has no rejectedBy field of its own.
-      await rollbackWithdrawal(String(req.params.id), `${b.reason} (refused by ${b.rejectedBy})`);
-      res.json({ state: await currentState(String(req.params.id)) });
+      const id = String(req.params.id);
+      const w = await WithdrawalModel.findById(id);
+      if (!w) throw new ApiError(404, `withdrawal not found: ${id}`);
+
+      // BUG-09 follow-up: a withdrawal already in a terminal state (CONFIRMED or
+      // ROLLED_BACK) has no transition to ROLLED_BACK at all — falling through to
+      // rollbackWithdrawal would hit its fromStates/InvalidWithdrawalTransitionError
+      // check below and come back as the generic "changed while being refused —
+      // reload and check again", which reads like a transient race an admin should
+      // retry. It isn't: the withdrawal is done, and retrying will never succeed.
+      // Say so plainly, before D7 even asks whether it's specifically BROADCASTING.
+      if (!canTransition(w.state, WithdrawalState.ROLLED_BACK)) {
+        throw new ApiError(409, `withdrawal ${id} is already ${w.state} — nothing to refuse`);
+      }
+
+      // D13: the exact tx this admin is chain-checking, snapshotted at this read — never recomputed
+      // from a later, possibly-changed `w`.
+      const pendingAtRead = w.pendingTxId;
+
+      // D7: a live broadcast — only the watcher, having actually checked the chain, ever refunds one.
+      if (w.state === WithdrawalState.BROADCASTING) {
+        throw new ApiError(
+          409,
+          `withdrawal ${id} already broadcast (${w.txHash ?? w.pendingTxId ?? ''}) — only the watcher ` +
+            'rolls back a broadcast withdrawal, on on-chain failure',
+        );
+      }
+
+      if (w.pendingTxId && b.chainChecked !== true) {
+        throw new ApiError(
+          409,
+          `withdrawal ${id} has an unresolved broadcast (${w.pendingTxId}) — check it on-chain and ` +
+            're-send with chainChecked:true, or resolve via /broadcast + /confirm if it landed',
+        );
+      }
+
+      if (w.pendingTxId && b.chainChecked === true) {
+        // D8: refuse to treat the pending send as dead before its own signed expiration, plus the same
+        // grace period the watcher's reconcile pass honors — this is deliberately the SAME window, not
+        // a separate one an admin could beat by acting faster than the watcher does.
+        if (w.pendingTxExpiration) {
+          const deadAtMs = w.pendingTxExpiration.getTime() + PENDING_TX_GRACE_MS;
+          if (Date.now() <= deadAtMs) {
+            throw new ApiError(
+              409,
+              `withdrawal ${id} has a pending broadcast (${w.pendingTxId}) that cannot be declared ` +
+                `dead before ${new Date(deadAtMs).toISOString()} — wait, or /broadcast if it landed`,
+            );
+          }
+        } else {
+          // Legacy row, broadcast before pendingTxExpiration existed — no expiry to reason from. Let
+          // the explicit chainChecked confirmation through (an admin has looked at the chain), same as
+          // the watcher's own reconcile alerting rather than guessing for a legacy row, but tell ops.
+          await alertOps(
+            'chainChecked reject allowed with no recorded pendingTxExpiration — cannot verify grace period elapsed',
+            { withdrawalId: id, txId: w.pendingTxId },
+          );
+        }
+        // D9: every chainChecked refusal of an unresolved broadcast is worth ops' attention on its
+        // own — it is, by construction, the one reject outcome that could turn out to be a double-pay.
+        await alertOps('withdrawal with unresolved broadcast refused by admin (chainChecked)', {
+          withdrawalId: id,
+          txId: w.pendingTxId,
+          rejectedBy: b.rejectedBy,
+        });
+      }
+
+      // The refusing administrator is recorded in the reason (readable audit text) and in the
+      // withdrawal's own `rejectedBy` field (D9, structured — the document previously had none).
+      //
+      // allowPendingTx mirrors chainChecked straight through, but (D13) only when there was actually a
+      // tx read above to chain-check — otherwise it stays false and the ordinary "no pendingTxId" filter
+      // arm applies. expectedPendingTxId pins the refund to `pendingAtRead` specifically: the early
+      // check above is a fast, friendly 409 for the common case, but the real guard is the atomic filter
+      // inside rollbackWithdrawal itself (D1/D13) — a pendingTxId that appears, or changes, between that
+      // read and this call is still caught, because the filter now matches only that exact value.
+      // fromStates (D7) is the same kind of belt-and-braces: the BROADCASTING check above reads `w`
+      // once, up front; rollbackWithdrawal's own fromStates check re-reads and re-checks state right
+      // before it writes, so a row that reaches BROADCASTING in the gap between the two is still caught.
+      try {
+        await rollbackWithdrawal(id, `${b.reason} (refused by ${b.rejectedBy})`, {
+          allowPendingTx: b.chainChecked === true && !!pendingAtRead,
+          ...(pendingAtRead ? { expectedPendingTxId: pendingAtRead } : {}),
+          fromStates: [WithdrawalState.REQUESTED, WithdrawalState.APPROVED],
+          rejectedBy: b.rejectedBy,
+        });
+      } catch (err) {
+        // D13: a filter miss here is a lost race (the withdrawal changed between this route's read and
+        // the atomic write below it — a fresh pendingTxId, or a state that moved on) — a conflict for
+        // the caller to retry against fresh data, not a server fault.
+        if (err instanceof InvalidWithdrawalTransitionError) {
+          throw new ApiError(
+            409,
+            `withdrawal ${id} changed while being refused — reload and check again`,
+          );
+        }
+        throw err;
+      }
+      res.json({ state: await currentState(id) });
     }),
   );
 
@@ -1828,24 +2023,47 @@ export function buildRouter(): Router {
     }),
   );
   // Take an APPROVED withdrawal on-chain: sign + broadcast the USDT transfer from the hot wallet and
-  // record the real txHash. On any failure the withdrawal rolls back (clearing hold released), so a
-  // failed send never strands the player's money. Needs TRON_HOT_WALLET_KEY (else 500 with a clear
-  // message, and the withdrawal stays APPROVED for a retry once the key is set).
+  // record the real txHash. Needs TRON_HOT_WALLET_KEY (else 500 with a clear message, and the
+  // withdrawal stays APPROVED for a retry once the key is set).
+  //
+  // BUG-09: NOT "on any failure the withdrawal rolls back" — that was true before the fix and is the
+  // bug it fixed. Build/sign failing (nothing reached the chain) rolls back; broadcast failing is
+  // ambiguous (may be live on-chain) and does NOT roll back — the withdrawal stays APPROVED with
+  // pendingTxId set, blocking a re-send until a human resolves it via /broadcast or /reject. See
+  // signAndBroadcastWithdrawal's doc comment in withdrawal-broadcast.ts.
+  // D9: `sentBy` is optional (older callers, or a re-send triggered without one, still work) and is
+  // recorded purely for the audit trail — it never gates anything.
+  const signBroadcastBody = z.object({ sentBy: z.string().min(1).optional() });
   r.post(
     '/internal/withdrawals/:id/sign-broadcast',
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
-      const txHash = await signAndBroadcastWithdrawal(req.params.id as string);
+      const { sentBy } = signBroadcastBody.parse(req.body);
+      const txHash = await signAndBroadcastWithdrawal(req.params.id as string, undefined, {
+        ...(sentBy ? { sentBy } : {}),
+      });
       res.json({ state: await currentState(req.params.id as string), txHash });
     }),
   );
-  const broadcastBody = z.object({ txHash: z.string().min(1) });
+  const broadcastBody = z.object({
+    txHash: z.string().min(1),
+    resolvedBy: z.string().min(1).optional(),
+    /**
+     * BUG-09 follow-up (D10): when true, refuses unless `txHash` is exactly this withdrawal's own
+     * unresolved `pendingTxId` — see broadcastWithdrawal's `requirePending` doc comment. The gateway's
+     * admin "mark as sent" action always sets this; the ordinary auto sign-broadcast path never does.
+     */
+    requirePending: z.boolean().optional(),
+  });
   r.post(
     '/internal/withdrawals/:id/broadcast',
     internalAuth,
     asyncHandler(async (req: Request, res: Response) => {
-      const { txHash } = broadcastBody.parse(req.body);
-      await broadcastWithdrawal(req.params.id as string, txHash);
+      const { txHash, resolvedBy, requirePending } = broadcastBody.parse(req.body);
+      await broadcastWithdrawal(req.params.id as string, txHash, {
+        ...(resolvedBy ? { resolvedBy } : {}),
+        ...(requirePending !== undefined ? { requirePending } : {}),
+      });
       res.json({ state: await currentState(req.params.id as string) });
     }),
   );

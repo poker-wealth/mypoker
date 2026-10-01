@@ -91,7 +91,36 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
       const hand = [...(this.game.handOf(playerId) ?? [])];
       const res = validateMove(cards, this.comboToBeat(playerId), hand);
       if (!res.valid) throw new RoomError(res.reason ?? 'invalid move');
-      this.game.play(playerId, cards);
+      try {
+        // AWAITED (BUG-25): this used to fire-and-forget. `play()` settles through `finish()` when
+        // it empties a hand, and an unawaited settlement rejection is an unhandled rejection —
+        // process-fatal in Node 15+. Worse, because `winner` is set synchronously before `finish()`
+        // awaits anything, the `getWinner()` check below used to fire and mirror stacks in
+        // `resolveRound` regardless of whether the settlement it raced actually landed.
+        await this.game.play(playerId, cards);
+      } catch (err) {
+        // A throw with the winner already set came from settlement inside `finish()`, not from an
+        // illegal play — the play itself already landed and emptied the hand. Treat it exactly like
+        // `resolveRound`'s own settlement failure: WAITING, nothing mirrored, failure reported. A
+        // throw with no winner is the engine rejecting the play itself (state the checks above did
+        // not catch, e.g. still bidding) and belongs to the player, not the table.
+        if (this.game.getWinner()) {
+          // BUG-20: the settlement may have committed in FC even though `play()` threw (a lost
+          // response, not a refusal). Ask before abandoning a hand the ledger already paid.
+          const nets = this.game.getNet();
+          const attempted = nets.size > 0 ? settleNet(nets, { rakeBps: this.config.rakeBps }) : undefined;
+          if (attempted && (await this.settledDespite(err, this.game.roundInfo()?.roundId, attempted))) {
+            // Proceed exactly as the happy path below would: `resolveRound` mirrors the stacks and
+            // draws the jackpot from the game's own state — it never calls FC again, so this cannot
+            // double-mirror or double-run the jackpot evaluation.
+            await this.resolveRound();
+            return;
+          }
+          this.abandonRoundAndRedeal(err);
+          return;
+        }
+        throw err;
+      }
     } else if (action.type === 'pass') {
       await this.game.pass(playerId);
     } else {
@@ -107,6 +136,12 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
 
   protected onSeatChanged(): void {
     this.maybeStartRound();
+  }
+
+  /** No per-trick wager to check (D4, BUG-07 follow-up) — a round in progress is the only thing a
+   *  Dou Di Zhu seat can be committed to. */
+  protected override seatCommitted(): boolean {
+    return this.phase !== 'WAITING';
   }
 
   // ── Reading the table ───────────────────────────────────────────────────────
@@ -132,7 +167,9 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
   private async maybeStartRound(): Promise<void> {
     if (this.phase !== 'WAITING') return;
     const occupied = this.occupiedSeats();
-    if (occupied.length !== 3) return;
+    // A seat on its way out (D6, BUG-07 follow-up) doesn't count toward the three this game needs,
+    // and never gets dealt in — there is no way to sub a fourth player into a hand already running.
+    if (occupied.length !== 3 || occupied.some((s) => s.leaving)) return;
 
     this.game = new DouDiZhuGame(
       this.config.id,
@@ -198,12 +235,7 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
         );
       }
     } catch (err) {
-      this.abandonRound(err);
-      // WAITING is not enough on its own: nothing else deals the next hand, so the table would
-      // sit idle with players in their seats. Give it the same beat a showdown gets, then try.
-      this.showdownTimer = setTimeout(() => {
-        void this.enqueue(() => this.maybeStartRound());
-      }, this.config.showdownDelayMs ?? 5_000);
+      this.abandonRoundAndRedeal(err);
       return;
     }
 
@@ -213,7 +245,26 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
     this.showdownTimer = setTimeout(() => {
       void this.enqueue(async () => {
         this.phase = 'WAITING';
+        // Frees anyone disconnect grace queued but could not release yet (D4, BUG-07 follow-up)
+        // before the next round can claim their seat as still occupied.
+        await this.releaseDeparted();
         this.push();
+        await this.maybeStartRound();
+      });
+    }, this.config.showdownDelayMs ?? 5_000);
+  }
+
+  /**
+   * `abandonRound` only puts `phase` back to WAITING — nothing else deals the next hand, so without
+   * this the table would sit idle with players still in their seats. Shared by `resolveRound`'s own
+   * settlement failure and by `handleAct`'s (BUG-25): a settlement can fail either place, and both
+   * need the same redeal beat a showdown gets.
+   */
+  private abandonRoundAndRedeal(err: unknown): void {
+    this.abandonRound(err);
+    this.showdownTimer = setTimeout(() => {
+      void this.enqueue(async () => {
+        await this.releaseDeparted();
         await this.maybeStartRound();
       });
     }, this.config.showdownDelayMs ?? 5_000);
@@ -308,17 +359,42 @@ export class DouDiZhuRoom extends BaseLiveRoom<DouDiZhuRoomConfig, RoomSeat> {
       winners: this.occupiedSeats().filter((s) => (s.net ?? 0) > 0).map((s) => s.index),
       ...(this.resultMessage() ? { message: this.resultMessage()! } : {}),
       ...(this.waitingFor(3) ? { message: this.waitingFor(3)! } : {}),
+      ...(this.leavingBlockedMessage() ? { message: this.leavingBlockedMessage()! } : {}),
       serverTime: Date.now(),
     };
   }
 
-  /** "Bruno (Landlord) wins" — a name, not the raw account id the old message printed. */
+  /**
+   * "Bruno (Landlord) wins" — a name, not the raw account id the old message printed.
+   *
+   * Returns undefined once the table is back to `WAITING` (BUG-25 follow-up): `this.game` is not
+   * replaced with a fresh `DouDiZhuGame` until `maybeStartRound` deals the next hand, so
+   * `getWinner()` keeps reporting the PREVIOUS hand's winner for the whole `WAITING` window —
+   * including after `abandonRoundAndRedeal` sends the table back to `WAITING` on a refused
+   * settlement, where nobody actually won anything and stacks never moved. Without this guard the
+   * felt showed "X wins" for a full `showdownDelayMs` after a settlement failure that paid nobody.
+   */
   private resultMessage(): string | undefined {
+    if (this.phase === 'WAITING') return undefined;
     const winnerId = this.game.getWinner();
     if (!winnerId) return undefined;
     const seat = this.seatOf(winnerId);
     const side = this.game.getLandlord() === winnerId ? 'Landlord' : 'Peasants';
     return `${seat?.name ?? winnerId} wins — ${side}`;
+  }
+
+  /**
+   * Occupied at three but still not dealing (F6, audit fix on BUG-07 follow-up) — `waitingFor(3)`
+   * reads as "the table is short a player," which is false here: all three seats are full, one of
+   * them just cannot be dealt in until its release clears (a `leaving` seat stuck on a refused
+   * release, or one grace is still winding down). Told apart from `waitingFor` so the felt does not
+   * ask a player to invite someone who is, from where they sit, already seated.
+   */
+  private leavingBlockedMessage(): string | undefined {
+    if (this.phase !== 'WAITING') return undefined;
+    const occupied = this.occupiedSeats();
+    if (occupied.length !== 3 || !occupied.some((s) => s.leaving)) return undefined;
+    return 'Waiting for a seat to clear before the next hand can be dealt.';
   }
 
   dispose(): void {

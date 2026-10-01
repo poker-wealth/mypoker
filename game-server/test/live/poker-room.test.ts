@@ -2,7 +2,13 @@ import { ChipBank } from '../../src/live/chip-bank';
 import { DevPlayers } from '../../src/live/players';
 import { DEFAULT_ROOM, PokerRoom, type PokerRoomConfig } from '../../src/live/poker-room';
 import type { TableSnapshot } from '../../src/live/room-state';
-import type { TableSettlementRequest } from '../../src/core/financial-core-client';
+import type {
+  SettlementFailureReport,
+  SettlementStatus,
+  TableSettlementRequest,
+  WalletScope,
+} from '../../src/core/financial-core-client';
+import type { PlayerDirectory, TablePlayer } from '../../src/live/players';
 
 /**
  * Two people, two devices, one table. These tests drive the room exactly as the client does —
@@ -188,6 +194,90 @@ describe('PokerRoom — a table real people sit at', () => {
     h.room.dispose();
   });
 
+  // BUG-02: a league table locked and released the PLATFORM wallet while settlement resolved the
+  // LEAGUE wallet — the buy-in came from an account settlement never touched. buyIn/release must
+  // carry the same (tableType, leagueId) scope settlement already does.
+  it('a league table sends its wallet scope on buyIn and release', async () => {
+    const h = harness({ tableType: 'LEAGUE', leagueId: 'league-7' });
+    const buyInScopes: (WalletScope | undefined)[] = [];
+    const releaseScopes: (WalletScope | undefined)[] = [];
+    const realBuyIn = h.bank.buyIn.bind(h.bank);
+    const realRelease = h.bank.release.bind(h.bank);
+    h.bank.buyIn = (playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> => {
+      buyInScopes.push(scope);
+      return realBuyIn(playerAccountId, amount, scope);
+    };
+    h.bank.release = (playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> => {
+      releaseScopes.push(scope);
+      return realRelease(playerAccountId, amount, scope);
+    };
+
+    await h.room.command(h.alice, { kind: 'sit', seat: 0, buyIn: 2_000 });
+    await h.room.command(h.alice, { kind: 'stand' });
+
+    expect(buyInScopes).toEqual([{ tableType: 'LEAGUE', leagueId: 'league-7' }]);
+    expect(releaseScopes).toEqual([{ tableType: 'LEAGUE', leagueId: 'league-7' }]);
+    h.room.dispose();
+  });
+
+  // D1: topUp had the same bug sit() did before BUG-02 — it read `player.available` from the
+  // directory, which only ever caches the PLATFORM balance, and refused a top-up on a LEAGUE table
+  // whose real (league-wallet) balance the directory has no way to know. The directory here reports
+  // 0 regardless of what the ledger actually holds, so a league top-up must go through anyway —
+  // FC's own overdraft guard on the league wallet is what actually protects it.
+  it('a league table tops up even when the directory reports 0 available, and sends the league scope', async () => {
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = new ChipBank(players);
+    const alice = players.create('Alice').id;
+
+    const zeroBalance: TablePlayer = {
+      id: alice,
+      displayName: 'Alice',
+      available: 0,
+      reputationScore: 1000,
+    };
+    const zeroBalanceDirectory: PlayerDirectory = {
+      find: () => zeroBalance,
+      ensure: () => zeroBalance,
+    };
+
+    const room = new PokerRoom(
+      { ...FAST, id: 't-league-topup', name: 'Test table', tableType: 'LEAGUE', leagueId: 'league-7' } as PokerRoomConfig,
+      { directory: zeroBalanceDirectory, fc: bank },
+    );
+
+    const buyInScopes: (WalletScope | undefined)[] = [];
+    const realBuyIn = bank.buyIn.bind(bank);
+    bank.buyIn = (playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> => {
+      buyInScopes.push(scope);
+      return realBuyIn(playerAccountId, amount, scope);
+    };
+
+    await room.command(alice, { kind: 'sit', seat: 0, buyIn: 2_000 });
+    await expect(room.command(alice, { kind: 'buyIn', amount: 500 })).resolves.toBeUndefined();
+
+    expect(buyInScopes).toEqual([
+      { tableType: 'LEAGUE', leagueId: 'league-7' },
+      { tableType: 'LEAGUE', leagueId: 'league-7' },
+    ]);
+    room.dispose();
+  });
+
+  it('a platform table sends the PLATFORM scope, with no leagueId', async () => {
+    const h = harness(); // default config — no tableType set
+    const buyInScopes: (WalletScope | undefined)[] = [];
+    const realBuyIn = h.bank.buyIn.bind(h.bank);
+    h.bank.buyIn = (playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> => {
+      buyInScopes.push(scope);
+      return realBuyIn(playerAccountId, amount, scope);
+    };
+
+    await h.room.command(h.alice, { kind: 'sit', seat: 0, buyIn: 2_000 });
+
+    expect(buyInScopes).toEqual([{ tableType: 'PLATFORM' }]);
+    h.room.dispose();
+  });
+
   it('rolls into the next hand and moves the button', async () => {
     const h = harness();
     await seatBoth(h, 0, 2);
@@ -267,6 +357,385 @@ describe('PokerRoom — a table real people sit at', () => {
     const countAfterLeaving = seen.length;
     await h.room.command(h.alice, { kind: 'stand' });
     expect(seen.length).toBe(countAfterLeaving); // unsubscribed means unsubscribed
+    h.room.dispose();
+  });
+});
+
+/**
+ * BUG-03: settlement can throw AFTER a hand completes (network error, 5xx, 409 — and
+ * `settleTableHand`'s own deliberate throw on `applied: false`). Before this fix nothing caught it:
+ * the room stayed in IN_HAND/SETTLING forever, nobody could act, and stand/close never completed.
+ *
+ * The recovery is narrow on purpose, mirroring `BaseLiveRoom.abandonRound`: `TexasGame.settle` only
+ * touches a seat's stack AFTER `fc.settleTableHand` resolves, and this room's own `seat.stack` mirror
+ * is only written by `finishHand` — which never runs when settlement throws. So a failed settlement
+ * really does mean nothing moved, and "recovery" is just putting the table back to WAITING.
+ */
+describe('PokerRoom — settlement failure recovery (BUG-03)', () => {
+  /** Reject the FIRST settlement (whatever hand hits it), then let every later one through for real. */
+  function failFirstSettlement(h: Harness): { calls: number } {
+    const state = { calls: 0 };
+    const realSettle = h.bank.settleTableHand.bind(h.bank);
+    h.bank.settleTableHand = (req: TableSettlementRequest): Promise<{ roundId: string; applied: boolean }> => {
+      state.calls += 1;
+      if (state.calls === 1) return Promise.reject(new Error('financial-core unreachable'));
+      return realSettle(req);
+    };
+    return state;
+  }
+
+  /** Reject the FIRST `release` call for one specific player, then let every later one through for real. */
+  function failReleaseOnce(h: Harness, playerId: string): { calls: number } {
+    const state = { calls: 0 };
+    const realRelease = h.bank.release.bind(h.bank);
+    h.bank.release = (playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> => {
+      if (playerAccountId === playerId) {
+        state.calls += 1;
+        if (state.calls === 1) return Promise.reject(new Error('financial-core unreachable (release)'));
+      }
+      return realRelease(playerAccountId, amount, scope);
+    };
+    return state;
+  }
+
+  it('recovers to WAITING with every stack unchanged, reports the failure, and deals again', async () => {
+    const h = harness();
+    failFirstSettlement(h);
+    const reportSpy = jest.fn<Promise<void>, [SettlementFailureReport]>().mockResolvedValue(undefined);
+    (h.bank as unknown as { reportSettlementFailure: typeof reportSpy }).reportSettlementFailure = reportSpy;
+
+    await seatBoth(h, 0, 1);
+    const before = new Map(h.room.snapshotFor(h.alice).seats.map((s) => [s.playerId, s.stack]));
+
+    await playToShowdown(h, { 0: h.alice, 1: h.bob });
+    // The command that drove the hand to completion awaits abandonHand fully, so phase is already
+    // WAITING by the time playToShowdown returns — polled anyway so this test isn't timing-fragile.
+    await until(() => h.room.snapshotFor(h.alice).phase === 'WAITING');
+
+    for (const seat of h.room.snapshotFor(h.alice).seats) {
+      expect(seat.stack).toBe(before.get(seat.playerId)); // nothing paid, nothing lost
+    }
+    expect(h.players.totalChips() + h.bank.sinkTotal()).toBe(h.startingTotal);
+    expect(reportSpy).toHaveBeenCalledTimes(1);
+    expect(reportSpy.mock.calls[0]![0]).toMatchObject({
+      tableId: 't1',
+      reason: expect.stringContaining('financial-core unreachable'),
+    });
+
+    // The table recovers rather than freezing — a second hand deals on its own.
+    await until(() => h.room.snapshotFor(h.alice).phase === 'IN_HAND' && h.room.snapshotFor(h.alice).handNumber === 2);
+    h.room.dispose();
+  });
+
+  it('recovers the same way when the failing settlement is driven by the action-timeout path', async () => {
+    const h = harness();
+    const state = failFirstSettlement(h);
+    // Watching (not just seated) keeps both seats `connected`, so the clock-driven fold below does
+    // not ALSO mark the timed-out player `sittingOut` — a real client watches its own table, and an
+    // unwatched seat sitting out on its first timeout is an unrelated, correct behaviour this test
+    // must not trip over.
+    const stopAlice = h.room.join(h.alice, { sendSnapshot: () => {}, sendEvent: () => {} });
+    const stopBob = h.room.join(h.bob, { sendSnapshot: () => {}, sendEvent: () => {} });
+    await seatBoth(h, 0, 1);
+    const before = new Map(h.room.snapshotFor(h.alice).seats.map((s) => [s.playerId, s.stack]));
+
+    // Nobody sends an `act` command: heads-up preflop, the player to act faces the big blind and
+    // cannot check, so the action clock folds them — ending the hand, and driving settlement, with
+    // no explicit action at all.
+    await until(() => state.calls >= 1);
+
+    // The WAITING phase itself is transient — the table redeals within showdownDelayMs — so assert
+    // on the money and on the redeal actually happening, rather than trying to catch WAITING mid-flight.
+    for (const seat of h.room.snapshotFor(h.alice).seats) {
+      expect(seat.stack).toBe(before.get(seat.playerId));
+    }
+    await until(() => h.room.snapshotFor(h.alice).handNumber >= 2);
+    stopAlice();
+    stopBob();
+    h.room.dispose();
+  });
+
+  it('still releases a leaveAfterHand seat once the abandoned hand ends', async () => {
+    const h = harness();
+    failFirstSettlement(h);
+    await seatBoth(h, 0, 1);
+
+    const seatOf: Record<number, string> = { 0: h.alice, 1: h.bob };
+    const toAct = h.room.snapshotFor(h.alice).toActSeat!;
+    const notToAct = toAct === 0 ? h.bob : h.alice;
+    // Not their turn, so this only queues leaveAfterHand — it does not fold them.
+    await h.room.command(notToAct, { kind: 'stand' });
+
+    await playToShowdown(h, seatOf);
+    await until(() => h.room.snapshotFor(h.alice).phase === 'WAITING');
+
+    expect(h.room.hasSeated(notToAct)).toBe(false); // released even though settlement never ran
+    expect(h.players.available(notToAct)).toBe(10_000); // whole stack back
+    h.room.dispose();
+  });
+
+  it('lets a pending close finish closing instead of dealing another hand', async () => {
+    const h = harness();
+    (h.room.config as { ownerId?: string }).ownerId = h.alice;
+    failFirstSettlement(h);
+
+    await seatBoth(h, 0, 1);
+    await h.room.command(h.alice, { kind: 'close_table' }); // queued — the hand in progress finishes first
+
+    await playToShowdown(h, { 0: h.alice, 1: h.bob });
+    // The abandoned hand must hand off to the pending close rather than dealing another one.
+    await until(() => h.room.snapshotFor(h.alice).seats.length === 0);
+
+    expect(h.players.available(h.alice)).toBe(10_000);
+    expect(h.players.available(h.bob)).toBe(10_000);
+    h.room.dispose();
+  });
+
+  it('still throws normally on an illegal action — that is not a settlement failure', async () => {
+    const h = harness();
+    failFirstSettlement(h); // present but irrelevant: the hand never reaches settlement
+    await seatBoth(h, 0, 1);
+
+    const seatOf: Record<number, string> = { 0: h.alice, 1: h.bob };
+    const toAct = h.room.snapshotFor(h.alice).toActSeat!;
+    // Preflop, facing the big blind: checking is illegal (must call, raise or fold).
+    await expect(
+      h.room.command(seatOf[toAct]!, { kind: 'act', action: { type: 'check' } }),
+    ).rejects.toThrow();
+
+    // Not abandoned: same hand, still in progress, nobody's chips moved.
+    expect(h.room.snapshotFor(h.alice).phase).toBe('IN_HAND');
+    expect(h.room.snapshotFor(h.alice).handNumber).toBe(1);
+    h.room.dispose();
+  });
+
+  it('keeps a stuck leaveAfterHand seat sittingOut when its release fails, and deals on for the others', async () => {
+    const h = harness();
+    const charlie = h.players.create('Charlie').id;
+    failFirstSettlement(h);
+    failReleaseOnce(h, h.bob);
+
+    await h.room.command(h.alice, { kind: 'sit', seat: 0, buyIn: 2_000 });
+    await h.room.command(h.bob, { kind: 'sit', seat: 1, buyIn: 2_000 });
+    await h.room.command(charlie, { kind: 'sit', seat: 2, buyIn: 2_000 });
+    await until(() => h.room.snapshotFor(h.alice).phase === 'IN_HAND');
+
+    // Queue bob to leave — same as any mid-hand stand — so abandonHand's release loop reaches him.
+    await h.room.command(h.bob, { kind: 'stand' });
+
+    const seatOf: Record<number, string> = { 0: h.alice, 1: h.bob, 2: charlie };
+    await playToShowdown(h, seatOf);
+    await until(() => h.room.snapshotFor(h.alice).phase === 'WAITING');
+
+    // Bob is still seated — the failed release must not have silently dropped him — and marked
+    // sittingOut so the room reports him correctly and does not try to deal him into the next hand.
+    expect(h.room.hasSeated(h.bob)).toBe(true);
+    const bobSeat = h.room.snapshotFor(h.alice).seats.find((s) => s.playerId === h.bob)!;
+    expect(bobSeat.status).toBe('sittingout');
+    expect(h.players.available(h.bob)).toBeLessThan(10_000); // chips still locked, not returned
+
+    // The table keeps dealing for the two players who are not stuck.
+    await until(
+      () => h.room.snapshotFor(h.alice).phase === 'IN_HAND' && h.room.snapshotFor(h.alice).handNumber === 2,
+    );
+    expect(h.room.snapshotFor(h.alice).seats.find((s) => s.playerId === h.bob)!.inHand).toBe(false);
+    expect(h.room.snapshotFor(h.alice).seats.find((s) => s.playerId === h.alice)!.inHand).toBe(true);
+    expect(h.room.snapshotFor(h.alice).seats.find((s) => s.playerId === charlie)!.inHand).toBe(true);
+
+    // A later stand retries the same release, which now succeeds — chips returned.
+    await h.room.command(h.bob, { kind: 'stand' });
+    expect(h.room.hasSeated(h.bob)).toBe(false);
+    expect(h.players.available(h.bob)).toBe(10_000);
+
+    h.room.dispose();
+  });
+
+  it('still lets a pending close finish even when a leaving seat failed to release during the abandoned hand', async () => {
+    const h = harness();
+    (h.room.config as { ownerId?: string }).ownerId = h.alice;
+    failFirstSettlement(h);
+
+    await seatBoth(h, 0, 1);
+    const toAct = h.room.snapshotFor(h.alice).toActSeat!;
+    const notToAct = toAct === 0 ? h.bob : h.alice;
+    failReleaseOnce(h, notToAct);
+    // Not their turn, so this only queues leaveAfterHand — it does not fold them, and the hand plays
+    // on normally with close_table queued right after, same as a normal pending close.
+    await h.room.command(notToAct, { kind: 'stand' });
+    await h.room.command(h.alice, { kind: 'close_table' }); // queued — the hand in progress finishes first
+
+    await playToShowdown(h, { 0: h.alice, 1: h.bob });
+
+    // The pending close still finishes: finishClose releases every occupied seat regardless of
+    // leaveAfterHand, which retries the seat whose release failed inside abandonHand — and this time
+    // it succeeds.
+    await until(() => h.room.snapshotFor(h.alice).seats.length === 0);
+    expect(h.players.available(h.alice)).toBe(10_000);
+    expect(h.players.available(h.bob)).toBe(10_000);
+    h.room.dispose();
+  });
+
+  it('does not abandon the hand when evaluateJackpots throws after a successful settlement', async () => {
+    const h = harness();
+    (h.room as unknown as { evaluateJackpots: () => Promise<void> }).evaluateJackpots = jest
+      .fn<Promise<void>, []>()
+      .mockRejectedValue(new Error('jackpot engine exploded'));
+
+    await seatBoth(h, 0, 1);
+    await playToShowdown(h, { 0: h.alice, 1: h.bob });
+
+    // Settled normally — not the abandon path's "could not be settled" recovery.
+    await until(() => h.room.snapshotFor(h.alice).phase === 'SHOWDOWN');
+    const view = h.room.snapshotFor(h.alice);
+    expect(view.message).toMatch(/wins/);
+    expect(view.handNumber).toBe(1);
+
+    // The settlement itself was applied: total chips are conserved (some moved to the winner / rake
+    // sink), which the abandon path's "nothing paid" recovery would not produce.
+    expect(h.players.totalChips() + h.bank.sinkTotal()).toBe(h.startingTotal);
+    h.room.dispose();
+  });
+});
+
+/**
+ * BUG-20: `fc.settleTableHand` can throw even after FC already committed the settlement — a lost
+ * response, not a refusal (a socket reset, a timeout on a slow-but-successful write). Before this
+ * fix `recoverSettlement` did not exist, so this landed in `abandonHand` exactly like a genuine
+ * refusal: the hand was reported as failed and the table redealt, while the ledger had, in fact,
+ * already paid it — table and ledger permanently disagreeing.
+ *
+ * `harnessWithBank` builds the same two-seat table `harness()` does, but with a caller-supplied
+ * `ChipBank` subclass instead of a plain one, so each test can control exactly how settlement fails.
+ */
+describe('PokerRoom — settlement recovery from a lost response (BUG-20)', () => {
+  /** Same shape as `harness()` above, but the bank is supplied rather than a plain `ChipBank`. */
+  function harnessOn<TBank extends ChipBank>(makeBank: (players: DevPlayers) => TBank): Harness & { bank: TBank } {
+    const players = new DevPlayers({ startingChips: 10_000 });
+    const bank = makeBank(players);
+    const alice = players.create('Alice').id;
+    const bob = players.create('Bob').id;
+    const room = new PokerRoom({ ...FAST, id: 't-bug20', name: 'Test table' } as PokerRoomConfig, {
+      directory: players,
+      fc: bank,
+    });
+    return { room, players, bank, alice, bob, startingTotal: players.totalChips() };
+  }
+
+  /** Commits the settlement for real (`super`), then throws ONCE — exactly a lost response: the
+   *  ledger has already moved, but the caller never sees the reply. */
+  class LostResponseBank extends ChipBank {
+    private failedOnce = false;
+    override async settleTableHand(
+      req: TableSettlementRequest,
+    ): Promise<{ roundId: string; applied: boolean }> {
+      const result = await super.settleTableHand(req);
+      if (!this.failedOnce) {
+        this.failedOnce = true;
+        throw new Error('socket hang up');
+      }
+      return result;
+    }
+  }
+
+  /** Never actually settles, and FC's own record disagrees with the request — a reused round id,
+   *  not a lost response to OUR request. */
+  class WrongReceiptBank extends ChipBank {
+    override async settleTableHand(): Promise<{ roundId: string; applied: boolean }> {
+      throw new Error('socket hang up');
+    }
+    override async settlementStatus(roundId: string): Promise<SettlementStatus> {
+      return {
+        settled: true,
+        receipt: {
+          type: 'table',
+          roundId,
+          rake: '999999',
+          jackpotTotal: '0',
+          losers: [{ playerAccountId: 'nobody-at-this-table', amount: '1' }],
+          winners: [],
+          hash: '',
+        },
+      };
+    }
+  }
+
+  /** Never actually settles, and asking FC about it fails too — status genuinely unknown. */
+  class UnknownStatusBank extends ChipBank {
+    override async settleTableHand(): Promise<{ roundId: string; applied: boolean }> {
+      throw new Error('socket hang up');
+    }
+    override async settlementStatus(): Promise<SettlementStatus> {
+      throw new Error('financial-core unreachable (status)');
+    }
+  }
+
+  it('finishes the hand when the response is lost but FC confirms it committed — never double-mirrors or double-runs the jackpot', async () => {
+    const h = harnessOn((players) => new LostResponseBank(players));
+    const reportSpy = jest.fn<Promise<void>, [SettlementFailureReport]>().mockResolvedValue(undefined);
+    (h.bank as unknown as { reportSettlementFailure: typeof reportSpy }).reportSettlementFailure = reportSpy;
+    const jackpotSpy = jest.spyOn(h.room as unknown as { evaluateJackpots: () => Promise<void> }, 'evaluateJackpots');
+
+    await seatBoth(h, 0, 1);
+    await playToShowdown(h, { 0: h.alice, 1: h.bob });
+
+    await until(() => h.room.snapshotFor(h.alice).phase === 'SHOWDOWN');
+    const view = h.room.snapshotFor(h.alice);
+    expect(view.message).toMatch(/wins/);
+
+    // The settlement actually applied: every seat's mirrored stack equals what the ledger has
+    // locked for that player, and total chips are conserved (some moved to the winner / rake sink)
+    // — the abandon path's "nothing paid" recovery would not produce either of these.
+    for (const seat of view.seats) {
+      expect(seat.stack).toBe(h.players.locked(seat.playerId));
+    }
+    expect(h.players.totalChips() + h.bank.sinkTotal()).toBe(h.startingTotal);
+
+    // Not treated as a failure: no alert to FC, and the jackpot evaluation — which the normal
+    // `handFc.settleTableHand` wrapper never got to run, because its own call is what threw — ran
+    // through `recoverSettlement` exactly once, not twice.
+    expect(reportSpy).not.toHaveBeenCalled();
+    expect(jackpotSpy).toHaveBeenCalledTimes(1);
+
+    // The table is not stuck: a second hand deals on its own.
+    await until(() => h.room.snapshotFor(h.alice).handNumber === 2);
+    h.room.dispose();
+  });
+
+  it('abandons (and reports) when FC has a settled round under this id but with a different receipt', async () => {
+    const h = harnessOn((players) => new WrongReceiptBank(players));
+    const reportSpy = jest.fn<Promise<void>, [SettlementFailureReport]>().mockResolvedValue(undefined);
+    (h.bank as unknown as { reportSettlementFailure: typeof reportSpy }).reportSettlementFailure = reportSpy;
+
+    await seatBoth(h, 0, 1);
+    const before = new Map(h.room.snapshotFor(h.alice).seats.map((s) => [s.playerId, s.stack]));
+
+    await playToShowdown(h, { 0: h.alice, 1: h.bob });
+    await until(() => h.room.snapshotFor(h.alice).phase === 'WAITING');
+
+    for (const seat of h.room.snapshotFor(h.alice).seats) {
+      expect(seat.stack).toBe(before.get(seat.playerId)); // nothing paid, nothing lost
+    }
+    expect(h.players.totalChips()).toBe(h.startingTotal);
+    expect(reportSpy).toHaveBeenCalledTimes(1);
+    h.room.dispose();
+  });
+
+  it('abandons (and reports) when FC cannot even say whether the round settled', async () => {
+    const h = harnessOn((players) => new UnknownStatusBank(players));
+    const reportSpy = jest.fn<Promise<void>, [SettlementFailureReport]>().mockResolvedValue(undefined);
+    (h.bank as unknown as { reportSettlementFailure: typeof reportSpy }).reportSettlementFailure = reportSpy;
+
+    await seatBoth(h, 0, 1);
+    const before = new Map(h.room.snapshotFor(h.alice).seats.map((s) => [s.playerId, s.stack]));
+
+    await playToShowdown(h, { 0: h.alice, 1: h.bob });
+    await until(() => h.room.snapshotFor(h.alice).phase === 'WAITING');
+
+    for (const seat of h.room.snapshotFor(h.alice).seats) {
+      expect(seat.stack).toBe(before.get(seat.playerId));
+    }
+    expect(h.players.totalChips()).toBe(h.startingTotal);
+    expect(reportSpy).toHaveBeenCalledTimes(1);
     h.room.dispose();
   });
 });

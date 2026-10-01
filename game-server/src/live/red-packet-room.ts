@@ -106,8 +106,17 @@ export class RedPacketRoom extends BaseLiveRoom<RedPacketRoomConfig, RoomSeat> {
     if (occupied.length < 2) return;
 
     let banker = occupied.find((s) => s.isBanker);
+    // Demote a sticky banker who is now leaving (D6, BUG-07 follow-up) — `isBanker` can predate
+    // `leaving`, so finding one is not enough.
+    if (banker?.leaving) {
+      banker.isBanker = false;
+      banker = undefined;
+    }
     if (!banker) {
-      banker = occupied[0]!;
+      banker = occupied.find((s) => !s.leaving);
+      // F5 (audit fix): every seat left is leaving — wait rather than force the bank onto one of
+      // them. The round starts on its own once a release clears one, or a fresh player sits down.
+      if (!banker) return;
       banker.isBanker = true;
     }
 
@@ -167,7 +176,20 @@ export class RedPacketRoom extends BaseLiveRoom<RedPacketRoomConfig, RoomSeat> {
         this.game.placeBet(b.playerId, b.cell!, b.bet);
       }
 
-      await this.game.start();
+      try {
+        await this.game.start();
+      } catch (err) {
+        // BUG-20: the settlement may have committed in FC even though this call threw (a lost
+        // response, not a refusal). Ask before abandoning a hand the ledger already paid.
+        const nets = this.game.getNet();
+        const attempted = nets.size > 0 ? settleNet(nets, { rakeBps: this.config.rakeBps }) : undefined;
+        if (!attempted || !(await this.settledDespite(err, this.game.getRoundId(), attempted))) throw err;
+        // Recovered: FC already committed this settlement, but `start()` threw before reaching its
+        // own post-settle lines — without this `this.game.reveal()` below stays null (it is gated on
+        // RESOLVED), so the jackpot draw is skipped for lack of a seed and the provably-fair mines
+        // stay withheld from a round the ledger already paid out (BUG-20 follow-up).
+        this.game.resolveSettled();
+      }
 
       const grossNets = this.game.getNet();
       const settlement = settleNet(grossNets, { rakeBps: this.config.rakeBps });
@@ -183,7 +205,10 @@ export class RedPacketRoom extends BaseLiveRoom<RedPacketRoomConfig, RoomSeat> {
         if (net > 0) winnerProfit += net;
       }
 
-      const roundId = `${this.config.id}-rp-${this.handNumber}`;
+      // Share the settlement's own round id rather than minting a second one from handNumber: two
+      // rooms with the same config.id (or a restart resetting handNumber) used to collide, and FC's
+      // idempotency key is `${roundId}:jackpot:${tier}` — a collision silently skips the payout.
+      const roundId = this.game.getRoundId();
       // The jackpot draws on the seed the round was actually generated from, so a player can
       // verify the draw the same way they verify the game. It used to draw on `${roundId}:seed`,
       // which anyone holding a round id can reproduce — a predictable jackpot.
@@ -204,7 +229,10 @@ export class RedPacketRoom extends BaseLiveRoom<RedPacketRoomConfig, RoomSeat> {
       // WAITING is not enough on its own: nothing else deals the next hand, so the table would
       // sit idle with players in their seats. Give it the same beat a showdown gets, then try.
       this.showdownTimer = setTimeout(() => {
-        void this.enqueue(() => this.maybeStartRound());
+        void this.enqueue(async () => {
+          await this.releaseDeparted();
+          this.maybeStartRound();
+        });
       }, this.config.showdownDelayMs ?? 5_000);
       return;
     }
@@ -213,8 +241,11 @@ export class RedPacketRoom extends BaseLiveRoom<RedPacketRoomConfig, RoomSeat> {
     this.push();
 
     this.showdownTimer = setTimeout(() => {
-      void this.enqueue(() => {
+      void this.enqueue(async () => {
         this.phase = 'WAITING';
+        // Frees anyone disconnect grace queued but could not release yet (D4, BUG-07 follow-up)
+        // before the next round can claim their seat as still occupied.
+        await this.releaseDeparted();
         this.push();
         this.maybeStartRound();
       });

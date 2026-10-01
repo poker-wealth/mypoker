@@ -129,8 +129,9 @@ export function TableScreen({ route, navigation }: TableScreenProps) {
    * needs answered.
    */
   const chips = useQuery({
-    queryKey: ['live', 'chips'],
-    queryFn: () => api.get<{ available: number }>('/api/live/chips'),
+    queryKey: ['live', 'chips', tableId],
+    queryFn: () =>
+      api.get<{ available: number }>(`/api/live/chips?tableId=${encodeURIComponent(tableId)}`),
     enabled: token !== null,
     staleTime: 10_000,
   });

@@ -171,6 +171,23 @@ describe('TexasGame runtime', () => {
     expect(game.state).toBe('WAITING');
     await game.startHand(1);
     expect(game.state).toBe('IN_HAND');
-    expect(game.roundInfo()!.roundId).toBe('room-1-h2'); // fresh round
+    expect(game.roundInfo()!.roundId).toMatch(/^room-1-h2-[0-9a-f]{8}$/); // fresh round
+  });
+
+  // BUG-01: many rooms build a new TexasGame instance per hand with roomId = config.id, so the
+  // in-memory handCounter alone repeats across instances and FC's idempotency key (roundId) collided
+  // — a settlement that looked like a replay (applied:false) while chips still moved locally.
+  it('two instances sharing a roomId produce different roundIds for hand 1', async () => {
+    const gameA = new TexasGame('room-shared', mockFc(), new EventBus(), cfg, new FakeChainClient());
+    const gameB = new TexasGame('room-shared', mockFc(), new EventBus(), cfg, new FakeChainClient());
+    await seatThree(gameA);
+    await seatThree(gameB);
+    await gameA.startHand(0);
+    await gameB.startHand(0);
+    const roundIdA = gameA.roundInfo()!.roundId;
+    const roundIdB = gameB.roundInfo()!.roundId;
+    expect(roundIdA).toMatch(/^room-shared-h1-[0-9a-f]{8}$/);
+    expect(roundIdB).toMatch(/^room-shared-h1-[0-9a-f]{8}$/);
+    expect(roundIdA).not.toBe(roundIdB);
   });
 });

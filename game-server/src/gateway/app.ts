@@ -11,7 +11,6 @@ import { buildAgentRouter } from './agent-routes';
 import { buildAdminRouter } from './admin-routes';
 import { buildMeRouter } from './me-routes';
 import { buildAvatarRouter } from './avatar-routes';
-import { createRedEnvelopeRouter } from './red-envelope-routes';
 import { buildInternalRouter } from './internal-routes';
 import { currentRuleManifest, ruleVersionFor } from '../fairness/rule-version';
 import { ruleCommitment } from '../fairness/rule-commitment';
@@ -32,6 +31,13 @@ import type { LobbyService } from '../lobby';
  */
 export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): Express {
   const app = express();
+
+  // Trust exactly the reverse proxy Heroku puts in front of this process (BUG-15).
+  // Without this, Express reads `req.ip` off the raw socket — the router's own
+  // address for every request behind Heroku — and the login throttle's IP half
+  // degenerates to the identifier alone. See `GatewayConfig.trustProxyHops` for
+  // why the count matters (too many hops makes X-Forwarded-For spoofable).
+  app.set('trust proxy', config.trustProxyHops);
 
   app.disable('x-powered-by');
   app.use(cors(config.corsOrigins));
@@ -147,7 +153,6 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
   // Jackpot pools are derived from the same tables, so it shares the gate.
   if (lobby) app.use('/jackpot', buildJackpotRouter(lobby, config));
 
-  app.use('/red-envelope', createRedEnvelopeRouter());
   // Live tables, folded into the gateway so ONE origin serves the API and the game socket (`/ws`).
   // Mounted only when the Financial Core secret is configured — i.e. a real deploy; an auth-only
   // gateway (and the auth/lobby tests) skip it. The WebSocket itself is attached to the http server
@@ -165,6 +170,10 @@ export function createGatewayApp(config: GatewayConfig, lobby?: LobbyService): E
       // suspended player kept playing until their token expired and could open
       // a fresh socket the whole time (docs/TRAPS.md §23).
       authorizeSession: (playerId) => userStore.canHoldSession(playerId),
+      // Same proxy, same trust (BUG-27): the socket is folded onto this same
+      // origin, so a connection's derived IP must agree with the HTTP side's
+      // `req.ip` about how many hops in front of the process are real.
+      trustProxyHops: config.trustProxyHops,
     });
     app.locals.tableHub = mounted.hub;
 

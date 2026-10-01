@@ -6,6 +6,7 @@ import type { LiveTableConfig } from './live-room';
 import type { TableHub } from './table-hub';
 import { mountLiveTables } from './mount';
 import { bankerMinimumFor } from './niu-niu-room';
+import { nonNegativeInt } from '../gateway/config';
 
 /**
  * The live table service — HTTP for the table list, WebSocket for the game.
@@ -37,6 +38,16 @@ export interface TableServerConfig {
   tables: LiveTableConfig[];
   /** Log every socket's fate. On by default: "it won't connect" is otherwise unanswerable. */
   logSockets?: boolean;
+  /**
+   * How many reverse-proxy hops to trust when deriving a socket connection's IP — see
+   * `GameSocketServerConfig.trustProxyHops` (BUG-27). This standalone server has no gateway to
+   * mirror, so it reads its own `TRUST_PROXY_HOPS` (see `startFromEnv`, same
+   * `nonNegativeInt` validation as `GatewayConfig.trustProxyHops`); if this ever runs behind
+   * a real proxy, leaving it unset (default 0) makes `connectionIp` read the proxy's own
+   * address for every connection, and a per-IP guard like `banSameIp` then refuses the
+   * second seat at every table.
+   */
+  trustProxyHops?: number;
 }
 
 export interface TableServer {
@@ -128,6 +139,7 @@ export function createTableServer(config: TableServerConfig): TableServer {
     ...(config.chipsFile ? { chipsFile: config.chipsFile } : {}),
     tables: config.tables,
     ...(config.logSockets !== undefined ? { logSockets: config.logSockets } : {}),
+    ...(config.trustProxyHops !== undefined ? { trustProxyHops: config.trustProxyHops } : {}),
   });
   const { hub } = mounted;
 
@@ -149,18 +161,39 @@ export function createTableServer(config: TableServerConfig): TableServer {
         server.listen(config.port, '0.0.0.0', () => resolve(config.port));
       }),
     close: async (): Promise<void> => {
+      // Drain before close (BUG-07): close() alone only ever disposed timers, never released a
+      // seat, so every stack at every table stayed locked in FC. Kept in step with
+      // gateway/server.ts's shutdown hook even though this standalone table server is not the
+      // current production entry (Procfile runs the gateway only — see DEPLOY.md) so that whichever
+      // process ends up owning the hub, now or once the table server deploys on its own, shuts down
+      // the same safe way.
+      await hub.drain();
       await hub.close();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },
   };
 }
 
-/** Read the environment and start. This is the deployed entry point. */
+/**
+ * Read the environment and start.
+ *
+ * NOT the current production entry (BUG-07 audit, Sep 2026): the Procfile runs `npm start` →
+ * `node dist/gateway/server.js` only, and DEPLOY.md lists the standalone table server as a
+ * follow-on ("later — its own app, or folded into the gateway"). In practice it was folded into
+ * the gateway already (`mountLiveTables` inside `createGatewayApp`) — this function is exercised by
+ * `npm run start:tables` / the `tables` script for local dev only. Left working and with the same
+ * graceful-shutdown hook as the gateway in case that changes.
+ */
 export function startFromEnv(): TableServer {
   const jwtSecret = process.env.JWT_SECRET;
   if (!jwtSecret) {
     throw new Error('JWT_SECRET is required — it must match whatever issues player tokens');
   }
+
+  // Same validation and the same production default as the gateway's own
+  // `GatewayConfig.trustProxyHops` (config.ts) — see the field doc above.
+  const isProduction = process.env.NODE_ENV === 'production';
+  const trustProxyHops = nonNegativeInt('TRUST_PROXY_HOPS', process.env.TRUST_PROXY_HOPS, isProduction ? 1 : 0);
 
   // TABLES_PORT wins locally (the gateway already owns PORT in .env); on a hosting platform only
   // the injected PORT exists, and binding anything else means the health check never passes.
@@ -183,6 +216,7 @@ export function startFromEnv(): TableServer {
       .map((o) => o.trim())
       .filter(Boolean),
     tables: defaultTables(),
+    trustProxyHops,
   });
 
   void server.listen().then((bound) => {

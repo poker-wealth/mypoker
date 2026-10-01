@@ -2,6 +2,8 @@ import type { FinancialCoreClient, JackpotAccounts } from '../core/financial-cor
 import { FakeChainClient, type ChainClient } from '../fairness';
 import type { JackpotCandidate } from '../jackpot/weights';
 import type { GameId } from '../lobby/game-catalog';
+import { toTableSettlementRequest, type TableSettlement } from '../games/texas/settlement';
+import { confirmSettled } from './settlement-recovery';
 import type { LiveRoom, LiveTableConfig, RoomDeps } from './live-room';
 import type { PlayerDirectory } from './players';
 import type { BetAction, RoomPhase, TableCommand, TableSnapshot, TableSummary, JackpotWinSnapshot } from './room-state';
@@ -27,6 +29,18 @@ export interface BaseRoomSeat {
   net?: number | undefined;
   connected: boolean;
   isBanker?: boolean;
+  /**
+   * On the way out — set by `stand()`, the disconnect-grace path and `drain()` right before each
+   * calls `releaseSeat`, and left set if that release throws (BUG-07 follow-up, D6). A seat carrying
+   * this must never be handed the bank, dealt in, or allowed a fresh bet: it is either genuinely
+   * leaving or stuck on a release FC keeps refusing, and either way it has no business starting
+   * something new. Cleared by `releaseSeat` succeeding (the seat is gone) — there is no other path
+   * that clears it EXCEPT a reconnect after 'disconnect' (BUG-07 follow-up, audit fix): a grace
+   * timer that fired while this seat was mid-round tagged it 'disconnect' before it ever asked to
+   * leave, so `join()`'s reconnect path un-tags it. 'stand' and 'drain' are the player (or the
+   * room) actually asking — those stay sticky through a reconnect, same as before.
+   */
+  leaving?: 'stand' | 'disconnect' | 'drain';
   /**
    * The worst this seat's standing bet can cost the bank, as a multiple of the stake — a tie at
    * baccarat's 8:1, a 5x stake against a 5x Niu Niu bank holding Five Small. Written by the room
@@ -77,7 +91,17 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
 
   private readonly roomJackpot: RoomJackpot;
   private readonly disconnectTimers = new Map<string, NodeJS.Timeout>();
+  /** playerIds the grace timer found unsafe to release yet — retried by `releaseDeparted` at the
+   *  next round boundary rather than waiting out the timer's own 5s re-arm (BUG-07 follow-up, D4). */
+  protected readonly departing = new Set<string>();
+  /** One retry sweep per room for every `leaving` seat a release has refused, independent of the
+   *  per-player disconnect timers above — `stand()` can set `leaving` on a seat that is still
+   *  connected, which has no disconnect timer of its own (BUG-07 follow-up, D6). */
+  private readonly leavingRetryTimer: NodeJS.Timeout;
   private queue: Promise<unknown> = Promise.resolve();
+  /** Set synchronously by `drain()` (D2, BUG-07 follow-up) — refuses new money (`sit`/`topUp`) and
+   *  new bets (`handleAct`) the instant shutdown starts, before the queue even sees it. */
+  private draining = false;
 
   constructor(config: TConfig, deps: RoomDeps) {
     this.config = config;
@@ -92,6 +116,12 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
       throw new RoomError(`table ${config.id}: minBuyIn ${config.minBuyIn} exceeds maxBuyIn ${config.maxBuyIn}`);
     }
     if (config.maxSeats < 1) throw new RoomError(`table ${config.id}: maxSeats must be at least 1`);
+
+    // .unref() (F3, audit fix) — repo convention (see gateway/app.ts's lobby resync): never holds
+    // the process, or a test run, open on its own.
+    this.leavingRetryTimer = setInterval(() => {
+      void this.enqueue(() => this.retryLeavingSeats());
+    }, 30_000).unref();
   }
 
   /**
@@ -139,11 +169,19 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
     const seat = this.seatOf(playerId);
     if (seat) {
       seat.connected = true;
+      // F2 (audit fix on BUG-07 follow-up): a 'disconnect' tag is the grace timer's own doing, not
+      // the player's — reconnecting before release actually cleared the seat means they are back,
+      // so nothing here should still be trying to hand their chair away, refusing their bets, or
+      // (via `retryLeavingSeats`/`releaseDeparted`) releasing them out from under a seat they never
+      // asked to leave. 'stand' and 'drain' are the player (or the room) actually asking — those
+      // stay sticky: reconnecting does not undo a stand that is still waiting on a stuck release.
+      if (seat.leaving === 'disconnect') delete seat.leaving;
       const timer = this.disconnectTimers.get(playerId);
       if (timer) {
         clearTimeout(timer);
         this.disconnectTimers.delete(playerId);
       }
+      this.departing.delete(playerId);
     }
 
     client.sendSnapshot(this.snapshotFor(playerId));
@@ -156,27 +194,171 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
         const mine = this.seatOf(playerId);
         if (mine) {
           mine.connected = false;
-          if (this.phase === 'WAITING') {
-            this.armDisconnectGrace(mine.playerId);
-          }
+          // Always armed (BUG-07) — it used to arm only when phase === 'WAITING' at the moment of
+          // disconnect, and nothing re-armed it once a round that was running had ended. A player
+          // who dropped mid-round kept their seat, and the money locked behind it, forever: the one
+          // event that could have freed them (join()'s own reconnect path) never fires for someone
+          // who never comes back.
+          this.armDisconnectGrace(mine.playerId);
         }
       }
     };
   }
 
+  /**
+   * Whether THIS seat, specifically, has anything live on it right now — not whether the table as a
+   * whole is busy (BUG-07 follow-up, D4). The original grace check gated on `this.phase`, table-wide:
+   * on a busy table a disconnected seat that never bet still saw `phase !== 'WAITING'` on every check,
+   * because the next round always started before the grace task ran (a disconnected seat still counts
+   * as occupied) — 42 hands, still seated, for a player who never had a chip at risk in any of them.
+   *
+   * Default: a live bet, or the banker's chair — the two ways a base-room seat carries risk. Dou Di
+   * Zhu has no bet to check (no per-trick wager) so it overrides to phase-based; red-envelope's
+   * equivalent of a bet is a claimed envelope; slots resolves a spin atomically and is never
+   * "committed" between calls.
+   */
+  protected seatCommitted(seat: TSeat): boolean {
+    return seat.bet > 0 || seat.isBanker === true;
+  }
+
+  /**
+   * Whether the grace timer may actually let go of this disconnected seat's chair.
+   *
+   * Default: the table is fully idle (`WAITING` — nothing anywhere is at risk, so even a seat this
+   * class considers "committed" by a sticky flag like `isBanker` is safe to let go of), OR this seat
+   * specifically is not committed. Texas Cowboy overrides this: its open betting window IS phase
+   * `WAITING` — seats place real bets into it — so `phase === 'WAITING'` cannot mean idle there the
+   * way it does everywhere else, and only `seatCommitted` (which texas-cowboy leaves at the default,
+   * bet-only) decides.
+   */
+  protected graceReleaseSafe(seat: TSeat): boolean {
+    return this.phase === 'WAITING' || !this.seatCommitted(seat);
+  }
+
+  /**
+   * The grace timer fires, checks whether it is actually safe to let go of the chair, and either
+   * releases the seat or checks again shortly — it does not just give up (BUG-07).
+   *
+   * Marks the seat `leaving` (D6) the moment the timer confirms the player is genuinely gone (still
+   * disconnected when the timer fires), whether or not release is safe yet: a seat on its way out
+   * must stop being eligible for the bank or a fresh deal from this point, not only once the release
+   * actually clears it.
+   */
   protected armDisconnectGrace(playerId: string, graceMs = 30_000): void {
     if (this.disconnectTimers.has(playerId)) return;
     const timer = setTimeout(() => {
       this.disconnectTimers.delete(playerId);
       void this.enqueue(async () => {
         const seat = this.seatOf(playerId);
-        if (seat && !seat.connected && this.phase === 'WAITING') {
-          await this.releaseSeat(seat.index);
-          this.push();
+        if (!seat || seat.connected) {
+          this.departing.delete(playerId);
+          return;
         }
+        // Never overwrite a sticky 'stand'/'drain' tag with 'disconnect' — those mean the player or
+        // the room already asked to leave, which is a stronger and stickier reason than merely
+        // being offline right now, and only a reconnect's own `'disconnect'`-specific clear should
+        // ever touch this (cleanup, audit fix on BUG-07 follow-up).
+        if (!seat.leaving) seat.leaving = 'disconnect';
+        if (!this.graceReleaseSafe(seat)) {
+          // Not this seat's table-wide idle moment, and it is still carrying something — check back
+          // shortly rather than dropping the grace entirely. Queued in `departing` too, so the next
+          // round boundary's `releaseDeparted` can free it the instant it actually becomes safe,
+          // rather than this seat waiting out its own next 5s tick.
+          this.departing.add(playerId);
+          this.armDisconnectGrace(playerId, 5_000);
+          return;
+        }
+        try {
+          await this.releaseSeat(seat.index);
+        } catch (err) {
+          // BUG-07 commit 1: a refused release now leaves the seat exactly as it was. `leaving` stays
+          // set, so nothing hands this chair the bank or a fresh bet while it retries — every 30s via
+          // the room's own leaving-seat sweep, and sooner via `releaseDeparted` at the next round
+          // boundary, plus this timer's own backoff so a released-in-between success is not blocked
+          // on the wider sweep alone.
+          console.error(`[room ${this.config.id}] seat ${seat.index} failed to release after disconnect grace:`, err);
+          this.departing.add(playerId);
+          this.armDisconnectGrace(playerId, 30_000);
+          return;
+        }
+        this.departing.delete(playerId);
+        this.push();
       });
     }, graceMs);
     this.disconnectTimers.set(playerId, timer);
+  }
+
+  /**
+   * Free every seat that grace queued as `departing` but could not yet release, plus any seat still
+   * marked `leaving` from a `stand()` or `drain()` release that failed — called by every room right
+   * after `this.phase = 'WAITING'` and BEFORE it deals the next round (BUG-07 follow-up, D4/D6). This
+   * is the fix for the actual race the auditor found: a disconnected seat still counts as occupied,
+   * so without this, `maybeStartRound()` claims it for the next hand before the grace timer's own
+   * tick ever gets a chance to run.
+   */
+  protected async releaseDeparted(): Promise<void> {
+    const indexes = new Set<number>();
+    for (const playerId of this.departing) {
+      const seat = this.seatOf(playerId);
+      if (seat && !seat.connected) indexes.add(seat.index);
+    }
+    for (const seat of this.occupiedSeats()) {
+      if (seat.leaving) indexes.add(seat.index);
+    }
+    for (const index of indexes) {
+      const seat = this.seats[index];
+      if (!seat) continue;
+      // Safety net (audit fix on BUG-07 follow-up, F1): every current call site runs this right
+      // after `this.phase = 'WAITING'` (or, for texas-cowboy, after its own bet reset — its
+      // `graceReleaseSafe` override does not depend on phase at all), so this is always true today.
+      // Kept explicit rather than relied on implicitly, so a future caller of `releaseDeparted` from
+      // a different point in a room's cycle cannot silently release a seat still mid-round.
+      if (!this.graceReleaseSafe(seat)) continue;
+      // Re-checked right before releasing (cleanup, audit fix, optional): `join()` runs outside the
+      // queue, so a reconnect can land between the snapshot above and this seat's own turn in the
+      // loop — this catches one that arrived in that window.
+      if (!seat.leaving && !this.departing.has(seat.playerId)) continue;
+      const playerId = seat.playerId;
+      try {
+        await this.releaseSeat(index);
+        this.departing.delete(playerId);
+      } catch (err) {
+        // Left in `departing` (if it was there) and still `leaving` — the next boundary, the 30s
+        // sweep, or the seat's own grace timer tries again. Nothing paid or lost here either way.
+        console.error(`[room ${this.config.id}] seat ${index} still could not be released:`, err);
+      }
+    }
+  }
+
+  /**
+   * The room's own 30s sweep for every `leaving` seat a release has refused — covers `stand()`
+   * failures too, which have no disconnect timer of their own to retry them (BUG-07 follow-up, D6).
+   *
+   * Gated on `graceReleaseSafe` (audit fix, F1): unlike `releaseDeparted`, this runs on its own
+   * clock, independent of any round boundary — it used to release a `leaving` seat unconditionally,
+   * which meant a disconnected banker (or a Dou Di Zhu player, or a texas-cowboy bettor) whose grace
+   * had already tagged them `leaving` while mid-round got released by this sweep regardless of
+   * whether the round they were part of had actually finished. `releaseDeparted` already covers the
+   * safe case at the boundary; this must only ever pick up what is ALSO safe right now.
+   */
+  protected async retryLeavingSeats(): Promise<void> {
+    const leaving = this.occupiedSeats().filter((s) => s.leaving);
+    if (leaving.length === 0) return;
+    let released = false;
+    for (const seat of leaving) {
+      if (!this.graceReleaseSafe(seat)) continue;
+      // Re-checked right before releasing (cleanup, audit fix, optional): `join()` runs outside the
+      // queue, so a reconnect can land between the snapshot above and this seat's own turn in the
+      // loop — this catches one that arrived in that window.
+      if (!seat.leaving && !this.departing.has(seat.playerId)) continue;
+      try {
+        await this.releaseSeat(seat.index);
+        released = true;
+      } catch (err) {
+        console.error(`[room ${this.config.id}] seat ${seat.index} still leaving — retry failed:`, err);
+      }
+    }
+    if (released) this.push();
   }
 
   hasSeated(playerId: string): boolean {
@@ -201,9 +383,17 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
       case 'buyIn':
         await this.topUp(playerId, cmd.amount);
         break;
-      case 'act':
+      case 'act': {
+        // Guarded HERE rather than in each of the ten subclasses' `handleAct` (D2, BUG-07 follow-up):
+        // every one of them is reached only through this dispatch — confirmed none overrides
+        // `command`/`handleCommand` — so one check covers every game's bet/act entry point.
+        if (this.draining) throw new RoomError('this table is closing');
+        // A leaving seat (D6, BUG-07 follow-up) is on its way out — refused a fresh bet the same way
+        // `draining` refuses one, rather than letting more money ride on a chair about to be released.
+        if (this.seatOf(playerId)?.leaving) throw new RoomError('you are leaving this table');
         await this.handleAct(playerId, cmd.action);
         break;
+      }
     }
   }
 
@@ -220,6 +410,9 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
     buyIn: number,
     profile: { displayName?: string; avatarUrl?: string },
   ): Promise<void> {
+    // Shutdown in progress (D2/D3, BUG-07 follow-up) — refuse fresh money the instant `drain()`
+    // starts rather than lock a new buy-in into a table that is about to release every seat.
+    if (this.draining) throw new RoomError('this table is closing');
     if (this.seatOf(playerId)) throw new RoomError('already seated');
     if (seatIndex < 0 || seatIndex >= this.config.maxSeats) throw new RoomError('invalid seat index');
     if (this.seats[seatIndex]) throw new RoomError('seat taken');
@@ -255,16 +448,44 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
   protected async stand(playerId: string): Promise<void> {
     const seat = this.seatOf(playerId);
     if (!seat) return;
-    if (this.phase === 'IN_HAND' && seat.bet > 0) {
-      throw new RoomError('cannot leave mid-hand with an active bet');
+    // BUG-07 follow-up, D6: the banker is the table's counterparty for every other seat's bet this
+    // round — walking away mid-round leaves those bets with nothing backing them. WAITING is fine:
+    // nothing is riding on the bank between rounds. Checked first, ahead of the general committed
+    // check below, so a leaving banker gets this specific reason rather than the generic one.
+    if (this.phase !== 'WAITING' && seat.isBanker) {
+      throw new RoomError("the banker can't leave mid-round");
+    }
+    // BUG-21 (audit fix on BUG-07 follow-up): `phase === 'IN_HAND' && seat.bet > 0` used to be the
+    // only guard here, which is baccarat-shaped and wrong for the rest of the rooms — Dou Di Zhu
+    // never carries a bet at all (mid-hand `seat.bet` stays 0, so the old check never fired), and
+    // Texas Cowboy's real money moves during its open betting window, which is phase `WAITING`, not
+    // `IN_HAND`. Reusing `graceReleaseSafe` asks the exact question the grace timer already answers
+    // for a disconnected seat: is this seat actually uncommitted right now, this room's own way.
+    if (!this.graceReleaseSafe(seat)) {
+      // Honest about which of the two it actually is (cleanup, audit fix): SHOWDOWN means the
+      // round already resolved and settled — nothing is "live" any more, it is just not this
+      // room's idle phase yet, so the seat's own commitment (a banker, or a stale `bet` not reset
+      // until the next round starts) reads as committed for the length of `showdownDelayMs`.
+      throw new RoomError(
+        this.phase === 'SHOWDOWN'
+          ? 'the round is settling — you can leave in a moment'
+          : 'you have a live bet this round — you can leave when it settles',
+      );
     }
 
+    // Set BEFORE the release, not after (D6): a refused release leaves the seat occupied, and it
+    // must not be eligible for the bank, a fresh deal, or a fresh bet while it sits there waiting
+    // for `retryLeavingSeats`/`releaseDeparted` to clear it. Nothing unsets this on failure —
+    // `releaseSeat` succeeding is the only thing that ever removes the seat this flag is on.
+    seat.leaving = 'stand';
     await this.releaseSeat(seat.index);
     this.push();
     this.onSeatChanged();
   }
 
   protected async topUp(playerId: string, amount: number): Promise<void> {
+    // Same shutdown guard as sit() — a top-up is new money too.
+    if (this.draining) throw new RoomError('this table is closing');
     const seat = this.seatOf(playerId);
     if (!seat) throw new RoomError('not seated');
     if (amount <= 0) throw new RoomError('invalid amount');
@@ -277,17 +498,31 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
     this.push();
   }
 
+  /**
+   * Give a seat's chips back and empty the chair.
+   *
+   * The chair is emptied AFTER the release, not before (BUG-07): this used to null the seat first
+   * and call `fc.release` second, so a refused release — FC unreachable, a 409 — lost the seat AND
+   * the money in the same moment. The chips stayed locked in FC with nothing at the table pointing
+   * back at them, and nobody could retry: the chair looked empty and sittable. Mirrors the order
+   * `PokerRoom.releaseSeat` already uses. A throw here now leaves the seat exactly as it was —
+   * still occupied, still holding its stack — so the caller's own retry (a later `stand`, or the
+   * next disconnect-grace check) is what actually clears it.
+   */
   protected async releaseSeat(seatIndex: number): Promise<void> {
     const seat = this.seats[seatIndex];
     if (!seat) return;
-    this.seats[seatIndex] = null;
 
     if (seat.stack > 0) {
       await this.fc.release(seat.playerId, String(seat.stack));
     }
+    this.seats[seatIndex] = null;
 
     if (seat.isBanker) {
-      const next = this.occupiedSeats()[0];
+      // Skip a seat that is itself on the way out (D6, BUG-07 follow-up) — handing the bank to a
+      // `leaving` seat just means reassigning it again the moment that seat's own release clears,
+      // and in between it is a banker nobody can reach.
+      const next = this.occupiedSeats().find((s) => !s.leaving) ?? this.occupiedSeats()[0];
       if (next) next.isBanker = true;
     }
   }
@@ -307,10 +542,16 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
    * are already correct. Either way, inventing a correction here would be the actual disaster.
    */
   protected abandonRound(err: unknown): void {
-    console.error(
-      `[room ${this.config.id}] round failed to settle — table returned to WAITING, nothing paid or reversed:`,
-      err,
-    );
+    // "nothing paid or reversed" was wrong whenever the throw landed AFTER `fc.settleTableHand`
+    // itself already succeeded (e.g. `processJackpot` throwing post-settlement in dou-di-zhu or
+    // san-zhang): FC had applied the settlement and this room had already mirrored the stacks, so
+    // telling ops nothing was paid was actively misleading during exactly the recovery this message
+    // exists to guide. Nothing here can tell "failed before settling" apart from "failed after" (see
+    // the class comment above), so the honest wording asks ops to check rather than asserting either
+    // way — and it is the SAME wording whether it lands in the console or in FC's security_log, so
+    // ops reading either one see the same instruction.
+    const message = `round ${this.config.id}#${this.handNumber} could not complete — check the ledger for this round before reversing anything`;
+    console.error(`[room ${this.config.id}] ${message}:`, err);
     // Surface it. A settlement failure is a money fault; left as a console line a RECURRING ledger
     // fault stays quiet. Report it so it lands in FC's append-only security_log and pages ops. Fire-
     // and-forget, exactly like the CB3 anomaly report — the recovery below must not wait on the alert.
@@ -318,13 +559,53 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
       void this.fc
         .reportSettlementFailure({
           tableId: this.config.id,
-          reason: err instanceof Error ? err.message : String(err),
+          reason: `${message}: ${err instanceof Error ? err.message : String(err)}`,
         })
         .catch((e) => console.error(`[room ${this.config.id}] settlement-failure report to FC failed:`, e));
     }
     this.phase = 'WAITING';
     this.actionDeadline = null;
     this.push();
+  }
+
+  /**
+   * BUG-20 — before abandoning a round whose settlement THREW, ask FC whether it actually committed
+   * anyway (a lost response, not a genuine refusal) and recover if so, rather than telling players a
+   * hand failed when the ledger already paid it.
+   *
+   * `settlement` must be EXACTLY what the game's own `settleTableHand` request would have been —
+   * this rebuilds it the same way every base-room game does (`tableType: 'PLATFORM'`, identity
+   * `accountOf`, `tableJackpotAccounts(this.config.id)`, no leagueId), which is what every game
+   * listed on this fix (baccarat, niu-niu, san-zhang, red-packet, red-envelope, cowboy-beauty,
+   * lottery) constructs its own `TableSettlementRequest` with — verified per game against its
+   * `*-game.ts` `toTableSettlementRequest` call. A game whose request this does NOT reproduce must
+   * not use this helper; it should keep abandoning as before.
+   *
+   * False on no roundId or an empty settlement (nothing was actually attempted) — those can only
+   * mean `settledDespite` was reached from a round that never called FC in the first place.
+   */
+  protected async settledDespite(
+    err: unknown,
+    roundId: string | undefined,
+    settlement: TableSettlement,
+  ): Promise<boolean> {
+    if (!roundId) return false;
+    if (settlement.losers.length === 0 && settlement.winners.length === 0) return false;
+
+    const req = toTableSettlementRequest(settlement, {
+      roundId,
+      tableType: 'PLATFORM',
+      accountOf: (p) => p,
+      jackpotAccounts: tableJackpotAccounts(this.config.id),
+    });
+    const ok = await confirmSettled(this.fc, req, `[room ${this.config.id}]`);
+    if (ok) {
+      console.error(
+        `[room ${this.config.id}] settlement response lost for round ${roundId} but FC confirms it committed — applying it`,
+        err,
+      );
+    }
+    return ok;
   }
 
   protected occupiedSeats(): TSeat[] {
@@ -409,23 +690,41 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
         const acctKey = accounts[tierLower];
         if (this.fc.jackpotPayout) {
           try {
-            await this.fc.jackpotPayout({
+            const result = await this.fc.jackpotPayout({
               tableId: this.config.id,
               roundId,
               tier: tierLower,
               playerId: hit.playerId,
               amount: String(hitChips),
               jackpotAccountId: acctKey,
+              // Non-poker rooms have no league concept today — every base-room table is PLATFORM.
+              // Explicit rather than left absent, so this stays true on purpose rather than by
+              // accident of an unset optional field (BUG-16).
+              tableType: 'PLATFORM',
             });
-            const winnerSeat = this.seatOf(hit.playerId);
-            this.lastJackpotWin = {
-              tier: hit.tier,
-              playerId: hit.playerId,
-              playerName: winnerSeat?.name ?? hit.playerId,
-              amount: hitChips,
-              animationMs: hit.animationMs,
-              roundId: hit.roundId,
-            };
+            if (result.applied) {
+              // The prize is in the winner's wallet (FC: availableBalance via transfer(); ChipBank:
+              // credit()). Deliberately NOT added to seat.stack: the stack mirrors the LOCKED balance
+              // and the release on leave unlocks exactly seat.stack — inflating it would over-draw
+              // that release and strand the seat. The winner may already have left; the wallet
+              // credit does not need the seat (BUG-23).
+              const winnerSeat = this.seatOf(hit.playerId);
+              this.lastJackpotWin = {
+                tier: hit.tier,
+                playerId: hit.playerId,
+                playerName: winnerSeat?.name ?? hit.playerId,
+                amount: hitChips,
+                animationMs: hit.animationMs,
+                roundId: hit.roundId,
+              };
+            } else {
+              // FC's idempotency key is `${roundId}:jackpot:${tierLower}` — applied:false means this
+              // exact payout already happened (a reused round id, most likely). No chips moved, so
+              // announcing it again would tell a player they won money that never arrived.
+              console.error(
+                `[room ${this.config.id}] jackpot payout for ${roundId}:${tierLower} was a replay — not announced`,
+              );
+            }
           } catch (err) {
             console.error(`[room ${this.config.id}] Jackpot payout error:`, err);
           }
@@ -481,10 +780,77 @@ export abstract class BaseLiveRoom<TConfig extends BaseRoomConfig, TSeat extends
     }
   }
 
+  /**
+   * Graceful shutdown (BUG-07 follow-up — D2): give every occupied seat's stack back through the
+   * same path a voluntary `stand` uses, one seat at a time so one seat's FC failure doesn't strand
+   * the rest — the same shape as `PokerRoom.finishClose`.
+   *
+   * Unlike a poker hand, a base-room round never has a live pot sitting apart from the seats: every
+   * game here (baccarat, niu-niu, san-zhang, red-packet, red-envelope, cowboy-beauty, dou-di-zhu,
+   * lottery, slots, texas-cowboy) only ever moves chips INTO `seat.stack` at settlement — a bet in
+   * progress lives in `seat.bet`, which is display state the settlement loop reads, not money the
+   * stack has already given up (verified per room for BUG-07: every `.stack +=`/`-=` site outside
+   * `topUp` is inside that room's own settlement code). So `seat.stack` right now is always either
+   * the untouched buy-in (a round mid-flight) or the fully-settled figure — never a value with money
+   * missing from it — and releasing it here is safe to do at any phase, not just between rounds. A
+   * seat still carrying a live `bet` is voided along with it: that bet never left `seat.stack`, so
+   * releasing the seat's current stack already returns it in full.
+   *
+   * Queued (D2, BUG-07 follow-up): the first version released seats immediately, racing an in-flight
+   * `handleAct` that is itself mid-settlement — `resolveRound`/`settleTableHand` reading or writing a
+   * seat this loop had already emptied. `draining` flips synchronously, before the queue is even
+   * touched, so `sit`/`topUp`/`act` are refused the instant shutdown starts; the release loop itself
+   * runs as a queued task, so it only starts after whatever command or settlement was already in
+   * flight has fully finished.
+   *
+   * Releases every seat CONCURRENTLY (BUG-07 follow-up), not one at a time: a 6-seat table's
+   * shutdown used to be bounded by the SUM of six FC timeouts, not one. `Promise.allSettled` keeps
+   * each seat's own try/catch — one seat's failure still cannot strand another's release.
+   */
+  async drain(): Promise<void> {
+    this.draining = true;
+    let failures = 0;
+    await this.enqueue(async () => {
+      // Gated on IN_HAND (BUG-07 follow-up): a room can be draining during SHOWDOWN too, where every
+      // bet has already been walked into `seat.stack` by the settlement that just ran — logging
+      // "voids N unsettled bets" there would describe money that already settled, not money about
+      // to be voided.
+      const voided = this.phase === 'IN_HAND' ? this.occupiedSeats().filter((s) => s.bet > 0) : [];
+      if (voided.length > 0) {
+        console.error(
+          `[room ${this.config.id}] drain voids ${voided.length} unsettled bet(s) — never left seat.stack`,
+        );
+      }
+      const occupied = this.occupiedSeats();
+      // Marked `leaving` before the release, same as `stand()` (D6, BUG-07 follow-up): a seat whose
+      // release fails here must not be handed the bank or a fresh bet if the room somehow outlives
+      // this drain, and it is what makes the 30s retry sweep and `releaseDeparted` keep trying it.
+      for (const seat of occupied) seat.leaving = 'drain';
+      const results = await Promise.allSettled(occupied.map((seat) => this.releaseSeat(seat.index)));
+      results.forEach((result, i) => {
+        if (result.status === 'rejected') {
+          failures += 1;
+          console.error(
+            `[room ${this.config.id}] seat ${occupied[i]!.index} failed to release during drain:`,
+            result.reason,
+          );
+        }
+      });
+      this.push();
+    });
+    if (failures > 0) {
+      // TableHub.drain (D7) turns this rejection into a failure count the process can act on —
+      // exit 1 instead of a silent 0 when chips were left stranded on shutdown.
+      throw new Error(`[room ${this.config.id}] drain left ${failures} seat(s) unreleased`);
+    }
+  }
+
   dispose(): void {
     for (const timer of this.disconnectTimers.values()) {
       clearTimeout(timer);
     }
     this.disconnectTimers.clear();
+    this.departing.clear();
+    clearInterval(this.leavingRetryTimer);
   }
 }

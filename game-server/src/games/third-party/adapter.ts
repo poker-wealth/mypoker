@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { FinancialCoreClient, JackpotAccounts } from '../../core/financial-core-client';
 import { settleNet, toTableSettlementRequest } from '../texas/settlement';
+import { confirmSettled } from '../../live/settlement-recovery';
 
 /**
  * ThirdPartyAdapter — the isolation boundary around an external game provider (Lottery, Slots).
@@ -74,6 +75,25 @@ export interface Receipt {
   payout: number;
   /** Player's net for the round (payout − wager). */
   net: number;
+  /**
+   * The exact amount FC moves for the PROVIDER'S OWN account this round — not the player's net
+   * (BUG-10 follow-up A). On a player win the provider is the loser in `settleNet` below and pays
+   * the raw amount (no deduction — rake/jackpot are only ever taken off a WINNER's side), so this
+   * equals `-net`. On a player loss the provider is the WINNER in `settleNet`, so rake and the
+   * jackpot injection come off ITS credit first — this is strictly less than `-net` in magnitude.
+   * Read straight off the settlement request we are about to send, so it can never drift from what
+   * FC actually applies. Zero when `net === 0` (a push settles nothing).
+   */
+  providerDelta: number;
+  /**
+   * The exact amount FC moves for the PLAYER's own account this round: `-wager` on a loss,
+   * `net - rake - jackpot` on a win (deductions come off the winner's credit, never the loser's —
+   * see `settleNet`), or `0` on a push. This is what a seat mirror must add to its stack and what
+   * is actually locked for the player in FC; `net` (the raw payout − wager) is NOT what lands on a
+   * win, because rake + the jackpot injection are deducted from the winner's side before it does.
+   * Read straight off the settlement request, same as `providerDelta`, so it can never drift.
+   */
+  playerDelta: number;
   outcome: unknown;
   replayed: boolean;
 }
@@ -149,6 +169,8 @@ export class ThirdPartyAdapter {
     }
 
     const net = result.payout - wager;
+    let providerDelta = 0;
+    let playerDelta = 0;
     if (net !== 0) {
       // Player ⇄ provider account. Sums to zero; the platform only rakes a commission.
       const grossNets = new Map<string, number>([
@@ -162,7 +184,33 @@ export class ThirdPartyAdapter {
         accountOf: (p) => (p === this.providerPlayerId ? this.cfg.providerAccountId : this.cfg.accountOf(p)),
         jackpotAccounts: this.cfg.jackpotAccounts,
       });
-      await this.fc.settleTableHand(request);
+
+      // The exact amount FC is about to move for the provider's own account — read straight off
+      // the request we are sending, not recomputed independently, so it can never drift from what
+      // actually gets applied. The provider appears in exactly one of losers/winners (never both,
+      // never neither, since net !== 0 here): a loser's `amount` is what leaves its balance, a
+      // winner's is what lands after rake + jackpot are deducted from it.
+      const providerLoss = request.losers.find((l) => l.playerAccountId === this.cfg.providerAccountId);
+      const providerWin = request.winners.find((w) => w.playerAccountId === this.cfg.providerAccountId);
+      providerDelta = providerLoss ? -Number(providerLoss.amount) : providerWin ? Number(providerWin.amount) : 0;
+
+      // Same reasoning as `providerDelta`, for the player's own side: a loser's `amount` is the raw
+      // stake it loses (no deduction — rake/jackpot only ever come off a WINNER's credit), a
+      // winner's is what lands after rake + jackpot are taken out.
+      const playerAccount = this.cfg.accountOf(playerId);
+      const playerLoss = request.losers.find((l) => l.playerAccountId === playerAccount);
+      const playerWin = request.winners.find((w) => w.playerAccountId === playerAccount);
+      playerDelta = playerLoss ? -Number(playerLoss.amount) : playerWin ? Number(playerWin.amount) : 0;
+
+      try {
+        await this.fc.settleTableHand(request);
+      } catch (err) {
+        // BUG-20: the settlement may have committed in FC even though this call threw (a lost
+        // response, not a refusal). `request` here is the exact object we sent — no reconstruction
+        // needed — so ask FC whether it matches what it has on file before treating the round as
+        // failed.
+        if (!(await confirmSettled(this.fc, request, `[adapter ${this.cfg.provider.name}]`))) throw err;
+      }
     }
 
     const receipt: Receipt = {
@@ -171,6 +219,8 @@ export class ThirdPartyAdapter {
       wager,
       payout: result.payout,
       net,
+      providerDelta,
+      playerDelta,
       outcome: result.outcome,
       replayed: false,
     };

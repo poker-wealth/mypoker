@@ -8,6 +8,7 @@ import {
   AccountNotFoundError,
   WithdrawalNotFoundError,
   InvalidWithdrawalTransitionError,
+  WithdrawalBroadcastPendingError,
 } from '../wallet/errors';
 import { alertOps } from '../lib/alert';
 import { LeagueError } from '../league/league-store';
@@ -140,7 +141,8 @@ export function errorHandler(
   }
   if (
     err instanceof InsufficientBalanceError ||
-    err instanceof InvalidWithdrawalTransitionError
+    err instanceof InvalidWithdrawalTransitionError ||
+    err instanceof WithdrawalBroadcastPendingError
   ) {
     res.status(409).json({ error: err.message });
     return;

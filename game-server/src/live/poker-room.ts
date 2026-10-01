@@ -1,7 +1,7 @@
 import { EventBus } from '../core/event-bus';
 import { positionOf } from '../history/hand-record';
 import { recordHand } from '../history/hand-store';
-import type { FinancialCoreClient } from '../core/financial-core-client';
+import type { FinancialCoreClient, WalletScope } from '../core/financial-core-client';
 import { FakeChainClient } from '../fairness';
 import type { ChainClient } from '../fairness';
 import type { RoundNotary } from '../fairness/round-notary';
@@ -9,6 +9,7 @@ import { TexasGame } from '../games/texas/texas-game';
 import { variant, type PokerVariant } from '../games/texas/variants';
 import type { Action, SeatPublic, Street } from '../games/texas/betting';
 import { isInsuranceEligible, underwrite } from '../games/texas/underwriting';
+import { confirmSettled } from './settlement-recovery';
 import { JackpotEngine, TIER_CONFIG } from '../jackpot/index';
 import type { JackpotHit } from '../jackpot/index';
 import type { TableSettlementRequest } from '../core/financial-core-client';
@@ -324,7 +325,19 @@ export class PokerRoom implements LiveRoom {
       rules: pokerTableRules({ variantId: this.config.variantId, rake: this.config.rake }),
     };
   }
+
   private readonly spec: PokerVariant;
+
+  /**
+   * Which wallet this table's buy-ins/releases lock and unlock — same (tableType, leagueId) settlement
+   * already routes rake and payouts through. Absent/`'PLATFORM'` is the platform wallet.
+   */
+  walletScope(): WalletScope {
+    return {
+      tableType: this.config.tableType ?? 'PLATFORM',
+      ...(this.config.leagueId ? { leagueId: this.config.leagueId } : {}),
+    };
+  }
 
   private readonly seats: (RoomSeat | null)[];
   private readonly viewers = new Map<string, Set<RoomClient>>();
@@ -351,8 +364,21 @@ export class PokerRoom implements LiveRoom {
   private paused = false;
   /** Close requested; the table deals no more and settles when the hand ends. */
   private closing = false;
-  /** finishClose has run. Guards against a double release of the same seat. */
+  /** Set by `runFinishClose` before it starts releasing seats — NOT the re-entry guard for
+   *  `finishClose` itself (that's `closeRun` below); this only tells `drain()`'s own task whether a
+   *  close is already under way, so it does not re-void a hand that closing has already claimed. */
   private closed = false;
+  /**
+   * Memoizes the CLOSE RUN itself (BUG-07 follow-up), not a flag set before it starts (DEFECT 2 —
+   * the previous `closed` guard flipped true synchronously, before a single seat had actually been
+   * released, so a second caller — `drain()` racing an owner's `close_table` already in flight — saw
+   * `closed` and returned immediately, as if every seat were already gone while the releases were
+   * still in flight; the process could then exit mid-release). `??=` in `finishClose` means every
+   * caller — the owner path (`beginClosing`/`maybeStartHand`, queued) and `drain()` (which calls it
+   * directly, never queued a second time) — gets the SAME promise and therefore the SAME eventual
+   * failure count, whichever of them got there first.
+   */
+  private closeRun: Promise<number> | null = null;
   private manualStarted = false;
 
   // The last reserve read that succeeded, and when. Null until the first one
@@ -463,7 +489,20 @@ export class PokerRoom implements LiveRoom {
         const result = await this.fc.settleTableHand(req);
         // Trigger evaluation rides the settlement: this is the one moment the
         // winner's profit is known and the money has actually moved.
-        if (result.applied) await this.evaluateJackpots(req);
+        //
+        // By this point FC has already committed the settlement — a throw from here is no longer a
+        // settlement failure, so it must never be allowed to look like one. Left uncaught, it would
+        // propagate out of this wrapper exactly like `settleTableHand` itself throwing, and
+        // `TexasGame.settle` cannot tell the two apart: `applyAction` would see `playedHand().isComplete`
+        // and run `abandonHand`, which reports a false "settlement failed" alarm and reasons about the
+        // hand as if nothing was paid — when the ledger has, in fact, already moved.
+        if (result.applied) {
+          try {
+            await this.evaluateJackpots(req);
+          } catch (err) {
+            console.error(`[room ${this.config.id}] jackpot evaluation failed after settlement:`, err);
+          }
+        }
         return result;
       },
     };
@@ -690,6 +729,10 @@ export class PokerRoom implements LiveRoom {
     buyIn: number,
     profile: { displayName?: string; avatarUrl?: string },
   ): Promise<void> {
+    // Shutdown in progress (D3, BUG-07 follow-up): `closing` flips synchronously the instant
+    // `drain()` is called, before the queue even sees it, so a buy-in racing the very start of
+    // shutdown is refused rather than locking fresh money into a table about to void its hand.
+    if (this.closing) throw new RoomError('this table is closing');
     if (this.seatOf(playerId)) throw new RoomError('you are already seated');
     if (seatIndex < 0 || seatIndex >= this.config.maxSeats) throw new RoomError('no such seat');
     if (this.seats[seatIndex]) throw new RoomError('seat taken');
@@ -700,10 +743,15 @@ export class PokerRoom implements LiveRoom {
     // First time we've seen this player id, the directory gets to create their record.
     const player = this.directory.ensure?.(playerId, profile) ?? this.directory.find(playerId);
     if (!player) throw new RoomError('unknown player');
-    if (player.available < buyIn) throw new RoomError('not enough chips');
+    // The directory only ever caches the PLATFORM balance (see fc-directory.ts), so this pre-check
+    // means nothing for a LEAGUE table — FC's own overdraft guard on the league wallet is what
+    // actually protects the buy-in below.
+    if (this.walletScope().tableType === 'PLATFORM' && player.available < buyIn) {
+      throw new RoomError('not enough chips');
+    }
 
     // Money first: if the lock fails, no seat is created.
-    await this.fc.buyIn(playerId, String(buyIn));
+    await this.fc.buyIn(playerId, String(buyIn), this.walletScope());
     this.seats[seatIndex] = {
       index: seatIndex,
       playerId,
@@ -815,42 +863,132 @@ export class PokerRoom implements LiveRoom {
    */
   private close(actorId: string): void {
     this.requireOwner(actorId, 'close the table');
-    if (this.closing) return;
-    this.closing = true;
-    this.push();
-    // Nothing in flight → close now. Otherwise the hand's end reaches
-    // maybeStartHand, which picks this up.
-    if (this.phase === 'WAITING') void this.finishClose();
+    this.beginClosing();
   }
 
   /**
-   * Give every remaining stack back, then stop.
+   * Graceful shutdown (BUG-07 follow-up — D1): VOID a hand in progress rather than wait it out.
    *
-   * Seats are released through the SAME path a voluntary departure uses, one at
-   * a time through the room's queue. Reusing `releaseSeat` rather than writing
-   * a bulk refund keeps this off its own money path — there is one way chips
-   * leave a table and this is not a second one.
+   * The first version of this shared `close()`'s own machinery and waited for a live hand to reach
+   * its own showdown. `close()`'s doc comment is right that an OWNER deciding a pot early would be
+   * the owner taking a decision that is the cards' to make — but a hand can legitimately run past a
+   * 25s hard exit (a 20s action clock plus up to 60s of time bank per player), and nobody is
+   * deciding anything by voiding it: the process is about to stop existing either way.
    *
-   * Guarded against re-entry: `maybeStartHand` runs on several edges and this
-   * must not start twice and double-release a seat.
+   * Voiding is safe here in a way it would not be for an arbitrary abort: `seat.stack` in this room
+   * is never written while a hand is in progress — the only writer is `finishHand`, which copies
+   * `game.seatedStacks()` only AFTER `fc.settleTableHand` resolves (see the MONEY CHECK comment on
+   * `abandonHand`, which relies on the same fact for the same reason). So every occupied seat still
+   * holds exactly its pre-hand stack right now, and releasing it below returns exactly that — never
+   * a value with money missing from it. Settlement itself can never race this: `finishHand` only
+   * ever runs inside a queued task (reached from `applyAction`/`endShowdown`), so a drain task queued
+   * behind it can only observe the hand AFTER settlement has already moved the stacks, never mid-way.
+   *
+   * `closing` flips synchronously, before the queue is even touched, so `sit`/`topUp` refuse the
+   * instant shutdown starts (D3) rather than waiting for whatever is already ahead of drain in the
+   * queue. Everything else — cancelling a hand that hasn't started dealing yet, skipping a showdown
+   * delay for one that already settled, releasing every seat — happens inside the queue, after
+   * whatever command or settlement was already in flight.
    */
-  private async finishClose(): Promise<void> {
-    if (this.closed) return;
+  async drain(): Promise<void> {
+    this.closing = true;
+    if (this.startTimer) {
+      clearTimeout(this.startTimer);
+      this.startTimer = undefined;
+    }
+    let failures = 0;
+    await this.enqueue(async () => {
+      if (this.showdownTimer) {
+        clearTimeout(this.showdownTimer);
+        this.showdownTimer = undefined;
+      }
+      const game = this.game;
+      // `!this.closed` (BUG-07 follow-up — DEFECT 2): a close already under way (the owner's
+      // `close_table`, queued ahead of this task) has already claimed the hand, if there was one, by
+      // the time its own queued `finishClose` ran — this task must not re-void anything. `finishClose`
+      // below is what actually decides whether there is still work to do; this is just the guard on
+      // OUR OWN void-hand block, not the re-entry guard for the release loop.
+      if (!this.closed && this.phase === 'IN_HAND' && game) {
+        const roundId = game.roundInfo()?.roundId;
+        console.error(
+          `[room ${this.config.id}] hand ${roundId ?? '?'} voided by shutdown — no settlement issued, pre-hand stacks returned`,
+        );
+        this.clearActionClock();
+        for (const s of this.occupied()) {
+          s.inHand = false;
+          delete s.lastAction;
+        }
+        this.game = undefined;
+        this.winners = [];
+        this.revealed.clear();
+        this.message = 'Table closed by the server — hand cancelled, chips returned';
+      }
+      this.phase = 'WAITING';
+      failures = await this.finishClose();
+    });
+    if (failures > 0) {
+      // TableHub.drain (D7) turns this rejection into a failure count the process can act on —
+      // exit 1 instead of a silent 0 when chips were left stranded on shutdown.
+      throw new Error(`[room ${this.config.id}] drain left ${failures} seat(s) unreleased`);
+    }
+  }
+
+  /**
+   * Start closing (idempotent).
+   *
+   * `closing` guards re-entry: a second `close_table`, or a `close()` racing `drain()`, is a no-op
+   * here. The actual release run is `finishClose` — queued, never called directly (BUG-07 follow-up
+   * — DEFECT 2), so it runs strictly after whatever command was already ahead of it, same as every
+   * other money-touching path in this room.
+   */
+  private beginClosing(): void {
+    if (this.closing) return;
+    this.closing = true;
+    this.push();
+    // Nothing in flight → close now. Otherwise the hand's end reaches maybeStartHand, which picks
+    // this up. Queued rather than called directly: this runs inside the ALREADY-executing queued
+    // task that dispatched `close()`, so `void this.enqueue(...)` schedules it to run next, after
+    // that task returns — never awaited here, so `close()` itself stays synchronous.
+    if (this.phase === 'WAITING') void this.enqueue(async () => { await this.finishClose(); });
+  }
+
+  /**
+   * Give every remaining stack back, then stop. Returns how many seats failed to release (D7).
+   *
+   * Seats are released through the SAME path a voluntary departure uses — releasing every seat
+   * CONCURRENTLY (BUG-07 follow-up) rather than one at a time, so a 6-seat table's shutdown is
+   * bounded by ONE seat's FC timeout, not the sum of all six; each seat still gets its own
+   * try/catch, so one seat's failure cannot strand another's release.
+   *
+   * Memoized on the RUN itself via `closeRun`, not a flag set before it starts (DEFECT 2 — see the
+   * field comment on `closeRun`): every caller of `finishClose` — the owner path (`beginClosing`,
+   * queued) and `drain()` (called directly, never queued a second time) — gets the SAME promise,
+   * so a second caller joins the release run already in flight instead of seeing "already closed"
+   * before a single seat has actually come back.
+   */
+  private finishClose(): Promise<number> {
+    this.closeRun ??= this.runFinishClose();
+    return this.closeRun;
+  }
+
+  private async runFinishClose(): Promise<number> {
     this.closed = true;
 
     // A copy: releaseSeat mutates the seat list as it goes. Empty chairs are
     // `null` here, not seats with no player, so they are filtered by identity.
     const occupied = [...this.seats].filter((s): s is NonNullable<typeof s> => s !== null);
-    for (const seat of occupied) {
-      try {
-        await this.releaseSeat(seat.index);
-      } catch (err) {
+    const results = await Promise.allSettled(occupied.map((seat) => this.releaseSeat(seat.index)));
+    let failures = 0;
+    results.forEach((result, i) => {
+      if (result.status === 'rejected') {
+        failures += 1;
         // One seat failing must not strand the rest — every other player still
         // gets their chips, and the failure is loud rather than silent.
-        console.error(`[poker-room] close: seat ${seat.index} failed to release:`, err);
+        console.error(`[poker-room] close: seat ${occupied[i]!.index} failed to release:`, result.reason);
       }
-    }
+    });
     this.push();
+    return failures;
   }
 
   private async kick(actorId: string, targetId: string): Promise<void> {
@@ -889,15 +1027,23 @@ export class PokerRoom implements LiveRoom {
   }
 
   private async topUp(playerId: string, amount: number): Promise<void> {
+    // Same shutdown guard as sit() (D3) — a top-up is new money locked into a table that is about
+    // to close, exactly like a fresh buy-in.
+    if (this.closing) throw new RoomError('this table is closing');
     const seat = this.requireSeat(playerId);
     if (seat.inHand && this.phase === 'IN_HAND') throw new RoomError('you can top up between hands');
     if (seat.stack + amount > this.config.maxBuyIn) {
       throw new RoomError(`a stack may not exceed ${this.config.maxBuyIn}`);
     }
     const player = this.directory.find(playerId);
-    if (!player || player.available < amount) throw new RoomError('not enough chips');
+    if (!player) throw new RoomError('unknown player');
+    // Same caveat as sit(): the directory caches only the PLATFORM balance, so the pre-check is
+    // meaningless for a LEAGUE table — FC's overdraft guard on the league wallet protects the buy-in.
+    if (this.walletScope().tableType === 'PLATFORM' && player.available < amount) {
+      throw new RoomError('not enough chips');
+    }
 
-    await this.fc.buyIn(playerId, String(amount));
+    await this.fc.buyIn(playerId, String(amount), this.walletScope());
     seat.stack += amount;
     // Counted here too, or a topped-up player reads as winning: their stack
     // grew without them having won a chip of it.
@@ -1180,7 +1326,13 @@ export class PokerRoom implements LiveRoom {
      * once the last hand is done every remaining stack goes home.
      */
     if (this.closing) {
-      void this.finishClose();
+      // Queued, not called directly (BUG-07 follow-up — DEFECT 2): `maybeStartHand` runs inside an
+      // already-executing queued task (every caller reaches it through `enqueue`'d command handling),
+      // so `void this.enqueue(...)` schedules the release run to start right after that task
+      // returns, rather than firing it unqueued and racing whatever runs next.
+      void this.enqueue(async () => {
+        await this.finishClose();
+      });
       return;
     }
     if (this.paused) return;
@@ -1297,7 +1449,23 @@ export class PokerRoom implements LiveRoom {
     // clock is torn down — otherwise dipping in for a second costs the lot.
     this.refundUnusedTimeBank(playerId);
     this.clearActionClock();
-    await this.game!.handleAction(playerId, action);
+    try {
+      await this.game!.handleAction(playerId, action);
+    } catch (err) {
+      // An illegal action throws BEFORE the hand completes; only a settlement failure throws after
+      // (TexasGame.settle transitions to SETTLING, then throws from fc.settleTableHand before touching
+      // any stack). playedHand().isComplete is true exactly in that second case — the engine only sets
+      // it once the hand itself (not the settlement) has finished.
+      if (this.game?.playedHand()?.isComplete) {
+        if (await this.recoverSettlement(err)) {
+          await this.finishHand();
+          return;
+        }
+        await this.abandonHand(err);
+        return;
+      }
+      throw err;
+    }
 
     if (seat && label) {
       // All-in is decided by the engine, not by comparing numbers here: a call
@@ -1518,6 +1686,112 @@ export class PokerRoom implements LiveRoom {
   }
 
   /**
+   * BUG-20 — `TexasGame.settle`'s own `fc.settleTableHand` call (inside `handFc`, above) can throw
+   * even after FC already committed the settlement: a lost response, not a refusal. Before
+   * `abandonHand` tells the table (and the players) a hand failed that the ledger actually paid, ask
+   * FC whether `game.pendingSettlementRequest()` — the EXACT request `settle()` sent, not a
+   * reconstruction of it — is the one FC has on file for this round.
+   *
+   * `false` means "abandon exactly as before this existed": no pending request (the throw came from
+   * somewhere else in `handleAction`, not settlement), or FC's own record does not match.
+   */
+  private async recoverSettlement(err: unknown): Promise<boolean> {
+    const game = this.game;
+    const req = game?.pendingSettlementRequest();
+    if (!game || !req) return false;
+    if (!(await confirmSettled(this.fc, req, `[room ${this.config.id}]`))) return false;
+
+    console.error(
+      `[room ${this.config.id}] settlement response lost for round ${req.roundId} but FC confirms it committed — applying it`,
+      err,
+    );
+    // Applies the exact stack deltas and result `settle()` had already computed — never a guess.
+    game.finalizeSettled();
+    // `handFc.settleTableHand` (constructor, above) only runs `evaluateJackpots` after its OWN call
+    // to `fc.settleTableHand` returns — which never happened here, because that call is what threw.
+    // Run it here instead, exactly once: jackpot payouts are idempotent per
+    // `${roundId}:jackpot:${tier}`, so this can never double-pay even if FC's reply arrives late and
+    // some other path also ends up retrying it.
+    try {
+      await this.evaluateJackpots(req);
+    } catch (jpErr) {
+      console.error(`[room ${this.config.id}] jackpot evaluation failed after recovered settlement:`, jpErr);
+    }
+    return true;
+  }
+
+  /**
+   * Settlement failed (BUG-03): `TexasGame.settle` transitions to SETTLING and only THEN awaits
+   * `fc.settleTableHand`, so a throw from there — network error, 5xx, 409, or `settleTableHand`'s own
+   * deliberate throw on `applied: false` — lands here with the hand stuck mid-settle and no money
+   * moved. Same narrow recovery as `BaseLiveRoom.abandonRound`: nothing is paid and nothing is
+   * reversed, because nothing was applied.
+   *
+   * MONEY CHECK (see PR): `seat.stack` in this room is never touched while a hand is in progress —
+   * the only writer is `finishHand`, which copies `game.seatedStacks()` after `handleAction` returns
+   * successfully. `TexasGame.settle` is the same shape: it mutates `this.table[].stack` only AFTER
+   * `fc.settleTableHand` resolves. So a throw from settlement means every seat here still holds
+   * exactly what it held when the hand was dealt — "chips returned" is really "chips never moved".
+   */
+  private async abandonHand(err: unknown): Promise<void> {
+    const roundId = this.game?.roundInfo()?.roundId;
+    console.error(`[room ${this.config.id}] hand ${roundId ?? '?'} failed to settle — nothing paid or reversed:`, err);
+    // Fire-and-forget, exactly like BaseLiveRoom.abandonRound and the CB3 anomaly report — the
+    // recovery below must not wait on the alert.
+    if (this.fc.reportSettlementFailure) {
+      void this.fc
+        .reportSettlementFailure({
+          tableId: this.config.id,
+          reason: err instanceof Error ? err.message : String(err),
+          ...(roundId ? { roundId } : {}),
+        })
+        .catch((e) => console.error(`[room ${this.config.id}] settlement-failure report to FC failed:`, e));
+    }
+    this.clearActionClock();
+    this.game = undefined;
+    this.winners = [];
+    this.revealed.clear();
+    this.message = 'This hand could not be settled — chips returned, dealing again';
+    // Same two loops finishHand's normal counterpart (endShowdown) runs: clear the hand off every
+    // seat first, then release whoever asked to leave. No stack was touched above, so there is no
+    // "busted" check to redo here — nobody's stack could have changed.
+    for (const seat of this.occupied()) {
+      seat.inHand = false;
+      delete seat.lastAction;
+    }
+    // phase/push land BEFORE the release loop, not after: abandonHand's usual trigger is FC being
+    // down, and releaseSeat's own call into FC (below) can fail for exactly the same reason. If it
+    // did and this were still queued after the release loop, the table would land right back in the
+    // frozen state this function exists to escape — IN_HAND forever, no timer, nobody able to act.
+    this.phase = 'WAITING';
+    this.push();
+    // Release whoever asked to leave, one seat at a time — mirroring finishClose's own per-seat
+    // try/catch, for the same reason: one seat's FC call failing must not strand the table, and must
+    // not strand the OTHER seats waiting to be released either. A seat whose release fails keeps its
+    // chair and its (locked) chips — the ledger-true state — but is forced sittingOut so it is never
+    // dealt into the next hand, and leaveAfterHand stays set so a later `stand` (or a pending
+    // finishClose, which releases every occupied seat regardless of this flag) retries the same call.
+    for (const seat of this.occupied()) {
+      if (!seat.leaveAfterHand) continue;
+      try {
+        await this.releaseSeat(seat.index);
+      } catch (err) {
+        console.error(`[room ${this.config.id}] seat ${seat.index} failed to release after an abandoned hand:`, err);
+        seat.sittingOut = true;
+        seat.leaveAfterHand = true;
+      }
+    }
+    this.push();
+    // Hold the failure message on screen for the same span a real result would (showdownDelayMs),
+    // then hand off to maybeStartHand exactly like endShowdown does — which is also what lets a
+    // pending close_table finish closing instead of dealing again.
+    this.startTimer = setTimeout(() => {
+      this.startTimer = undefined;
+      void this.enqueue(() => this.maybeStartHand());
+    }, this.config.showdownDelayMs);
+  }
+
+  /**
    * Turn the hand just finished into a history record.
    *
    * FIRE AND FORGET, like notarization above it and for the same reason: the
@@ -1646,7 +1920,7 @@ export class PokerRoom implements LiveRoom {
       this.clearActionClock();
     }
     this.clearAwayTimers(seat);
-    if (seat.stack > 0) await this.fc.release(seat.playerId, String(seat.stack));
+    if (seat.stack > 0) await this.fc.release(seat.playerId, String(seat.stack), this.walletScope());
     this.behavior.delete(seat.playerId); // the seat's behaviour session ends when they leave
     this.seats[index] = null;
   }
@@ -1693,34 +1967,48 @@ export class PokerRoom implements LiveRoom {
     const engine = this.jackpot();
     const now = Date.now();
     const wasFrozen = engine.isFrozen();
-    const hits = engine.onRoundSettled({
-      roundId: req.roundId,
-      seed: this.game?.roundInfo()?.finalSeed ?? req.roundId,
-      now,
-      candidates: seatIds.map((playerId) => ({
-        playerId,
-        baseWeight: 1,
-        /**
-         * The seat's real behaviour, not a constant.
-         *
-         * The weights module was wired up but fed `NORMAL` for everyone, so a bot and a person had
-         * exactly the same chance at a jackpot — the scoring existed and decided nothing. This is
-         * the input side of it: `behaviorStatusFor` reads the reaction times and bet sizing the
-         * room records per turn and returns FLAGGED once a seat crosses the review threshold,
-         * which halves its jackpot weight.
-         *
-         * FLAGGED weights a draw and nothing else (§8.3): it never bans, never touches reputation
-         * and never blocks a withdrawal.
-         */
-        behavior: this.behaviorStatusFor(playerId),
-        /**
-         * Left alone deliberately. `associated` and COLLUDING come from the collusion and
-         * association pipeline, which is a different signal from per-seat timing — this change
-         * must not start asserting things that pipeline is responsible for.
-         */
-        associated: false,
-      })),
-    });
+    // The draw has to run on the round's own verifiable seed, so a player can check it the same way
+    // they check the deal. This used to fall back to `req.roundId` when the game had no finalSeed
+    // yet — a round id is not a secret (it is right there in the snapshot), so that fallback drew on
+    // a seed anyone at the table could predict in advance. No fallback on purpose: without a real
+    // seed the draw is SKIPPED, because running it on a guessable one is the bug, not the backstop.
+    const finalSeed = this.game?.roundInfo()?.finalSeed;
+    let hits: JackpotHit[];
+    if (finalSeed) {
+      hits = engine.onRoundSettled({
+        roundId: req.roundId,
+        seed: finalSeed,
+        now,
+        candidates: seatIds.map((playerId) => ({
+          playerId,
+          baseWeight: 1,
+          /**
+           * The seat's real behaviour, not a constant.
+           *
+           * The weights module was wired up but fed `NORMAL` for everyone, so a bot and a person had
+           * exactly the same chance at a jackpot — the scoring existed and decided nothing. This is
+           * the input side of it: `behaviorStatusFor` reads the reaction times and bet sizing the
+           * room records per turn and returns FLAGGED once a seat crosses the review threshold,
+           * which halves its jackpot weight.
+           *
+           * FLAGGED weights a draw and nothing else (§8.3): it never bans, never touches reputation
+           * and never blocks a withdrawal.
+           */
+          behavior: this.behaviorStatusFor(playerId),
+          /**
+           * Left alone deliberately. `associated` and COLLUDING come from the collusion and
+           * association pipeline, which is a different signal from per-seat timing — this change
+           * must not start asserting things that pipeline is responsible for.
+           */
+          associated: false,
+        })),
+      });
+    } else {
+      console.error(
+        `[room ${this.config.id}] round ${req.roundId} has no verifiable seed — jackpot draw skipped rather than drawn on a predictable one`,
+      );
+      hits = [];
+    }
 
     // CB3 edge — the engine froze THIS round (three jackpots inside an hour on this table, a farming
     // signature). It has already stopped paying locally; report it to FC so the freeze lands in the
@@ -1735,20 +2023,43 @@ export class PokerRoom implements LiveRoom {
     const pools = this.jackpotAccountIds();
     for (const hit of hits) {
       const tierKey = hit.tier.toLowerCase() as 'mini' | 'minor' | 'major' | 'grand';
-      const amountChips = hit.amount / CHIPS_TO_MICROS; // micros → table currency
+      // The chip rail (fc-chip-adapter → chip-currency.parseChips) only accepts whole-chip decimal
+      // strings (/^\d+$/) — a fractional amount like "12.500000" throws there and refuses the whole
+      // payout. Floor to the whole chip the ledger can actually move; a sub-chip remainder is not
+      // worth minting a fifth currency unit over, and a hit that floors to zero pays nothing.
+      const amountChips = Math.floor(hit.amount / CHIPS_TO_MICROS); // micros → table currency
+      if (amountChips <= 0) continue;
+      let applied: boolean;
       try {
-        await this.fc.jackpotPayout({
+        ({ applied } = await this.fc.jackpotPayout({
           tableId: this.config.id,
           tier: tierKey,
           jackpotAccountId: pools[tierKey],
           playerId: hit.playerId,
-          amount: amountChips.toFixed(6),
+          amount: String(amountChips),
           roundId: req.roundId,
-        });
+          // A league table's jackpot pays into the winner's LEAGUE wallet, not their platform one
+          // (BUG-16) — same scope buy-ins/releases already lock and unlock through.
+          ...this.walletScope(),
+        }));
       } catch (err) {
         console.error('[room] jackpot payout refused by ledger — hit not shown:', err);
         continue;
       }
+      if (!applied) {
+        // FC's idempotency key is `${roundId}:jackpot:${tierKey}` — applied:false means this exact
+        // payout already happened (a reused round id, most likely). No chips moved, so announcing it
+        // again would tell a player they won money that never arrived.
+        console.error(
+          `[room ${this.config.id}] jackpot payout for ${req.roundId}:${tierKey} was a replay — not announced`,
+        );
+        continue;
+      }
+      // The prize is in the winner's wallet (FC: availableBalance via transfer(); ChipBank: credit()).
+      // Deliberately NOT added to seat.stack: the stack mirrors the LOCKED balance and the release on
+      // leave unlocks exactly seat.stack — inflating it would over-draw that release and strand the
+      // seat. The winner may already have left; the wallet credit does not need the seat (BUG-23).
+      // seat.stack is a mirror of TexasGame's stacks — neither is touched.
       this.announceJackpot(hit, amountChips);
     }
   }

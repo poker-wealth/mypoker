@@ -5,9 +5,11 @@ import type {
   JackpotPayoutRequest,
   SettleRoundRequest,
   SettlementReceipt,
+  SettlementStatus,
   TableSettlementRequest,
+  WalletScope,
 } from '../core/financial-core-client';
-import { chipsToUsdt } from './chip-currency';
+import { chipsToUsdt, usdtToChips } from './chip-currency';
 
 /**
  * Wraps a real `FinancialCoreClient` so the room keeps speaking chips while the ledger receives USDT.
@@ -19,14 +21,59 @@ import { chipsToUsdt } from './chip-currency';
  * not one line of room, game, or settlement code changes.
  */
 export class ChipDenominatedFc implements FinancialCoreClient {
-  constructor(private readonly inner: FinancialCoreClient) {}
+  /**
+   * Declared as an optional PROPERTY, not a prototype method, so it can be left entirely unset
+   * below (BUG-10 follow-up B). `FinancialCoreClient.lockedBalance` is documented as: absent means
+   * the caller should treat "locked" as UNKNOWN, never as zero. A method that always exists and
+   * quietly returns '0' when the inner client can't answer breaks that contract for anyone reading
+   * `fc.lockedBalance` as a presence check (slots-room's `fundVendor` does exactly that) — they'd
+   * see a real function and trust its lying zero instead of falling back to their own tracking.
+   */
+  lockedBalance?: (playerAccountId: string, scope?: WalletScope) => Promise<string>;
 
-  buyIn(playerAccountId: string, amount: string): Promise<void> {
-    return this.inner.buyIn(playerAccountId, chipsToUsdt(amount));
+  /**
+   * Same optional-property shape as `lockedBalance` above, and for the same reason (BUG-20): absent
+   * means the caller (settlement-recovery's `confirmSettled`) should treat a lost response as
+   * unconfirmable, never as a silent "can't have happened".
+   */
+  settlementStatus?: (roundId: string) => Promise<SettlementStatus>;
+
+  constructor(private readonly inner: FinancialCoreClient) {
+    if (inner.lockedBalance) {
+      const innerLockedBalance = inner.lockedBalance.bind(inner);
+      this.lockedBalance = async (playerAccountId: string, scope?: WalletScope): Promise<string> => {
+        const usdt = await innerLockedBalance(playerAccountId, scope);
+        // The inner client (the real ledger) speaks USDT; the room speaks chips — convert at this
+        // same boundary every other amount crosses, just in the read direction.
+        return String(usdtToChips(usdt));
+      };
+    }
+    if (inner.settlementStatus) {
+      const innerSettlementStatus = inner.settlementStatus.bind(inner);
+      this.settlementStatus = async (roundId: string): Promise<SettlementStatus> => {
+        const status = await innerSettlementStatus(roundId);
+        if (!status.settled || !status.receipt) return status;
+        const r = status.receipt;
+        return {
+          settled: true,
+          receipt: {
+            ...r,
+            rake: String(usdtToChips(r.rake)),
+            jackpotTotal: String(usdtToChips(r.jackpotTotal)),
+            losers: r.losers.map((p) => ({ ...p, amount: String(usdtToChips(p.amount)) })),
+            winners: r.winners.map((p) => ({ ...p, amount: String(usdtToChips(p.amount)) })),
+          },
+        };
+      };
+    }
   }
 
-  release(playerAccountId: string, amount: string): Promise<void> {
-    return this.inner.release(playerAccountId, chipsToUsdt(amount));
+  buyIn(playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> {
+    return this.inner.buyIn(playerAccountId, chipsToUsdt(amount), scope);
+  }
+
+  release(playerAccountId: string, amount: string, scope?: WalletScope): Promise<void> {
+    return this.inner.release(playerAccountId, chipsToUsdt(amount), scope);
   }
 
   settleRound(req: SettleRoundRequest): Promise<SettlementReceipt> {

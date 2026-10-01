@@ -6,7 +6,7 @@ import { settleTableHand } from '../../src/settlement/table-settlement';
 import { TableType } from '../../src/settlement/settlement-domain';
 import { Money } from '../../src/domain/money';
 import { AccountType, LedgerDirection } from '../../src/domain/account-types';
-import { InsufficientBalanceError } from '../../src/wallet/errors';
+import { AccountNotFoundError, InsufficientBalanceError } from '../../src/wallet/errors';
 import { startTestDb, stopTestDb, clearCollections, ensureIndexes } from '../db-helper';
 
 async function player(owner: string, locked: string): Promise<string> {
@@ -128,5 +128,54 @@ describe('settleTableHand — multi-party settlement on locked balances', () => 
         jackpotAccounts: jp,
       }),
     ).rejects.toThrow(InsufficientBalanceError);
+  });
+
+  // BUG-17: a winner/pool credit's updateOne used to ignore matchedCount, so
+  // a bogus account id silently no-opped the credit instead of aborting —
+  // the loser's debit still landed, breaking conservation with no trace.
+  it('throws and leaves losers untouched when a winner account does not exist', async () => {
+    const p1 = await player('p1', '1000');
+    await AccountModel.create({ accountType: AccountType.TREASURY, ownerId: 'PLATFORM' });
+    const jp = await pools('t5');
+
+    await expect(
+      settleTableHand({
+        roundId: 'r-bad-winner',
+        tableType: TableType.PLATFORM,
+        losers: [{ accountId: p1, amount: m('1000') }],
+        winners: [{ accountId: 'no-such-account', amount: m('950') }],
+        rake: m('50'),
+        jackpot: { mini: m('0'), minor: m('0'), major: m('0'), grand: m('0') },
+        jackpotAccounts: jp,
+      }),
+    ).rejects.toThrow(AccountNotFoundError);
+
+    // The transaction aborted — the loser's stake was never actually moved.
+    expect(await locked(p1)).toBe(1000);
+    expect(await SettlementModel.findOne({ roundId: 'r-bad-winner' })).toBeNull();
+  });
+
+  it('throws and leaves losers untouched when a jackpot pool account does not exist', async () => {
+    const p0 = await player('p0', '1000');
+    const p1 = await player('p1', '1000');
+    await AccountModel.create({ accountType: AccountType.TREASURY, ownerId: 'PLATFORM' });
+    const jp = await pools('t6');
+
+    await expect(
+      settleTableHand({
+        roundId: 'r-bad-pool',
+        tableType: TableType.PLATFORM,
+        losers: [{ accountId: p1, amount: m('1000') }],
+        winners: [{ accountId: p0, amount: m('995') }],
+        rake: m('0'),
+        // mini set to a nonexistent pool id; the other three are real.
+        jackpot: { mini: m('5'), minor: m('0'), major: m('0'), grand: m('0') },
+        jackpotAccounts: { ...jp, mini: 'no-such-pool' },
+      }),
+    ).rejects.toThrow(AccountNotFoundError);
+
+    expect(await locked(p1)).toBe(1000);
+    expect(await locked(p0)).toBe(1000);
+    expect(await SettlementModel.findOne({ roundId: 'r-bad-pool' })).toBeNull();
   });
 });

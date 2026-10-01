@@ -1,3 +1,4 @@
+import type { WalletScope } from '../core/financial-core-client';
 import type { PlayerDirectory, TablePlayer } from './players';
 import { usdtToChips } from './chip-currency';
 
@@ -71,16 +72,26 @@ export class FcPlayerDirectory implements PlayerDirectory {
   }
 
   /** The live buy-in budget for `GET /api/live/chips` — always a fresh read. */
-  async availableChips(playerId: string): Promise<number> {
-    const available = await this.fetchAvailableChips(playerId);
-    const entry = this.cache.get(playerId);
-    if (entry) entry.available = available;
+  async availableChips(playerId: string, scope?: WalletScope): Promise<number> {
+    const available = await this.fetchAvailableChips(playerId, scope);
+    // The cache is the PLATFORM balance (sit()'s pre-check relies on that); never overwrite it
+    // with a league wallet's figure.
+    if (!scope || scope.tableType === 'PLATFORM') {
+      const entry = this.cache.get(playerId);
+      if (entry) entry.available = available;
+    }
     return available;
   }
 
-  private async fetchAvailableChips(playerId: string): Promise<number> {
+  private async fetchAvailableChips(playerId: string, scope?: WalletScope): Promise<number> {
+    const params = new URLSearchParams();
+    if (scope) {
+      params.set('tableType', scope.tableType);
+      if (scope.leagueId) params.set('leagueId', scope.leagueId);
+    }
+    const qs = params.toString();
     const res = await this.doFetch(
-      `${this.baseUrl}/internal/accounts/${encodeURIComponent(playerId)}/balance`,
+      `${this.baseUrl}/internal/accounts/${encodeURIComponent(playerId)}/balance${qs ? `?${qs}` : ''}`,
       { headers: { 'x-internal-secret': this.secret } },
     );
     if (!res.ok) throw new Error(`FC balance ${res.status}`);

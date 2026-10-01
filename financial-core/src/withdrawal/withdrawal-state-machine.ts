@@ -15,6 +15,7 @@ import {
   AccountNotFoundError,
   InsufficientBalanceError,
   InvalidWithdrawalTransitionError,
+  WithdrawalBroadcastPendingError,
   WithdrawalNotFoundError,
 } from '../wallet/errors';
 import { WithdrawalModel, type WithdrawalDoc } from './withdrawal.model';
@@ -145,13 +146,77 @@ export async function approveWithdrawal(
   return { state: WithdrawalState.APPROVED, approvals, required };
 }
 
-/** BROADCASTING: record the on-chain tx hash. Funds remain held in clearing. */
-export async function broadcastWithdrawal(withdrawalId: string, txHash: string): Promise<void> {
+/**
+ * BROADCASTING: record the on-chain tx hash. Funds remain held in clearing.
+ *
+ * Also clears `pendingTxId` (BUG-09): once a txHash is recorded here, the send is no longer
+ * ambiguous — either this call is the normal auto sign-broadcast follow-through (pendingTxId ===
+ * txHash), or it's an admin resolving a stuck ambiguous send via the manual `/broadcast` route after
+ * checking the chain, in which case pendingTxId has done its job (blocking a re-send) and should stop
+ * blocking anything further.
+ *
+ * BUG-09 follow-up (D3): if `pendingTxId` is set to something OTHER than `txHash`, this refuses. The
+ * manual `/broadcast` route lets an admin confirm a send with a txHash they read off the chain — without
+ * this guard they could type (or the client could send) any txHash while a real broadcast is still
+ * unresolved, silently discarding the actual pending send and recording a fabricated one instead.
+ */
+export interface BroadcastWithdrawalOptions {
+  /**
+   * BUG-09 follow-up (D10): when true, this refuses to record a send unless `txHash` is EXACTLY the
+   * withdrawal's own unresolved `pendingTxId` — the "no pendingTxId at all → accept any txHash" arm
+   * below is not available. That arm exists for the ordinary auto sign-broadcast follow-through
+   * (there is nothing to compare against yet); an admin's manual "mark as sent" action is resolving a
+   * SPECIFIC unresolved send they read off the chain, and if the withdrawal turns out not to have one
+   * — already resolved, state moved on, stale screen — that is a bug to surface, not a hash to accept.
+   */
+  requirePending?: boolean;
+  /** BUG-09 follow-up (D9): the admin who resolved this send via the manual `/broadcast` route, for the audit trail. */
+  resolvedBy?: string;
+}
+
+export async function broadcastWithdrawal(
+  withdrawalId: string,
+  txHash: string,
+  opts?: BroadcastWithdrawalOptions,
+): Promise<void> {
   const w = await loadOrThrow(withdrawalId);
   assertTransition(w.state, WithdrawalState.BROADCASTING);
+  if (opts?.requirePending) {
+    if (w.pendingTxId !== txHash) {
+      throw new WithdrawalBroadcastPendingError(
+        withdrawalId,
+        `withdrawal ${withdrawalId} has no unresolved broadcast matching txHash ${txHash} ` +
+          `(pendingTxId: ${w.pendingTxId ?? 'none'}) — requirePending refuses to record a send that ` +
+          'is not the one actually pending',
+      );
+    }
+  } else if (w.pendingTxId && w.pendingTxId !== txHash) {
+    throw new WithdrawalBroadcastPendingError(
+      withdrawalId,
+      `withdrawal ${withdrawalId} has a pending broadcast ${w.pendingTxId} — txHash ${txHash} does not ` +
+        'match it, refusing (resolve the actual pending send, or reject with chainChecked:true)',
+    );
+  }
+  // Filter accepts either no pendingTxId at all, or one that matches txHash exactly — atomically, so a
+  // concurrent CAS onto pendingTxId between the read above and this write cannot slip a mismatched
+  // txHash through. requirePending (D10) drops the "no pendingTxId at all" arm: the filter then only
+  // matches a row whose pendingTxId is still exactly this txHash.
   const moved = await WithdrawalModel.updateOne(
-    { _id: withdrawalId, state: WithdrawalState.APPROVED },
-    { $set: { state: WithdrawalState.BROADCASTING, txHash } },
+    {
+      _id: withdrawalId,
+      state: WithdrawalState.APPROVED,
+      ...(opts?.requirePending
+        ? { pendingTxId: txHash }
+        : { $or: [{ pendingTxId: { $exists: false } }, { pendingTxId: txHash }] }),
+    },
+    {
+      $set: {
+        state: WithdrawalState.BROADCASTING,
+        txHash,
+        ...(opts?.resolvedBy ? { resolvedBy: opts.resolvedBy } : {}),
+      },
+      $unset: { pendingTxId: '', pendingTxExpiration: '' },
+    },
   );
   if (moved.matchedCount === 0) {
     throw new InvalidWithdrawalTransitionError(w.state, WithdrawalState.BROADCASTING);
@@ -268,13 +333,80 @@ export async function confirmWithdrawal(withdrawalId: string): Promise<void> {
   }
 }
 
+export interface RollbackWithdrawalOptions {
+  /**
+   * BUG-09 (D1): by default, rollback refuses a withdrawal with an unresolved broadcast
+   * (`pendingTxId` set) — it may already be live on-chain, and refunding it risks a double-pay. Pass
+   * `true` only once the caller has explicitly confirmed (chain-checked) it's safe — mirrors the
+   * `chainChecked` flag on the reject route, the only caller that ever sets this.
+   */
+  allowPendingTx?: boolean;
+  /**
+   * BUG-09 follow-up (D7): restrict which states this may roll back FROM. `w.state` (read just above,
+   * before the atomic write) is checked against this list and throws immediately if it doesn't match —
+   * and the write below stays CAS-safe even so, because its filter pins `state: w.state`, the very
+   * state this check just approved. If the row has since moved to a state that check never saw (e.g.
+   * the watcher advancing it to BROADCASTING mid-review), the filter simply fails to match and the
+   * generic `matchedCount === 0` branch throws the same error — the fast check here is a clearer
+   * message, not the only guard.
+   *
+   * The reject route (the only caller a human drives) passes `[REQUESTED, APPROVED]` — a live
+   * BROADCASTING withdrawal is refundable only by the watcher, which actually checks the chain before
+   * doing it. Every other caller (the watcher itself, build/sign's own rollback) passes nothing.
+   */
+  fromStates?: WithdrawalState[];
+  /**
+   * BUG-09 follow-up (D13): required whenever `allowPendingTx` is true — the EXACT `pendingTxId` the
+   * caller chain-checked. Without this, `allowPendingTx` used to drop the pendingTxId guard from the
+   * filter entirely (matching ANY pendingTxId), which refunds whatever happens to be pending by the
+   * time the write lands, not the one the caller actually looked at: a watcher release (reconcile
+   * clearing an expired `pendingTxId`, state staying APPROVED) followed by a re-send CAS
+   * (withdrawal-broadcast.ts's `claimed` update) can plant a fresh, LIVE `pendingTxId` in the gap
+   * between an admin's chain-check and this call. The atomic filter below now pins on
+   * `expectedPendingTxId` instead of dropping the guard, so a `pendingTxId` that changes in that gap
+   * fails to match and falls into the ordinary `matchedCount === 0` branch — refund refused, not a
+   * tx nobody ever chain-checked.
+   */
+  expectedPendingTxId?: string;
+  /** BUG-09 follow-up (D9): the admin who refused this withdrawal, for the audit trail. */
+  rejectedBy?: string;
+  /**
+   * BUG-09 follow-up (D9): who confirmed the chain check that authorized `allowPendingTx`. Defaults to
+   * `rejectedBy` — refusing a withdrawal with an unresolved broadcast is, in practice, one admin doing
+   * both in the same action — but is its own field because that need not always be true.
+   */
+  chainCheckedBy?: string;
+}
+
 /**
  * ROLLED_BACK: terminal failure. If the amount was held in clearing (APPROVED/BROADCASTING),
  * release it back to available. From REQUESTED there is nothing to release.
+ *
+ * BUG-09 (D1): the `pendingTxId` guard is enforced IN the atomic filter below, not only by a caller
+ * reading the withdrawal first and deciding whether to call this. A read-then-decide check has a race
+ * — a send can CAS `pendingTxId` onto the withdrawal between that read and this call — so the filter
+ * itself refuses to match a row that has since grown a `pendingTxId` the caller never saw or OK'd.
+ *
+ * BUG-09 follow-up (D13): `allowPendingTx` alone is not enough to authorize a refund — it must name
+ * the exact tx (`expectedPendingTxId`) it was told is safe. Passing `allowPendingTx` without it is a
+ * caller bug (a chain-check that never actually named the tx it checked) and throws immediately,
+ * before touching the database.
  */
-export async function rollbackWithdrawal(withdrawalId: string, reason: string): Promise<void> {
+export async function rollbackWithdrawal(
+  withdrawalId: string,
+  reason: string,
+  opts?: RollbackWithdrawalOptions,
+): Promise<void> {
+  if (opts?.allowPendingTx && !opts.expectedPendingTxId) {
+    throw new Error(
+      'rollbackWithdrawal: allowPendingTx requires expectedPendingTxId naming the pendingTxId that was chain-checked',
+    );
+  }
   const w = await loadOrThrow(withdrawalId);
   assertTransition(w.state, WithdrawalState.ROLLED_BACK);
+  if (opts?.fromStates && !opts.fromStates.includes(w.state)) {
+    throw new InvalidWithdrawalTransitionError(w.state, WithdrawalState.ROLLED_BACK);
+  }
   const amountD = w.amount;
   const negAmountD = Money.fromDecimal128(w.amount).negate().toDecimal128();
   const releaseHold = isHeldInClearing(w.state);
@@ -289,9 +421,32 @@ export async function rollbackWithdrawal(withdrawalId: string, reason: string): 
       if (released.matchedCount === 0) throw new InsufficientBalanceError(w.playerAccountId);
     }
 
+    // D9: `pendingTxId`/`pendingTxExpiration` are deliberately NOT `$unset` here even when
+    // allowPendingTx let this through — they are the record of exactly which broadcast an admin
+    // chain-checked and refunded. Clearing them would make a ROLLED_BACK-with-a-pendingTxId doc
+    // indistinguishable from an ordinary one, which is the one thing an investigator into a suspected
+    // double-pay most needs to find.
     const moved = await WithdrawalModel.updateOne(
-      { _id: withdrawalId, state: w.state },
-      { $set: { state: WithdrawalState.ROLLED_BACK, failureReason: reason } },
+      {
+        _id: withdrawalId,
+        state: w.state,
+        // D13: allowPendingTx pins the filter to the EXACT tx the caller named, rather than dropping
+        // the pendingTxId guard entirely — a mismatch (the tx changed since the caller chain-checked
+        // it) falls through to matchedCount === 0 below, same as any other lost race.
+        ...(opts?.allowPendingTx
+          ? { pendingTxId: opts.expectedPendingTxId }
+          : { pendingTxId: { $exists: false } }),
+      },
+      {
+        $set: {
+          state: WithdrawalState.ROLLED_BACK,
+          failureReason: reason,
+          ...(opts?.rejectedBy ? { rejectedBy: opts.rejectedBy } : {}),
+          ...(opts?.allowPendingTx && (opts?.chainCheckedBy ?? opts?.rejectedBy)
+            ? { chainCheckedBy: opts.chainCheckedBy ?? opts.rejectedBy }
+            : {}),
+        },
+      },
       { session },
     );
     if (moved.matchedCount === 0) {

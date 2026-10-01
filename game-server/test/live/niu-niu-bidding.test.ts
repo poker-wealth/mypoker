@@ -46,8 +46,12 @@ interface Harness {
   ids: string[];
 }
 
-async function seated(count: number, buyIn = 100_000, overrides: Partial<NiuNiuRoomConfig> = {}): Promise<Harness> {
-  const players = new DevPlayers({ startingChips: 1_000_000 });
+async function seated(
+  count: number,
+  buyIn: number | number[] = 100_000,
+  overrides: Partial<NiuNiuRoomConfig> = {},
+): Promise<Harness> {
+  const players = new DevPlayers({ startingChips: 10_000_000 });
   const bankLedger = new ChipBank(players);
   const room = new NiuNiuRoom({ ...CONFIG, ...overrides } as NiuNiuRoomConfig, {
     directory: players,
@@ -58,7 +62,8 @@ async function seated(count: number, buyIn = 100_000, overrides: Partial<NiuNiuR
   for (let i = 0; i < count; i++) {
     const id = players.create(`P${i}`).id;
     ids.push(id);
-    await room.command(id, { kind: 'sit', seat: i, buyIn });
+    const seatBuyIn = Array.isArray(buyIn) ? buyIn[i]! : buyIn;
+    await room.command(id, { kind: 'sit', seat: i, buyIn: seatBuyIn });
   }
   return { room, players, bank: bankLedger, ids };
 }
@@ -152,7 +157,9 @@ describe('the multipliers compound, and the money still balances', () => {
 
   it('refuses a bet the bank cannot cover at the full multiplier', async () => {
     // A 5x bank, a 5x stake and a possible 6x hand is 150x the stake — a thin bank cannot take it.
-    const h = await seated(2, 2_000);
+    // The bettor's own stack is generous here on purpose, so this bet clears the bettor's-own-loss
+    // guard (BUG-06) and it is really the banker exposure guard being exercised.
+    const h = await seated(2, [2_000, 500_000]);
     await auction(h, { 0: 'bid-5', 1: 'bid-1' });
 
     await expect(
@@ -170,6 +177,36 @@ describe('the multipliers compound, and the money still balances', () => {
     await expect(
       h.room.command(h.ids[1]!, { kind: 'act', action: { type: 'bet', amount: 100, multiplier: 3 } }),
     ).rejects.toThrow(/1x, 2x or 5x/);
+    h.room.dispose();
+  });
+
+  it('refuses a bet whose worst loss exceeds the BETTOR\'s own stack (BUG-06)', async () => {
+    // 1x bank, 1x stake: the stake alone (1,000) fits a 3,000 stack, but a Five Small banker hand
+    // (6x) turns that into a 6,000-chip loss — more than the bettor has. The old guard only ever
+    // checked `amount > seat.stack`, which this bet would have passed. The banker's own stack is
+    // generous here on purpose, so it is only the bettor's-own-loss guard being exercised — not
+    // banker exposure, which is covered separately above.
+    const h = await seated(2, [500_000, 3_000]);
+    await auction(h, { 0: 'bid-1', 1: 'bid-1' });
+
+    await expect(
+      h.room.command(h.ids[1]!, { kind: 'act', action: { type: 'bet', amount: 1_000, multiplier: 1 } }),
+    ).rejects.toThrow(/can lose 6000 chips/);
+
+    // 500 x 1x x 1x bank x 6x hand = 3,000 — exactly the stack, so it stands.
+    await h.room.command(h.ids[1]!, { kind: 'act', action: { type: 'bet', amount: 500, multiplier: 1 } });
+    h.room.dispose();
+  });
+
+  it('never settles a loser below zero, even at the worst-case multiplier the guard allows', async () => {
+    const h = await seated(2, 3_000);
+    await auction(h, { 0: 'bid-1', 1: 'bid-1' });
+    // The largest bet the guard permits at this stack and this bank: 500 x 1 x 1 x 6 = 3,000.
+    await h.room.command(h.ids[1]!, { kind: 'act', action: { type: 'bet', amount: 500, multiplier: 1 } });
+
+    await until(() => snapshot(h).phase === 'SHOWDOWN', 10_000);
+    const bettor = snapshot(h).seats.find((s) => s.playerId === h.ids[1])!;
+    expect(bettor.stack).toBeGreaterThanOrEqual(0);
     h.room.dispose();
   });
 });

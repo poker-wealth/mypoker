@@ -56,6 +56,9 @@ export interface ChipLedger {
   unlock(playerId: string, amount: number): void;
   /** Settlement: shift a player's locked stack (winners +, losers −). */
   adjustLocked(playerId: string, delta: number): void;
+  /** A prize paid from outside the player ledger (a jackpot pool sink) straight into AVAILABLE —
+   *  the play-chip mirror of FC's transfer() crediting availableBalance. Never touches locked. */
+  credit(playerId: string, amount: number): void;
 }
 
 export class PlayerError extends Error {}
@@ -163,6 +166,13 @@ export class DevPlayers implements PlayerDirectory, ChipLedger {
     const record = this.require(playerId);
     if (record.locked + delta < 0) throw new PlayerError('settlement would overdraw a stack');
     record.locked += delta;
+    this.save();
+  }
+
+  credit(playerId: string, amount: number): void {
+    const record = this.require(playerId);
+    assertPositive(amount);
+    record.available += amount;
     this.save();
   }
 
